@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Approval</title>
+    <style>
+        body { font-family: Arial; margin: 50px; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; }
+        .approve { background-color: #4CAF50; color: white; border: none; }
+        .reject { background-color: #f44336; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>User Approval</h2>
+        <p><strong>Registration ID:</strong> <span id="registration_id"></span></p>
+        <p><strong>Name:</strong> <span id="name"></span></p>
+        <p><strong>Email:</strong> <span id="email"></span></p>
+        <p><strong>Role:</strong> <span id="role"></span></p>
+        <p><strong>Company:</strong> <span id="company"></span></p>
+        <p><strong>Status:</strong> <span id="status"></span></p>
+
+        <button class="approve" onclick="approve()">Approve</button>
+        <button class="reject" onclick="reject()">Reject</button>
+    </div>
+
+    <script>
+        // Get registration_id from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const registration_id = urlParams.get('registration_id');
+
+        // Fetch user details
+        fetch(`http://localhost:8000/api/user/${registration_id}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('registration_id').innerText = data.registration_id;
+                document.getElementById('name').innerText = data.first_name + ' ' + data.last_name;
+                document.getElementById('email').innerText = data.email;
+                document.getElementById('role').innerText = data.role;
+                document.getElementById('company').innerText = data.company_name;
+                document.getElementById('status').innerText = data.approved_status;
+            });
+
+        function approve() {
+            fetch(`http://localhost:8000/api/user/approve`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ registration_id })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.detail);
+                document.getElementById('status').innerText = "approved";
+            });
+        }
+
+        function reject() {
+            fetch(`http://localhost:8000/api/user/reject`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ registration_id })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.detail);
+                document.getElementById('status').innerText = "rejected";
+            });
+        }
+    </script>
+</body>
+</html>
