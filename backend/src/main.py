@@ -3,10 +3,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.controller import user_controller
+from src.config.database import init_db
 
 # fixed import
 
 app = FastAPI(title="User Registration Approval System")
+
+# Initialize database tables
+init_db()
 
 # Mount static folder (create directory if needed)
 import os
@@ -17,7 +21,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 # Include API routes
-app.include_router(user_controller.router)
+app.include_router(user_controller.router, prefix="/api")
 
 # Enable CORS
 app.add_middleware(

@@ -1,9 +1,10 @@
+from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DB_USER = "postgres"
-DB_PASSWORD = "suriya2002"
+DB_PASSWORD = quote_plus("Password@1")
 DB_HOST = "localhost"
 DB_PORT = "5432"
 DB_NAME = "mygrape"
@@ -23,5 +24,5 @@ def get_db():
 
 # 🔹 Add this function
 def init_db():
-    from ..models import user_model  # import your models so Base knows them
+    from ..models import user_model, otp_model  # import your models so Base knows them
     Base.metadata.create_all(bind=engine)
