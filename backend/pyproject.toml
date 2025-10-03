@@ -1,0 +1,23 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "surya-senthilkumar-ZS0638",email = "surya.senthilkumar@zucisystems.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg2 (>=2.9.10,<3.0.0)",
+    "fastapi (>=0.118.0,<0.119.0)",
+    "sqlalchemy (>=2.0.43,<3.0.0)",
+    "pydantic[email] (>=2.11.9,<3.0.0)",
+    "uvicorn (>=0.37.0,<0.38.0)",
+    "psycopg2-binary (>=2.9.10,<3.0.0)"
+]
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
