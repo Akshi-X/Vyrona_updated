@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -35,7 +35,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
         otp_code = generate_otp_code()
         
         # Set expiration time (10 minutes from now)
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         
         # Create OTP record
         otp = OTP(
@@ -80,7 +80,7 @@ def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
             and_(
                 OTP.user_id == user_id,
                 OTP.is_used == False,
-                OTP.expires_at > datetime.utcnow()
+                OTP.expires_at > datetime.now(timezone.utc)
             )
         ).order_by(OTP.created_at.desc()).first()
         

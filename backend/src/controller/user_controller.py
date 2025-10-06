@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from starlette.responses import FileResponse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.config import database
 from src.models import user_model
@@ -17,7 +17,7 @@ from src.schemas.auth_schema import (
     ResendOTPRequest, ResendOTPSuccessResponse, ResendOTPFailureResponse
 )
 from src.utils import utils
-from src.auth.auth import create_access_token, verify_password
+from src.auth.auth import create_access_token, get_current_user, verify_password
 
 router = APIRouter()
 
@@ -133,7 +133,7 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
         email=user.email,
         status="Logged In",
         auth_token=access_token,
-        expires_at=datetime.utcnow() + access_token_expires,
+        expires_at=datetime.now(timezone.utc) + access_token_expires,
         message="OTP verified successfully. User is now logged in."
     )
 
@@ -196,7 +196,7 @@ class RegistrationAction(BaseModel):
 # Get user details
 # ---------------------------
 @router.get("/user/{registration_id}")
-def get_user(registration_id: str, db: Session = Depends(database.get_db)):
+def get_user(registration_id: str, db: Session = Depends(database.get_db), current_user: user_model.User = Depends(get_current_user)):
     user = db.query(user_model.User).filter(user_model.User.registration_id == registration_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -236,7 +236,7 @@ def approve_user(action: RegistrationAction, db: Session = Depends(database.get_
 
     user.approved_status = "approved"
     user.status = True
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(user)
@@ -256,6 +256,23 @@ def reject_user(action: RegistrationAction, db: Session = Depends(database.get_d
         raise HTTPException(status_code=404, detail="User not found")
     user.approved_status = "rejected"
     user.status = False
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     return {"detail": f"User {user.first_name} rejected successfully"}
+
+
+# ---------------------------
+# Protected endpoint example
+# ---------------------------
+@router.get("/profile")
+def get_user_profile(current_user: user_model.User = Depends(get_current_user)):
+    """Get current user's profile - requires JWT authentication"""
+    return {
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "role": current_user.role,
+        "company_name": current_user.company_name,
+        "approved_status": current_user.approved_status
+    }
