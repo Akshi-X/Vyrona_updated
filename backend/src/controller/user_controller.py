@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from src.config import database
 from src.models import user_model
 from src.service import user_service
-from src.service.otp_service import send_otp_to_user, verify_otp, get_user_by_email, get_user_by_user_id, cleanup_expired_otps
+from src.service.otp_service import send_otp_to_user, verify_otp, get_user_by_email, get_user_by_user_id
 from src.schemas import user_schema
 from src.schemas.auth_schema import (
     LoginRequest, LoginResponse, LoginFailureResponse,
@@ -19,7 +19,7 @@ from src.schemas.auth_schema import (
 from src.utils import utils
 from src.auth.auth import create_access_token, verify_password
 
-router = APIRouter(prefix="/users")
+router = APIRouter()
 
 
 # ---------------------------
@@ -48,7 +48,7 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
             detail=LoginFailureResponse(
                 status="Failed",
                 message="Invalid user ID or email. OTP could not be sent."
-            ).dict()
+            ).model_dump()
         )
     
     # Check if user is approved
@@ -58,7 +58,7 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
             detail=LoginFailureResponse(
                 status="Failed",
                 message="User account is not approved yet."
-            ).dict()
+            ).model_dump()
         )
     
     # Verify password
@@ -68,7 +68,7 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
             detail=LoginFailureResponse(
                 status="Failed",
                 message="Invalid user ID or email. OTP could not be sent."
-            ).dict()
+            ).model_dump()
         )
     
     # Generate and send OTP
@@ -88,7 +88,7 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
             detail=LoginFailureResponse(
                 status="Failed",
                 message="Failed to send OTP. Please try again."
-            ).dict()
+            ).model_dump()
         )
 
 
@@ -107,7 +107,7 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
                 user_id=request.user_id,
                 status="OTP Invalid",
                 message="The OTP entered is incorrect or has expired."
-            ).dict()
+            ).model_dump()
         )
     
     # Get user details
@@ -119,7 +119,7 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
                 user_id=request.user_id,
                 status="OTP Invalid",
                 message="User not found."
-            ).dict()
+            ).model_dump()
         )
     
     # Create JWT token
@@ -152,7 +152,7 @@ def resend_otp_endpoint(request: ResendOTPRequest, db: Session = Depends(databas
             detail=ResendOTPFailureResponse(
                 status="Failed",
                 message="Invalid user ID or email. OTP could not be sent."
-            ).dict()
+            ).model_dump()
         )
     
     if not user.status or user.approved_status != "approved":
@@ -161,7 +161,7 @@ def resend_otp_endpoint(request: ResendOTPRequest, db: Session = Depends(databas
             detail=ResendOTPFailureResponse(
                 status="Failed",
                 message="User account is not approved yet."
-            ).dict()
+            ).model_dump()
         )
     
     # Generate and send new OTP
@@ -181,31 +181,9 @@ def resend_otp_endpoint(request: ResendOTPRequest, db: Session = Depends(databas
             detail=ResendOTPFailureResponse(
                 status="Failed",
                 message="Failed to send OTP. Please try again."
-            ).dict()
+            ).model_dump()
         )
 
-
-# ---------------------------
-# OTP Cleanup endpoint (Admin)
-# ---------------------------
-@router.post("/admin/cleanup-otps")
-def cleanup_otps_endpoint(db: Session = Depends(database.get_db)):
-    """Manually trigger OTP cleanup - removes expired OTPs"""
-    try:
-        expired_count = cleanup_expired_otps(db)
-        return {
-            "status": "success",
-            "message": f"Cleaned up {expired_count} expired OTPs",
-            "expired_otps_removed": expired_count
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "error",
-                "message": f"Failed to cleanup OTPs: {str(e)}"
-            }
-        )
 
 # ---------------------------
 # Pydantic model for approve/reject
@@ -217,7 +195,7 @@ class RegistrationAction(BaseModel):
 # ---------------------------
 # Get user details
 # ---------------------------
-@router.get("/admin/user/{registration_id}")
+@router.get("/user/{registration_id}")
 def get_user(registration_id: str, db: Session = Depends(database.get_db)):
     user = db.query(user_model.User).filter(user_model.User.registration_id == registration_id).first()
     if not user:
@@ -236,7 +214,7 @@ def get_user(registration_id: str, db: Session = Depends(database.get_db)):
 # ---------------------------
 # Serve approval HTML
 # ---------------------------
-@router.get("/admin/approval-screen", include_in_schema=False)
+@router.get("/approval-screen", include_in_schema=False)
 def approval_screen():
     html_path = os.path.join("static", "approvescreen.html")
     if not os.path.exists(html_path):
@@ -247,7 +225,7 @@ def approval_screen():
 # ---------------------------
 # Approve user
 # ---------------------------
-@router.post("/admin/user/approve")
+@router.post("/user/approve")
 def approve_user(action: RegistrationAction, db: Session = Depends(database.get_db)):
     user = db.query(user_model.User).filter(user_model.User.registration_id == action.registration_id).first()
     if not user:
@@ -271,7 +249,7 @@ def approve_user(action: RegistrationAction, db: Session = Depends(database.get_
 # ---------------------------
 # Reject user
 # ---------------------------
-@router.post("/admin/user/reject")
+@router.post("/user/reject")
 def reject_user(action: RegistrationAction, db: Session = Depends(database.get_db)):
     user = db.query(user_model.User).filter(user_model.User.registration_id == action.registration_id).first()
     if not user:
