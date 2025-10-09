@@ -59,25 +59,22 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="w-full h-screen flex overflow-hidden bg-white" style={{ fontFamily: "'Work Sans', sans-serif" }}>
+        <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
             {/* Left Section */}
             <aside
-                className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden"
-                style={{
-                    background: "linear-gradient(180deg, #9C3AA6 0%, #30024D 100%)",
-                    borderTopRightRadius: "40px",
-                    borderBottomRightRadius: "40px",
-                }}
+                className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden 
+             bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
+             rounded-tr-[40px] rounded-br-[40px]"
             >
                 <div className="flex h-[15%] items-center space-x-2  p-12 pb-0 ">
-                    <img src={MyGrapeLogo} style={{ width: "41.87px", height: "55px" }} alt="logo" />
+                    <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
                     <h1 className="font-semibold text-[30px]">myGrape</h1>
                 </div>
                 <div className="flex items-center overflow-hidden">
                     <img
                         src={MyGrapeBanner}
-                        style={{ width: "100%", height: "125%", objectFit: "fill" }}
                         alt="banner"
+                        className="w-full h-[125%] object-fill"
                     />
                 </div>
                 <div className="flex flex-col h-[20%] justify-end pt-0 p-12 ">
@@ -95,8 +92,7 @@ const Login: React.FC = () => {
             <main className="flex-1 flex flex-col items-center justify-center px-16 overflow-hidden">
                 <div className="w-full max-w-[22rem]">
                     <h2
-                        className="text-3xl font-black text-gray-700 mb-2 tracking-tighter"
-                        style={{ fontFamily: "'Work Sans', sans-serif", fontSize: "32px" }}
+                        className="font-['Work_Sans'] text-[32px] font-black text-gray-700 mb-2 tracking-tighter"
                     >
                         Welcome Back!
                     </h2>
