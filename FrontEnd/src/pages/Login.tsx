@@ -1,30 +1,61 @@
 import React, { useState } from "react";
 import MyGrapeBanner from "../assets/Isolation_Mode.svg";
-// import Banner from "../assets/banner.svg";
 import MyGrapeLogo from "../assets/logo.svg";
-// import EyeIcon from "../assets/eye.svg";
 import EyeOffIcon from "../assets/eye-off.svg";
-
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
 
     const validateEmail = (email: string) => {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return regex.test(email);
     };
 
+    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setEmail(e.target.value);
+        if (!e.target.value) {
+            setEmailError("Email is required");
+        } else if (!validateEmail(e.target.value)) {
+            setEmailError("Invalid Email ID");
+        } else {
+            setEmailError("");
+        }
+    };
+
+    const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setPassword(e.target.value);
+        if (!e.target.value) {
+            setPasswordError("Password is required");
+        } else {
+            setPasswordError("");
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateEmail(email)) {
-            setError("Invalid Email ID");
-            return;
+        let valid = true;
+
+        if (!email) {
+            setEmailError("Email is required");
+            valid = false;
+        } else if (!validateEmail(email)) {
+            setEmailError("Invalid Email ID");
+            valid = false;
         }
-        setError("");
-        console.log("Login with:", { email, password });
+
+        if (!password) {
+            setPasswordError("Password is required");
+            valid = false;
+        }
+
+        if (!valid) return;
+
+        setEmailError("");
+        setPasswordError("");
     };
 
     return (
@@ -59,16 +90,9 @@ const Login: React.FC = () => {
                     </p>
                 </div>
             </aside>
-            {/* <div className="flex items-center overflow-hidden">
-                <img
-                    src={Banner}
-                    style={{ width: "100%", height: "100%", objectFit: "fill", zIndex: 1000 }}
-                    alt="banner"
-                />
-            </div> */}
+
             {/* Right Section */}
             <main className="flex-1 flex flex-col items-center justify-center px-16 overflow-hidden">
-                {/* <div className="w-full max-w-sm"> */}
                 <div className="w-full max-w-[22rem]">
                     <h2
                         className="text-3xl font-black text-gray-700 mb-2 tracking-tighter"
@@ -86,18 +110,18 @@ const Login: React.FC = () => {
                             <input
                                 type="email"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={handleEmailChange}
                                 placeholder="Enter your email"
-                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${error ? "border-red-500" : "border-gray-300"}`}
+                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${emailError ? "border-red-500" : "border-gray-300"}`}
                             />
                             <label
                                 className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-      ${error ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                ${emailError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
                             >
                                 Email
                             </label>
-                            {error && (
-                                <p className="text-xs text-red-500 mt-1">{error}</p>
+                            {emailError && (
+                                <p className="text-xs text-red-500 mt-1">{emailError}</p>
                             )}
                         </div>
 
@@ -107,15 +131,14 @@ const Login: React.FC = () => {
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={handlePasswordChange}
                                     placeholder="Password"
-                                    className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${error ? "border-red-500" : "border-gray-300"
+                                    className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"
                                         }`}
                                 />
                                 <label
                                     className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-        ${error ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`
-                                    }
+                                ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
                                 >
                                     Password
                                 </label>
@@ -131,11 +154,10 @@ const Login: React.FC = () => {
                                     />
                                 </button>
                             </div>
-                            {error && (
-                                <p className="text-xs text-red-500 mt-1">{error}</p>
+                            {passwordError && (
+                                <p className="text-xs text-red-500 mt-1">{passwordError}</p>
                             )}
                         </div>
-
 
                         {/* Remember Me + Forgot */}
                         <div className="flex justify-between items-center text-sm">
