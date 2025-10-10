@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import MyGrapeBanner from "../assets/Isolation_Mode.svg";
-import MyGrapeLogo from "../assets/logo.svg";
-import EyeOffIcon from "../assets/eye-off.svg";
+import { Link } from "react-router-dom";
+import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
+import MyGrapeLogo from "../../assets/logo.svg";
+import EyeOffIcon from "../../assets/eye-off.svg";
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -164,9 +165,9 @@ const Login: React.FC = () => {
                                 />
                                 <span className="text-gray-700 font-medium">Remember me</span>
                             </label>
-                            <a href="#" className="text-[#8b2a96] font-medium underline">
+                            <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
                                 Forgot password ?
-                            </a>
+                            </Link>
                         </div>
 
                         {/* Sign In Button */}
@@ -181,9 +182,9 @@ const Login: React.FC = () => {
                     {/* Footer */}
                     <p className="text-center text-sm text-gray-500 mt-8">
                         New to myGrape?{" "}
-                        <a href="#" className="text-[#8b2a96] font-medium underline">
+                        <Link to="/signup" className="text-[#8b2a96] font-medium underline">
                             Create an account
-                        </a>
+                        </Link>
                     </p>
                 </div>
             </main>
@@ -192,3 +193,5 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
+
