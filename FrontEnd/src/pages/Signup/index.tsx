@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import MyGrapeBanner from "../assets/Isolation_Mode.svg";
-import MyGrapeLogo from "../assets/logo.svg";
-import EyeOffIcon from "../assets/eye-off.svg";
+import { Link } from "react-router-dom";
+import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
+import MyGrapeLogo from "../../assets/logo.svg";
+import EyeOffIcon from "../../assets/eye-off.svg";
 
 const Signup: React.FC = () => {
     const [firstName, setFirstName] = useState("");
@@ -297,9 +298,9 @@ const Signup: React.FC = () => {
 
                     <p className="mt-2 text-center font-normal text-base">
                         <span className="text-[#6c6c6c]">Already have an account? </span>
-                        <a href="/" className="font-semibold text-[#6b1176] underline">
+                        <Link to="/login" className="font-semibold text-[#6b1176] underline">
                             Sign in
-                        </a>
+                        </Link>
                     </p>
 
                     <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
@@ -319,3 +320,5 @@ const Signup: React.FC = () => {
 };
 
 export default Signup;
+
+
