@@ -22,11 +22,11 @@ RUN poetry config virtualenvs.create false
 RUN poetry install --no-dev
 
 # Copy application code
-COPY src/ ./src/
+COPY app/ ./app/
 COPY static/ ./static/
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the application
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
