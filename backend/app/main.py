@@ -47,6 +47,16 @@ def custom_openapi():
     from fastapi.openapi.utils import get_openapi
     from app.config.permissions import PUBLIC_ENDPOINTS
     
+    def _is_public_endpoint(method: str, path: str, endpoints) -> bool:
+        """Check if a method+path combination is in the public endpoints set"""
+        # Check for exact match
+        if (method, path) in endpoints:
+            return True
+        # Check for wildcard method match
+        if ("*", path) in endpoints:
+            return True
+        return False
+    
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
@@ -66,13 +76,17 @@ def custom_openapi():
     
     # Mark protected endpoints with security requirement
     for path, path_item in openapi_schema["paths"].items():
-        # Check if this path is public
-        is_public = path in PUBLIC_ENDPOINTS or path.startswith("/static")
+        if path.startswith("/static"):
+            continue
         
-        if not is_public:
-            # Add security requirement to all methods (GET, POST, etc.)
-            for method in path_item:
-                if method in ["get", "post", "put", "delete", "patch"]:
+        # Add security requirement to all methods (GET, POST, etc.)
+        for method in path_item:
+            if method in ["get", "post", "put", "delete", "patch"]:
+                # Check if this specific method+path is public
+                http_method = method.upper()
+                is_public = _is_public_endpoint(http_method, path, PUBLIC_ENDPOINTS)
+                
+                if not is_public:
                     if "security" not in path_item[method]:
                         path_item[method]["security"] = [{"BearerAuth": []}]
     
