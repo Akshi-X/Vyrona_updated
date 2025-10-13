@@ -1,0 +1,142 @@
+import os
+import logging
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.models import SecuritySchemeType
+from fastapi.security import HTTPBearer
+
+from app.controller import user_controller
+from app.init_db import init_db
+from app.config.config import settings
+from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
+from app.middleware.exception_handler import setup_exception_handlers
+from app.middleware.request_validation_middleware import RequestValidationMiddleware
+from app.middleware.sanitization_middleware import SanitizationMiddleware
+from app.middleware.token_validation_middleware import TokenValidationMiddleware
+from app.middleware.rbac_middleware import RBACMiddleware
+
+# Create logs directory if it doesn't exist (BEFORE logging setup)
+os.makedirs('logs', exist_ok=True)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/app.log'),
+        logging.StreamHandler()
+    ]
+)
+
+# Create FastAPI app with security scheme for Swagger
+app = FastAPI(
+    title=APP_NAME,
+    description="MyGrape Supply Chain Tracking API",
+    version="1.0.0",
+    swagger_ui_parameters={
+        "persistAuthorization": True  # Keep authorization after page refresh
+    }
+)
+
+# Add security scheme for Swagger UI
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    from fastapi.openapi.utils import get_openapi
+    from app.config.permissions import PUBLIC_ENDPOINTS
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add Bearer token security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token from the /api/verify-otp endpoint"
+        }
+    }
+    
+    # Mark protected endpoints with security requirement
+    for path, path_item in openapi_schema["paths"].items():
+        # Check if this path is public
+        is_public = path in PUBLIC_ENDPOINTS or path.startswith("/static")
+        
+        if not is_public:
+            # Add security requirement to all methods (GET, POST, etc.)
+            for method in path_item:
+                if method in ["get", "post", "put", "delete", "patch"]:
+                    if "security" not in path_item[method]:
+                        path_item[method]["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+# Setup global exception handlers
+setup_exception_handlers(app)
+
+# Startup event to initialize database
+@app.on_event("startup")
+async def startup_event():
+    """Run on application startup"""
+    print("\n" + "!" * 60)
+    print("APPLICATION STARTUP EVENT")
+    print("!" * 60)
+    init_db()
+    print("!" * 60 + "\n")
+
+# Enable CORS (add FIRST so it executes FIRST in the chain)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Add middlewares (executed in reverse order)
+# Flow: CORS → Sanitization → Validation → Token → RBAC → Controller
+app.add_middleware(RBACMiddleware)
+app.add_middleware(TokenValidationMiddleware)
+app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(SanitizationMiddleware)
+
+# Mount static folder (create directory if needed)
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Include API routes
+app.include_router(user_controller.router, prefix=API_PREFIX)
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint."""
+    from app.schemas.response_schema import HealthCheckResponse
+    from app.constants.status_constants import HEALTH_HEALTHY
+    return HealthCheckResponse(
+        status=HEALTH_HEALTHY,
+        platform="MyGrape",
+        service="Supply Chain Tracking",
+        environment=settings.ENVIRONMENT,
+        database_connected=True
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app, 
+        host=settings.HOST, 
+        port=settings.PORT, 
+        reload=settings.RELOAD
+    )

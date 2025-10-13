@@ -1,0 +1,292 @@
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from typing import Optional
+from datetime import datetime, timezone
+
+from app.models import user_model
+from app.models.user_model import User
+from app.schemas import user_schema
+from app.schemas.user_schema import UserRegistrationResponse
+from app.schemas.response_schema import (
+    UserProfileResponse,
+    UserApprovalResponse,
+    UserRejectionResponse,
+    UserDetailsResponse
+)
+from app.service.email_service import send_approval_email
+from app.utils import utils
+from app.exceptions import EmailAlreadyExistsException, DatabaseQueryException
+from app.constants.app_constants import (
+    ADMIN_SESSION_TIMEOUT_MINUTES,
+    MANAGER_SESSION_TIMEOUT_MINUTES,
+    USER_SESSION_TIMEOUT_MINUTES,
+    DEFAULT_SESSION_TIMEOUT_MINUTES
+)
+from app.constants.messages import SuccessMessages
+from app.config.config import settings
+
+
+def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
+    """
+    Get the email of an approved manager from the specified company.
+    
+    Used for two-level approval: Users need approval from their company manager.
+    
+    Args:
+        company_name: Company name to search for
+        db: Database session
+        
+    Returns:
+        Manager's email if found, None otherwise
+    """
+    manager = db.query(user_model.User).filter(
+        user_model.User.company_name == company_name,
+        user_model.User.role == 'manager',
+        user_model.User.approved_status == 'approved',
+        user_model.User.status == True
+    ).first()
+    
+    return manager.email if manager else None
+
+
+def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistrationResponse:
+    """
+    Register a new user - CLEAN!
+    
+    Validation already done in dependency.
+    Service only handles: Business Logic (Create user, Send email)
+    """
+    # Normalize role to lowercase (database enum is lowercase)
+    role_lower = request.role.lower()
+    
+    # Generate custom user ID (USR-XXXXXX format)
+    user_id = utils.generate_user_id()
+    
+    # Create user with custom user_id
+    user = user_model.User(
+        user_id=user_id,
+        first_name=request.first_name,
+        last_name=request.last_name,
+        email=request.email,
+        password_hash=utils.hash_password(request.password),
+        role=role_lower,
+        company_name=request.company_name,
+    )
+    
+    # Set session timeout based on role (from constants)
+    if role_lower == 'admin':
+        user.session_timeout = ADMIN_SESSION_TIMEOUT_MINUTES
+    elif role_lower == 'manager':
+        user.session_timeout = MANAGER_SESSION_TIMEOUT_MINUTES
+    elif role_lower == 'user':
+        user.session_timeout = USER_SESSION_TIMEOUT_MINUTES
+    else:
+        user.session_timeout = DEFAULT_SESSION_TIMEOUT_MINUTES
+    
+    try:
+        print(f"Adding user to database: {user.email}, role: {user.role}")
+        db.add(user)
+        print("Committing to database...")
+        db.commit()
+        print("Refreshing user object...")
+        db.refresh(user)
+        print(f"User created successfully: {user.user_id}")
+    except IntegrityError as e:
+        db.rollback()
+        print(f"IntegrityError during registration: {str(e)}")
+        # Check if it's a duplicate email error
+        if 'email' in str(e).lower() or 'unique' in str(e).lower():
+            raise EmailAlreadyExistsException(email=request.email)
+        else:
+            raise DatabaseQueryException(operation="user registration", reason=str(e))
+    except Exception as e:
+        db.rollback()
+        print(f"Exception during registration: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise DatabaseQueryException(operation="user registration", reason=str(e))
+
+    # Send approval email - TWO-LEVEL APPROVAL SYSTEM
+    print(f"Preparing to send approval email for role: {role_lower}")
+    recipient_email = None
+    approval_sent = False
+    
+    try:
+        # Determine recipient based on role
+        if role_lower == 'manager':
+            # Manager registration → Send to MyGrape Platform Admin
+            recipient_email = settings.ADMIN_EMAIL
+            print(f"Manager registration: Sending approval email to MyGrape Admin ({recipient_email})")
+        else:
+            # User registration → Send to Company Manager
+            # Find approved manager from the same company
+            company_manager_email = get_company_manager_email(request.company_name, db)
+            
+            if company_manager_email:
+                # Company has an approved manager
+                recipient_email = company_manager_email
+                print(f"User registration: Sending approval email to Company Manager ({recipient_email})")
+            else:
+                # Company has NO approved manager yet
+                # Fallback: Send to MyGrape admin (for first user registration)
+                recipient_email = settings.ADMIN_EMAIL
+                print(f"WARNING: User registration but no company manager found. Sending to MyGrape Admin ({recipient_email})")
+        
+        # Send approval email to appropriate recipient
+        send_approval_email(
+            registration_id=str(user.user_id),
+            first_name=request.first_name,
+            last_name=request.last_name,
+            email=request.email,
+            role=request.role,
+            company=request.company_name,
+            recipient_email=recipient_email  # Dynamic recipient
+        )
+        approval_sent = True
+    except Exception as e:
+        # User is already saved, email failure shouldn't fail registration
+        print(f"WARNING: Email send failed: {str(e)}")
+        pass  # Log this error but don't fail registration
+
+    # Build response message using constants
+    if approval_sent:
+        if role_lower == 'manager':
+            message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
+        else:
+            if recipient_email == settings.ADMIN_EMAIL:
+                message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN_NO_MANAGER
+            else:
+                message = SuccessMessages.REGISTRATION_SENT_TO_MANAGER
+    else:
+        message = SuccessMessages.REGISTRATION_EMAIL_FAILED
+    
+    # Build structured response
+    response = UserRegistrationResponse(
+        message=message,
+        user_id=user.user_id,
+        email=user.email,
+        role=user.role,
+        company_name=user.company_name,
+        approval_status=user.approved_status,
+        approval_sent_to=recipient_email if recipient_email else "Email failed"
+    )
+    return response
+
+
+def approve_user(user: User, approved_by_user_id: str, db: Session) -> UserApprovalResponse:
+    """
+    Approve user registration with audit trail.
+    
+    Args:
+        user: User object to approve
+        approved_by_user_id: Admin user ID
+        db: Database session
+        
+    Returns:
+        UserApprovalResponse with approval details
+    """
+    # Business Logic: Set approval status and audit trail
+    user.approved_status = 'approved'
+    user.status = True
+    user.approved_by = str(approved_by_user_id)
+    user.approved_on = datetime.now(timezone.utc)
+    user.updated_by = str(approved_by_user_id)
+    user.updated_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    db.refresh(user)
+    
+    # Build response object
+    response = UserApprovalResponse(
+        detail=f"{SuccessMessages.USER_APPROVED}: {user.first_name}",
+        user_id=user.user_id,
+        approved_by=user.approved_by,
+        approved_on=user.approved_on.isoformat()
+    )
+    return response
+
+
+def reject_user(user: User, rejected_by_user_id: str, db: Session) -> UserRejectionResponse:
+    """
+    Reject user registration with audit trail.
+    
+    Args:
+        user: User object to reject
+        rejected_by_user_id: Admin user ID
+        db: Database session
+        
+    Returns:
+        UserRejectionResponse with rejection details
+    """
+    # Business Logic: Set rejection status and audit trail
+    user.approved_status = 'rejected'
+    user.status = False
+    user.updated_by = str(rejected_by_user_id)
+    user.updated_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    
+    # Build response object
+    response = UserRejectionResponse(
+        detail=f"{SuccessMessages.USER_REJECTED}: {user.first_name}",
+        rejected_by=rejected_by_user_id,
+        rejected_on=datetime.now(timezone.utc).isoformat()
+    )
+    return response
+
+
+def get_user_details(user: User, db: Session) -> UserDetailsResponse:
+    """
+    Get user details.
+    
+    Args:
+        user: User object
+        db: Database session
+        
+    Returns:
+        UserDetailsResponse with user details
+    """
+    # Build response object
+    response = UserDetailsResponse(
+        user_id=user.user_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        role=user.role,
+        company_name=user.company_name,
+        approved_status=user.approved_status,
+        status=user.status,
+        is_locked=user.is_locked,
+        login_attempts=user.login_attempts,
+        last_login=user.last_login,
+        session_timeout=user.session_timeout
+    )
+    return response
+
+
+def get_user_profile(user: user_model.User) -> UserProfileResponse:
+    """
+    Build UserProfileResponse DTO from User model.
+    
+    Args:
+        user: User model from authentication
+        
+    Returns:
+        UserProfileResponse DTO with all profile fields
+    """
+    # Build response object
+    response = UserProfileResponse(
+        user_id=user.user_id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=user.role,
+        company_name=user.company_name,
+        approved_status=user.approved_status,
+        status=user.status,
+        session_timeout=user.session_timeout,
+        last_login=user.last_login,
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
+    return response
