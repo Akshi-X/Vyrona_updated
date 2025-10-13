@@ -1,11 +1,6 @@
 """
-Error Codes for Internationalization (i18n)
-Simple numeric format for easy translation mapping.
-
-Frontend can map error codes to translations:
-- en.json: { "ERR_1001": "User not found" }
-- es.json: { "ERR_1001": "Usuario no encontrado" }
-- fr.json: { "ERR_1001": "Utilisateur introuvable" }
+Error Codes for Application Errors
+Simple numeric format for consistent error handling.
 
 Format: ERR_XXXX (4 digits)
 Categories:
@@ -140,126 +135,22 @@ ERROR_CODES = {
 
 
 # ============================================
-# ERROR METADATA
-# Backend uses this for HTTP status, severity, etc.
-# ============================================
-
-ERROR_METADATA = {
-    # Authentication & Login
-    "ERR_1001": {"http_status": 400, "category": "Authentication", "severity": "LOW"},
-    "ERR_1002": {"http_status": 403, "category": "Authentication", "severity": "LOW"},
-    "ERR_1003": {"http_status": 401, "category": "Authentication", "severity": "MEDIUM"},
-    "ERR_1004": {"http_status": 500, "category": "Authentication", "severity": "HIGH"},
-    "ERR_1005": {"http_status": 403, "category": "Authentication", "severity": "MEDIUM"},
-    "ERR_1006": {"http_status": 403, "category": "Authentication", "severity": "LOW"},
-    
-    # OTP
-    "ERR_1021": {"http_status": 400, "category": "Authentication", "severity": "LOW"},
-    "ERR_1022": {"http_status": 400, "category": "Authentication", "severity": "LOW"},
-    "ERR_1023": {"http_status": 404, "category": "Authentication", "severity": "MEDIUM"},
-    "ERR_1024": {"http_status": 429, "category": "Authentication", "severity": "MEDIUM"},
-    "ERR_1025": {"http_status": 400, "category": "Authentication", "severity": "LOW"},
-    
-    # Resend OTP
-    "ERR_1041": {"http_status": 400, "category": "Authentication", "severity": "LOW"},
-    "ERR_1042": {"http_status": 403, "category": "Authentication", "severity": "LOW"},
-    "ERR_1043": {"http_status": 500, "category": "Authentication", "severity": "HIGH"},
-    "ERR_1044": {"http_status": 429, "category": "Authentication", "severity": "MEDIUM"},
-    
-    # Token
-    "ERR_1061": {"http_status": 401, "category": "Authentication", "severity": "MEDIUM"},
-    "ERR_1062": {"http_status": 401, "category": "Authentication", "severity": "LOW"},
-    "ERR_1063": {"http_status": 401, "category": "Authentication", "severity": "LOW"},
-    "ERR_1064": {"http_status": 401, "category": "Authentication", "severity": "MEDIUM"},
-    
-    # Registration
-    "ERR_2001": {"http_status": 409, "category": "Registration", "severity": "LOW"},
-    "ERR_2002": {"http_status": 400, "category": "Registration", "severity": "LOW"},
-    "ERR_2003": {"http_status": 400, "category": "Registration", "severity": "LOW"},
-    "ERR_2004": {"http_status": 400, "category": "Registration", "severity": "LOW"},
-    "ERR_2005": {"http_status": 400, "category": "Registration", "severity": "LOW"},
-    "ERR_2006": {"http_status": 500, "category": "Registration", "severity": "HIGH"},
-    "ERR_2007": {"http_status": 500, "category": "Registration", "severity": "MEDIUM"},
-    
-    # User Management
-    "ERR_3001": {"http_status": 404, "category": "User Management", "severity": "LOW"},
-    "ERR_3002": {"http_status": 400, "category": "User Management", "severity": "LOW"},
-    "ERR_3003": {"http_status": 403, "category": "User Management", "severity": "MEDIUM"},
-    "ERR_3021": {"http_status": 404, "category": "User Management", "severity": "MEDIUM"},
-    "ERR_3022": {"http_status": 409, "category": "User Management", "severity": "LOW"},
-    "ERR_3023": {"http_status": 500, "category": "User Management", "severity": "HIGH"},
-    "ERR_3024": {"http_status": 403, "category": "User Management", "severity": "MEDIUM"},
-    "ERR_3041": {"http_status": 404, "category": "User Management", "severity": "MEDIUM"},
-    "ERR_3042": {"http_status": 409, "category": "User Management", "severity": "LOW"},
-    "ERR_3043": {"http_status": 500, "category": "User Management", "severity": "HIGH"},
-    "ERR_3044": {"http_status": 403, "category": "User Management", "severity": "MEDIUM"},
-    
-    # Database
-    "ERR_4001": {"http_status": 503, "category": "Database", "severity": "CRITICAL"},
-    "ERR_4002": {"http_status": 503, "category": "Database", "severity": "CRITICAL"},
-    "ERR_4003": {"http_status": 500, "category": "Database", "severity": "HIGH"},
-    "ERR_4004": {"http_status": 504, "category": "Database", "severity": "HIGH"},
-    "ERR_4005": {"http_status": 500, "category": "Database", "severity": "HIGH"},
-    "ERR_4006": {"http_status": 500, "category": "Database", "severity": "HIGH"},
-    
-    # Email
-    "ERR_5001": {"http_status": 503, "category": "Email", "severity": "HIGH"},
-    "ERR_5002": {"http_status": 500, "category": "Email", "severity": "HIGH"},
-    "ERR_5003": {"http_status": 400, "category": "Email", "severity": "LOW"},
-    "ERR_5004": {"http_status": 500, "category": "Email", "severity": "MEDIUM"},
-    "ERR_5005": {"http_status": 500, "category": "Email", "severity": "MEDIUM"},
-    "ERR_5006": {"http_status": 504, "category": "Email", "severity": "HIGH"},
-    
-    # Validation
-    "ERR_6001": {"http_status": 400, "category": "Validation", "severity": "LOW"},
-    "ERR_6002": {"http_status": 400, "category": "Validation", "severity": "LOW"},
-    "ERR_6003": {"http_status": 400, "category": "Validation", "severity": "LOW"},
-    "ERR_6004": {"http_status": 400, "category": "Validation", "severity": "LOW"},
-    "ERR_6005": {"http_status": 400, "category": "Validation", "severity": "LOW"},
-    
-    # Security
-    "ERR_7001": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    "ERR_7002": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    "ERR_7003": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    "ERR_7004": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    "ERR_7005": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    "ERR_7006": {"http_status": 400, "category": "Security", "severity": "CRITICAL"},
-    
-    # General
-    "ERR_9001": {"http_status": 500, "category": "General", "severity": "CRITICAL"},
-    "ERR_9002": {"http_status": 503, "category": "General", "severity": "HIGH"},
-    "ERR_9003": {"http_status": 504, "category": "General", "severity": "MEDIUM"},
-    "ERR_9004": {"http_status": 404, "category": "General", "severity": "LOW"},
-    "ERR_9005": {"http_status": 403, "category": "General", "severity": "MEDIUM"},
-    "ERR_9006": {"http_status": 429, "category": "General", "severity": "MEDIUM"},
-}
-
-
-# ============================================
-# HELPER FUNCTIONS
+# HELPER FUNCTION
 # ============================================
 
 def get_error_code(key: str) -> str:
     """
-    Get error code by key name
+    Get error code by key name.
+    
+    Args:
+        key: The error key (e.g., "INVALID_PASSWORD")
+    
+    Returns:
+        Error code string (e.g., "ERR_1003")
+        Returns "ERR_9001" (SERVER_ERROR) if key not found
     
     Usage:
         error_code = get_error_code("INVALID_PASSWORD")  # Returns "ERR_1003"
+        error_code = get_error_code("USER_NOT_FOUND")    # Returns "ERR_1001"
     """
     return ERROR_CODES.get(key, "ERR_9001")
-
-
-def get_error_metadata(error_code: str) -> dict:
-    """
-    Get metadata for error code
-    
-    Usage:
-        metadata = get_error_metadata("ERR_1003")
-        # Returns: {"http_status": 401, "category": "Authentication", "severity": "MEDIUM"}
-    """
-    return ERROR_METADATA.get(error_code, {
-        "http_status": 500,
-        "category": "Unknown",
-        "severity": "UNKNOWN"
-    })
-

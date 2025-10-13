@@ -36,6 +36,7 @@ class ErrorMessages:
     INVALID_EMAIL = "Please provide a valid email address"
     INVALID_ROLE = "Invalid role selected"
     INVALID_USER_OR_EMAIL = "Invalid user ID or email. OTP could not be sent"
+    REGISTRATION_EMAIL_FAILED = "Registration failed: Unable to send approval email"
     
     # Validation
     REQUIRED_FIELD = "This field is required"

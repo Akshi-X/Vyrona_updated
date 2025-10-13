@@ -1,10 +1,11 @@
 """
 Authentication Dependencies
 
-Validation functions used by middleware.
+FastAPI dependencies for validation and authentication.
+These are used with Depends() in route handlers.
 """
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -36,49 +37,28 @@ from ..models.user_model import User
 from ..schemas.user_schema import UserRegister
 
 
-class ValidatedLoginUser:
-    """Login validation dependency."""
+# ============================================
+# Get Current User from Request State
+# ============================================
+def get_current_user(request: Request) -> User:
+    """
+    Get current authenticated user from request state.
     
-    def __init__(self, email: str, password: str):
-        self.email = email
-        self.password = password
+    This is set by TokenValidationMiddleware.
+    Use this in protected endpoints.
     
-    async def __call__(self, db: Session = Depends(get_db)) -> User:
-        """Validate user login credentials."""
-        # Validation 1: User exists
-        user = get_user_by_email(db, self.email)
-        if not user:
-            raise UserNotFoundException(email=self.email)
-        
-        # Validation 2: Check account lock (auto-unlocks if expired)
-        check_account_lock_status(user, db)
-        
-        # Validation 3: Account is active
-        if not user.status:
-            raise AccountInactiveException(user_id=user.user_id)
-        
-        # Validation 4: User is approved
-        if user.approved_status != 'approved':
-            raise UserNotApprovedException(user_id=user.user_id)
-        
-        # Validation 5: Password is correct
-        if not verify_password(self.password, user.password_hash):
-            # Increment failed attempts and possibly lock
-            increment_failed_login_attempt(user, db)
-            attempts_remaining = get_remaining_attempts(user)
-            
-            raise InvalidCredentialsException(
-                email=self.email,
-                attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
-            )
-        
-        # All validations passed! Reset login attempts
-        reset_login_attempts(user, db)
-        
-        return user
+    Usage:
+        @router.get("/profile")
+        def get_profile(current_user: User = Depends(get_current_user)):
+            return {"name": current_user.name}
+    """
+    if not hasattr(request.state, "current_user"):
+        raise InvalidCredentialsException(email="unknown")
+    
+    return request.state.current_user
 
 
-def validate_login_request(email: str, password: str, db: Session = Depends(get_db)) -> User:
+def validate_login_request(email: str, password: str, db: Session) -> User:
     """
     Validate login request.
     

@@ -370,6 +370,22 @@ class PasswordMismatchException(RegistrationException):
         )
 
 
+class RegistrationEmailFailedException(RegistrationException):
+    """Failed to send registration approval email"""
+    
+    def __init__(self, email: str, reason: str = "Email service unavailable"):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=f"{ErrorMessages.REGISTRATION_EMAIL_FAILED}. Please try again later.",
+            error_code=ERROR_CODES["REGISTRATION_EMAIL_FAILED"],
+            status_code=500,
+            email=email,
+            reason=reason
+        )
+
+
 # ============================================
 # DATABASE EXCEPTIONS
 # ============================================
