@@ -27,13 +27,14 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         """Intercept requests and validate tokens for protected endpoints."""
         path = request.url.path
+        method = request.method
         
         # Skip token validation for OPTIONS requests (CORS preflight)
-        if request.method == "OPTIONS":
+        if method == "OPTIONS":
             return await call_next(request)
         
         # Skip token validation for public endpoints
-        if self._is_public_endpoint(path):
+        if self._is_public_endpoint(method, path):
             return await call_next(request)
         
         # Skip token validation for static files
@@ -128,11 +129,15 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                 }
             )
     
-    def _is_public_endpoint(self, path: str) -> bool:
+    def _is_public_endpoint(self, method: str, path: str) -> bool:
         """
         Check if endpoint is public.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            path: Request path
         
         Returns:
             True if public
         """
-        return EndpointPermissions.is_public_endpoint(path)
+        return EndpointPermissions.is_public_endpoint(method, path)
