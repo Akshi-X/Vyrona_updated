@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import axios from "axios";
+import { Link, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
@@ -21,7 +22,13 @@ const Signup: React.FC = () => {
     const [passwordError, setPasswordError] = useState("");
     const [confirmPasswordError, setConfirmPasswordError] = useState("");
 
+    const [apiError, setApiError] = useState("");
+    const [apiSuccess, setApiSuccess] = useState("");
+    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    const navigate = useNavigate();
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
     const validateEmail = (value: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -29,9 +36,12 @@ const Signup: React.FC = () => {
     const validatePassword = (value: string) =>
         /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(value);
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        setApiError("");
+        setApiSuccess("");
 
+        // Reset errors
         setFirstNameError("");
         setLastNameError("");
         setEmailError("");
@@ -42,6 +52,7 @@ const Signup: React.FC = () => {
 
         let valid = true;
 
+        // Validations
         if (!firstName) {
             setFirstNameError("First Name is required");
             valid = false;
@@ -70,7 +81,7 @@ const Signup: React.FC = () => {
             valid = false;
         } else if (!validatePassword(password)) {
             setPasswordError(
-                "Password must be ≥8 characters, include 1 uppercase, 1 number, and 1 special character"
+                "Password must be ≥8 chars, include 1 uppercase, 1 number, and 1 special character"
             );
             valid = false;
         }
@@ -82,7 +93,37 @@ const Signup: React.FC = () => {
             valid = false;
         }
 
-        if (valid) alert("Form submitted successfully!");
+        if (!valid) return;
+
+        // Prepare request payload
+        const payload = {
+            email,
+            password,
+            confirm_password: confirmPassword,
+            first_name: firstName,
+            last_name: lastName,
+            role: designation.toLowerCase(), // "manager" or "user" → match backend roles
+            company_name: organization,
+        };
+
+        try {
+            setLoading(true);
+            const response = await axios.post(`${API_BASE_URL}/api/register`, payload);
+
+            console.log("Register Response:", response.data);
+
+            setApiSuccess(response.data.message);
+
+            // Optionally redirect after success
+            setTimeout(() => {
+                navigate("/login");
+            }, 2000);
+        } catch (err: any) {
+            console.error("Registration Error:", err);
+            setApiError(err.response?.data?.message || "Registration failed. Try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -204,7 +245,7 @@ const Signup: React.FC = () => {
                                     Designation
                                 </option>
                                 <option value="Manager">Manager</option>
-                                <option value="User">User</option>
+                                <option value="Worker">User</option>
                             </select>
                             {designationError && (
                                 <p className="text-xs text-red-500 mt-1">{designationError}</p>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import axios from "axios";
+import { Link, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
@@ -10,7 +11,11 @@ const Login: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [emailError, setEmailError] = useState("");
     const [passwordError, setPasswordError] = useState("");
+    const [apiError, setApiError] = useState("");
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const validateEmail = (email: string) => {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return regex.test(email);
@@ -36,8 +41,9 @@ const Login: React.FC = () => {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setApiError("");
         let valid = true;
 
         if (!email) {
@@ -46,17 +52,44 @@ const Login: React.FC = () => {
         } else if (!validateEmail(email)) {
             setEmailError("Invalid Email ID");
             valid = false;
+        } else {
+            setEmailError("");
         }
 
         if (!password) {
             setPasswordError("Password is required");
             valid = false;
+        } else {
+            setPasswordError("");
         }
 
         if (!valid) return;
 
-        setEmailError("");
-        setPasswordError("");
+        try {
+            setLoading(true);
+            const response = await axios.post(`${API_BASE_URL}/api/login`, {
+                email,
+                password,
+            });
+
+            if (response.data.status === "OTP Sent") {
+                // Example: navigate to OTP page
+                navigate("/verify-otp", {
+                    state: {
+                        userId: response.data.user_id,
+                        email: response.data.email,
+                        otpExpiry: response.data.otp_expiry,
+                    },
+                });
+            } else {
+                setApiError(response.data.message || "Unexpected response");
+            }
+        } catch (err: any) {
+            console.error(err);
+            setApiError(err.response?.data?.message || "Login failed");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -193,5 +226,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-
 
