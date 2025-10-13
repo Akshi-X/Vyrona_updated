@@ -1,6 +1,10 @@
 """
 Role-Based Access Control (RBAC) Dependencies
 
+Optional per-endpoint role checks (alternative to middleware).
+Your app uses RBAC Middleware by default, but these can be used 
+for additional fine-grained control.
+
 Admin: Full system access, manage all users and settings
 Manager: Approve users, manage shipments, view analytics
 User: View assigned tasks, update status, view sensor data
@@ -9,8 +13,8 @@ User: View assigned tasks, update status, view sensor data
 from fastapi import Depends
 from typing import List
 from ..models.user_model import User
-from ..auth.auth import get_current_user
-from ..config.permissions import EndpointPermissions, get_role_permissions
+from ..dependencies.auth_dependencies import get_current_user
+from ..config.permissions import get_role_permissions
 from ..exceptions import (
     AdminRoleRequiredException,
     ManagerRoleRequiredException,

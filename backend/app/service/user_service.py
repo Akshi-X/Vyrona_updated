@@ -51,10 +51,10 @@ def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
 
 def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistrationResponse:
     """
-    Register a new user - CLEAN!
+    Register a new user with proper transaction handling.
     
+    If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
-    Service only handles: Business Logic (Create user, Send email)
     """
     # Normalize role to lowercase (database enum is lowercase)
     role_lower = request.role.lower()
@@ -86,33 +86,13 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     try:
         print(f"Adding user to database: {user.email}, role: {user.role}")
         db.add(user)
-        print("Committing to database...")
-        db.commit()
-        print("Refreshing user object...")
-        db.refresh(user)
-        print(f"User created successfully: {user.user_id}")
-    except IntegrityError as e:
-        db.rollback()
-        print(f"IntegrityError during registration: {str(e)}")
-        # Check if it's a duplicate email error
-        if 'email' in str(e).lower() or 'unique' in str(e).lower():
-            raise EmailAlreadyExistsException(email=request.email)
-        else:
-            raise DatabaseQueryException(operation="user registration", reason=str(e))
-    except Exception as e:
-        db.rollback()
-        print(f"Exception during registration: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise DatabaseQueryException(operation="user registration", reason=str(e))
-
-    # Send approval email - TWO-LEVEL APPROVAL SYSTEM
-    print(f"Preparing to send approval email for role: {role_lower}")
-    recipient_email = None
-    approval_sent = False
-    
-    try:
-        # Determine recipient based on role
+        db.flush()  # Flush but don't commit yet - validate first
+        print(f"User flushed to DB (not committed): {user.user_id}")
+        
+        # Determine recipient for approval email
+        print(f"Preparing to send approval email for role: {role_lower}")
+        recipient_email = None
+        
         if role_lower == 'manager':
             # Manager registration → Send to MyGrape Platform Admin
             recipient_email = settings.ADMIN_EMAIL
@@ -132,7 +112,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
                 recipient_email = settings.ADMIN_EMAIL
                 print(f"WARNING: User registration but no company manager found. Sending to MyGrape Admin ({recipient_email})")
         
-        # Send approval email to appropriate recipient
+        # Send approval email BEFORE committing
+        # If email fails, transaction will rollback
         send_approval_email(
             registration_id=str(user.user_id),
             first_name=request.first_name,
@@ -140,25 +121,46 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             email=request.email,
             role=request.role,
             company=request.company_name,
-            recipient_email=recipient_email  # Dynamic recipient
+            recipient_email=recipient_email
         )
-        approval_sent = True
+        print("Approval email sent successfully")
+        
+        # Email sent successfully, NOW commit the transaction
+        db.commit()
+        db.refresh(user)
+        print(f"User created and email sent successfully: {user.user_id}")
+        
+    except IntegrityError as e:
+        db.rollback()
+        print(f"IntegrityError during registration: {str(e)}")
+        # Check if it's a duplicate email error
+        if 'email' in str(e).lower() or 'unique' in str(e).lower():
+            raise EmailAlreadyExistsException(email=request.email)
+        else:
+            raise DatabaseQueryException(operation="user registration", reason=str(e))
     except Exception as e:
-        # User is already saved, email failure shouldn't fail registration
-        print(f"WARNING: Email send failed: {str(e)}")
-        pass  # Log this error but don't fail registration
+        # Rollback on ANY error (including email failure)
+        db.rollback()
+        print(f"Registration failed, rolling back: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # If it's an email error, raise a more specific exception
+        if 'email' in str(e).lower() or 'smtp' in str(e).lower():
+            from ..exceptions import RegistrationEmailFailedException
+            raise RegistrationEmailFailedException(email=request.email, reason=str(e))
+        else:
+            raise DatabaseQueryException(operation="user registration", reason=str(e))
 
     # Build response message using constants
-    if approval_sent:
-        if role_lower == 'manager':
-            message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
-        else:
-            if recipient_email == settings.ADMIN_EMAIL:
-                message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN_NO_MANAGER
-            else:
-                message = SuccessMessages.REGISTRATION_SENT_TO_MANAGER
+    # If we reach here, email was sent successfully (otherwise exception would have been raised)
+    if role_lower == 'manager':
+        message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
     else:
-        message = SuccessMessages.REGISTRATION_EMAIL_FAILED
+        if recipient_email == settings.ADMIN_EMAIL:
+            message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN_NO_MANAGER
+        else:
+            message = SuccessMessages.REGISTRATION_SENT_TO_MANAGER
     
     # Build structured response
     response = UserRegistrationResponse(
@@ -168,7 +170,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         role=user.role,
         company_name=user.company_name,
         approval_status=user.approved_status,
-        approval_sent_to=recipient_email if recipient_email else "Email failed"
+        approval_sent_to=recipient_email
     )
     return response
 

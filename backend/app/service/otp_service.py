@@ -17,7 +17,9 @@ def generate_otp_code(length: int = 6) -> str:
 
 def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
     """
-    Generate and send OTP to user's email
+    Generate and send OTP to user's email with proper transaction handling.
+    
+    If email sending fails, OTP record is rolled back to prevent orphaned OTP codes.
     
     Args:
         db: Database session
@@ -47,17 +49,22 @@ def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
             attempts=0
         )
         
-        # Save to database
+        # Add to database but don't commit yet
         db.add(otp)
+        db.flush()  # Flush but don't commit - validate first
+        
+        # Send OTP via email BEFORE committing
+        # If email fails, transaction will rollback
+        send_otp_email(email, otp_code)
+        
+        # Email sent successfully, NOW commit the transaction
         db.commit()
         db.refresh(otp)
-        
-        # Send OTP via email
-        send_otp_email(email, otp_code)
         
         return otp
         
     except Exception as e:
+        # Rollback on ANY error (including email failure)
         db.rollback()
         raise Exception(f"Failed to send OTP: {str(e)}")
 

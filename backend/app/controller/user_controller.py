@@ -21,6 +21,7 @@ from app.schemas.response_schema import (
     UserProfileResponse
 )
 from app.constants.messages import SuccessMessages
+from app.dependencies.auth_dependencies import get_current_user
 
 router = APIRouter()
 
@@ -119,19 +120,16 @@ class RegistrationAction(BaseModel):
 @router.get("/user/{user_id}", response_model=UserDetailsResponse)
 def get_user(
     user_id: str,
-    request: Request,
+    current_user: user_model.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Get user details.
     
-    Protected endpoint. Manager role required.
-    Target user validated by middleware.
+    Protected endpoint. Manager role required (enforced by middleware).
+    Uses Depends(get_current_user) to get authenticated user.
     """
     from ..exceptions import CompanyAccessForbiddenException, UserGetNotFoundException
-    
-    # Get current user from middleware
-    current_user = request.state.current_user
     
     # Refetch target user with controller's DB session
     target_user = db.query(user_model.User).filter(user_model.User.user_id == user_id).first()
@@ -169,19 +167,16 @@ def approval_screen():
 @router.post("/user/approve", response_model=UserApprovalResponse)
 def approve_user(
     action: RegistrationAction,
-    request: Request,
+    current_user: user_model.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Approve user registration.
     
-    Protected endpoint. Manager role required.
-    Target user validated by middleware.
+    Protected endpoint. Manager role required (enforced by middleware).
+    Uses Depends(get_current_user) to get authenticated user.
     """
     from ..exceptions import UserApproveNotFoundException
-    
-    # Get current user from middleware
-    current_user = request.state.current_user
     
     # Refetch target user with controller's DB session
     target_user = db.query(user_model.User).filter(user_model.User.user_id == action.registration_id).first()
@@ -204,19 +199,16 @@ def approve_user(
 @router.post("/user/reject", response_model=UserRejectionResponse)
 def reject_user(
     action: RegistrationAction,
-    request: Request,
+    current_user: user_model.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
     """
     Reject user registration.
     
-    Protected endpoint. Manager role required.
-    Target user validated by middleware.
+    Protected endpoint. Manager role required (enforced by middleware).
+    Uses Depends(get_current_user) to get authenticated user.
     """
     from ..exceptions import UserRejectNotFoundException
-    
-    # Get current user from middleware
-    current_user = request.state.current_user
     
     # Refetch target user with controller's DB session
     target_user = db.query(user_model.User).filter(user_model.User.user_id == action.registration_id).first()
@@ -238,12 +230,11 @@ def reject_user(
 # Protected endpoint example
 # ---------------------------
 @router.get("/profile", response_model=UserProfileResponse)
-def get_user_profile_endpoint(request: Request):
+def get_user_profile_endpoint(current_user: user_model.User = Depends(get_current_user)):
     """
     Get current user's profile.
     
     Protected endpoint. Any authenticated user.
+    Uses Depends(get_current_user) to inject authenticated user.
     """
-    # Get current user from middleware (guaranteed to exist)
-    current_user = request.state.current_user
     return user_service.get_user_profile(current_user)
