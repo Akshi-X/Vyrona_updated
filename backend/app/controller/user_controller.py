@@ -8,6 +8,8 @@ from starlette.responses import FileResponse
 from app.config import database
 from app.models import user_model
 from app.service import user_service
+from app.service.login_service import handle_login
+from app.service.otp_service import verify_otp_and_create_token, resend_otp_to_user
 from app.schemas import user_schema
 from app.schemas.auth_schema import (
     LoginRequest, LoginResponse,
@@ -21,7 +23,7 @@ from app.schemas.response_schema import (
     UserProfileResponse
 )
 from app.constants.messages import SuccessMessages
-from app.dependencies.auth_dependencies import get_current_user
+from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 
 router = APIRouter()
 
@@ -33,7 +35,6 @@ router = APIRouter()
 def register_user_endpoint(request: user_schema.UserRegister, db: Session = Depends(database.get_db)):
     """User registration endpoint."""
     # Validate
-    from ..dependencies.auth_dependencies import validate_registration_request
     validated_request = validate_registration_request(request, db)
     
     # Call service (all business logic there)
@@ -49,8 +50,6 @@ def register_user_endpoint(request: user_schema.UserRegister, db: Session = Depe
 @router.post("/login", response_model=LoginResponse)
 def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
     """User login endpoint."""
-    from ..service.login_service import handle_login
-    
     # Call service (all business logic there)
     result = handle_login(request.email, request.password, db)
     
@@ -70,8 +69,6 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
 @router.post("/verify-otp", response_model=VerifyOTPSuccessResponse)
 def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(database.get_db)):
     """OTP verification endpoint."""
-    from ..service.otp_service import verify_otp_and_create_token
-    
     # Call service (all business logic there)
     result = verify_otp_and_create_token(request.user_id, request.otp, db)
     
@@ -92,8 +89,6 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
 @router.post("/resend-otp", response_model=ResendOTPSuccessResponse)
 def resend_otp_endpoint(request: ResendOTPRequest, db: Session = Depends(database.get_db)):
     """Resend OTP endpoint."""
-    from ..service.otp_service import resend_otp_to_user
-    
     # Call service (all business logic there)
     result = resend_otp_to_user(request.user_id, request.email, db)
     
@@ -129,22 +124,12 @@ def get_user(
     Protected endpoint. Manager role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
-    from ..exceptions import CompanyAccessForbiddenException, UserGetNotFoundException
-    
-    # Refetch target user with controller's DB session
-    target_user = db.query(user_model.User).filter(user_model.User.user_id == user_id).first()
-    if not target_user:
-        raise UserGetNotFoundException(registration_id=user_id)
-    
-    # Multi-tenant check: Manager can only view users from their company
-    if target_user.company_name != current_user.company_name:
-        raise CompanyAccessForbiddenException(
-            user_company=current_user.company_name,
-            target_company=target_user.company_name
-        )
-    
-    # Call service (pass validated user)
-    result = user_service.get_user_details(target_user, db)
+    # Call service (business logic in service layer)
+    result = user_service.get_user_details_by_id(
+        user_id=user_id,
+        current_user=current_user,
+        db=db
+    )
     
     # Return DTO (result is already UserDetailsResponse)
     return result
@@ -176,16 +161,9 @@ def approve_user(
     Protected endpoint. Manager role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
-    from ..exceptions import UserApproveNotFoundException
-    
-    # Refetch target user with controller's DB session
-    target_user = db.query(user_model.User).filter(user_model.User.user_id == action.registration_id).first()
-    if not target_user:
-        raise UserApproveNotFoundException(registration_id=action.registration_id)
-    
-    # Call service (pass validated user)
+    # Call service (business logic in service layer)
     result = user_service.approve_user(
-        user=target_user,
+        registration_id=action.registration_id,
         approved_by_user_id=current_user.user_id,
         db=db
     )
@@ -208,16 +186,9 @@ def reject_user(
     Protected endpoint. Manager role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
-    from ..exceptions import UserRejectNotFoundException
-    
-    # Refetch target user with controller's DB session
-    target_user = db.query(user_model.User).filter(user_model.User.user_id == action.registration_id).first()
-    if not target_user:
-        raise UserRejectNotFoundException(registration_id=action.registration_id)
-    
-    # Call service (pass validated user)
+    # Call service (business logic in service layer)
     result = user_service.reject_user(
-        user=target_user,
+        registration_id=action.registration_id,
         rejected_by_user_id=current_user.user_id,
         db=db
     )

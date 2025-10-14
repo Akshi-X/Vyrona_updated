@@ -15,6 +15,7 @@ from typing import List
 from ..models.user_model import User
 from ..dependencies.auth_dependencies import get_current_user
 from ..config.permissions import get_role_permissions
+from ..constants.roles import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER, MANAGEMENT_ROLES
 from ..exceptions import (
     AdminRoleRequiredException,
     ManagerRoleRequiredException,
@@ -36,7 +37,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     Raises:
         AdminRoleRequiredException if not admin
     """
-    if current_user.role.lower() != 'admin':
+    if current_user.role.lower() != ROLE_ADMIN:
         raise AdminRoleRequiredException(user_role=current_user.role)
     return current_user
 
@@ -51,7 +52,7 @@ def require_manager(current_user: User = Depends(get_current_user)) -> User:
     Raises:
         ManagerRoleRequiredException if not manager
     """
-    if current_user.role.lower() not in ['admin', 'manager']:  # Admin can access manager functions
+    if current_user.role.lower() not in MANAGEMENT_ROLES:  # Admin can access manager functions
         raise ManagerRoleRequiredException(user_role=current_user.role)
     return current_user
 
@@ -66,7 +67,7 @@ def require_user(current_user: User = Depends(get_current_user)) -> User:
     Raises:
         UserRoleRequiredException if not user
     """
-    if current_user.role.lower() != 'user':
+    if current_user.role.lower() != ROLE_USER:
         raise UserRoleRequiredException(user_role=current_user.role)
     return current_user
 
@@ -127,7 +128,7 @@ def can_approve_users(current_user: User = Depends(get_current_user)) -> bool:
     Raises:
         ManagerApprovalOnlyException if cannot approve
     """
-    if current_user.role.lower() not in ['admin', 'manager']:
+    if current_user.role.lower() not in MANAGEMENT_ROLES:
         raise ManagerApprovalOnlyException(user_role=current_user.role)
     return True
 
@@ -142,7 +143,7 @@ def can_manage_shipments(current_user: User = Depends(get_current_user)) -> bool
     Raises:
         ManagerShipmentManagementOnlyException if cannot manage
     """
-    if current_user.role.lower() not in ['admin', 'manager']:
+    if current_user.role.lower() not in MANAGEMENT_ROLES:
         raise ManagerShipmentManagementOnlyException(user_role=current_user.role)
     return True
 
@@ -157,7 +158,7 @@ def is_admin(user: User) -> bool:
     Returns:
         True if admin
     """
-    return user.role.lower() == 'admin'
+    return user.role.lower() == ROLE_ADMIN
 
 
 def is_manager(user: User) -> bool:
@@ -170,7 +171,7 @@ def is_manager(user: User) -> bool:
     Returns:
         True if manager
     """
-    return user.role.lower() == 'manager'
+    return user.role.lower() == ROLE_MANAGER
 
 
 def is_user(user: User) -> bool:
@@ -183,7 +184,7 @@ def is_user(user: User) -> bool:
     Returns:
         True if user
     """
-    return user.role.lower() == 'user'
+    return user.role.lower() == ROLE_USER
 
 
 def get_user_permissions(user: User) -> dict:

@@ -53,6 +53,11 @@ USER_ID_PREFIX = "USR"
 REGISTRATION_ID_PREFIX = "REG"
 ID_LENGTH = 6
 
+# User Roles
+ROLE_ADMIN = "admin"
+ROLE_MANAGER = "manager"
+ROLE_USER = "user"
+
 # ============================================
 # FILE UPLOAD
 # ============================================
