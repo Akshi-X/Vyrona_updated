@@ -1,32 +1,29 @@
+from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 
-# Database URL - you can modify this based on your database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:Password%401@localhost/mygrape")
+DB_USER = "postgres"
+DB_PASSWORD = quote_plus("Password@1")
+DB_HOST = "localhost"
+DB_PORT = "5432"
+DB_NAME = "mygrape"
 
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Create SessionLocal class
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class for models
 Base = declarative_base()
 
 def get_db():
-    """Dependency to get database session"""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
+# 🔹 Add this function
 def init_db():
-    """Initialize database tables"""
-    # Import all models here to ensure they are registered with Base
-    from app.models.patient_model import Patient
-    
-    # Create all tables
+    # Import your models so Base knows them
+    from ..models.patient_model import Patient
     Base.metadata.create_all(bind=engine)
