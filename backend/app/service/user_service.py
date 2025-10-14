@@ -175,18 +175,28 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     return response
 
 
-def approve_user(user: User, approved_by_user_id: str, db: Session) -> UserApprovalResponse:
+def approve_user(registration_id: str, approved_by_user_id: str, db: Session) -> UserApprovalResponse:
     """
     Approve user registration with audit trail.
     
     Args:
-        user: User object to approve
-        approved_by_user_id: Admin user ID
+        registration_id: User ID to approve
+        approved_by_user_id: Admin/Manager user ID
         db: Database session
         
     Returns:
         UserApprovalResponse with approval details
+        
+    Raises:
+        UserApproveNotFoundException: If user not found
     """
+    from ..exceptions import UserApproveNotFoundException
+    
+    # Get user from database
+    user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
+    if not user:
+        raise UserApproveNotFoundException(registration_id=registration_id)
+    
     # Business Logic: Set approval status and audit trail
     user.approved_status = 'approved'
     user.status = True
@@ -208,18 +218,28 @@ def approve_user(user: User, approved_by_user_id: str, db: Session) -> UserAppro
     return response
 
 
-def reject_user(user: User, rejected_by_user_id: str, db: Session) -> UserRejectionResponse:
+def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> UserRejectionResponse:
     """
     Reject user registration with audit trail.
     
     Args:
-        user: User object to reject
-        rejected_by_user_id: Admin user ID
+        registration_id: User ID to reject
+        rejected_by_user_id: Admin/Manager user ID
         db: Database session
         
     Returns:
         UserRejectionResponse with rejection details
+        
+    Raises:
+        UserRejectNotFoundException: If user not found
     """
+    from ..exceptions import UserRejectNotFoundException
+    
+    # Get user from database
+    user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
+    if not user:
+        raise UserRejectNotFoundException(registration_id=registration_id)
+    
     # Business Logic: Set rejection status and audit trail
     user.approved_status = 'rejected'
     user.status = False
@@ -237,31 +257,52 @@ def reject_user(user: User, rejected_by_user_id: str, db: Session) -> UserReject
     return response
 
 
-def get_user_details(user: User, db: Session) -> UserDetailsResponse:
+def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> UserDetailsResponse:
     """
-    Get user details.
+    Get user details by user ID with multi-tenant validation.
     
     Args:
-        user: User object
+        user_id: User ID to retrieve
+        current_user: Current authenticated user
         db: Database session
         
     Returns:
         UserDetailsResponse with user details
+        
+    Raises:
+        UserGetNotFoundException: If user not found
+        CompanyAccessForbiddenException: If trying to access user from different company
     """
+    from ..exceptions import UserGetNotFoundException, CompanyAccessForbiddenException
+    
+    # Get target user from database
+    target_user = db.query(user_model.User).filter(user_model.User.user_id == user_id).first()
+    if not target_user:
+        raise UserGetNotFoundException(registration_id=user_id)
+    
+    # Multi-tenant check: Manager can only view users from their company
+    # Admin can view all users
+    if current_user.role.lower() != 'admin':
+        if target_user.company_name != current_user.company_name:
+            raise CompanyAccessForbiddenException(
+                user_company=current_user.company_name,
+                target_company=target_user.company_name
+            )
+    
     # Build response object
     response = UserDetailsResponse(
-        user_id=user.user_id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        role=user.role,
-        company_name=user.company_name,
-        approved_status=user.approved_status,
-        status=user.status,
-        is_locked=user.is_locked,
-        login_attempts=user.login_attempts,
-        last_login=user.last_login,
-        session_timeout=user.session_timeout
+        user_id=target_user.user_id,
+        first_name=target_user.first_name,
+        last_name=target_user.last_name,
+        email=target_user.email,
+        role=target_user.role,
+        company_name=target_user.company_name,
+        approved_status=target_user.approved_status,
+        status=target_user.status,
+        is_locked=target_user.is_locked,
+        login_attempts=target_user.login_attempts,
+        last_login=target_user.last_login,
+        session_timeout=target_user.session_timeout
     )
     return response
 
