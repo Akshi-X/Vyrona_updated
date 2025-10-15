@@ -47,6 +47,12 @@ OTP_MAX_ATTEMPTS = 3
 OTP_CHARACTERS = "0123456789"  # Only digits
 
 # ============================================
+# PASSWORD RESET
+# ============================================
+PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 30
+PASSWORD_RESET_RATE_LIMIT_MINUTES = 15  # Allow 1 request per 15 minutes
+
+# ============================================
 # USER & REGISTRATION
 # ============================================
 USER_ID_PREFIX = "USR"
@@ -107,6 +113,7 @@ EMAIL_APPROVAL_SUBJECT = "New User Registration Pending Approval"
 EMAIL_OTP_SUBJECT = "Your Login OTP - MyGrape"
 EMAIL_WELCOME_SUBJECT = "Welcome to MyGrape"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
+EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - MyGrape"
 
 # ============================================
 # TIME ZONES

@@ -51,6 +51,17 @@ ERROR_CODES = {
     "TOKEN_MISSING": "ERR_1063",
     "TOKEN_VALIDATION_FAILED": "ERR_1064",
     
+    # Password Reset (1081-1100)
+    "RESET_USER_NOT_FOUND": "ERR_1081",
+    "RESET_TOKEN_INVALID": "ERR_1082",
+    "RESET_TOKEN_EXPIRED": "ERR_1083",
+    "PASSWORD_RESET_FAILED": "ERR_1084",
+    "RESET_RATE_LIMIT": "ERR_1085",
+    "RESET_PASSWORD_MISMATCH": "ERR_1086",
+    "RESET_WEAK_PASSWORD": "ERR_1087",
+    "RESET_USER_NOT_APPROVED": "ERR_1088",
+    "RESET_ACCOUNT_LOCKED": "ERR_1089",
+    
     # ============================================
     # REGISTRATION (2xxx)
     # ============================================

@@ -10,11 +10,14 @@ from app.models import user_model
 from app.service import user_service
 from app.service.login_service import handle_login
 from app.service.otp_service import verify_otp_and_create_token, resend_otp_to_user
+from app.service.password_reset_service import request_password_reset, reset_password
 from app.schemas import user_schema
 from app.schemas.auth_schema import (
     LoginRequest, LoginResponse,
     VerifyOTPRequest, VerifyOTPSuccessResponse,
-    ResendOTPRequest, ResendOTPSuccessResponse
+    ResendOTPRequest, ResendOTPSuccessResponse,
+    ForgotPasswordRequest, ForgotPasswordResponse,
+    ResetPasswordRequest, ResetPasswordResponse
 )
 from app.schemas.response_schema import (
     UserApprovalResponse,
@@ -99,6 +102,54 @@ def resend_otp_endpoint(request: ResendOTPRequest, db: Session = Depends(databas
         status="OTP Resent",
         otp_expiry=result["otp_expiry"],
         message=SuccessMessages.OTP_RESENT
+    )
+
+
+# ---------------------------
+# Forgot Password endpoint
+# ---------------------------
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password_endpoint(request: ForgotPasswordRequest, db: Session = Depends(database.get_db)):
+    """
+    Request password reset link.
+    
+    Public endpoint - no authentication required.
+    Sends password reset link to user's email.
+    """
+    # Call service (all business logic there)
+    result = request_password_reset(request.email, db)
+    
+    # Return DTO
+    return ForgotPasswordResponse(
+        email=result["email"],
+        status="success",
+        message=SuccessMessages.PASSWORD_RESET_EMAIL_SENT
+    )
+
+
+# ---------------------------
+# Reset Password endpoint
+# ---------------------------
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password_endpoint(request: ResetPasswordRequest, db: Session = Depends(database.get_db)):
+    """
+    Reset user password using reset token.
+    
+    Public endpoint - no authentication required.
+    Requires valid reset token from email link.
+    """
+    # Call service (all business logic there)
+    result = reset_password(
+        token=request.token,
+        new_password=request.new_password,
+        confirm_password=request.confirm_password,
+        db=db
+    )
+    
+    # Return DTO
+    return ResetPasswordResponse(
+        status="success",
+        message=SuccessMessages.PASSWORD_RESET_SUCCESS
     )
 
 
