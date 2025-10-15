@@ -57,3 +57,28 @@ class ResendOTPSuccessResponse(BaseModel):
 class ResendOTPFailureResponse(BaseModel):
     status: str
     message: str
+
+
+# ============================================
+# FORGOT PASSWORD SCHEMAS
+# ============================================
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    email: str
+    status: str
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+    confirm_password: str
+
+
+class ResetPasswordResponse(BaseModel):
+    status: str
+    message: str

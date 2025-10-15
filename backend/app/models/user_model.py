@@ -36,6 +36,8 @@ class User(Base):
     
     # Password Security
     last_password_changed = sqlalchemy.Column(sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc))
+    last_password_reset_request = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # Audit: last reset request
+    password_reset_count = sqlalchemy.Column(sqlalchemy.Integer, default=0)  # Audit: total reset attempts
     
     # Session Management
     session_timeout = sqlalchemy.Column(sqlalchemy.Integer, default=30)  # Minutes (custom per user)
