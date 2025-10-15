@@ -7,6 +7,8 @@ from sqlalchemy import and_
 
 from ..models.otp_model import OTP
 from ..models.user_model import User
+from ..auth.auth import create_access_token
+from ..exceptions import ResendOTPFailedException
 from .email_service import send_otp_email
 
 
@@ -163,9 +165,8 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     Returns:
         dict with user_id, email, auth_token, expires_at
     """
-    from datetime import timedelta, timezone, datetime
+    # Import here to avoid circular dependency
     from ..dependencies.auth_dependencies import validate_otp_verification
-    from ..auth.auth import create_access_token
     
     print(f"Verifying OTP for user_id: {user_id}")
     
@@ -209,8 +210,8 @@ def resend_otp_to_user(user_id: str, email: str, db: Session) -> dict:
     Returns:
         dict with user_id, email, otp_expiry
     """
+    # Import here to avoid circular dependency
     from ..dependencies.auth_dependencies import get_validated_user
-    from ..exceptions import ResendOTPFailedException
     
     # Validation
     user = get_validated_user(email, user_id, db)

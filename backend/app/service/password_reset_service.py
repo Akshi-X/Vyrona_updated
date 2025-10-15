@@ -2,9 +2,11 @@
 Password Reset Service
 
 Handles forgot password and password reset functionality with JWT tokens.
-Implements rate limiting and security best practices.
+Stateless approach - no separate database table needed.
 
 Architecture:
+- Stateless JWT tokens (like login sessions)
+- Audit tracking in User table
 - Business Logic Layer: Pure validation and token operations
 - Orchestration Layer: Coordinates flow and database transactions
 """
@@ -15,11 +17,9 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
 from ..models.user_model import User
-from ..models.password_reset_model import PasswordReset
-from ..auth.auth import get_password_hash, pwd_context
+from ..auth.auth import get_password_hash
 from ..config.config import settings
 from ..service.email_service import send_password_reset_email
-from ..utils.utils import ensure_timezone_aware
 from ..constants.app_constants import (
     ALGORITHM,
     PASSWORD_RESET_TOKEN_EXPIRY_MINUTES,
@@ -58,14 +58,6 @@ def create_password_reset_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def hash_reset_token(token: str) -> str:
-    """Hash reset token for secure database storage"""
-    return pwd_context.hash(token)
-
-
-def verify_reset_token_hash(token: str, token_hash: str) -> bool:
-    """Verify reset token against its hash"""
-    return pwd_context.verify(token, token_hash)
 
 
 def decode_reset_token(token: str) -> Dict[str, Any]:
@@ -188,27 +180,6 @@ def get_user_by_id(user_id: str, email: str, db: Session) -> User:
     return user
 
 
-def get_valid_reset_record(user_id: str, email: str, db: Session) -> Optional[PasswordReset]:
-    """Get valid (unused, non-expired) reset record"""
-    return db.query(PasswordReset).filter(
-        PasswordReset.user_id == user_id,
-        PasswordReset.email == email,
-        PasswordReset.is_used == False,
-        PasswordReset.expires_at > datetime.now(timezone.utc)
-    ).order_by(PasswordReset.created_at.desc()).first()
-
-
-def create_reset_record(user: User, token_hash: str, db: Session) -> PasswordReset:
-    """Create password reset database record"""
-    reset_record = PasswordReset(
-        user_id=user.user_id,
-        email=user.email,
-        token_hash=token_hash,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRY_MINUTES),
-        is_used=False
-    )
-    db.add(reset_record)
-    return reset_record
 
 
 def update_user_password(user: User, new_password: str) -> None:
@@ -217,9 +188,6 @@ def update_user_password(user: User, new_password: str) -> None:
     user.last_password_changed = datetime.now(timezone.utc)
 
 
-def mark_token_as_used(reset_record: PasswordReset) -> None:
-    """Mark reset token as used"""
-    reset_record.is_used = True
 
 
 # ============================================
@@ -230,11 +198,14 @@ def request_password_reset(email: str, db: Session) -> Dict[str, str]:
     """
     Request password reset - sends reset link to user's email
     
+    Stateless approach - no database table for tokens.
+    Only tracks reset attempts in User table for audit.
+    
     Orchestrates:
     1. User validation
-    2. Token generation
+    2. Token generation (JWT)
     3. Email sending
-    4. Database commit
+    4. Audit tracking
     
     Args:
         email: User's email address
@@ -250,46 +221,41 @@ def request_password_reset(email: str, db: Session) -> Dict[str, str]:
     user = get_user_by_email(email, db)
     validate_user_can_reset_password(user)
     
-    # Generate token and hash
+    # Track reset request FIRST (audit trail - track even if email fails)
+    user.last_password_reset_request = datetime.now(timezone.utc)
+    user.password_reset_count = (user.password_reset_count or 0) + 1
+    db.commit()  # Commit audit immediately
+    
+    # Generate JWT token (stateless)
     reset_token = create_password_reset_token(user.user_id, user.email)
-    token_hash = hash_reset_token(reset_token)
     
-    # Create database record
-    reset_record = create_reset_record(user, token_hash, db)
+    # Generate reset link
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
     
+    # Send email (if this fails, audit is already saved)
     try:
-        # Flush to validate before sending email
-        db.flush()
-        
-        # Generate reset link
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-        
-        # Send email (if fails, transaction will rollback)
         send_password_reset_email(user.email, reset_link, user.first_name)
-        
-        # Commit transaction
-        db.commit()
-        
-        return {
-            "email": user.email,
-            "message": "Password reset link has been sent to your email"
-        }
-        
     except Exception as e:
-        db.rollback()
+        # Email failed, but audit already saved
         raise PasswordResetFailedException(reason=str(e))
+    
+    return {
+        "email": user.email,
+        "message": "Password reset link has been sent to your email"
+    }
 
 
 def reset_password(token: str, new_password: str, confirm_password: str, db: Session) -> Dict[str, str]:
     """
     Reset user's password using reset token
     
+    Stateless approach - JWT token validated directly, no database lookup needed.
+    Token expiry and signature validation handled by JWT library.
+    
     Orchestrates:
     1. Password validation
-    2. Token verification
-    3. Database record check
-    4. Password update
-    5. Token invalidation
+    2. Token verification (JWT)
+    3. Password update
     
     Args:
         token: Password reset JWT token
@@ -307,27 +273,17 @@ def reset_password(token: str, new_password: str, confirm_password: str, db: Ses
     validate_passwords_match(new_password, confirm_password)
     validate_password_strength(new_password)
     
-    # Decode and validate token
+    # Decode and validate JWT token (stateless - no DB check needed)
     token_data = decode_reset_token(token)
     user_id = token_data["user_id"]
     email = token_data["email"]
-    
-    # Get and validate reset record
-    reset_record = get_valid_reset_record(user_id, email, db)
-    if not reset_record:
-        raise InvalidResetTokenException()
-    
-    # Verify token hash
-    if not verify_reset_token_hash(token, reset_record.token_hash):
-        raise InvalidResetTokenException()
     
     # Get user
     user = get_user_by_id(user_id, email, db)
     
     try:
-        # Update password and mark token as used
+        # Update password
         update_user_password(user, new_password)
-        mark_token_as_used(reset_record)
         
         # Commit changes
         db.commit()

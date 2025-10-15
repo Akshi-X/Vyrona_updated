@@ -15,7 +15,15 @@ from app.schemas.response_schema import (
 )
 from app.service.email_service import send_approval_email
 from app.utils import utils
-from app.exceptions import EmailAlreadyExistsException, DatabaseQueryException
+from app.exceptions import (
+    EmailAlreadyExistsException,
+    DatabaseQueryException,
+    UserApproveNotFoundException,
+    UserRejectNotFoundException,
+    UserGetNotFoundException,
+    CompanyAccessForbiddenException,
+    RegistrationEmailFailedException
+)
 from app.constants.app_constants import (
     ADMIN_SESSION_TIMEOUT_MINUTES,
     MANAGER_SESSION_TIMEOUT_MINUTES,
@@ -147,7 +155,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         
         # If it's an email error, raise a more specific exception
         if 'email' in str(e).lower() or 'smtp' in str(e).lower():
-            from ..exceptions import RegistrationEmailFailedException
             raise RegistrationEmailFailedException(email=request.email, reason=str(e))
         else:
             raise DatabaseQueryException(operation="user registration", reason=str(e))
@@ -190,8 +197,6 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     Raises:
         UserApproveNotFoundException: If user not found
     """
-    from ..exceptions import UserApproveNotFoundException
-    
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
@@ -233,8 +238,6 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     Raises:
         UserRejectNotFoundException: If user not found
     """
-    from ..exceptions import UserRejectNotFoundException
-    
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
@@ -273,8 +276,6 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
         UserGetNotFoundException: If user not found
         CompanyAccessForbiddenException: If trying to access user from different company
     """
-    from ..exceptions import UserGetNotFoundException, CompanyAccessForbiddenException
-    
     # Get target user from database
     target_user = db.query(user_model.User).filter(user_model.User.user_id == user_id).first()
     if not target_user:
