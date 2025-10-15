@@ -9,6 +9,7 @@ from ..models.otp_model import OTP
 from ..models.user_model import User
 from ..auth.auth import create_access_token
 from ..exceptions import ResendOTPFailedException
+from ..utils.utils import get_user_by_email, get_user_by_id
 from .email_service import send_otp_email
 
 
@@ -114,38 +115,6 @@ def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
         raise Exception(f"Failed to verify OTP: {str(e)}")
 
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    """
-    Get user by email address
-    
-    Args:
-        db: Database session
-        email: User's email address
-        
-    Returns:
-        User object if found, None otherwise
-    """
-    try:
-        return db.query(User).filter(User.email == email).first()
-    except Exception as e:
-        raise Exception(f"Failed to get user by email: {str(e)}")
-
-
-def get_user_by_user_id(db: Session, user_id: str) -> Optional[User]:
-    """
-    Get user by user ID
-    
-    Args:
-        db: Database session
-        user_id: User's ID
-        
-    Returns:
-        User object if found, None otherwise
-    """
-    try:
-        return db.query(User).filter(User.user_id == user_id).first()
-    except Exception as e:
-        raise Exception(f"Failed to get user by user ID: {str(e)}")
 
 
 def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:

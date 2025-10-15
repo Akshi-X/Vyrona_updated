@@ -20,6 +20,8 @@ from ..models.user_model import User
 from ..auth.auth import get_password_hash
 from ..config.config import settings
 from ..service.email_service import send_password_reset_email
+from ..utils.utils import get_user_by_email as utils_get_user_by_email
+from ..utils.utils import get_user_by_id as utils_get_user_by_id
 from ..constants.app_constants import (
     ALGORITHM,
     PASSWORD_RESET_TOKEN_EXPIRY_MINUTES,
@@ -154,27 +156,27 @@ def validate_user_can_reset_password(user: User) -> None:
 # BUSINESS LOGIC - Database Operations
 # ============================================
 
-def get_user_by_email(email: str, db: Session) -> User:
+def get_validated_user_by_email(email: str, db: Session) -> User:
     """
-    Get user by email
+    Get user by email with validation for password reset
     
     Raises:
         PasswordResetUserNotFoundException: User not found
     """
-    user = db.query(User).filter(User.email == email).first()
+    user = utils_get_user_by_email(email, db)
     if not user:
         raise PasswordResetUserNotFoundException(email=email)
     return user
 
 
-def get_user_by_id(user_id: str, email: str, db: Session) -> User:
+def get_validated_user_by_id(user_id: str, email: str, db: Session) -> User:
     """
-    Get user by ID and validate email matches
+    Get user by ID and validate email matches for password reset
     
     Raises:
         PasswordResetUserNotFoundException: User not found
     """
-    user = db.query(User).filter(User.user_id == user_id).first()
+    user = utils_get_user_by_id(user_id, db)
     if not user:
         raise PasswordResetUserNotFoundException(email=email)
     return user
@@ -218,7 +220,7 @@ def request_password_reset(email: str, db: Session) -> Dict[str, str]:
         Various PasswordResetException subclasses
     """
     # Validate user
-    user = get_user_by_email(email, db)
+    user = get_validated_user_by_email(email, db)
     validate_user_can_reset_password(user)
     
     # Track reset request FIRST (audit trail - track even if email fails)
@@ -279,7 +281,7 @@ def reset_password(token: str, new_password: str, confirm_password: str, db: Ses
     email = token_data["email"]
     
     # Get user
-    user = get_user_by_id(user_id, email, db)
+    user = get_validated_user_by_id(user_id, email, db)
     
     try:
         # Update password
