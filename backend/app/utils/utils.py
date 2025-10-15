@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from passlib.context import CryptContext
 
+from ..models.user_model import User
+
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -29,3 +31,35 @@ def ensure_timezone_aware(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+# ============================================
+# DATABASE QUERY UTILITIES
+# ============================================
+
+def get_user_by_email(email: str, db) -> User:
+    """
+    Get user by email address (common utility)
+    
+    Args:
+        email: User's email address
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        User object if found, None otherwise
+    """
+    return db.query(User).filter(User.email == email).first()
+
+
+def get_user_by_id(user_id: str, db) -> User:
+    """
+    Get user by user ID (common utility)
+    
+    Args:
+        user_id: User's ID
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        User object if found, None otherwise
+    """
+    return db.query(User).filter(User.user_id == user_id).first()
