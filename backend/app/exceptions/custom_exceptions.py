@@ -504,6 +504,150 @@ class UserFromTokenNotFoundException(TokenException):
 
 
 # ============================================
+# PASSWORD RESET EXCEPTIONS
+# ============================================
+
+class PasswordResetException(AppException):
+    """Base exception for password reset errors"""
+    
+    def __init__(self, message: str, error_code: str, status_code: int = 400, **kwargs):
+        super().__init__(message, error_code, status_code, kwargs)
+
+
+class PasswordResetUserNotFoundException(PasswordResetException):
+    """User not found during password reset"""
+    
+    def __init__(self, email: str):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_USER_NOT_FOUND,
+            error_code=ERROR_CODES["RESET_USER_NOT_FOUND"],
+            status_code=404,
+            email=email
+        )
+
+
+class InvalidResetTokenException(PasswordResetException):
+    """Invalid or expired password reset token"""
+    
+    def __init__(self):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_TOKEN_INVALID,
+            error_code=ERROR_CODES["RESET_TOKEN_INVALID"],
+            status_code=400
+        )
+
+
+class ResetTokenExpiredException(PasswordResetException):
+    """Password reset token has expired"""
+    
+    def __init__(self):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_TOKEN_EXPIRED,
+            error_code=ERROR_CODES["RESET_TOKEN_EXPIRED"],
+            status_code=400
+        )
+
+
+class PasswordResetFailedException(PasswordResetException):
+    """Failed to reset password"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.PASSWORD_RESET_FAILED,
+            error_code=ERROR_CODES["PASSWORD_RESET_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class PasswordResetRateLimitException(PasswordResetException):
+    """Too many password reset requests"""
+    
+    def __init__(self, email: str, retry_after_minutes: int):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=f"{ErrorMessages.RESET_RATE_LIMIT} (retry after {retry_after_minutes} minutes)",
+            error_code=ERROR_CODES["RESET_RATE_LIMIT"],
+            status_code=429,
+            email=email,
+            retry_after_minutes=retry_after_minutes
+        )
+
+
+class ResetPasswordMismatchException(PasswordResetException):
+    """New password and confirm password don't match"""
+    
+    def __init__(self):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_PASSWORD_MISMATCH,
+            error_code=ERROR_CODES["RESET_PASSWORD_MISMATCH"],
+            status_code=400
+        )
+
+
+class ResetWeakPasswordException(PasswordResetException):
+    """Password doesn't meet security requirements"""
+    
+    def __init__(self, reason: str):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=f"{ErrorMessages.RESET_WEAK_PASSWORD}: {reason}",
+            error_code=ERROR_CODES["RESET_WEAK_PASSWORD"],
+            status_code=400,
+            reason=reason
+        )
+
+
+class ResetUserNotApprovedException(PasswordResetException):
+    """User account not approved yet - cannot reset password"""
+    
+    def __init__(self, email: str):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_USER_NOT_APPROVED,
+            error_code=ERROR_CODES["RESET_USER_NOT_APPROVED"],
+            status_code=403,
+            email=email
+        )
+
+
+class ResetAccountLockedException(PasswordResetException):
+    """Account is locked - cannot reset password"""
+    
+    def __init__(self, email: str):
+        from ..constants.error_codes import ERROR_CODES
+        from ..constants.messages import ErrorMessages
+        
+        super().__init__(
+            message=ErrorMessages.RESET_ACCOUNT_LOCKED,
+            error_code=ERROR_CODES["RESET_ACCOUNT_LOCKED"],
+            status_code=403,
+            email=email
+        )
+
+
+# ============================================
 # DATABASE EXCEPTIONS (Extended)
 # ============================================
 
