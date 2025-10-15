@@ -16,6 +16,14 @@ from ..config.database import SessionLocal
 from ..config.permissions import EndpointPermissions
 from ..models.user_model import User
 from ..constants.error_codes import ERROR_CODES
+from ..exceptions import (
+    InvalidTokenException,
+    TokenExpiredException,
+    UserFromTokenNotFoundException,
+    AccountInactiveException,
+    UserNotApprovedException,
+    AppException
+)
 
 
 class TokenValidationMiddleware(BaseHTTPMiddleware):
@@ -42,15 +50,6 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         # Protected endpoint - VALIDATE TOKEN
-        from ..exceptions import (
-            InvalidTokenException,
-            TokenExpiredException,
-            UserFromTokenNotFoundException,
-            AccountInactiveException,
-            UserNotApprovedException,
-            AppException
-        )
-        
         try:
             # Extract token from Authorization header
             auth_header = request.headers.get("Authorization")
