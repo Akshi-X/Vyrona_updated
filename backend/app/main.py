@@ -15,7 +15,7 @@ from app.middleware.request_validation_middleware import RequestValidationMiddle
 from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.token_validation_middleware import TokenValidationMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
-
+w
 # Create logs directory if it doesn't exist (BEFORE logging setup)
 os.makedirs('logs', exist_ok=True)
 
