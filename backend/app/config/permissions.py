@@ -30,6 +30,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("*", "/api/login"),
     ("*", "/api/verify-otp"),
     ("*", "/api/resend-otp"),
+    ("*", "/api/forgot-password"),
+    ("*", "/api/reset-password"),
     ("*", "/api/approval-screen"),
     ("*", "/health"),
     ("*", "/docs"),

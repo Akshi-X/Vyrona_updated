@@ -11,7 +11,10 @@ These exceptions follow industry standards:
 
 from typing import Optional, Dict, Any
 from datetime import datetime
+
 from ..constants.status_constants import STATUS_FAILED
+from ..constants.error_codes import ERROR_CODES
+from ..constants.messages import ErrorMessages
 
 
 class AppException(Exception):
@@ -57,11 +60,7 @@ class UserNotFoundException(AuthenticationException):
     """User not found in the system"""
     
     def __init__(self, email: Optional[str] = None, user_id: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         details = {}
-
             
         super().__init__(
             message=ErrorMessages.INVALID_USER_OR_EMAIL,
@@ -74,10 +73,6 @@ class UserNotApprovedException(AuthenticationException):
     """User account is not approved yet"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_LOGIN_002
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_NOT_APPROVED,
             error_code=ERROR_CODES["USER_NOT_APPROVED"],
@@ -90,10 +85,6 @@ class InvalidCredentialsException(AuthenticationException):
     """Invalid login credentials"""
     
     def __init__(self, email: str, attempts_remaining: Optional[int] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_LOGIN_003
-        from ..constants.messages import ErrorMessages
-        
         message = ErrorMessages.INVALID_CREDENTIALS
         if attempts_remaining is not None:
             message = f"{message}. {attempts_remaining} attempts remaining before account lock."
@@ -111,9 +102,6 @@ class AccountLockedException(AuthenticationException):
     """Account is locked due to too many failed login attempts"""
     
     def __init__(self, user_id: str, unlock_time: Optional[datetime], minutes_remaining: int):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_LOGIN_005
-        
         unlock_time_str = unlock_time.isoformat() if unlock_time else None
         
         super().__init__(
@@ -130,9 +118,6 @@ class AccountInactiveException(AuthenticationException):
     """Account is inactive (status = False)"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_LOGIN_006
-        
         super().__init__(
             message="Your account has been deactivated. Please contact support.",
             error_code=ERROR_CODES["ACCOUNT_REJECTED"],
@@ -156,10 +141,6 @@ class InvalidOTPException(OTPException):
     """Invalid or incorrect OTP code"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_OTP_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.OTP_EXPIRED,
             error_code=ERROR_CODES["INVALID_OTP"],
@@ -172,10 +153,6 @@ class OTPExpiredException(OTPException):
     """OTP has expired"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_OTP_002
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.OTP_EXPIRED,
             error_code=ERROR_CODES["OTP_EXPIRED"],
@@ -188,10 +165,6 @@ class OTPSendFailedException(OTPException):
     """Failed to send OTP to user"""
     
     def __init__(self, email: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_LOGIN_004
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.OTP_SEND_FAILED,
             error_code=ERROR_CODES["OTP_SEND_FAILED"],
@@ -205,10 +178,6 @@ class OTPUserNotFoundException(OTPException):
     """User not found during OTP verification"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_OTP_003
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_NOT_FOUND,
             error_code=ERROR_CODES["OTP_USER_NOT_FOUND"],
@@ -225,10 +194,6 @@ class ResendOTPInvalidUserException(OTPException):
     """Invalid user ID or email for resend OTP"""
     
     def __init__(self, user_id: str, email: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_RESEND_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.INVALID_USER_OR_EMAIL,
             error_code=ERROR_CODES["RESEND_INVALID_USER"],
@@ -242,10 +207,6 @@ class ResendOTPUserNotApprovedException(OTPException):
     """User not approved for resend OTP"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_RESEND_002
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_NOT_APPROVED,
             error_code=ERROR_CODES["RESEND_USER_NOT_APPROVED"],
@@ -258,10 +219,6 @@ class ResendOTPFailedException(OTPException):
     """Failed to resend OTP"""
     
     def __init__(self, email: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_RESEND_003
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.OTP_SEND_FAILED,
             error_code=ERROR_CODES["RESEND_OTP_FAILED"],
@@ -286,9 +243,6 @@ class UserGetNotFoundException(UserManagementException):
     """User not found in GET operation"""
     
     def __init__(self, registration_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # USER_GET_001
-        
         super().__init__(
             message="User not found",
             error_code=ERROR_CODES["USER_GET_NOT_FOUND"],
@@ -301,9 +255,6 @@ class UserApproveNotFoundException(UserManagementException):
     """User not found in APPROVE operation"""
     
     def __init__(self, registration_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # USER_APPROVE_001
-        
         super().__init__(
             message="User not found",
             error_code=ERROR_CODES["APPROVE_USER_NOT_FOUND"],
@@ -316,10 +267,6 @@ class UserRejectNotFoundException(UserManagementException):
     """User not found in REJECT operation"""
     
     def __init__(self, registration_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # USER_REJECT_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_NOT_FOUND,
             error_code=ERROR_CODES["REJECT_USER_NOT_FOUND"],
@@ -343,10 +290,6 @@ class EmailAlreadyExistsException(RegistrationException):
     """Email already registered"""
     
     def __init__(self, email: str):
-        from ..constants.error_codes import ERROR_CODES
-        # REG_CREATE_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.EMAIL_ALREADY_EXISTS,
             error_code=ERROR_CODES["EMAIL_ALREADY_EXISTS"],
@@ -359,10 +302,6 @@ class PasswordMismatchException(RegistrationException):
     """Passwords do not match"""
     
     def __init__(self):
-        from ..constants.error_codes import ERROR_CODES
-        # REG_CREATE_002
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.PASSWORD_MISMATCH,
             error_code=ERROR_CODES["PASSWORD_MISMATCH"],
@@ -374,9 +313,6 @@ class RegistrationEmailFailedException(RegistrationException):
     """Failed to send registration approval email"""
     
     def __init__(self, email: str, reason: str = "Email service unavailable"):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=f"{ErrorMessages.REGISTRATION_EMAIL_FAILED}. Please try again later.",
             error_code=ERROR_CODES["REGISTRATION_EMAIL_FAILED"],
@@ -405,9 +341,6 @@ class EmailServiceException(AppException):
     """Email service operation failed"""
     
     def __init__(self, recipient: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # EMAIL_SEND_001
-        
         super().__init__(
             message="Failed to send email",
             error_code=ERROR_CODES["EMAIL_SMTP_FAILED"],
@@ -420,9 +353,6 @@ class TemplateNotFoundException(AppException):
     """Email template not found"""
     
     def __init__(self, template_name: str):
-        from ..constants.error_codes import ERROR_CODES
-        # EMAIL_SEND_004
-        
         super().__init__(
             message=f"Email template '{template_name}' not found",
             error_code=ERROR_CODES["EMAIL_TEMPLATE_NOT_FOUND"],
@@ -435,9 +365,6 @@ class TemplateRenderException(AppException):
     """Email template rendering failed"""
     
     def __init__(self, template_name: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # EMAIL_SEND_005
-        
         super().__init__(
             message=f"Failed to render email template '{template_name}'",
             error_code=ERROR_CODES["EMAIL_TEMPLATE_RENDER_FAILED"],
@@ -461,10 +388,6 @@ class InvalidTokenException(TokenException):
     """Invalid or malformed token"""
     
     def __init__(self):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_TOKEN_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.INVALID_TOKEN,
             error_code=ERROR_CODES["TOKEN_INVALID"],
@@ -476,10 +399,6 @@ class TokenExpiredException(TokenException):
     """Token has expired"""
     
     def __init__(self):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_TOKEN_002
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.TOKEN_EXPIRED,
             error_code=ERROR_CODES["TOKEN_EXPIRED"],
@@ -491,15 +410,128 @@ class UserFromTokenNotFoundException(TokenException):
     """User not found from token"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        # AUTH_TOKEN_001
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_NOT_FOUND,
             error_code=ERROR_CODES["TOKEN_INVALID"],
             status_code=401,
             user_id=user_id
+        )
+
+
+# ============================================
+# PASSWORD RESET EXCEPTIONS
+# ============================================
+
+class PasswordResetException(AppException):
+    """Base exception for password reset errors"""
+    
+    def __init__(self, message: str, error_code: str, status_code: int = 400, **kwargs):
+        super().__init__(message, error_code, status_code, kwargs)
+
+
+class PasswordResetUserNotFoundException(PasswordResetException):
+    """User not found during password reset"""
+    
+    def __init__(self, email: str):
+        super().__init__(
+            message=ErrorMessages.RESET_USER_NOT_FOUND,
+            error_code=ERROR_CODES["RESET_USER_NOT_FOUND"],
+            status_code=404,
+            email=email
+        )
+
+
+class InvalidResetTokenException(PasswordResetException):
+    """Invalid or expired password reset token"""
+    
+    def __init__(self):
+        super().__init__(
+            message=ErrorMessages.RESET_TOKEN_INVALID,
+            error_code=ERROR_CODES["RESET_TOKEN_INVALID"],
+            status_code=400
+        )
+
+
+class ResetTokenExpiredException(PasswordResetException):
+    """Password reset token has expired"""
+    
+    def __init__(self):
+        super().__init__(
+            message=ErrorMessages.RESET_TOKEN_EXPIRED,
+            error_code=ERROR_CODES["RESET_TOKEN_EXPIRED"],
+            status_code=400
+        )
+
+
+class PasswordResetFailedException(PasswordResetException):
+    """Failed to reset password"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.PASSWORD_RESET_FAILED,
+            error_code=ERROR_CODES["PASSWORD_RESET_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class PasswordResetRateLimitException(PasswordResetException):
+    """Too many password reset requests"""
+    
+    def __init__(self, email: str, retry_after_minutes: int):
+        super().__init__(
+            message=f"{ErrorMessages.RESET_RATE_LIMIT} (retry after {retry_after_minutes} minutes)",
+            error_code=ERROR_CODES["RESET_RATE_LIMIT"],
+            status_code=429,
+            email=email,
+            retry_after_minutes=retry_after_minutes
+        )
+
+
+class ResetPasswordMismatchException(PasswordResetException):
+    """New password and confirm password don't match"""
+    
+    def __init__(self):
+        super().__init__(
+            message=ErrorMessages.RESET_PASSWORD_MISMATCH,
+            error_code=ERROR_CODES["RESET_PASSWORD_MISMATCH"],
+            status_code=400
+        )
+
+
+class ResetWeakPasswordException(PasswordResetException):
+    """Password doesn't meet security requirements"""
+    
+    def __init__(self, reason: str):
+        super().__init__(
+            message=f"{ErrorMessages.RESET_WEAK_PASSWORD}: {reason}",
+            error_code=ERROR_CODES["RESET_WEAK_PASSWORD"],
+            status_code=400,
+            reason=reason
+        )
+
+
+class ResetUserNotApprovedException(PasswordResetException):
+    """User account not approved yet - cannot reset password"""
+    
+    def __init__(self, email: str):
+        super().__init__(
+            message=ErrorMessages.RESET_USER_NOT_APPROVED,
+            error_code=ERROR_CODES["RESET_USER_NOT_APPROVED"],
+            status_code=403,
+            email=email
+        )
+
+
+class ResetAccountLockedException(PasswordResetException):
+    """Account is locked - cannot reset password"""
+    
+    def __init__(self, email: str):
+        super().__init__(
+            message=ErrorMessages.RESET_ACCOUNT_LOCKED,
+            error_code=ERROR_CODES["RESET_ACCOUNT_LOCKED"],
+            status_code=403,
+            email=email
         )
 
 
@@ -511,9 +543,6 @@ class IntegrityConstraintException(AppException):
     """Database integrity constraint violation (e.g., duplicate email)"""
     
     def __init__(self, constraint: str, details: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # REG_CREATE_001
-        
         super().__init__(
             message=f"Database constraint violation: {constraint}",
             error_code=ERROR_CODES["EMAIL_ALREADY_EXISTS"],
@@ -526,9 +555,6 @@ class DatabaseQueryException(AppException):
     """Database query failed"""
     
     def __init__(self, operation: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        # DB_QUERY_001
-        
         super().__init__(
             message=f"Database query failed: {operation}",
             error_code=ERROR_CODES["DB_QUERY_FAILED"],
@@ -552,9 +578,6 @@ class AuthenticationRequiredException(AppException):
     """User authentication required (401)"""
     
     def __init__(self):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.AUTHENTICATION_REQUIRED,
             error_code=ERROR_CODES["TOKEN_REQUIRED"],
@@ -566,9 +589,6 @@ class AdminRoleRequiredException(AuthorizationException):
     """Admin role required for this operation"""
     
     def __init__(self, user_role: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.ADMIN_ROLE_REQUIRED,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -581,9 +601,6 @@ class ManagerRoleRequiredException(AuthorizationException):
     """Manager role required for this operation"""
     
     def __init__(self, user_role: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.MANAGER_ROLE_REQUIRED,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -596,9 +613,6 @@ class UserRoleRequiredException(AuthorizationException):
     """User role required for this operation"""
     
     def __init__(self, user_role: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.USER_ROLE_REQUIRED,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -611,8 +625,6 @@ class InsufficientPermissionsException(AuthorizationException):
     """User doesn't have required permissions"""
     
     def __init__(self, user_role: str, required_roles: list):
-        from ..constants.error_codes import ERROR_CODES
-        
         super().__init__(
             message=f"Access forbidden. Required roles: {', '.join(required_roles)}",
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -625,9 +637,6 @@ class CompanyAccessForbiddenException(AuthorizationException):
     """User cannot access data from another company (multi-tenant)"""
     
     def __init__(self, user_company: str, target_company: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.COMPANY_DATA_ONLY,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -640,9 +649,6 @@ class ManagerApprovalOnlyException(AuthorizationException):
     """Only managers can approve users"""
     
     def __init__(self, user_role: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.MANAGER_APPROVE_ONLY,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
@@ -654,9 +660,6 @@ class ManagerShipmentManagementOnlyException(AuthorizationException):
     """Only managers can manage shipments"""
     
     def __init__(self, user_role: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
-        
         super().__init__(
             message=ErrorMessages.MANAGER_MANAGE_SHIPMENTS_ONLY,
             error_code=ERROR_CODES["ACCESS_FORBIDDEN"],
