@@ -3,12 +3,14 @@ import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
+import { useAuth } from "../../contexts/AuthContext";
 
 const VerifyOtp: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { login } = useAuth();
 
-    const { userId, email, otpExpiry } = location.state || {};
+    const { userId, otpExpiry, fromPath } = location.state || {};
 
     const [otp, setOtp] = useState("");
     const [error, setError] = useState("");
@@ -51,8 +53,11 @@ const VerifyOtp: React.FC = () => {
 
             if (response.data.status === "Logged In") {
                 setSuccess("OTP verified successfully!");
-                localStorage.setItem("auth_token", response.data.auth_token);
-                setTimeout(() => navigate("/dashboard"), 1000);
+                // Save auth token using context
+                login(response.data.auth_token);
+                // Redirect back to original page if provided, else dashboard
+                const target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
+                setTimeout(() => navigate(target, { replace: true }), 500);
             } else {
                 setError(response.data.message || "Invalid OTP");
             }

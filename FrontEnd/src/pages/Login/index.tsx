@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
@@ -14,6 +14,7 @@ const Login: React.FC = () => {
     const [apiError, setApiError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
 
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const validateEmail = (email: string) => {
@@ -73,12 +74,18 @@ const Login: React.FC = () => {
             });
 
             if (response.data.status === "OTP Sent") {
+                // Preserve original destination (if any) to return after OTP login
+                const from = (location.state as any)?.from;
+                const fromPath = from
+                    ? `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`
+                    : undefined;
                 // Example: navigate to OTP page
                 navigate("/verify-otp", {
                     state: {
                         userId: response.data.user_id,
                         email: response.data.email,
                         otpExpiry: response.data.otp_expiry,
+                        fromPath,
                     },
                 });
             } else {
@@ -135,6 +142,7 @@ const Login: React.FC = () => {
                     </p>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        
                         {/* Email Field */}
                         <div className="relative w-full my-4">
                             <input
@@ -206,10 +214,15 @@ const Login: React.FC = () => {
                         {/* Sign In Button */}
                         <button
                             type="submit"
-                            className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition"
+                            disabled={loading}
+                            className={`w-full py-3 mb-2 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96]"
+                                }`}
                         >
-                            Sign in
+                            {loading ? "Signing in..." : "Sign in"}
                         </button>
+                        {apiError && (
+                            <p className="text-sm text-red-500 flex justify-center">{apiError}</p>
+                        )}
                     </form>
 
                     {/* Footer */}
@@ -219,7 +232,13 @@ const Login: React.FC = () => {
                             Create an account
                         </Link>
                     </p>
+
                 </div>
+                <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
+                    Having trouble logging in? Contact <a href="#" className="text-[#6b1176] inline">
+                        ITAdmin@MyGrape.com
+                    </a>{" "} for help.
+                </p>
             </main>
         </div>
     );
