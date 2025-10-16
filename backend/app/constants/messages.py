@@ -29,6 +29,17 @@ class ErrorMessages:
     OTP_SEND_FAILED = "Failed to send OTP. Please try again"
     OTP_MAX_ATTEMPTS = "Maximum OTP attempts exceeded. Please request a new OTP"
     
+    # Password Reset
+    RESET_USER_NOT_FOUND = "No account found with this email address"
+    RESET_TOKEN_INVALID = "Invalid or expired password reset link. Please request a new one"
+    RESET_TOKEN_EXPIRED = "Password reset link has expired. Please request a new one"
+    PASSWORD_RESET_FAILED = "Failed to reset password. Please try again"
+    RESET_RATE_LIMIT = "Too many password reset requests. Please try again later"
+    RESET_PASSWORD_MISMATCH = "Passwords do not match"
+    RESET_WEAK_PASSWORD = "Password does not meet security requirements"
+    RESET_USER_NOT_APPROVED = "Your account is not approved yet. Cannot reset password"
+    RESET_ACCOUNT_LOCKED = "Your account is locked. Please contact support"
+    
     # Registration
     EMAIL_ALREADY_EXISTS = "This email is already registered"
     PASSWORD_MISMATCH = "Passwords do not match"
@@ -125,6 +136,9 @@ class SuccessMessages:
     FEEDBACK_COMMENT_ADDED = "Comment added successfully"
     FEEDBACK_STATUS_UPDATED = "Feedback status updated successfully"
     FEEDBACK_RETRIEVED = "Feedback retrieved successfully"
+    # Password Reset
+    PASSWORD_RESET_EMAIL_SENT = "Password reset link has been sent to your email"
+    PASSWORD_RESET_SUCCESS = "Password reset successful. Please login with your new password"
 
 
 class InfoMessages:

@@ -13,8 +13,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
 from ..constants.messages import ErrorMessages
-
+from ..constants.error_codes import ERROR_CODES
 from ..config.database import SessionLocal
+from ..exceptions import AppException, PasswordMismatchException
+from ..dependencies.auth_dependencies import (
+    validate_login_request,
+    validate_get_user_request,
+    validate_approve_user_request,
+    validate_reject_user_request
+)
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -78,8 +85,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_login(self, request: Request):
         """Validate login request."""
-        from ..exceptions.custom_exceptions import AppException
-        
         try:
             body = await request.body()
             request._body = body  # Store for controller to use
@@ -100,7 +105,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 )
             
             # Validate using dependency function
-            from ..dependencies.auth_dependencies import validate_login_request
             db = SessionLocal()
             try:
                 user = validate_login_request(email, password, db)
@@ -146,8 +150,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_registration(self, request: Request):
         """Validate registration request."""
-        from ..exceptions.custom_exceptions import AppException
-        
         try:
             print("Validating registration request in middleware...")
             body = await request.body()
@@ -158,7 +160,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             
             if data.get("password") != data.get("confirm_password"):
                 print("Password mismatch detected")
-                from ..exceptions import PasswordMismatchException
                 raise PasswordMismatchException()
             
             print("Middleware validation passed, continuing to controller...")
@@ -194,8 +195,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_otp(self, request: Request):
         """Validate OTP verification BEFORE controller - catches ALL exceptions"""
-        from ..exceptions.custom_exceptions import AppException
-        
         try:
             body = await request.body()
             request._body = body
@@ -241,8 +240,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_resend_otp(self, request: Request):
         """Validate resend OTP request."""
-        from ..exceptions.custom_exceptions import AppException
-        
         try:
             body = await request.body()
             request._body = body
@@ -288,9 +285,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_get_user(self, request: Request, user_id: str):
         """Validate get user request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..dependencies.auth_dependencies import validate_get_user_request
-        
         db = SessionLocal()
         try:
             target_user = validate_get_user_request(user_id, db)
@@ -314,9 +308,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_approve_user(self, request: Request):
         """Validate approve user request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..dependencies.auth_dependencies import validate_approve_user_request
-        
         try:
             body = await request.body()
             request._body = body
@@ -356,9 +347,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_reject_user(self, request: Request):
         """Validate reject user request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..dependencies.auth_dependencies import validate_reject_user_request
-        
         try:
             body = await request.body()
             request._body = body

@@ -14,6 +14,11 @@ from ..constants.app_constants import (
     EMAIL_APPROVAL_SUBJECT, EMAIL_OTP_SUBJECT, OTP_EXPIRY_MINUTES,
     EMAIL_FEEDBACK_NEW_TICKET_SUBJECT, EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT, 
     EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT
+    EMAIL_APPROVAL_SUBJECT,
+    EMAIL_OTP_SUBJECT,
+    EMAIL_PASSWORD_RESET_SUBJECT,
+    OTP_EXPIRY_MINUTES,
+    PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
 )
 from ..exceptions import EmailServiceException, TemplateNotFoundException, TemplateRenderException
 
@@ -436,3 +441,37 @@ def send_feedback_new_comment_email(
     
     # Send to admin
     send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+def send_password_reset_email(user_email: str, reset_link: str, first_name: str):
+    """
+    Send password reset link to user's email with HTML template
+    Clean exception handling!
+    
+    Args:
+        user_email: User's email address
+        reset_link: Password reset URL with token
+        first_name: User's first name for personalization
+        
+    Raises:
+        TemplateNotFoundException: If template file not found
+        TemplateRenderException: If template rendering fails
+        EmailServiceException: If email sending fails
+    """
+    subject = EMAIL_PASSWORD_RESET_SUBJECT
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("password_reset_email.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="password_reset_email.html")
+    
+    try:
+        html_body = template.render(
+            first_name=first_name,
+            reset_link=reset_link,
+            expiry_minutes=PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="password_reset_email.html", reason=str(e))
+    
+    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    send_email(user_email, subject, html_body)
