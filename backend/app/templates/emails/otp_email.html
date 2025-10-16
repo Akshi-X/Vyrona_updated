@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+            color: #333333;
+        }
+        .content h2 {
+            color: #11998e;
+            font-size: 20px;
+            margin-top: 0;
+        }
+        .otp-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .otp-code {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .otp-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning-box p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #856404;
+        }
+        .info-box {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #0c5460;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 20px 0;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">🔐</div>
+            <h1>{{ subject }}</h1>
+        </div>
+        
+        <div class="content">
+            <h2>Your One-Time Password</h2>
+            <p>Hello,</p>
+            <p>You've requested to log in to your myGrape account. Please use the OTP below to complete your login:</p>
+            
+            <div class="otp-box">
+                <div class="otp-label">Your OTP Code</div>
+                <div class="otp-code">{{ otp_code }}</div>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>⏱️ Important:</strong> This OTP is valid for <strong>{{ expiry_minutes }} minutes</strong> only.</p>
+                <p>Please enter it in your login screen to continue.</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="warning-box">
+                <p><strong>⚠️ Security Notice:</strong></p>
+                <p>• Never share this OTP with anyone</p>
+                <p>• myGrape will never ask for your OTP via email or phone</p>
+                <p>• If you didn't request this OTP, please ignore this email</p>
+            </div>
+            
+            <p style="font-size: 14px; color: #6c757d; margin-top: 20px;">
+                Need help? Contact our support team if you're having trouble logging in.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>myGrape</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="margin-top: 10px; font-size: 11px;">
+                © 2025 myGrape. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

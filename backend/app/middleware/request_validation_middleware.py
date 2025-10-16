@@ -1,0 +1,381 @@
+
+"""
+Request Validation Middleware
+
+Validates requests before reaching controllers.
+"""
+
+import json
+from typing import Callable
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from datetime import datetime, timezone
+from ..constants.status_constants import STATUS_FAILED
+from ..constants.messages import ErrorMessages
+from ..constants.error_codes import ERROR_CODES
+from ..config.database import SessionLocal
+from ..exceptions import AppException, PasswordMismatchException
+from ..dependencies.auth_dependencies import (
+    validate_login_request,
+    validate_get_user_request,
+    validate_approve_user_request,
+    validate_reject_user_request
+)
+
+
+class RequestValidationMiddleware(BaseHTTPMiddleware):
+    """Validates requests before they reach controllers."""
+    
+    async def dispatch(self, request: Request, call_next: Callable):
+        # Get path and method
+        path = request.url.path
+        method = request.method
+        
+        # Only validate specific endpoints
+        if method == "POST":
+            # Validate based on endpoint
+            if path == "/api/login":
+                response = await self._validate_login(request)
+                if response:
+                    return response  # Validation failed, return error
+            
+            # Registration validation handled by Pydantic schema + dependency
+            
+            elif path == "/api/verify-otp":
+                response = await self._validate_otp(request)
+                if response:
+                    return response  # Validation failed, return error
+            
+            elif path == "/api/resend-otp":
+                response = await self._validate_resend_otp(request)
+                if response:
+                    return response  # Validation failed, return error
+            
+            elif path == "/api/user/approve":
+                response = await self._validate_approve_user(request)
+                if response:
+                    return response  # Validation failed, return error
+            
+            elif path == "/api/user/reject":
+                response = await self._validate_reject_user(request)
+                if response:
+                    return response  # Validation failed, return error
+        
+        elif method == "GET":
+            # Validate GET endpoints
+            if path.startswith("/api/user/") and path != "/api/user/approve" and path != "/api/user/reject":
+                # Extract user_id from path /api/user/{user_id}
+                parts = path.split("/")
+                if len(parts) == 4:  # /api/user/{user_id}
+                    user_id = parts[3]
+                    response = await self._validate_get_user(request, user_id)
+                    if response:
+                        return response  # Validation failed, return error
+        
+        # Validation passed (or endpoint doesn't need validation)
+        # Continue to controller
+        response = await call_next(request)
+        return response
+    
+    async def _validate_login(self, request: Request):
+        """Validate login request."""
+        try:
+            body = await request.body()
+            request._body = body  # Store for controller to use
+            data = json.loads(body)
+            
+            email = data.get("email")
+            password = data.get("password")
+            
+            if not email or not password:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": ErrorMessages.EMAIL_AND_PASSWORD_REQUIRED,
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Validate using dependency function
+            db = SessionLocal()
+            try:
+                user = validate_login_request(email, password, db)
+                # Attach validated user to request state
+                request.state.validated_user = user
+                request.state.db = db
+                return None  # Validation passed
+            except AppException as e:
+                # Catch custom exceptions and return proper JSON
+                db.close()
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content={
+                        "error_code": e.error_code,
+                        "message": e.message,
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        **e.details  # Add any extra details (like remaining_attempts)
+                    }
+                )
+            except Exception as e:
+                db.close()
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error_code": "GEN_SERVER_001",
+                        "message": ErrorMessages.INTERNAL_ERROR,
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+                
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "GEN_SERVER_001",
+                    "message": ErrorMessages.INTERNAL_ERROR,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_registration(self, request: Request):
+        """Validate registration request."""
+        try:
+            print("Validating registration request in middleware...")
+            body = await request.body()
+            request._body = body
+            data = json.loads(body)
+            
+            print(f"Registration data: email={data.get('email')}, role={data.get('role')}")
+            
+            if data.get("password") != data.get("confirm_password"):
+                print("Password mismatch detected")
+                raise PasswordMismatchException()
+            
+            print("Middleware validation passed, continuing to controller...")
+            # Additional validation done in dependency
+            return None  # Let controller handle rest
+            
+        except AppException as e:
+            # Catch custom exceptions and return proper JSON
+            print(f"AppException in middleware: {e.error_code} - {e.message}")
+            return JSONResponse(
+                status_code=e.status_code,
+                content={
+                    "error_code": e.error_code,
+                    "message": e.message,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    **e.details
+                }
+            )
+        except Exception as e:
+            print(f"Unexpected exception in registration middleware: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "GEN_SERVER_001",
+                    "message": ErrorMessages.INTERNAL_ERROR,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_otp(self, request: Request):
+        """Validate OTP verification BEFORE controller - catches ALL exceptions"""
+        try:
+            body = await request.body()
+            request._body = body
+            data = json.loads(body)
+            
+            user_id = data.get("user_id")
+            otp = data.get("otp")
+            
+            if not user_id or not otp:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": ErrorMessages.USER_ID_AND_OTP_REQUIRED,
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            return None  # Validation passed, continue to controller
+            
+        except AppException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={
+                    "error_code": e.error_code,
+                    "message": e.message,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    **e.details
+                }
+            )
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "GEN_SERVER_001",
+                    "message": ErrorMessages.INTERNAL_ERROR,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_resend_otp(self, request: Request):
+        """Validate resend OTP request."""
+        try:
+            body = await request.body()
+            request._body = body
+            data = json.loads(body)
+            
+            user_id = data.get("user_id")
+            email = data.get("email")
+            
+            if not user_id or not email:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": ErrorMessages.USER_ID_AND_EMAIL_REQUIRED,
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            return None  # Validation passed, continue to controller
+            
+        except AppException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={
+                    "error_code": e.error_code,
+                    "message": e.message,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    **e.details
+                }
+            )
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "GEN_SERVER_001",
+                    "message": ErrorMessages.INTERNAL_ERROR,
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_get_user(self, request: Request, user_id: str):
+        """Validate get user request."""
+        db = SessionLocal()
+        try:
+            target_user = validate_get_user_request(user_id, db)
+            request.state.validated_target_user = target_user
+            request.state.validation_db = db
+            return None
+        except AppException as e:
+            db.close()
+            return JSONResponse(status_code=e.status_code, content=e.to_dict())
+        except Exception as e:
+            db.close()
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "SERVER_ERROR",
+                    "message": f"Validation error: {str(e)}",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_approve_user(self, request: Request):
+        """Validate approve user request."""
+        try:
+            body = await request.body()
+            request._body = body
+            data = json.loads(body)
+            
+            registration_id = data.get("registration_id")
+            if not registration_id:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "registration_id is required",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            db = SessionLocal()
+            try:
+                target_user = validate_approve_user_request(registration_id, db)
+                request.state.validated_target_user = target_user
+                request.state.validation_db = db
+                return None
+            except AppException as e:
+                db.close()
+                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "SERVER_ERROR",
+                    "message": f"Validation error: {str(e)}",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+    
+    async def _validate_reject_user(self, request: Request):
+        """Validate reject user request."""
+        try:
+            body = await request.body()
+            request._body = body
+            data = json.loads(body)
+            
+            registration_id = data.get("registration_id")
+            if not registration_id:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "registration_id is required",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            db = SessionLocal()
+            try:
+                target_user = validate_reject_user_request(registration_id, db)
+                request.state.validated_target_user = target_user
+                request.state.validation_db = db
+                return None
+            except AppException as e:
+                db.close()
+                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "SERVER_ERROR",
+                    "message": f"Validation error: {str(e)}",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+
