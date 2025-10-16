@@ -108,10 +108,24 @@ EMAIL_OTP_SUBJECT = "Your Login OTP - MyGrape"
 EMAIL_WELCOME_SUBJECT = "Welcome to MyGrape"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
 
+# Feedback Email Subjects
+EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - MyGrape"
+EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - MyGrape"
+EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - MyGrape"
+
 # ============================================
 # TIME ZONES
 # ============================================
 DEFAULT_TIMEZONE = "UTC"
+
+# ============================================
+# FEEDBACK SYSTEM
+# ============================================
+FEEDBACK_TICKET_PREFIX = "TK"
+FEEDBACK_ID_LENGTH = 3  # For TK-YYYY-MM-001 format
+FEEDBACK_MAX_ATTACHMENT_SIZE_MB = 10
+FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".gif"]
+FEEDBACK_UPLOAD_DIR = "uploads/feedback"
 
 # ============================================
 # REGEX PATTERNS

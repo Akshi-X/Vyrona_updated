@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-from app.controller import user_controller
+from app.controller import user_controller, feedback_controller
 from app.init_db import init_db
 from app.config.config import settings
 from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
@@ -102,11 +102,12 @@ setup_exception_handlers(app)
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup"""
-    print("\n" + "!" * 60)
-    print("APPLICATION STARTUP EVENT")
-    print("!" * 60)
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 60)
+    logger.info("APPLICATION STARTUP EVENT")
+    logger.info("=" * 60)
     init_db()
-    print("!" * 60 + "\n")
+    logger.info("=" * 60)
 
 # Enable CORS (add FIRST so it executes FIRST in the chain)
 app.add_middleware(
@@ -129,8 +130,14 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Create uploads directory for feedback attachments
+from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
+if not os.path.exists(FEEDBACK_UPLOAD_DIR):
+    os.makedirs(FEEDBACK_UPLOAD_DIR, exist_ok=True)
+
 # Include API routes
 app.include_router(user_controller.router, prefix=API_PREFIX)
+app.include_router(feedback_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")
