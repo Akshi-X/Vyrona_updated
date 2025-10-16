@@ -686,8 +686,6 @@ class FeedbackCreateFailedException(FeedbackException):
     """Failed to create feedback ticket"""
     
     def __init__(self, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_CREATE_FAILED,
@@ -701,8 +699,6 @@ class FeedbackInvalidDataException(FeedbackException):
     """Invalid feedback data provided"""
     
     def __init__(self, field: Optional[str] = None, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         message = ErrorMessages.FEEDBACK_INVALID_DATA
         if field:
@@ -723,8 +719,6 @@ class FeedbackAttachmentTooLargeException(FeedbackException):
     """File attachment exceeds maximum size limit"""
     
     def __init__(self, file_size_mb: float, max_size_mb: float):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_ATTACHMENT_TOO_LARGE}. File size: {file_size_mb:.1f}MB, Maximum allowed: {max_size_mb}MB",
@@ -739,8 +733,6 @@ class FeedbackAttachmentInvalidTypeException(FeedbackException):
     """File attachment type not allowed"""
     
     def __init__(self, file_extension: str, allowed_extensions: list):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_ATTACHMENT_INVALID_TYPE}. File type: {file_extension}, Allowed types: {', '.join(allowed_extensions)}",
@@ -755,8 +747,6 @@ class FeedbackAttachmentSaveFailedException(FeedbackException):
     """Failed to save file attachment"""
     
     def __init__(self, filename: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         message = f"{ErrorMessages.FEEDBACK_ATTACHMENT_SAVE_FAILED}. File: {filename}"
         if reason:
@@ -775,8 +765,6 @@ class FeedbackTicketIdGenerationFailedException(FeedbackException):
     """Failed to generate unique ticket ID"""
     
     def __init__(self, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_TICKET_ID_GENERATION_FAILED,
@@ -794,8 +782,6 @@ class FeedbackNotFoundException(FeedbackException):
     """Feedback ticket not found"""
     
     def __init__(self, feedback_id: Optional[int] = None, ticket_id: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         details = {}
         if feedback_id:
@@ -815,8 +801,6 @@ class FeedbackAccessDeniedException(FeedbackException):
     """Access denied to feedback ticket"""
     
     def __init__(self, feedback_id: int, user_id: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_ACCESS_DENIED,
@@ -832,8 +816,6 @@ class FeedbackFilterInvalidException(FeedbackException):
     """Invalid filter parameters for feedback query"""
     
     def __init__(self, invalid_filters: list, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         message = f"{ErrorMessages.FEEDBACK_FILTER_INVALID}. Invalid filters: {', '.join(invalid_filters)}"
         if reason:
@@ -852,8 +834,6 @@ class FeedbackUserNotFoundException(FeedbackException):
     """User not found for feedback operation"""
     
     def __init__(self, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_USER_NOT_FOUND,
@@ -871,8 +851,6 @@ class FeedbackCommentCreateFailedException(FeedbackException):
     """Failed to create comment on feedback ticket"""
     
     def __init__(self, feedback_id: int, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_COMMENT_CREATE_FAILED,
@@ -887,8 +865,6 @@ class FeedbackCommentNotFoundException(FeedbackException):
     """Comment not found"""
     
     def __init__(self, comment_id: int):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_COMMENT_NOT_FOUND,
@@ -902,8 +878,6 @@ class FeedbackCommentInvalidException(FeedbackException):
     """Invalid comment data"""
     
     def __init__(self, field: Optional[str] = None, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         message = ErrorMessages.FEEDBACK_COMMENT_INVALID
         if field:
@@ -924,8 +898,6 @@ class FeedbackCommentAccessDeniedException(FeedbackException):
     """Access denied to comment"""
     
     def __init__(self, comment_id: int, user_id: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_COMMENT_ACCESS_DENIED,
@@ -944,8 +916,6 @@ class FeedbackStatusUpdateFailedException(FeedbackException):
     """Failed to update feedback status"""
     
     def __init__(self, feedback_id: int, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_STATUS_UPDATE_FAILED,
@@ -960,8 +930,6 @@ class FeedbackStatusInvalidException(FeedbackException):
     """Invalid status value for feedback"""
     
     def __init__(self, status: str, valid_statuses: list):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_STATUS_INVALID}. Provided: {status}, Valid values: {', '.join(valid_statuses)}",
@@ -976,8 +944,6 @@ class FeedbackStatusAccessDeniedException(FeedbackException):
     """Access denied to update feedback status"""
     
     def __init__(self, feedback_id: int, user_id: str, current_status: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=ErrorMessages.FEEDBACK_STATUS_ACCESS_DENIED,
@@ -993,8 +959,6 @@ class FeedbackStatusAlreadySetException(FeedbackException):
     """Status is already set to the requested value"""
     
     def __init__(self, feedback_id: int, status: str):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_STATUS_ALREADY_SET}. Status: {status}",
@@ -1013,8 +977,6 @@ class FeedbackEmailSendFailedException(FeedbackException):
     """Failed to send feedback notification email"""
     
     def __init__(self, email_type: str, recipient: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_EMAIL_SEND_FAILED}. Type: {email_type}, Recipient: {recipient}",
@@ -1030,8 +992,6 @@ class FeedbackEmailTemplateErrorException(FeedbackException):
     """Email template error for feedback notification"""
     
     def __init__(self, template_name: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_EMAIL_TEMPLATE_ERROR}. Template: {template_name}",
@@ -1046,8 +1006,6 @@ class FeedbackEmailRecipientInvalidException(FeedbackException):
     """Invalid email recipient for feedback notification"""
     
     def __init__(self, recipient: str, reason: Optional[str] = None):
-        from ..constants.error_codes import ERROR_CODES
-        from ..constants.messages import ErrorMessages
         
         super().__init__(
             message=f"{ErrorMessages.FEEDBACK_EMAIL_RECIPIENT_INVALID}. Recipient: {recipient}",

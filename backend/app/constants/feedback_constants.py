@@ -19,8 +19,8 @@ class FeedbackConstants:
     # File upload limits
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
     ALLOWED_FILE_EXTENSIONS = {
-        '.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.gif',
-        '.xlsx', '.xls', '.csv', '.zip', '.rar', '.7z'
+        '.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png',
+        '.xlsx', '.xls', '.csv', '.zip', '.rar'
     }
     
     # Pagination defaults
@@ -31,55 +31,6 @@ class FeedbackConstants:
     DEFAULT_SORT_FIELD = "submitted_on"
     DEFAULT_SORT_ORDER = "desc"
     
-    # Email configuration
-    ADMIN_EMAIL = "admin@mygrape.com"
-    SUPPORT_EMAIL = "support@mygrape.com"
-
-
-class DepartmentEnum(str, Enum):
-    """Enum for departments"""
-    LOGISTICS = "logistics"
-    QUALITY_ASSURANCE = "quality_assurance"
-    SUPPLY_CHAIN_OPS = "supply_chain_ops"
-    COMPLIANCE = "compliance"
-    OTHER = "other"
-
-
-class FeedbackTypeEnum(str, Enum):
-    """Enum for feedback types"""
-    BUG = "bug"
-    DATA_QUALITY_ISSUE = "data_quality_issue"
-    FEATURE_REQUEST = "feature_request"
-    UX_WORKFLOW_IMPROVEMENT = "ux_workflow_improvement"
-    API_INTEGRATION = "api_integration"
-    COMPLIANCE_CONCERN = "compliance_concern"
-    OTHER = "other"
-
-
-class PriorityEnum(str, Enum):
-    """Enum for priority levels"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class AffectedModulesEnum(str, Enum):
-    """Enum for affected modules"""
-    TRACK_TRACE = "track_trace"
-    QUALITY_MONITORING = "quality_monitoring"
-    COMPLIANCE_AUTOMATION = "compliance_automation"
-    RISK_MODULE = "risk_module"
-    OTHER = "other"
-
-
-class StatusEnum(str, Enum):
-    """Enum for feedback status"""
-    OPEN = "Open"
-    IN_PROGRESS = "In Progress"
-    COMPLETED = "Completed"
-    REOPEN = "Reopen"
-
 
 class ErrorMessages:
     """Error messages for feedback operations"""
