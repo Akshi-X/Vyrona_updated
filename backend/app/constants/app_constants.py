@@ -110,15 +110,15 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d -
 # EMAIL TEMPLATES
 # ============================================
 EMAIL_APPROVAL_SUBJECT = "New User Registration Pending Approval"
-EMAIL_OTP_SUBJECT = "Your Login OTP - MyGrape"
-EMAIL_WELCOME_SUBJECT = "Welcome to MyGrape"
+EMAIL_OTP_SUBJECT = "Your Login OTP - myGrape"
+EMAIL_WELCOME_SUBJECT = "Welcome to myGrape"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
-EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - MyGrape"
+EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - myGrape"
 
 # Feedback Email Subjects
-EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - MyGrape"
-EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - MyGrape"
-EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - MyGrape"
+EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - myGrape"
+EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - myGrape"
+EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - myGrape"
 
 # ============================================
 # TIME ZONES
