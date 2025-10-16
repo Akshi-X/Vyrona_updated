@@ -6,16 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-from app.controller import user_controller
+from app.controller import user_controller, patient_controller
 from app.init_db import init_db
 from app.config.config import settings
 from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
 from app.middleware.exception_handler import setup_exception_handlers
 from app.middleware.request_validation_middleware import RequestValidationMiddleware
+from app.middleware.patient_validation_middleware import PatientValidationMiddleware
 from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.token_validation_middleware import TokenValidationMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
-w
+
 # Create logs directory if it doesn't exist (BEFORE logging setup)
 os.makedirs('logs', exist_ok=True)
 
@@ -118,10 +119,11 @@ app.add_middleware(
 )
 
 # Add middlewares (executed in reverse order)
-# Flow: CORS → Sanitization → Validation → Token → RBAC → Controller
+# Flow: CORS → Sanitization → Patient Validation → User Validation → Token → RBAC → Controller
 app.add_middleware(RBACMiddleware)
 app.add_middleware(TokenValidationMiddleware)
 app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(PatientValidationMiddleware)
 app.add_middleware(SanitizationMiddleware)
 
 # Mount static folder (create directory if needed)
@@ -131,6 +133,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Include API routes
 app.include_router(user_controller.router, prefix=API_PREFIX)
+app.include_router(patient_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")
