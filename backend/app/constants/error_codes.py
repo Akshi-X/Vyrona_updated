@@ -114,6 +114,14 @@ ERROR_CODES = {
     "EMAIL_TEMPLATE_RENDER_FAILED": "ERR_5005",
     "EMAIL_SEND_TIMEOUT": "ERR_5006",
     
+    # Patient Service (5007-5012)
+    "PATIENT_SERVICE_ERROR": "ERR_5007",
+    "PATIENT_CREATE_FAILED": "ERR_5008",
+    "PATIENT_UPDATE_FAILED": "ERR_5009",
+    "PATIENT_DELETE_FAILED": "ERR_5010",
+    "PATIENT_SEARCH_FAILED": "ERR_5011",
+    "PATIENT_STATISTICS_FAILED": "ERR_5012",
+    
     # ============================================
     # VALIDATION (6xxx)
     # ============================================
@@ -122,6 +130,13 @@ ERROR_CODES = {
     "VALIDATION_TOO_LONG": "ERR_6003",
     "VALIDATION_TOO_SHORT": "ERR_6004",
     "VALIDATION_INVALID_CHARS": "ERR_6005",
+    
+    # Patient Validation (6006-6010)
+    "PATIENT_VALIDATION_ERROR": "ERR_6006",
+    "PATIENT_NAME_INVALID": "ERR_6007",
+    "PATIENT_CONDITION_INVALID": "ERR_6008",
+    "PATIENT_INSURANCE_INVALID": "ERR_6009",
+    "PATIENT_DATA_INVALID": "ERR_6010",
     
     # ============================================
     # SECURITY (7xxx)
@@ -133,6 +148,12 @@ ERROR_CODES = {
     "SECURITY_NOSQL_INJECTION": "ERR_7005",
     "SECURITY_PATH_TRAVERSAL": "ERR_7006",
     
+    # Patient Document (7007-7010)
+    "PATIENT_DOCUMENT_ERROR": "ERR_7007",
+    "PATIENT_DOCUMENT_UPLOAD_FAILED": "ERR_7008",
+    "PATIENT_DOCUMENT_DOWNLOAD_FAILED": "ERR_7009",
+    "PATIENT_DOCUMENT_DELETE_FAILED": "ERR_7010",
+    
     # ============================================
     # GENERAL (9xxx)
     # ============================================
@@ -142,6 +163,12 @@ ERROR_CODES = {
     "RESOURCE_NOT_FOUND": "ERR_9004",
     "ACCESS_FORBIDDEN": "ERR_9005",
     "RATE_LIMIT_EXCEEDED": "ERR_9006",
+    
+    # Patient Not Found (9007-9010)
+    "PATIENT_NOT_FOUND": "ERR_9007",
+    "PROVIDER_NOT_FOUND": "ERR_9008",
+    "PHARMA_NOT_FOUND": "ERR_9009",
+    "PATIENT_DOCUMENT_NOT_FOUND": "ERR_9010",
 }
 
 
