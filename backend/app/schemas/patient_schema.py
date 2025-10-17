@@ -78,14 +78,10 @@ class MonthlyStats(BaseModel):
 
 
 class PharmaStatisticsResponse(BaseModel):
-    """Schema for pharma statistics response"""
+    """Schema for pharma statistics response - current month only"""
     pharma_id: str
-    patient_count: int
-    treatment_count: int
-    top_therapy: Optional[dict] = Field(None, description="Top therapy with count")
-    top_conditions: List[dict] = Field(default_factory=list, description="Top conditions with counts")
-    recent_patients: int = Field(0, description="Patients added in last 30 days")
-    monthly_statistics: List[MonthlyStats] = Field(default_factory=list, description="Monthly statistics for the last 12 months")
+    current_month_patient_count: int = Field(0, description="Number of patients added in current month")
+    current_month_treatment_count: int = Field(0, description="Number of treatments started in current month")
 
 
 class PatientSummaryResponse(BaseModel):
