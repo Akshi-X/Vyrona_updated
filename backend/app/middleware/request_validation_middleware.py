@@ -101,6 +101,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.EMAIL_AND_PASSWORD_REQUIRED,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -123,6 +129,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         **e.details  # Add any extra details (like remaining_attempts)
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             except Exception as e:
@@ -134,6 +146,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.INTERNAL_ERROR,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
                 
@@ -177,6 +195,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     **e.details
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
         except Exception as e:
@@ -190,6 +214,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": ErrorMessages.INTERNAL_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -211,6 +241,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.USER_ID_AND_OTP_REQUIRED,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -225,6 +261,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     **e.details
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
         except Exception as e:
@@ -235,6 +277,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": ErrorMessages.INTERNAL_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -256,6 +304,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.USER_ID_AND_EMAIL_REQUIRED,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -270,6 +324,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     **e.details
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
         except Exception as e:
@@ -280,6 +340,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": ErrorMessages.INTERNAL_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -293,7 +359,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return None
         except AppException as e:
             db.close()
-            return JSONResponse(status_code=e.status_code, content=e.to_dict())
+            return JSONResponse(
+                status_code=e.status_code,
+                content=e.to_dict(),
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
         except Exception as e:
             db.close()
             return JSONResponse(
@@ -303,6 +378,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -322,6 +403,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": "registration_id is required",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -333,7 +420,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return None
             except AppException as e:
                 db.close()
-                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=e.to_dict(),
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -342,6 +438,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -361,6 +463,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": "registration_id is required",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -372,7 +480,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return None
             except AppException as e:
                 db.close()
-                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=e.to_dict(),
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -381,6 +498,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     

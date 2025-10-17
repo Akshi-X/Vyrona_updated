@@ -167,7 +167,21 @@ ERROR_CODES = {
     "FEEDBACK_EMAIL_SEND_FAILED": "ERR_8081",
     "FEEDBACK_EMAIL_TEMPLATE_ERROR": "ERR_8082",
     "FEEDBACK_EMAIL_RECIPIENT_INVALID": "ERR_8083",
-    
+
+
+    # ============================================
+    # TASK MANAGEMENT (10xxx)
+    # ============================================
+    "TASK_CREATE_FAILED": "ERR_10001",
+    "TASK_NOT_FOUND": "ERR_10002",
+    "TASK_INVALID_ASSIGNEE": "ERR_10003",
+    "TASK_INVALID_PATIENT": "ERR_10004",
+    "TASK_UPDATE_FAILED": "ERR_10005",
+    "TASK_DELETE_FAILED": "ERR_10006",
+    "TASK_UNAUTHORIZED_EDIT": "ERR_10007",
+    "TASK_UNAUTHORIZED_STATUS": "ERR_10008",
+    "TASK_MANAGER_ONLY": "ERR_10009",
+
     # ============================================
     # GENERAL (9xxx)
     # ============================================
