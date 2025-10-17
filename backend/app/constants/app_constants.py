@@ -131,8 +131,25 @@ DEFAULT_TIMEZONE = "UTC"
 FEEDBACK_TICKET_PREFIX = "TK"
 FEEDBACK_ID_LENGTH = 3  # For TK-YYYY-MM-001 format
 FEEDBACK_MAX_ATTACHMENT_SIZE_MB = 10
-FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".gif"]
+FEEDBACK_MAX_ATTACHMENT_SIZE_BYTES = FEEDBACK_MAX_ATTACHMENT_SIZE_MB * 1024 * 1024
+FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".xlsx", ".xls", ".csv", ".zip", ".rar"]
 FEEDBACK_UPLOAD_DIR = "uploads/feedback"
+
+# Feedback field validation limits
+FEEDBACK_MAX_SUBJECT_LENGTH = 255
+FEEDBACK_MAX_DESCRIPTION_LENGTH = 5000
+FEEDBACK_MAX_COMMENT_LENGTH = 2000
+FEEDBACK_MAX_SUBMITTED_BY_LENGTH = 255
+FEEDBACK_MAX_CREATED_BY_LENGTH = 255
+FEEDBACK_MAX_UPDATED_BY_LENGTH = 255
+
+# Feedback pagination defaults
+FEEDBACK_DEFAULT_PAGE_SIZE = 10
+FEEDBACK_MAX_PAGE_SIZE = 100
+
+# Feedback search and sorting
+FEEDBACK_DEFAULT_SORT_FIELD = "submitted_on"
+FEEDBACK_DEFAULT_SORT_ORDER = "desc"
 
 # ============================================
 # REGEX PATTERNS
