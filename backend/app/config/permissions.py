@@ -73,6 +73,14 @@ USER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
 # ALL AUTHENTICATED USERS CAN ACCESS
 # ============================================
 AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
+    # Feedback endpoints - all authenticated users can access
+    ("POST", "/api/feedback"),                    # Create feedback
+    ("GET", "/api/feedback"),                     # Get all feedback
+    ("GET", "/api/feedback/user/{user_id}"),      # Get user feedback
+    ("GET", "/api/feedback/{feedback_id}"),       # Get feedback by ID
+    ("POST", "/api/feedback/{feedback_id}/comments"),  # Add comment
+    ("GET", "/api/feedback/{feedback_id}/comments"),   # Get comments
+    ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
     ("GET", "/api/profile"),  # View own profile
 }
 
