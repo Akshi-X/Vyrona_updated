@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
-import calendar
+from datetime import datetime
 
 from app.schemas.patient_schema import (
     PatientCreate, 
@@ -142,121 +141,47 @@ class PatientService:
             raise e
 
     def get_pharma_statistics(self, pharma_id: str) -> PharmaStatisticsResponse:
-        """Get comprehensive statistics for a specific pharma"""
+        """Get current month statistics for a specific pharma"""
         try:
-            # Get total patient count for this pharma
-            patient_count = self.db.query(Patient).filter(Patient.pharma_id == pharma_id).count()
+            # Get current month start and end dates
+            current_date = datetime.now()
+            current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            # Get treatment count (patients with therapy_id)
-            treatment_count = self.db.query(Patient).filter(
-                and_(Patient.pharma_id == pharma_id, Patient.therapy_id.isnot(None))
-            ).count()
+            # Calculate next month start for end date
+            if current_date.month == 12:
+                next_month_start = current_date.replace(year=current_date.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            else:
+                next_month_start = current_date.replace(month=current_date.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            # Get top therapy
-            top_therapy_result = self.db.query(
-                Patient.therapy_id,
-                func.count(Patient.id).label('count')
-            ).filter(
-                and_(Patient.pharma_id == pharma_id, Patient.therapy_id.isnot(None))
-            ).group_by(Patient.therapy_id).order_by(desc('count')).first()
-            
-            top_therapy = None
-            if top_therapy_result:
-                top_therapy = {
-                    "therapy_id": top_therapy_result.therapy_id,
-                    "count": top_therapy_result.count
-                }
-            
-            # Get top conditions
-            top_conditions_result = self.db.query(
-                Patient.condition,
-                func.count(Patient.id).label('count')
-            ).filter(Patient.pharma_id == pharma_id).group_by(Patient.condition).order_by(desc('count')).limit(5).all()
-            
-            top_conditions = [
-                {"condition": result.condition, "count": result.count}
-                for result in top_conditions_result
-            ]
-            
-            # Get recent patients (last 30 days)
-            thirty_days_ago = datetime.now() - timedelta(days=30)
-            recent_patients = self.db.query(Patient).filter(
+            # Get current month patient count for this pharma
+            current_month_patient_count = self.db.query(Patient).filter(
                 and_(
                     Patient.pharma_id == pharma_id,
-                    Patient.created_at >= thirty_days_ago
+                    Patient.created_at >= current_month_start,
+                    Patient.created_at < next_month_start
                 )
             ).count()
             
-            # Get monthly statistics for the last 12 months
-            monthly_stats = self._get_monthly_statistics(pharma_id)
+            # Get current month treatment count (patients with therapy_id)
+            current_month_treatment_count = self.db.query(Patient).filter(
+                and_(
+                    Patient.pharma_id == pharma_id,
+                    Patient.therapy_id.isnot(None),
+                    Patient.created_at >= current_month_start,
+                    Patient.created_at < next_month_start
+                )
+            ).count()
             
             statistics_data = {
                 "pharma_id": pharma_id,
-                "patient_count": patient_count,
-                "treatment_count": treatment_count,
-                "top_therapy": top_therapy,
-                "top_conditions": top_conditions,
-                "recent_patients": recent_patients,
-                "monthly_statistics": monthly_stats
+                "current_month_patient_count": current_month_patient_count,
+                "current_month_treatment_count": current_month_treatment_count
             }
             
             return PharmaStatisticsResponse(**statistics_data)
         except Exception as e:
             raise PatientServiceError("get_pharma_statistics", f"Failed to get pharma statistics: {str(e)}")
 
-    def _get_monthly_statistics(self, pharma_id: str) -> List[Dict]:
-        """Get monthly statistics for the last 12 months"""
-        monthly_stats = []
-        current_date = datetime.now()
-        
-        for i in range(12):
-            # Calculate the month (going back i months from current)
-            target_year = current_date.year
-            target_month = current_date.month - i
-            
-            # Handle year rollover
-            while target_month <= 0:
-                target_month += 12
-                target_year -= 1
-            
-            # Calculate the start and end of the month
-            month_start = datetime(target_year, target_month, 1, 0, 0, 0)
-            
-            # Get the last day of the month
-            last_day = calendar.monthrange(target_year, target_month)[1]
-            if i == 0:
-                # For current month, use current date as end
-                month_end = current_date
-            else:
-                month_end = datetime(target_year, target_month, last_day, 23, 59, 59)
-            
-            # Get patient count for this month
-            patient_count = self.db.query(Patient).filter(
-                and_(
-                    Patient.pharma_id == pharma_id,
-                    Patient.created_at >= month_start,
-                    Patient.created_at <= month_end
-                )
-            ).count()
-            
-            # Get treatment count for this month (patients with therapy_id)
-            treatment_count = self.db.query(Patient).filter(
-                and_(
-                    Patient.pharma_id == pharma_id,
-                    Patient.therapy_id.isnot(None),
-                    Patient.created_at >= month_start,
-                    Patient.created_at <= month_end
-                )
-            ).count()
-            
-            monthly_stats.append({
-                "month": month_start.strftime("%Y-%m"),
-                "patient_count": patient_count,
-                "treatment_count": treatment_count
-            })
-        
-        # Reverse to get chronological order (oldest first)
-        return list(reversed(monthly_stats))
 
     def create_patients(self, request_data: PatientCreateRequest) -> PatientCreateResponse:
         """Create single or multiple patients with business logic validation"""
