@@ -61,6 +61,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 response = await self._validate_reject_user(request)
                 if response:
                     return response  # Validation failed, return error
+            
+            elif path == "/api/feedback":
+                response = await self._validate_feedback_creation(request)
+                if response:
+                    return response  # Validation failed, return error
         
         elif method == "GET":
             # Validate GET endpoints
@@ -378,4 +383,139 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             )
-
+    
+    async def _validate_feedback_creation(self, request: Request):
+        """Validate feedback creation request."""
+        from ..exceptions.custom_exceptions import AppException
+        from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+        
+        try:
+            # For multipart form data, we need to handle it differently
+            # The request body will contain the form data
+            form_data = await request.form()
+            request_json = form_data.get("request")
+            
+            if not request_json:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "Request data is required",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Parse JSON from form data
+            try:
+                data = json.loads(request_json)
+            except json.JSONDecodeError as e:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": f"Invalid JSON format: {str(e)}",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Validate required fields
+            required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            
+            if missing_fields:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": f"Missing required fields: {', '.join(missing_fields)}",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Validate enum values
+            try:
+                department = FeedbackDepartment(data["department"])
+                feedback_type = FeedbackType(data["feedback_type"])
+                priority = FeedbackPriority(data["priority"])
+                affected_modules = AffectedModule(data["affected_modules"])
+            except ValueError as e:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": f"Invalid enum value: {str(e)}",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Validate string lengths
+            if len(data["subject"]) < 3:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "Subject must be at least 3 characters long",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            if len(data["description"]) < 10:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "Description must be at least 10 characters long",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            if len(data["subject"]) > 200:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "Subject must be less than 200 characters",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            if len(data["description"]) > 2000:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error_code": "VAL_INPUT_001",
+                        "message": "Description must be less than 2000 characters",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+            
+            # Store validated data in request state for controller to use
+            request.state.validated_feedback_data = {
+                "department": department,
+                "feedback_type": feedback_type,
+                "subject": data["subject"].strip(),
+                "description": data["description"].strip(),
+                "priority": priority,
+                "affected_modules": affected_modules
+            }
+            
+            return None  # Validation passed
+            
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error_code": "GEN_SERVER_001",
+                    "message": f"Validation error: {str(e)}",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
