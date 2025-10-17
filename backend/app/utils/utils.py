@@ -7,11 +7,6 @@ from ..models.user_model import User
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
-def generate_chat_id():
-    """Generate unique chat ID"""
-    return f"CHAT-{uuid.uuid4().hex[:12].upper()}"
-
 def generate_user_id():
     return f"USR-{uuid.uuid4().hex[:6].upper()}"
 
