@@ -10,6 +10,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 
+from ..config.database import SessionLocal
 from ..service.otp_service import get_user_by_email
 from ..auth.auth import verify_password
 from ..service.account_locking_service import (
@@ -41,7 +42,6 @@ class LoginValidationMiddleware(BaseHTTPMiddleware):
                 password = body.get("password")
                 
                 # Get database session
-                from ..config.database import SessionLocal
                 db = SessionLocal()
                 
                 try:

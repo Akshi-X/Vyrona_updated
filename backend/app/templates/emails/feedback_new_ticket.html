@@ -39,21 +39,37 @@
             font-size: 20px;
             margin-top: 0;
         }
-        .user-details {
+        .ticket-details {
             background-color: #f8f9fa;
             border-left: 4px solid #667eea;
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
         }
-        .user-details p {
+        .ticket-details p {
             margin: 8px 0;
             font-size: 14px;
         }
-        .user-details strong {
+        .ticket-details strong {
             color: #495057;
             display: inline-block;
-            width: 100px;
+            width: 120px;
+        }
+        .priority-high {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .priority-critical {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .priority-medium {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .priority-low {
+            background-color: #d1ecf1;
+            border-left-color: #17a2b8;
         }
         .action-buttons {
             text-align: center;
@@ -92,49 +108,67 @@
             background-color: #e9ecef;
             margin: 20px 0;
         }
+        .description-box {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>🔔 {{ subject }}</h1>
+            <h1>🎫 {{ subject }}</h1>
         </div>
         
         <div class="content">
-            <h2>New User Registration</h2>
-            <p>Hello Admin,</p>
-            <p>A new user has registered and is awaiting your approval. Please review the details below:</p>
+            <h2>New Feedback Ticket Created</h2>
+            <p>Hello,</p>
+            <p>A new feedback ticket has been created in the myGrape system. Here are the details:</p>
             
-            <div class="user-details">
-                <p><strong>Name:</strong> {{ first_name }} {{ last_name }}</p>
-                <p><strong>Email:</strong> {{ email }}</p>
-                <p><strong>Role:</strong> {{ role }}</p>
-                <p><strong>Company:</strong> {{ company }}</p>
+            <div class="ticket-details priority-{{ priority }}">
+                <p><strong>Ticket ID:</strong> {{ ticket_id }}</p>
+                <p><strong>Subject:</strong> {{ feedback_subject }}</p>
+                <p><strong>Department:</strong> {{ department }}</p>
+                <p><strong>Type:</strong> {{ feedback_type }}</p>
+                <p><strong>Priority:</strong> {{ priority }}</p>
+                <p><strong>Submitted By:</strong> {{ submitted_by_name }} ({{ submitted_by_email }})</p>
+                <p><strong>Submitted On:</strong> {{ submitted_on }}</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <h3>Description:</h3>
+            <div class="description-box">
+                {{ description }}
             </div>
             
             <div class="divider"></div>
             
             <p style="text-align: center; font-size: 14px; color: #6c757d;">
-                Click the button below to review and approve/reject this registration
+                Click the button below to view and manage this ticket
             </p>
             
             <div class="action-buttons">
-                <a href="{{ approval_url }}" class="button button-primary">
-                    Review Application →
+                <a href="{{ ticket_url }}" class="button button-primary">
+                    View Ticket →
                 </a>
             </div>
             
             <p style="font-size: 13px; color: #6c757d; margin-top: 20px;">
                 <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-                <a href="{{ approval_url }}" style="color: #667eea; word-break: break-all;">{{ approval_url }}</a>
+                <a href="{{ ticket_url }}" style="color: #667eea; word-break: break-all;">{{ ticket_url }}</a>
             </p>
         </div>
         
         <div class="footer">
-            <p><strong>myGrape</strong></p>
+            <p><strong>myGrape</strong> - Feedback Management System</p>
             <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
 </body>
 </html>
-

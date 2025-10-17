@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from ..config.database import get_db
-from ..service.otp_service import get_user_by_email, get_user_by_user_id, verify_otp as verify_otp_service
+from ..service.otp_service import verify_otp as verify_otp_service
+from ..utils.utils import get_user_by_email, get_user_by_id
 from ..auth.auth import verify_password
 from ..service.account_locking_service import (
     check_account_lock_status,
@@ -71,7 +72,7 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
         Validated User object
     """
     # Validation 1: User exists
-    user = get_user_by_email(db, email)
+    user = get_user_by_email(email, db)
     if not user:
         raise UserNotFoundException(email=email)
     
@@ -117,7 +118,7 @@ def validate_registration_request(request: UserRegister, db: Session) -> UserReg
         raise PasswordMismatchException()
     
     # Validation 2: Email doesn't already exist
-    existing_user = get_user_by_email(db, request.email)
+    existing_user = get_user_by_email(request.email, db)
     if existing_user:
         raise EmailAlreadyExistsException(email=request.email)
     
@@ -137,7 +138,7 @@ def validate_otp_verification(user_id: str, otp: str, db: Session) -> User:
         raise InvalidOTPException(user_id=user_id)
     
     # Validation 2: Get user details
-    user = get_user_by_user_id(db, user_id)
+    user = get_user_by_id(user_id, db)
     if not user:
         raise OTPUserNotFoundException(user_id=user_id)
     
@@ -152,7 +153,7 @@ def get_validated_user(email: str, user_id: str, db: Session) -> User:
         Validated User object
     """
     # Get user
-    user = get_user_by_user_id(db, user_id)
+    user = get_user_by_id(user_id, db)
     
     # Validate user exists and email matches
     if not user or user.email != email:

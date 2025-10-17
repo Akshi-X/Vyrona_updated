@@ -1,15 +1,29 @@
 import smtplib
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
+from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from jinja2.exceptions import TemplateError
 import msal
 import requests
 
 from ..config.config import settings
-from ..constants.app_constants import EMAIL_APPROVAL_SUBJECT, EMAIL_OTP_SUBJECT, OTP_EXPIRY_MINUTES
+from ..constants.app_constants import (
+    EMAIL_APPROVAL_SUBJECT, EMAIL_OTP_SUBJECT, OTP_EXPIRY_MINUTES,
+    EMAIL_FEEDBACK_NEW_TICKET_SUBJECT, EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT, 
+    EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT,
+    EMAIL_APPROVAL_SUBJECT,
+    EMAIL_OTP_SUBJECT,
+    EMAIL_PASSWORD_RESET_SUBJECT,
+    OTP_EXPIRY_MINUTES,
+    PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+)
 from ..exceptions import EmailServiceException, TemplateNotFoundException, TemplateRenderException
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 # Setup Jinja2 template environment
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "emails"
@@ -219,7 +233,7 @@ def send_email(recipient_email: str, subject: str, html_body: str):
     Raises:
         EmailServiceException if sending fails
     """
-    print(f"Using Gmail SMTP to send email to {recipient_email}...")
+    logger.info(f"Using Gmail SMTP to send email to {recipient_email}...")
     send_email_via_smtp(recipient_email, subject, html_body)
 
 
@@ -292,6 +306,172 @@ def send_otp_email(user_email: str, otp_code: str):
         )
     except TemplateError as e:
         raise TemplateRenderException(template_name="otp_email.html", reason=str(e))
+    
+    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    send_email(user_email, subject, html_body)
+
+
+# ============================================
+# FEEDBACK EMAIL FUNCTIONS
+# ============================================
+
+def send_feedback_new_ticket_email(
+    ticket_id: str,
+    subject: str,
+    description: str,
+    priority: str,
+    department: str,
+    submitted_by_name: str,
+    submitted_by_email: str,
+    feedback_id: str
+):
+    """
+    Send new feedback ticket notification email
+    """
+    email_subject = EMAIL_FEEDBACK_NEW_TICKET_SUBJECT
+    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("feedback_new_ticket.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="feedback_new_ticket.html")
+    
+    try:
+        html_body = template.render(
+            subject=email_subject,
+            ticket_id=ticket_id,
+            feedback_subject=subject,
+            description=description,
+            priority=priority,
+            department=department,
+            feedback_type="Feedback",  # Could be enhanced to pass actual type
+            submitted_by_name=submitted_by_name,
+            submitted_by_email=submitted_by_email,
+            submitted_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            ticket_url=ticket_url
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="feedback_new_ticket.html", reason=str(e))
+    
+    # Send to submitter
+    send_email(submitted_by_email, email_subject, html_body)
+    
+    # Send to admin
+    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+
+
+def send_feedback_status_update_email(
+    ticket_id: str,
+    subject: str,
+    old_status: str,
+    new_status: str,
+    updated_by_name: str,
+    submitted_by_email: str,
+    feedback_id: str
+):
+    """
+    Send feedback status update notification email
+    """
+    email_subject = EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT
+    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("feedback_status_update.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="feedback_status_update.html")
+    
+    try:
+        html_body = template.render(
+            subject=email_subject,
+            ticket_id=ticket_id,
+            feedback_subject=subject,
+            old_status=old_status,
+            new_status=new_status,
+            updated_by_name=updated_by_name,
+            updated_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            ticket_url=ticket_url
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="feedback_status_update.html", reason=str(e))
+    
+    # Send to submitter
+    send_email(submitted_by_email, email_subject, html_body)
+    
+    # Send to admin
+    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+
+
+def send_feedback_new_comment_email(
+    ticket_id: str,
+    subject: str,
+    comment: str,
+    commented_by_name: str,
+    submitted_by_email: str,
+    feedback_id: str
+):
+    """
+    Send new comment notification email
+    """
+    email_subject = EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT
+    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("feedback_new_comment.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="feedback_new_comment.html")
+    
+    try:
+        html_body = template.render(
+            subject=email_subject,
+            ticket_id=ticket_id,
+            feedback_subject=subject,
+            comment=comment,
+            commented_by_name=commented_by_name,
+            commented_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            ticket_url=ticket_url
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="feedback_new_comment.html", reason=str(e))
+    
+    # Send to submitter
+    send_email(submitted_by_email, email_subject, html_body)
+    
+    # Send to admin
+    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+def send_password_reset_email(user_email: str, reset_link: str, first_name: str):
+    """
+    Send password reset link to user's email with HTML template
+    Clean exception handling!
+    
+    Args:
+        user_email: User's email address
+        reset_link: Password reset URL with token
+        first_name: User's first name for personalization
+        
+    Raises:
+        TemplateNotFoundException: If template file not found
+        TemplateRenderException: If template rendering fails
+        EmailServiceException: If email sending fails
+    """
+    subject = EMAIL_PASSWORD_RESET_SUBJECT
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("password_reset_email.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="password_reset_email.html")
+    
+    try:
+        html_body = template.render(
+            first_name=first_name,
+            reset_link=reset_link,
+            expiry_minutes=PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="password_reset_email.html", reason=str(e))
     
     # Send email using configured service (Azure AD or SMTP with auto-fallback)
     send_email(user_email, subject, html_body)

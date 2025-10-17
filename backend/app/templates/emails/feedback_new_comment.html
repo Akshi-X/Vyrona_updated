@@ -20,7 +20,7 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
             color: #ffffff;
             padding: 30px;
             text-align: center;
@@ -35,25 +35,43 @@
             color: #333333;
         }
         .content h2 {
-            color: #667eea;
+            color: #17a2b8;
             font-size: 20px;
             margin-top: 0;
         }
-        .user-details {
+        .ticket-details {
             background-color: #f8f9fa;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #17a2b8;
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
         }
-        .user-details p {
+        .ticket-details p {
             margin: 8px 0;
             font-size: 14px;
         }
-        .user-details strong {
+        .ticket-details strong {
             color: #495057;
             display: inline-block;
-            width: 100px;
+            width: 120px;
+        }
+        .comment-box {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .comment-header {
+            background-color: #17a2b8;
+            color: white;
+            padding: 8px 12px;
+            margin: -15px -15px 15px -15px;
+            border-radius: 4px 4px 0 0;
+            font-weight: 600;
+            font-size: 13px;
         }
         .action-buttons {
             text-align: center;
@@ -70,11 +88,11 @@
             transition: all 0.3s ease;
         }
         .button-primary {
-            background-color: #667eea;
+            background-color: #17a2b8;
             color: #ffffff;
         }
         .button-primary:hover {
-            background-color: #5568d3;
+            background-color: #138496;
         }
         .footer {
             background-color: #f8f9fa;
@@ -97,44 +115,53 @@
 <body>
     <div class="email-container">
         <div class="header">
-            <h1>🔔 {{ subject }}</h1>
+            <h1>💬 {{ subject }}</h1>
         </div>
         
         <div class="content">
-            <h2>New User Registration</h2>
-            <p>Hello Admin,</p>
-            <p>A new user has registered and is awaiting your approval. Please review the details below:</p>
+            <h2>New Comment Added to Feedback Ticket</h2>
+            <p>Hello,</p>
+            <p>A new comment has been added to your feedback ticket. Here are the details:</p>
             
-            <div class="user-details">
-                <p><strong>Name:</strong> {{ first_name }} {{ last_name }}</p>
-                <p><strong>Email:</strong> {{ email }}</p>
-                <p><strong>Role:</strong> {{ role }}</p>
-                <p><strong>Company:</strong> {{ company }}</p>
+            <div class="ticket-details">
+                <p><strong>Ticket ID:</strong> {{ ticket_id }}</p>
+                <p><strong>Subject:</strong> {{ feedback_subject }}</p>
+                <p><strong>Commented By:</strong> {{ commented_by_name }}</p>
+                <p><strong>Commented On:</strong> {{ commented_on }}</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <h3>New Comment:</h3>
+            <div class="comment-box">
+                <div class="comment-header">
+                    Comment by {{ commented_by_name }}
+                </div>
+                {{ comment }}
             </div>
             
             <div class="divider"></div>
             
             <p style="text-align: center; font-size: 14px; color: #6c757d;">
-                Click the button below to review and approve/reject this registration
+                Click the button below to view the full ticket and all comments
             </p>
             
             <div class="action-buttons">
-                <a href="{{ approval_url }}" class="button button-primary">
-                    Review Application →
+                <a href="{{ ticket_url }}" class="button button-primary">
+                    View Ticket →
                 </a>
             </div>
             
             <p style="font-size: 13px; color: #6c757d; margin-top: 20px;">
                 <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-                <a href="{{ approval_url }}" style="color: #667eea; word-break: break-all;">{{ approval_url }}</a>
+                <a href="{{ ticket_url }}" style="color: #17a2b8; word-break: break-all;">{{ ticket_url }}</a>
             </p>
         </div>
         
         <div class="footer">
-            <p><strong>myGrape</strong></p>
+            <p><strong>myGrape</strong> - Feedback Management System</p>
             <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
 </body>
 </html>
-

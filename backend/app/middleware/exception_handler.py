@@ -9,6 +9,8 @@ import logging
 import traceback
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError, HTTPException
+from pydantic import ValidationError
 from datetime import datetime
 
 from ..exceptions.custom_exceptions import AppException
@@ -80,9 +82,6 @@ def setup_exception_handlers(app):
     """
     Setup exception handlers for specific FastAPI exceptions
     """
-    from fastapi.exceptions import RequestValidationError
-    from fastapi.exceptions import HTTPException
-    from pydantic import ValidationError
     
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException):
