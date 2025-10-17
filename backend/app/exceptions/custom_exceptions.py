@@ -666,3 +666,351 @@ class ManagerShipmentManagementOnlyException(AuthorizationException):
             user_role=user_role
         )
 
+
+# ============================================
+# FEEDBACK SYSTEM EXCEPTIONS
+# ============================================
+
+class FeedbackException(AppException):
+    """Base exception for feedback system errors"""
+    
+    def __init__(self, message: str, error_code: str, status_code: int = 400, **kwargs):
+        super().__init__(message, error_code, status_code, kwargs)
+
+
+# ============================================
+# FEEDBACK CREATION EXCEPTIONS
+# ============================================
+
+class FeedbackCreateFailedException(FeedbackException):
+    """Failed to create feedback ticket"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_CREATE_FAILED,
+            error_code=ERROR_CODES["FEEDBACK_CREATE_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class FeedbackInvalidDataException(FeedbackException):
+    """Invalid feedback data provided"""
+    
+    def __init__(self, field: Optional[str] = None, reason: Optional[str] = None):
+        
+        message = ErrorMessages.FEEDBACK_INVALID_DATA
+        if field:
+            message = f"{message}. Invalid field: {field}"
+        if reason:
+            message = f"{message}. Reason: {reason}"
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES["FEEDBACK_INVALID_DATA"],
+            status_code=400,
+            field=field,
+            reason=reason
+        )
+
+
+class FeedbackAttachmentTooLargeException(FeedbackException):
+    """File attachment exceeds maximum size limit"""
+    
+    def __init__(self, file_size_mb: float, max_size_mb: float):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_ATTACHMENT_TOO_LARGE}. File size: {file_size_mb:.1f}MB, Maximum allowed: {max_size_mb}MB",
+            error_code=ERROR_CODES["FEEDBACK_ATTACHMENT_TOO_LARGE"],
+            status_code=413,
+            file_size_mb=file_size_mb,
+            max_size_mb=max_size_mb
+        )
+
+
+class FeedbackAttachmentInvalidTypeException(FeedbackException):
+    """File attachment type not allowed"""
+    
+    def __init__(self, file_extension: str, allowed_extensions: list):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_ATTACHMENT_INVALID_TYPE}. File type: {file_extension}, Allowed types: {', '.join(allowed_extensions)}",
+            error_code=ERROR_CODES["FEEDBACK_ATTACHMENT_INVALID_TYPE"],
+            status_code=400,
+            file_extension=file_extension,
+            allowed_extensions=allowed_extensions
+        )
+
+
+class FeedbackAttachmentSaveFailedException(FeedbackException):
+    """Failed to save file attachment"""
+    
+    def __init__(self, filename: str, reason: Optional[str] = None):
+        
+        message = f"{ErrorMessages.FEEDBACK_ATTACHMENT_SAVE_FAILED}. File: {filename}"
+        if reason:
+            message = f"{message}. Reason: {reason}"
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES["FEEDBACK_ATTACHMENT_SAVE_FAILED"],
+            status_code=500,
+            filename=filename,
+            reason=reason
+        )
+
+
+class FeedbackTicketIdGenerationFailedException(FeedbackException):
+    """Failed to generate unique ticket ID"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_TICKET_ID_GENERATION_FAILED,
+            error_code=ERROR_CODES["FEEDBACK_TICKET_ID_GENERATION_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+# ============================================
+# FEEDBACK RETRIEVAL EXCEPTIONS
+# ============================================
+
+class FeedbackNotFoundException(FeedbackException):
+    """Feedback ticket not found"""
+    
+    def __init__(self, feedback_id: Optional[int] = None, ticket_id: Optional[str] = None):
+        
+        details = {}
+        if feedback_id:
+            details["feedback_id"] = feedback_id
+        if ticket_id:
+            details["ticket_id"] = ticket_id
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_NOT_FOUND,
+            error_code=ERROR_CODES["FEEDBACK_NOT_FOUND"],
+            status_code=404,
+            **details
+        )
+
+
+class FeedbackAccessDeniedException(FeedbackException):
+    """Access denied to feedback ticket"""
+    
+    def __init__(self, feedback_id: int, user_id: str, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_ACCESS_DENIED,
+            error_code=ERROR_CODES["FEEDBACK_ACCESS_DENIED"],
+            status_code=403,
+            feedback_id=feedback_id,
+            user_id=user_id,
+            reason=reason
+        )
+
+
+class FeedbackFilterInvalidException(FeedbackException):
+    """Invalid filter parameters for feedback query"""
+    
+    def __init__(self, invalid_filters: list, reason: Optional[str] = None):
+        
+        message = f"{ErrorMessages.FEEDBACK_FILTER_INVALID}. Invalid filters: {', '.join(invalid_filters)}"
+        if reason:
+            message = f"{message}. Reason: {reason}"
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES["FEEDBACK_FILTER_INVALID"],
+            status_code=400,
+            invalid_filters=invalid_filters,
+            reason=reason
+        )
+
+
+class FeedbackUserNotFoundException(FeedbackException):
+    """User not found for feedback operation"""
+    
+    def __init__(self, user_id: str):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_USER_NOT_FOUND,
+            error_code=ERROR_CODES["FEEDBACK_USER_NOT_FOUND"],
+            status_code=404,
+            user_id=user_id
+        )
+
+
+# ============================================
+# FEEDBACK COMMENT EXCEPTIONS
+# ============================================
+
+class FeedbackCommentCreateFailedException(FeedbackException):
+    """Failed to create comment on feedback ticket"""
+    
+    def __init__(self, feedback_id: int, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_COMMENT_CREATE_FAILED,
+            error_code=ERROR_CODES["FEEDBACK_COMMENT_CREATE_FAILED"],
+            status_code=500,
+            feedback_id=feedback_id,
+            reason=reason
+        )
+
+
+class FeedbackCommentNotFoundException(FeedbackException):
+    """Comment not found"""
+    
+    def __init__(self, comment_id: int):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_COMMENT_NOT_FOUND,
+            error_code=ERROR_CODES["FEEDBACK_COMMENT_NOT_FOUND"],
+            status_code=404,
+            comment_id=comment_id
+        )
+
+
+class FeedbackCommentInvalidException(FeedbackException):
+    """Invalid comment data"""
+    
+    def __init__(self, field: Optional[str] = None, reason: Optional[str] = None):
+        
+        message = ErrorMessages.FEEDBACK_COMMENT_INVALID
+        if field:
+            message = f"{message}. Invalid field: {field}"
+        if reason:
+            message = f"{message}. Reason: {reason}"
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES["FEEDBACK_COMMENT_INVALID"],
+            status_code=400,
+            field=field,
+            reason=reason
+        )
+
+
+class FeedbackCommentAccessDeniedException(FeedbackException):
+    """Access denied to comment"""
+    
+    def __init__(self, comment_id: int, user_id: str):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_COMMENT_ACCESS_DENIED,
+            error_code=ERROR_CODES["FEEDBACK_COMMENT_ACCESS_DENIED"],
+            status_code=403,
+            comment_id=comment_id,
+            user_id=user_id
+        )
+
+
+# ============================================
+# FEEDBACK STATUS UPDATE EXCEPTIONS
+# ============================================
+
+class FeedbackStatusUpdateFailedException(FeedbackException):
+    """Failed to update feedback status"""
+    
+    def __init__(self, feedback_id: int, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_STATUS_UPDATE_FAILED,
+            error_code=ERROR_CODES["FEEDBACK_STATUS_UPDATE_FAILED"],
+            status_code=500,
+            feedback_id=feedback_id,
+            reason=reason
+        )
+
+
+class FeedbackStatusInvalidException(FeedbackException):
+    """Invalid status value for feedback"""
+    
+    def __init__(self, status: str, valid_statuses: list):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_STATUS_INVALID}. Provided: {status}, Valid values: {', '.join(valid_statuses)}",
+            error_code=ERROR_CODES["FEEDBACK_STATUS_INVALID"],
+            status_code=400,
+            status=status,
+            valid_statuses=valid_statuses
+        )
+
+
+class FeedbackStatusAccessDeniedException(FeedbackException):
+    """Access denied to update feedback status"""
+    
+    def __init__(self, feedback_id: int, user_id: str, current_status: str):
+        
+        super().__init__(
+            message=ErrorMessages.FEEDBACK_STATUS_ACCESS_DENIED,
+            error_code=ERROR_CODES["FEEDBACK_STATUS_ACCESS_DENIED"],
+            status_code=403,
+            feedback_id=feedback_id,
+            user_id=user_id,
+            current_status=current_status
+        )
+
+
+class FeedbackStatusAlreadySetException(FeedbackException):
+    """Status is already set to the requested value"""
+    
+    def __init__(self, feedback_id: int, status: str):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_STATUS_ALREADY_SET}. Status: {status}",
+            error_code=ERROR_CODES["FEEDBACK_STATUS_ALREADY_SET"],
+            status_code=400,
+            feedback_id=feedback_id,
+            status=status
+        )
+
+
+# ============================================
+# FEEDBACK EMAIL NOTIFICATION EXCEPTIONS
+# ============================================
+
+class FeedbackEmailSendFailedException(FeedbackException):
+    """Failed to send feedback notification email"""
+    
+    def __init__(self, email_type: str, recipient: str, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_EMAIL_SEND_FAILED}. Type: {email_type}, Recipient: {recipient}",
+            error_code=ERROR_CODES["FEEDBACK_EMAIL_SEND_FAILED"],
+            status_code=500,
+            email_type=email_type,
+            recipient=recipient,
+            reason=reason
+        )
+
+
+class FeedbackEmailTemplateErrorException(FeedbackException):
+    """Email template error for feedback notification"""
+    
+    def __init__(self, template_name: str, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_EMAIL_TEMPLATE_ERROR}. Template: {template_name}",
+            error_code=ERROR_CODES["FEEDBACK_EMAIL_TEMPLATE_ERROR"],
+            status_code=500,
+            template_name=template_name,
+            reason=reason
+        )
+
+
+class FeedbackEmailRecipientInvalidException(FeedbackException):
+    """Invalid email recipient for feedback notification"""
+    
+    def __init__(self, recipient: str, reason: Optional[str] = None):
+        
+        super().__init__(
+            message=f"{ErrorMessages.FEEDBACK_EMAIL_RECIPIENT_INVALID}. Recipient: {recipient}",
+            error_code=ERROR_CODES["FEEDBACK_EMAIL_RECIPIENT_INVALID"],
+            status_code=400,
+            recipient=recipient,
+            reason=reason
+        )

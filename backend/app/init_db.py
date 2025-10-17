@@ -37,8 +37,8 @@ def create_super_admin():
             if existing_admin.approved_status != 'approved':
                 existing_admin.approved_status = 'approved'
                 needs_update = True
-            if existing_admin.company_name != 'MyGrape Platform':
-                existing_admin.company_name = 'MyGrape Platform'
+            if existing_admin.company_name != 'myGrape Platform':
+                existing_admin.company_name = 'myGrape Platform'
                 needs_update = True
             if existing_admin.role != 'admin':
                 existing_admin.role = 'admin'
@@ -63,7 +63,7 @@ def create_super_admin():
             first_name="Platform",
             last_name="Admin",
             role="admin",
-            company_name="MyGrape Platform",
+            company_name="myGrape Platform",
             approved_status="approved",
             status=True,
             session_timeout=120,

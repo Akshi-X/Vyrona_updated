@@ -134,6 +134,41 @@ ERROR_CODES = {
     "SECURITY_PATH_TRAVERSAL": "ERR_7006",
     
     # ============================================
+    # FEEDBACK SYSTEM (8xxx)
+    # ============================================
+    
+    # Feedback Creation (8001-8020)
+    "FEEDBACK_CREATE_FAILED": "ERR_8001",
+    "FEEDBACK_INVALID_DATA": "ERR_8002",
+    "FEEDBACK_ATTACHMENT_TOO_LARGE": "ERR_8003",
+    "FEEDBACK_ATTACHMENT_INVALID_TYPE": "ERR_8004",
+    "FEEDBACK_ATTACHMENT_SAVE_FAILED": "ERR_8005",
+    "FEEDBACK_TICKET_ID_GENERATION_FAILED": "ERR_8006",
+    
+    # Feedback Retrieval (8021-8040)
+    "FEEDBACK_NOT_FOUND": "ERR_8021",
+    "FEEDBACK_ACCESS_DENIED": "ERR_8022",
+    "FEEDBACK_FILTER_INVALID": "ERR_8023",
+    "FEEDBACK_USER_NOT_FOUND": "ERR_8024",
+    
+    # Feedback Comments (8041-8060)
+    "FEEDBACK_COMMENT_CREATE_FAILED": "ERR_8041",
+    "FEEDBACK_COMMENT_NOT_FOUND": "ERR_8042",
+    "FEEDBACK_COMMENT_INVALID": "ERR_8043",
+    "FEEDBACK_COMMENT_ACCESS_DENIED": "ERR_8044",
+    
+    # Feedback Status Updates (8061-8080)
+    "FEEDBACK_STATUS_UPDATE_FAILED": "ERR_8061",
+    "FEEDBACK_STATUS_INVALID": "ERR_8062",
+    "FEEDBACK_STATUS_ACCESS_DENIED": "ERR_8063",
+    "FEEDBACK_STATUS_ALREADY_SET": "ERR_8064",
+    
+    # Feedback Email Notifications (8081-8100)
+    "FEEDBACK_EMAIL_SEND_FAILED": "ERR_8081",
+    "FEEDBACK_EMAIL_TEMPLATE_ERROR": "ERR_8082",
+    "FEEDBACK_EMAIL_RECIPIENT_INVALID": "ERR_8083",
+    
+    # ============================================
     # GENERAL (9xxx)
     # ============================================
     "SERVER_ERROR": "ERR_9001",
