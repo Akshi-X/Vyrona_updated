@@ -17,3 +17,6 @@ class OTP(Base):
     expires_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
     is_used = sqlalchemy.Column(sqlalchemy.Boolean, default=False)
     attempts = sqlalchemy.Column(sqlalchemy.Integer, default=0)
+    
+    # Relationship
+    user = relationship("User", back_populates="otps")

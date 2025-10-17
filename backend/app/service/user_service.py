@@ -13,7 +13,7 @@ from app.schemas.response_schema import (
     UserRejectionResponse,
     UserDetailsResponse
 )
-from app.schemas.chat_schema import UserListResponse, UserListItem
+from app.schemas.user_schema import UserListResponse, UserListItem
 from app.service.email_service import send_approval_email
 from app.utils import utils
 from app.exceptions import (

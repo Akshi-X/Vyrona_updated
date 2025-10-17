@@ -25,7 +25,7 @@ from app.schemas.response_schema import (
     UserDetailsResponse,
     UserProfileResponse
 )
-from app.schemas.chat_schema import UserListResponse
+from app.schemas.user_schema import UserListResponse
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 

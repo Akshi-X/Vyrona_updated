@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
 class UserRegister(BaseModel):
@@ -50,3 +50,22 @@ class UserRegistrationResponse(BaseModel):
     company_name: str
     approval_status: str
     approval_sent_to: str  # Who the approval email was sent to
+
+
+class UserListItem(BaseModel):
+    """Schema for user item in list"""
+    user_id: str
+    first_name: str
+    last_name: str
+    email: str
+    role: str
+    company_name: str
+    
+    class Config:
+        from_attributes = True
+
+
+class UserListResponse(BaseModel):
+    """Response schema for listing all users"""
+    total_users: int
+    users: List[UserListItem]
