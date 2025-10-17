@@ -10,7 +10,9 @@ from app.schemas.patient_schema import (
     PatientResponse, 
     PatientCreateRequest,
     PatientCreateResponse,
-    PharmaStatisticsResponse
+    PharmaStatisticsResponse,
+    PatientSummaryResponse,
+    PatientDetailedResponse
 )
 from app.models.patient_model import Patient
 from app.utils.patient_utils import generate_patient_id
@@ -89,25 +91,6 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("update_patient", f"Failed to update patient: {str(e)}")
 
-    def delete_patient(self, patient_id: str) -> bool:
-        """Delete patient with business logic validation"""
-        try:
-            # Check if patient exists
-            db_patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-            if not db_patient:
-                raise PatientNotFoundError(patient_id)
-            
-            # Additional business logic can be added here
-            # For example: check if patient has active treatments, etc.
-            
-            self.db.delete(db_patient)
-            self.db.commit()
-            return True
-        except PatientNotFoundError:
-            raise
-        except Exception as e:
-            raise PatientServiceError("delete_patient", f"Failed to delete patient: {str(e)}")
-
     def get_patients_by_provider(self, provider_id: str) -> List[PatientResponse]:
         """Get all patients for a specific provider"""
         try:
@@ -127,44 +110,6 @@ class PatientService:
     def patient_exists(self, patient_id: str) -> bool:
         """Check if patient exists"""
         return self.db.query(Patient).filter(Patient.id == patient_id).first() is not None
-
-    def search_patients_advanced(
-        self,
-        patient_name: Optional[str] = None,
-        condition: Optional[str] = None,
-        hospital_name: Optional[str] = None,
-        insurance_provider: Optional[str] = None,
-        therapy_id: Optional[str] = None,
-        provider_id: Optional[str] = None,
-        pharma_id: Optional[str] = None,
-        stage_id: Optional[int] = None
-    ) -> List[PatientResponse]:
-        """Advanced search for patients with multiple filters"""
-        try:
-            query = self.db.query(Patient)
-            
-            # Apply filters if provided
-            if patient_name:
-                query = query.filter(Patient.patient_name.ilike(f"%{patient_name}%"))
-            if condition:
-                query = query.filter(Patient.condition.ilike(f"%{condition}%"))
-            if hospital_name:
-                query = query.filter(Patient.hospital_name.ilike(f"%{hospital_name}%"))
-            if insurance_provider:
-                query = query.filter(Patient.insurance_provider.ilike(f"%{insurance_provider}%"))
-            if therapy_id:
-                query = query.filter(Patient.therapy_id == therapy_id)
-            if provider_id:
-                query = query.filter(Patient.provider_id == provider_id)
-            if pharma_id:
-                query = query.filter(Patient.pharma_id == pharma_id)
-            if stage_id:
-                query = query.filter(Patient.stage_id == stage_id)
-            
-            patients = query.order_by(desc(Patient.created_at)).all()
-            return [PatientResponse.model_validate(patient) for patient in patients]
-        except Exception as e:
-            raise PatientServiceError("search_patients_advanced", f"Failed to perform advanced search: {str(e)}")
 
     def create_multiple_patients(self, patients_data: List[PatientCreate]) -> List[Patient]:
         """Create multiple patients in a single transaction"""
@@ -368,3 +313,88 @@ class PatientService:
             raise
         except Exception as e:
             raise PatientServiceError("create_patients", f"Failed to create patients: {str(e)}")
+
+    def get_patients_summary(self, pharma_id: str) -> List[PatientSummaryResponse]:
+        """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
+        try:
+            # Import here to avoid circular imports
+            from app.models.pharma_model import Pharma
+            from app.models.provider_model import Provider
+            
+            # Query with joins to get related data - filter for specific pharma and scheduled patients
+            query = self.db.query(
+                Patient.id.label('patient_id'),
+                Patient.condition,
+                Patient.hospital_name.label('hospital'),
+                Patient.stage,
+                Provider.name.label('provider_name'),
+                Pharma.location.label('pharma_location')
+            ).outerjoin(
+                Provider, Patient.provider_id == Provider.id
+            ).outerjoin(
+                Pharma, Patient.pharma_id == Pharma.id
+            ).filter(
+                Patient.pharma_id == pharma_id,  # Filter by specific pharma
+                Patient.stage == 'Scheduled'     # Only show scheduled patients
+            ).order_by(desc(Patient.created_at))
+            
+            results = query.all()
+            
+            # Convert to PatientSummaryResponse objects
+            summary_data = []
+            for result in results:
+                summary_data.append(PatientSummaryResponse(
+                    patient_id=result.patient_id,
+                    condition=result.condition,
+                    hospital=result.hospital,
+                    stage=result.stage,
+                    provider_name=result.provider_name,
+                    pharma_location=result.pharma_location
+                ))
+            
+            return summary_data
+            
+        except Exception as e:
+            raise PatientServiceError("get_patients_summary", f"Failed to get patients summary: {str(e)}")
+
+    def get_patients_detailed(self, pharma_id: str) -> List[PatientDetailedResponse]:
+        """Get detailed patient data with docs_report for specific pharma"""
+        try:
+            # Import here to avoid circular imports
+            from app.models.pharma_model import Pharma
+            from app.models.provider_model import Provider
+            
+            # Query with joins to get related data - filter for specific pharma
+            query = self.db.query(
+                Patient.id.label('patient_id'),
+                Patient.condition,
+                Patient.stage,
+                Patient.docs_report,
+                Provider.name.label('provider_name'),
+                Pharma.location.label('pharma_location')
+            ).outerjoin(
+                Provider, Patient.provider_id == Provider.id
+            ).outerjoin(
+                Pharma, Patient.pharma_id == Pharma.id
+            ).filter(
+                Patient.pharma_id == pharma_id  # Filter by specific pharma
+            ).order_by(desc(Patient.created_at))
+            
+            results = query.all()
+            
+            # Convert to PatientDetailedResponse objects
+            detailed_data = []
+            for result in results:
+                detailed_data.append(PatientDetailedResponse(
+                    patient_id=result.patient_id,
+                    condition=result.condition,
+                    pharma_location=result.pharma_location,
+                    provider_name=result.provider_name,
+                    stage=result.stage,
+                    docs_report=result.docs_report
+                ))
+            
+            return detailed_data
+            
+        except Exception as e:
+            raise PatientServiceError("get_patients_detailed", f"Failed to get patients detailed: {str(e)}")

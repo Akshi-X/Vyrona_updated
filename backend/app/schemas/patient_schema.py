@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, RootModel
 from typing import Optional, List, Union
 from datetime import datetime
+from app.constants.enums import PatientStage
 
 
 class PatientBase(BaseModel):
@@ -13,7 +14,7 @@ class PatientBase(BaseModel):
     location: Optional[str] = Field(None, max_length=255, description="Patient location")
     provider_id: Optional[str] = Field(None, description="Reference to provider")
     pharma_id: Optional[str] = Field(None, description="Reference to pharma")
-    stage_id: Optional[int] = Field(None, description="Reference to stage")
+    stage: Optional[PatientStage] = Field(PatientStage.SCHEDULED, description="Patient treatment stage")
     created_by: Optional[str] = Field(None, max_length=255, description="User who created the record")
     updated_by: Optional[str] = Field(None, max_length=255, description="User who last updated the record")
 
@@ -39,7 +40,7 @@ class PatientUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=255)
     provider_id: Optional[str] = None
     pharma_id: Optional[str] = None
-    stage_id: Optional[int] = None
+    stage: Optional[PatientStage] = None
     updated_by: Optional[str] = Field(None, max_length=255)
 
 
@@ -85,3 +86,29 @@ class PharmaStatisticsResponse(BaseModel):
     top_conditions: List[dict] = Field(default_factory=list, description="Top conditions with counts")
     recent_patients: int = Field(0, description="Patients added in last 30 days")
     monthly_statistics: List[MonthlyStats] = Field(default_factory=list, description="Monthly statistics for the last 12 months")
+
+
+class PatientSummaryResponse(BaseModel):
+    """Schema for patient summary with joined data"""
+    patient_id: str = Field(..., description="Patient ID")
+    condition: str = Field(..., description="Patient condition")
+    hospital: Optional[str] = Field(None, description="Hospital name")
+    stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
+    provider_name: Optional[str] = Field(None, description="Provider name")
+    pharma_location: Optional[str] = Field(None, description="Pharma company location")
+    
+    class Config:
+        from_attributes = True
+
+
+class PatientDetailedResponse(BaseModel):
+    """Schema for detailed patient data with docs_report"""
+    patient_id: str = Field(..., description="Patient ID")
+    condition: str = Field(..., description="Patient condition")
+    pharma_location: Optional[str] = Field(None, description="Pharma company location")
+    provider_name: Optional[str] = Field(None, description="Provider name")
+    stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
+    docs_report: Optional[bytes] = Field(None, description="Patient documents report")
+    
+    class Config:
+        from_attributes = True
