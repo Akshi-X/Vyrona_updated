@@ -34,5 +34,6 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
+    from ..models import user_model, otp_model, patient_model  # import your models so Base knows them
     from ..models import user_model, otp_model, feedback_model, feedback_comments  # import your models so Base knows them
     Base.metadata.create_all(bind=engine)
