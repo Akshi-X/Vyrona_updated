@@ -12,6 +12,12 @@ from ..constants.enums import (
 
 class Feedback(Base):
     __tablename__ = "feedback"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Automatically set created_by to submitted_by if not provided
+        if hasattr(self, 'submitted_by') and self.submitted_by and not self.created_by:
+            self.created_by = self.submitted_by
 
     # Primary Key - Auto-generated Ticket ID (TK-YYYY-MM-nnn format)
     ticket_id = sqlalchemy.Column(sqlalchemy.String, primary_key=True, index=True)
@@ -58,18 +64,26 @@ class Feedback(Base):
         nullable=False
     )
     
-    # Audit Trail
+    # Audit Trail - All set automatically
     created_at = sqlalchemy.Column(
         sqlalchemy.DateTime, 
         default=lambda: datetime.now(timezone.utc),
         nullable=False
-    )
+    )  # Automatically set to current timestamp when record is created
+    created_by = sqlalchemy.Column(
+        sqlalchemy.String, 
+        nullable=True,
+        default=lambda: None
+    )  # Automatically set to submitted_by when record is created
     updated_at = sqlalchemy.Column(
         sqlalchemy.DateTime, 
+        nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc)
+    )  # Automatically set when record is updated
+    updated_by = sqlalchemy.Column(
+        sqlalchemy.String, 
         nullable=True
-    )
-    created_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    updated_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    )  # Automatically set to current user when record is updated
     
     # Relationships
     comments = relationship("Comment", back_populates="feedback", cascade="all, delete-orphan")
