@@ -18,7 +18,7 @@ def generate_otp_code(length: int = 6) -> str:
     return ''.join(random.choices(string.digits, k=length))
 
 
-def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
+def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = False) -> OTP:
     """
     Generate and send OTP to user's email with proper transaction handling.
     
@@ -28,6 +28,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
         db: Database session
         user_id: User ID
         email: User's email address
+        remember_me: Remember Me preference for extended session duration
         
     Returns:
         OTP object that was created
@@ -42,14 +43,15 @@ def send_otp_to_user(db: Session, user_id: str, email: str) -> OTP:
         # Set expiration time (10 minutes from now)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         
-        # Create OTP record
+        # Create OTP record with remember_me preference
         otp = OTP(
             user_id=user_id,
             email=email,
             otp_code=otp_code,
             expires_at=expires_at,
             is_used=False,
-            attempts=0
+            attempts=0,
+            remember_me=remember_me
         )
         
         # Add to database but don't commit yet
@@ -124,7 +126,7 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     Business Logic:
     - Validate OTP
     - Get user
-    - Create token with user's custom session timeout
+    - Create token with duration based on remember_me preference
     
     Args:
         user_id: User ID
@@ -136,6 +138,7 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     """
     # Import here to avoid circular dependency
     from ..dependencies.auth_dependencies import validate_otp_verification
+    from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
     
     print(f"Verifying OTP for user_id: {user_id}")
     
@@ -143,11 +146,32 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     user = validate_otp_verification(user_id, otp, db)
     print(f"OTP validated for user: {user.email}")
     
-    # Business Logic: Create JWT token with user's custom session timeout
-    print(f"Creating JWT token with session timeout: {user.session_timeout} minutes")
-    access_token_expires = timedelta(minutes=user.session_timeout)
+    # Get the OTP record to check remember_me preference
+    otp_record = db.query(OTP).filter(
+        and_(
+            OTP.user_id == user_id,
+            OTP.otp_code == otp,
+            OTP.is_used == True  # It was just marked as used by validation
+        )
+    ).order_by(OTP.created_at.desc()).first()
+    
+    # Determine session duration based on remember_me preference
+    if otp_record and otp_record.remember_me:
+        session_duration = REMEMBER_ME_SESSION_DURATION_MINUTES  # 9 hours
+        remember_me = True
+        print(f"Remember Me enabled: Session expires in {session_duration} minutes (9 hours)")
+    else:
+        session_duration = NO_REMEMBER_ME_SESSION_DURATION_MINUTES  # 1 hour
+        remember_me = False
+        print(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
+    
+    # Business Logic: Create JWT token with remember_me flag in payload
+    access_token_expires = timedelta(minutes=session_duration)
     access_token = create_access_token(
-        data={"sub": str(user.user_id)}, 
+        data={
+            "sub": str(user.user_id),
+            "remember_me": remember_me
+        }, 
         expires_delta=access_token_expires
     )
     print(f"JWT token created successfully")

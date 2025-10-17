@@ -17,7 +17,8 @@ from app.schemas.auth_schema import (
     VerifyOTPRequest, VerifyOTPSuccessResponse,
     ResendOTPRequest, ResendOTPSuccessResponse,
     ForgotPasswordRequest, ForgotPasswordResponse,
-    ResetPasswordRequest, ResetPasswordResponse
+    ResetPasswordRequest, ResetPasswordResponse,
+    LogoutResponse
 )
 from app.schemas.response_schema import (
     UserApprovalResponse,
@@ -52,9 +53,9 @@ def register_user_endpoint(request: user_schema.UserRegister, db: Session = Depe
 # ---------------------------
 @router.post("/login", response_model=LoginResponse)
 def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
-    """User login endpoint."""
+    """User login endpoint with Remember Me support."""
     # Call service (all business logic there)
-    result = handle_login(request.email, request.password, db)
+    result = handle_login(request.email, request.password, request.remember_me, db)
     
     # Return DTO
     return LoginResponse(
@@ -83,6 +84,26 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
         auth_token=result["auth_token"],
         expires_at=result["expires_at"],
         message=SuccessMessages.OTP_VERIFIED
+    )
+
+
+# ---------------------------
+# Logout endpoint
+# ---------------------------
+@router.post("/logout", response_model=LogoutResponse)
+def logout_user(current_user: user_model.User = Depends(get_current_user)):
+    """
+    User logout endpoint.
+    
+    Protected endpoint. Any authenticated user can logout.
+    
+    Note: Since JWT tokens are stateless, the actual token invalidation 
+    happens on the client side by removing the token from storage.
+    This endpoint serves to acknowledge the logout action.
+    """
+    return LogoutResponse(
+        status="success",
+        message=SuccessMessages.LOGOUT_SUCCESS
     )
 
 
@@ -172,7 +193,7 @@ def get_user(
     """
     Get user details.
     
-    Protected endpoint. Manager role required (enforced by middleware).
+    Protected endpoint. Manager or Admin role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
     # Call service (business logic in service layer)
@@ -209,7 +230,7 @@ def approve_user(
     """
     Approve user registration.
     
-    Protected endpoint. Manager role required (enforced by middleware).
+    Protected endpoint. Manager or Admin role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
     # Call service (business logic in service layer)
@@ -234,7 +255,7 @@ def reject_user(
     """
     Reject user registration.
     
-    Protected endpoint. Manager role required (enforced by middleware).
+    Protected endpoint. Manager or Admin role required (enforced by middleware).
     Uses Depends(get_current_user) to get authenticated user.
     """
     # Call service (business logic in service layer)
