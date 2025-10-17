@@ -1,35 +1,31 @@
 from enum import Enum
+from .app_constants import (
+    FEEDBACK_MAX_SUBJECT_LENGTH,
+    FEEDBACK_MAX_DESCRIPTION_LENGTH,
+    FEEDBACK_MAX_COMMENT_LENGTH,
+    FEEDBACK_MAX_ATTACHMENT_SIZE_BYTES,
+    FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS,
+    FEEDBACK_MAX_PAGE_SIZE
+)
 
 
 class FeedbackConstants:
-    """Constants for feedback-related operations"""
+    """Constants for feedback-related operations - references app_constants.py"""
     
-    # Feedback ID format
-    FEEDBACK_ID_PREFIX = "TK"
-    FEEDBACK_ID_SEQUENCE_LENGTH = 3
-    
-    # Field validation limits
-    MAX_SUBJECT_LENGTH = 255
-    MAX_DESCRIPTION_LENGTH = 5000
-    MAX_COMMENT_LENGTH = 2000
+    # Field validation limits (imported from app_constants.py)
+    MAX_SUBJECT_LENGTH = FEEDBACK_MAX_SUBJECT_LENGTH
+    MAX_DESCRIPTION_LENGTH = FEEDBACK_MAX_DESCRIPTION_LENGTH
+    MAX_COMMENT_LENGTH = FEEDBACK_MAX_COMMENT_LENGTH
     MAX_SUBMITTED_BY_LENGTH = 255
     MAX_CREATED_BY_LENGTH = 255
     MAX_UPDATED_BY_LENGTH = 255
     
-    # File upload limits
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-    ALLOWED_FILE_EXTENSIONS = {
-        '.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png',
-        '.xlsx', '.xls', '.csv', '.zip', '.rar'
-    }
+    # File upload limits (imported from app_constants.py)
+    MAX_FILE_SIZE = FEEDBACK_MAX_ATTACHMENT_SIZE_BYTES
+    ALLOWED_FILE_EXTENSIONS = set(FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS)
     
-    # Pagination defaults
-    DEFAULT_PAGE_SIZE = 10
-    MAX_PAGE_SIZE = 100
-    
-    # Search and sorting
-    DEFAULT_SORT_FIELD = "submitted_on"
-    DEFAULT_SORT_ORDER = "desc"
+    # Pagination defaults (imported from app_constants.py)
+    MAX_PAGE_SIZE = FEEDBACK_MAX_PAGE_SIZE
     
 
 class ErrorMessages:
@@ -45,7 +41,7 @@ class ErrorMessages:
     INVALID_PAGE_SIZE = f"Page size must be between 1 and {FeedbackConstants.MAX_PAGE_SIZE}"
     INVALID_SORT_ORDER = "Sort order must be 'asc' or 'desc'"
     INVALID_FILE_SIZE = f"File size exceeds maximum allowed size of {FeedbackConstants.MAX_FILE_SIZE // (1024*1024)}MB"
-    INVALID_FILE_TYPE = f"File type not allowed. Allowed types: {', '.join(FeedbackConstants.ALLOWED_FILE_EXTENSIONS)}"
+    INVALID_FILE_TYPE = f"File type not allowed. Allowed types: {', '.join(sorted(FeedbackConstants.ALLOWED_FILE_EXTENSIONS))}"
     
     # Not found errors
     FEEDBACK_NOT_FOUND = "Feedback not found"
