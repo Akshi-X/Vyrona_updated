@@ -1,6 +1,7 @@
 import sqlalchemy
 from datetime import datetime, timezone
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
 
 from ..config.database import Base
 
@@ -48,3 +49,6 @@ class User(Base):
     updated_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who last updated
     created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
+
+    # Relationships
+    pharma = relationship("Pharma", back_populates="user")

@@ -9,7 +9,9 @@ from app.schemas.patient_schema import (
     PatientResponse,
     PatientCreateRequest,
     PatientCreateResponse,
-    PharmaStatisticsResponse
+    PharmaStatisticsResponse,
+    PatientSummaryResponse,
+    PatientDetailedResponse
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -34,6 +36,26 @@ def get_all_patients(db: Session = Depends(get_db)):
     return patient_service.get_all_patients()
 
 
+@router.get("/ongoing", response_model=List[PatientSummaryResponse])
+def get_patients_summary(
+    pharma_id: str = Query(..., description="Pharma ID to filter patients"),
+    db: Session = Depends(get_db)
+):
+    """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
+    patient_service = PatientService(db)
+    return patient_service.get_patients_summary(pharma_id=pharma_id)
+
+
+@router.get("/detailed", response_model=List[PatientDetailedResponse])
+def get_patients_detailed(
+    pharma_id: str = Query(..., description="Pharma ID to filter patients"),
+    db: Session = Depends(get_db)
+):
+    """Get detailed patient data with docs_report for specific pharma"""
+    patient_service = PatientService(db)
+    return patient_service.get_patients_detailed(pharma_id=pharma_id)
+
+
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient_by_id(
     patient_id: str,
@@ -55,17 +77,6 @@ def update_patient(
     # Call service (all business logic there)
     patient_service = PatientService(db)
     return patient_service.update_patient(patient_id, patient_data)
-
-
-@router.delete("/{patient_id}", status_code=204)
-def delete_patient(
-    patient_id: str,
-    db: Session = Depends(get_db)
-):
-    """Delete patient"""
-    # Call service (all business logic there)
-    patient_service = PatientService(db)
-    patient_service.delete_patient(patient_id)
 
 
 @router.get("/provider/{provider_id}", response_model=List[PatientResponse])
@@ -99,30 +110,3 @@ def get_pharma_statistics(
     # Call service (all business logic there)
     patient_service = PatientService(db)
     return patient_service.get_pharma_statistics(pharma_id)
-
-
-@router.get("/search/advanced", response_model=List[PatientResponse])
-def search_patients_advanced(
-    patient_name: str = Query(None, description="Filter by patient name"),
-    condition: str = Query(None, description="Filter by condition"),
-    hospital_name: str = Query(None, description="Filter by hospital name"),
-    insurance_provider: str = Query(None, description="Filter by insurance provider"),
-    therapy_id: str = Query(None, description="Filter by therapy ID"),
-    provider_id: str = Query(None, description="Filter by provider ID"),
-    pharma_id: str = Query(None, description="Filter by pharma ID"),
-    stage_id: int = Query(None, description="Filter by stage ID"),
-    db: Session = Depends(get_db)
-):
-    """Advanced search for patients with multiple filters"""
-    # Call service (all business logic there)
-    patient_service = PatientService(db)
-    return patient_service.search_patients_advanced(
-        patient_name=patient_name,
-        condition=condition,
-        hospital_name=hospital_name,
-        insurance_provider=insurance_provider,
-        therapy_id=therapy_id,
-        provider_id=provider_id,
-        pharma_id=pharma_id,
-        stage_id=stage_id
-    )
