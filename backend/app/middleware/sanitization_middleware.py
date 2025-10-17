@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_BLOCKED
+from ..constants.error_codes import ERROR_CODES
 
 
 class SanitizationMiddleware(BaseHTTPMiddleware):
@@ -95,7 +96,6 @@ class SanitizationMiddleware(BaseHTTPMiddleware):
                         threat = self._detect_threats(data)
                         
                         if threat:
-                            from ..constants.error_codes import ERROR_CODES
                             return JSONResponse(
                                 status_code=400,
                                 content={

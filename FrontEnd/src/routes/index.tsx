@@ -1,19 +1,27 @@
 import { createBrowserRouter } from 'react-router-dom'
-import Dashboard from '../pages/Dashboard'
 import Login from '../pages/Login'
 import Signup from '../pages/Signup'
 import TrackAndTrace from '../pages/TrackAndTrace'
 import UserProfilePage from '../pages/UserProfilePage'
 import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
+import VerifyOtp from '../pages/Verify'
+import Dashboard from '../pages/Dashboard'
+import ApprovalScreen from '../pages/ApprovalScreen'
+import ForgotPassword from '../pages/ForgotPassword'
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Dashboard /> },
+  { path: '/', element:<Login /> },
   { path: '/login', element: <Login /> },
   { path: '/signup', element: <Signup /> },
   { path: '/track-and-trace', element: <TrackAndTrace /> },
   { path: '/user-profile', element: <UserProfilePage /> },
   { path: '/support', element: <Support /> },
+  { path: '*', element: <NotFound /> },
+  { path: '/verify-otp', element: <VerifyOtp /> },
+  { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/dashboard', element: <Dashboard /> },
+  { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])
 

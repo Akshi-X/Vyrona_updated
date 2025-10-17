@@ -47,6 +47,12 @@ OTP_MAX_ATTEMPTS = 3
 OTP_CHARACTERS = "0123456789"  # Only digits
 
 # ============================================
+# PASSWORD RESET
+# ============================================
+PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 30
+PASSWORD_RESET_RATE_LIMIT_MINUTES = 15  # Allow 1 request per 15 minutes
+
+# ============================================
 # USER & REGISTRATION
 # ============================================
 USER_ID_PREFIX = "USR"
@@ -104,14 +110,46 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d -
 # EMAIL TEMPLATES
 # ============================================
 EMAIL_APPROVAL_SUBJECT = "New User Registration Pending Approval"
-EMAIL_OTP_SUBJECT = "Your Login OTP - MyGrape"
-EMAIL_WELCOME_SUBJECT = "Welcome to MyGrape"
+EMAIL_OTP_SUBJECT = "Your Login OTP - myGrape"
+EMAIL_WELCOME_SUBJECT = "Welcome to myGrape"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
+EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - myGrape"
+
+# Feedback Email Subjects
+EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - myGrape"
+EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT = "Ticket Status Update - myGrape"
+EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT = "New Comment Added to Ticket - myGrape"
 
 # ============================================
 # TIME ZONES
 # ============================================
 DEFAULT_TIMEZONE = "UTC"
+
+# ============================================
+# FEEDBACK SYSTEM
+# ============================================
+FEEDBACK_TICKET_PREFIX = "TK"
+FEEDBACK_ID_LENGTH = 3  # For TK-YYYY-MM-001 format
+FEEDBACK_MAX_ATTACHMENT_SIZE_MB = 10
+FEEDBACK_MAX_ATTACHMENT_SIZE_BYTES = FEEDBACK_MAX_ATTACHMENT_SIZE_MB * 1024 * 1024
+FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".xlsx", ".xls", ".csv", ".zip", ".rar"]
+FEEDBACK_UPLOAD_DIR = "uploads/feedback"
+
+# Feedback field validation limits
+FEEDBACK_MAX_SUBJECT_LENGTH = 255
+FEEDBACK_MAX_DESCRIPTION_LENGTH = 5000
+FEEDBACK_MAX_COMMENT_LENGTH = 2000
+FEEDBACK_MAX_SUBMITTED_BY_LENGTH = 255
+FEEDBACK_MAX_CREATED_BY_LENGTH = 255
+FEEDBACK_MAX_UPDATED_BY_LENGTH = 255
+
+# Feedback pagination defaults
+FEEDBACK_DEFAULT_PAGE_SIZE = 10
+FEEDBACK_MAX_PAGE_SIZE = 100
+
+# Feedback search and sorting
+FEEDBACK_DEFAULT_SORT_FIELD = "submitted_on"
+FEEDBACK_DEFAULT_SORT_ORDER = "desc"
 
 # ============================================
 # REGEX PATTERNS

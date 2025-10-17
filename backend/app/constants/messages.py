@@ -29,6 +29,17 @@ class ErrorMessages:
     OTP_SEND_FAILED = "Failed to send OTP. Please try again"
     OTP_MAX_ATTEMPTS = "Maximum OTP attempts exceeded. Please request a new OTP"
     
+    # Password Reset
+    RESET_USER_NOT_FOUND = "No account found with this email address"
+    RESET_TOKEN_INVALID = "Invalid or expired password reset link. Please request a new one"
+    RESET_TOKEN_EXPIRED = "Password reset link has expired. Please request a new one"
+    PASSWORD_RESET_FAILED = "Failed to reset password. Please try again"
+    RESET_RATE_LIMIT = "Too many password reset requests. Please try again later"
+    RESET_PASSWORD_MISMATCH = "Passwords do not match"
+    RESET_WEAK_PASSWORD = "Password does not meet security requirements"
+    RESET_USER_NOT_APPROVED = "Your account is not approved yet. Cannot reset password"
+    RESET_ACCOUNT_LOCKED = "Your account is locked. Please contact support"
+    
     # Registration
     EMAIL_ALREADY_EXISTS = "This email is already registered"
     PASSWORD_MISMATCH = "Passwords do not match"
@@ -65,6 +76,29 @@ class ErrorMessages:
     DB_QUERY_FAILED = "Database query failed"
     DB_CONNECTION_FAILED = "Database connection failed"
     
+    # Feedback System
+    FEEDBACK_CREATE_FAILED = "Failed to create feedback ticket"
+    FEEDBACK_INVALID_DATA = "Invalid feedback data provided"
+    FEEDBACK_ATTACHMENT_TOO_LARGE = "File size exceeds maximum allowed size"
+    FEEDBACK_ATTACHMENT_INVALID_TYPE = "File type not allowed"
+    FEEDBACK_ATTACHMENT_SAVE_FAILED = "Failed to save attachment"
+    FEEDBACK_TICKET_ID_GENERATION_FAILED = "Failed to generate ticket ID"
+    FEEDBACK_NOT_FOUND = "Feedback ticket not found"
+    FEEDBACK_ACCESS_DENIED = "Access denied to feedback ticket"
+    FEEDBACK_FILTER_INVALID = "Invalid filter parameters"
+    FEEDBACK_USER_NOT_FOUND = "User not found for feedback operation"
+    FEEDBACK_COMMENT_CREATE_FAILED = "Failed to create comment"
+    FEEDBACK_COMMENT_NOT_FOUND = "Comment not found"
+    FEEDBACK_COMMENT_INVALID = "Invalid comment data"
+    FEEDBACK_COMMENT_ACCESS_DENIED = "Access denied to comment"
+    FEEDBACK_STATUS_UPDATE_FAILED = "Failed to update feedback status"
+    FEEDBACK_STATUS_INVALID = "Invalid status value"
+    FEEDBACK_STATUS_ACCESS_DENIED = "Access denied to update status"
+    FEEDBACK_STATUS_ALREADY_SET = "Status is already set to this value"
+    FEEDBACK_EMAIL_SEND_FAILED = "Failed to send feedback notification email"
+    FEEDBACK_EMAIL_TEMPLATE_ERROR = "Email template error for feedback notification"
+    FEEDBACK_EMAIL_RECIPIENT_INVALID = "Invalid email recipient for feedback notification"
+    
     # General
     INTERNAL_ERROR = "An internal server error occurred"
     NOT_FOUND = "Resource not found"
@@ -96,6 +130,15 @@ class SuccessMessages:
     # Profile
     PROFILE_UPDATED = "Profile updated successfully"
     PASSWORD_CHANGED = "Password changed successfully"
+    
+    # Feedback System
+    FEEDBACK_CREATED = "Feedback ticket created successfully"
+    FEEDBACK_COMMENT_ADDED = "Comment added successfully"
+    FEEDBACK_STATUS_UPDATED = "Feedback status updated successfully"
+    FEEDBACK_RETRIEVED = "Feedback retrieved successfully"
+    # Password Reset
+    PASSWORD_RESET_EMAIL_SENT = "Password reset link has been sent to your email"
+    PASSWORD_RESET_SUCCESS = "Password reset successful. Please login with your new password"
 
 
 class InfoMessages:
