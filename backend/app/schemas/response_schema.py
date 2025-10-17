@@ -12,6 +12,11 @@ class UserApprovalResponse(BaseModel):
     """Response for user approval"""
     detail: str
     user_id: str
+    email: str
+    first_name: str
+    last_name: str
+    role: str
+    company_name: str
     approved_by: str
     approved_on: str
 

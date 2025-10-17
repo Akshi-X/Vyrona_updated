@@ -111,3 +111,23 @@ class FeedbackStatus(str, Enum):
     @classmethod
     def list(cls):
         return [status.value for status in cls]
+
+class TaskPriority(str, Enum):
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+
+    @classmethod
+    def list(cls):
+        return [priority.value for priority in cls]
+
+
+class TaskStatus(str, Enum):
+    DONE = "Done"
+    IN_PROGRESS = "In progress"
+    NOT_STARTED = "Not started"
+
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]
+

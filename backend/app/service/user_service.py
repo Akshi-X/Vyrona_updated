@@ -13,6 +13,7 @@ from app.schemas.response_schema import (
     UserRejectionResponse,
     UserDetailsResponse
 )
+from app.schemas.chat_schema import UserListResponse, UserListItem
 from app.service.email_service import send_approval_email
 from app.utils import utils
 from app.exceptions import (
@@ -217,6 +218,11 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     response = UserApprovalResponse(
         detail=f"{SuccessMessages.USER_APPROVED}: {user.first_name}",
         user_id=user.user_id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=user.role,
+        company_name=user.company_name,
         approved_by=user.approved_by,
         approved_on=user.approved_on.isoformat()
     )
@@ -334,3 +340,45 @@ def get_user_profile(user: user_model.User) -> UserProfileResponse:
         updated_at=user.updated_at
     )
     return response
+
+
+def get_all_users(db: Session, current_user: User) -> UserListResponse:
+    """
+    Get list of all users in the system from the same company.
+    
+    Multi-tenant filtering: Users can only see other users from their own company.
+    
+    Args:
+        db: Database session
+        current_user: Current authenticated user
+        
+    Returns:
+        UserListResponse with users from current user's company
+    """
+    try:
+        # Query all approved and active users FROM SAME COMPANY (multi-tenant filtering)
+        users = db.query(User).filter(
+            User.approved_status == 'approved',
+            User.status == True,
+            User.company_name == current_user.company_name  # ✅ FILTER BY COMPANY
+        ).all()
+        
+        # Convert to UserListItem
+        user_items = [
+            UserListItem(
+                user_id=user.user_id,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                email=user.email,
+                role=user.role,
+                company_name=user.company_name
+            )
+            for user in users
+        ]
+        
+        return UserListResponse(
+            total_users=len(user_items),
+            users=user_items
+        )
+    except Exception as e:
+        raise DatabaseQueryException(operation="list users", reason=str(e))
