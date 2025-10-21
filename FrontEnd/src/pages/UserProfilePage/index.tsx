@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
+import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
+import { userService, type UserProfileDto } from '../../services/userService';
+import Header from '../../components/Header';
 
 interface Ticket {
   id: string;
@@ -17,34 +20,119 @@ const UserProfilePage: React.FC = () => {
   const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState(true);
   const [isFeatureUpdatesEnabled, setIsFeatureUpdatesEnabled] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [fullName, setFullName] = useState("Dr. Sarah Johnson");
+  const [fullName, setFullName] = useState("");
   const [fullNameError, setFullNameError] = useState<string | null>(null);
-  const [department, setDepartment] = useState("Quality Assurance");
+  const [workEmail, setWorkEmail] = useState("");
+  const [, setRole] = useState(" ");
   const navigate = useNavigate();
 
-  const tickets: Ticket[] = [
-    {
-      id: 'TK-2025-10-001',
-      title: 'Temperature alert not working',
-      type: 'Bug / Technical Issue',
-      status: 'In Progress',
-      submittedOn: '2024.05.25'
-    },
-    {
-      id: 'TK-2025-10-002',
-      title: 'Feature request for batch export',
-      type: 'Feature Request',
-      status: 'Completed',
-      submittedOn: '2024.05.20'
-    },
-    {
-      id: 'TK-2025-10-003',
-      title: 'KPI calculation error',
-      type: 'Data Quality Issue',
-      status: 'Under Review',
-      submittedOn: '2024.05.18'
-    }
-  ];
+
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState<boolean>(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getTokenFromCookie = (): string | null => {
+      try {
+        const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
+        return match ? decodeURIComponent(match[1]) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const decodeJwtPayload = (token: string): any | null => {
+      try {
+        const parts = token.split('.');
+        if (parts.length < 2) return null;
+        const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    };
+
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const resolveUserId = async (): Promise<string | null> => {
+      // 1) localStorage
+      try {
+        const ls = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || '') : '';
+        if (ls) return ls;
+      } catch {}
+      // 2) decode JWT from cookie/localStorage
+      const token = getTokenFromCookie() || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+      if (token) {
+        const payload = decodeJwtPayload(token);
+        const candidate = payload?.user_id || payload?.sub || payload?.uid || null;
+        if (candidate) {
+          try { localStorage.setItem('user_id', candidate); } catch {}
+          return candidate;
+        }
+      }
+      // 3) call profile endpoint as fallback
+      try {
+        const profile = await userService.getProfile();
+        const profileUserId = profile.user_id;
+        if (profileUserId) {
+          try { localStorage.setItem('user_id', profileUserId); } catch {}
+          return profileUserId;
+        }
+      } catch {}
+      return null;
+    };
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+
+    let isMounted = true;
+    (async () => {
+      // Load profile first to populate header fields
+      try {
+        const profile: UserProfileDto = await userService.getProfile();
+        const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+        setFullName(name || '');
+        setWorkEmail(profile.email || '');
+        setRole(profile.role || '');
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        // Set default values if profile fails to load
+        setFullName('User');
+        setWorkEmail('user@example.com');
+        setRole('User');
+      }
+
+      // Require authenticated user_id again
+      const userId = await resolveUserId();
+      if (!isMounted) return;
+      if (!userId) {
+        setTicketsError('Not logged in');
+        return;
+      }
+      setTicketsError(null);
+      setLoadingTickets(true);
+      feedbackApi
+        .getUserTickets(userId)
+        .then((data: UserTicketSummary[]) => {
+          const mapped: Ticket[] = data.map((t) => ({
+            id: t.feedback_id,
+            title: t.feedback,
+            type: t.type,
+            status: t.status === 'OPEN' ? 'In Progress' : (t.status === 'CLOSED' ? 'Completed' : 'Under Review'),
+            submittedOn: new Date(t.submitted_on).toISOString().slice(0,10).replace(/-/g, '.'),
+          }));
+          if (!isMounted) return;
+          setTickets(mapped);
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          setTicketsError(err instanceof Error ? err.message : 'Failed to load tickets');
+        })
+        .finally(() => {
+          if (!isMounted) return;
+          setLoadingTickets(false);
+        });
+    })();
+
+    return () => { isMounted = false; };
+  }, []);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -79,13 +167,12 @@ const UserProfilePage: React.FC = () => {
     }
     setFullNameError(null);
     setIsEditingProfile(false);
-    console.log('Profile saved');
   };
 
   const handleCancelEdit = () => {
     setIsEditingProfile(false);
     setFullName("Dr. Sarah Johnson");
-    setDepartment("Quality Assurance");
+    setWorkEmail("jothikaraj272001@gmail.com");
     setFullNameError(null);
   };
 
@@ -94,19 +181,15 @@ const UserProfilePage: React.FC = () => {
       state: {
         readonly: false,
         hideAttach: false,
-        lockIdentity: true, // full name, email, department are non-editable on Support
+        lockIdentity: true, // full name, email are non-editable on Support
         prefill: {
           fullName: fullName,
-          workEmail: 'sarah.johnson@pharma.com',
-          department: department,
+          workEmail: workEmail,
         }
       }
     });
   };
 
-  const handleViewAllTickets = () => {
-    console.log('View all tickets clicked');
-  };
 
   const navigateToTicketPrefilled = (ticket: Ticket) => {
     const mapStatus = (s: string) => {
@@ -118,10 +201,10 @@ const UserProfilePage: React.FC = () => {
       state: {
         readonly: true,
         hideAttach: true,
+        feedbackId: ticket.id,
         prefill: {
           fullName: fullName,
-          workEmail: 'sarah.johnson@pharma.com',
-          department: department,
+          workEmail: 'jothikaraj272001@gmail.com',
           feedbackType: ticket.type,
           subject: ticket.title,
           description: `Ticket ${ticket.id} reported on ${ticket.submittedOn.replace(/\./g, '-')}`,
@@ -134,19 +217,9 @@ const UserProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="px-4 py-4 sm:px-6 lg:px-8" style={{ backgroundColor: COLORS.primary.purple }}>
-        <div className="flex items-center">
-          <button className="text-white hover:text-gray-200 mr-4 flex-shrink-0">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-semibold text-white flex-shrink-0">User Profile</h1>
-        </div>
-      </div>
+      <Header title="User Profile" />
 
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 pt-20">
         <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Basic Information Section */}
@@ -208,35 +281,10 @@ const UserProfilePage: React.FC = () => {
               <label className="block text-sm font-bold text-black mb-2">Email Address</label>
               <input
                 type="email"
-                value="sarah.johnson@pharma.com"
+                value="jothikaraj272001@gmail.com"
                 disabled
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-black mb-2">Department / Team</label>
-              <div className="relative">
-                <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  disabled={!isEditingProfile}
-                  className={`w-full px-3 py-2 border rounded-lg appearance-none ${
-                    isEditingProfile 
-                      ? 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                      : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
-                  }`}
-                >
-                  <option value="Quality Assurance">Quality Assurance</option>
-                  <option value="Research & Development">Research & Development</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Regulatory Affairs">Regulatory Affairs</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
             </div>
             <div>
               <label className="block text-sm font-bold text-black mb-2">Role</label>
@@ -252,12 +300,6 @@ const UserProfilePage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
             <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleViewAllTickets}
-                className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-200 bg-white"
-              >
-                View All My Tickets
-              </button>
               <button
                 onClick={handleSubmitRequest}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
@@ -321,8 +363,21 @@ const UserProfilePage: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+                {(!loadingTickets && tickets.length === 0 && !ticketsError) && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-6 text-sm text-gray-500">No tickets found.</td>
+                  </tr>
+                )}
+                {ticketsError && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-6 text-sm text-red-600">{ticketsError}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            {loadingTickets && (
+              <div className="px-6 py-3 text-sm text-gray-500">Loading tickets...</div>
+            )}
           </div>
         </div>
 

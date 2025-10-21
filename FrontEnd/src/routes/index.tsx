@@ -9,6 +9,7 @@ import VerifyOtp from '../pages/Verify'
 import Dashboard from '../pages/Dashboard'
 import ApprovalScreen from '../pages/ApprovalScreen'
 import ForgotPassword from '../pages/ForgotPassword'
+import SuccessAlert from '../pages/SuccessAlert'
 
 export const router = createBrowserRouter([
   { path: '/', element:<Login /> },
@@ -17,7 +18,7 @@ export const router = createBrowserRouter([
   { path: '/track-and-trace', element: <TrackAndTrace /> },
   { path: '/user-profile', element: <UserProfilePage /> },
   { path: '/support', element: <Support /> },
-  { path: '*', element: <NotFound /> },
+  { path: '/success', element: <SuccessAlert /> },
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/dashboard', element: <Dashboard /> },
