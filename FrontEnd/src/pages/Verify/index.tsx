@@ -55,6 +55,10 @@ const VerifyOtp: React.FC = () => {
                 setSuccess("OTP verified successfully!");
                 // Save auth token using context
                 login(response.data.auth_token);
+                // Persist user id for pages that need it (e.g., My Tickets)
+                try {
+                    localStorage.setItem('user_id', response.data.user_id);
+                } catch {}
                 // Redirect back to original page if provided, else dashboard
                 const target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
                 setTimeout(() => navigate(target, { replace: true }), 500);

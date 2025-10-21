@@ -111,7 +111,6 @@ const Signup: React.FC = () => {
             setLoading(true);
             const response = await axios.post(`${API_BASE_URL}/api/register`, payload);
 
-            console.log("Register Response:", response.data);
 
             // Handle backend-declared failures
             const respStatus = (response.data?.status || '').toString().toLowerCase();

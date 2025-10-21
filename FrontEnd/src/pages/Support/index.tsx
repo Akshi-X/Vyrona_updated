@@ -1,6 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
+import { feedbackApi, type FeedbackSubmission } from '../../api/feedbackApi';
+import { userService } from '../../services/userService';
+import Header from '../../components/Header';
 
 const modules = [
   'Track & Trace',
@@ -20,59 +23,153 @@ interface CommentItem {
   createdAt: string; // ISO or human
 }
 
-interface HistoryItem {
-  id: string;
-  text: string;
-  createdAt: string;
-}
 
 const NAME_MAX = 80;
 const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 
 const Support: React.FC = () => {
   const location = useLocation() as { state?: any };
+  const navigate = useNavigate();
   const readonly = Boolean(location.state?.readonly);
   const hideAttach = Boolean(location.state?.hideAttach);
   const lockIdentity = Boolean(location.state?.lockIdentity);
   const prefill = location.state?.prefill || {};
+  const initialFeedbackId = location.state?.feedbackId || prefill.feedbackId;
+  const [activeFeedbackId] = useState<string | undefined>(initialFeedbackId);
 
   const [fullName, setFullName] = useState<string>(prefill.fullName || '');
   const [fullNameError, setFullNameError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState<string>(prefill.workEmail || '');
-  const [department, setDepartment] = useState<string>(prefill.department || '');
   const [feedbackType, setFeedbackType] = useState<string>(prefill.feedbackType || '');
   const [subject, setSubject] = useState<string>(prefill.subject || '');
   const [description, setDescription] = useState<string>(prefill.description || '');
   const [priority, setPriority] = useState<string>(prefill.priority || '');
   const [status] = useState<string>(prefill.status || 'Under Review');
+  const [selectedModuleIndices, setSelectedModuleIndices] = useState<number[]>([]);
+  const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
 
   const [, setFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Comments & History (Jira-like)
-  const [activeTab, setActiveTab] = useState<'comments' | 'history'>('comments');
+  // Comments
   const [newComment, setNewComment] = useState('');
-  const [comments, setComments] = useState<CommentItem[]>([
-    { id: 'c1', author: 'Sarah Johnson', content: 'Investigating the alert thresholds.', createdAt: '2025-10-14 10:12' },
-    { id: 'c2', author: 'QA Bot', content: 'Auto-check complete. No outages detected.', createdAt: '2025-10-14 10:30' }
-  ]);
-  const [history] = useState<HistoryItem[]>([
-    { id: 'h1', text: 'Status changed from Created to Under Review by System', createdAt: '2025-10-14 10:05' },
-    { id: 'h2', text: 'Priority set to Medium by Sarah Johnson', createdAt: '2025-10-14 10:06' }
-  ]);
+  const [comments, setComments] = useState<CommentItem[]>([]);
 
-  const addComment = () => {
+  // Fetch user profile data if not provided via prefill
+  useEffect(() => {
+    if (!fullName || !workEmail) {
+      const fetchProfile = async () => {
+        try {
+          const profile = await userService.getProfile();
+          const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+          if (!fullName) setFullName(name || 'User');
+          if (!workEmail) setWorkEmail(profile.email || '');
+        } catch (error) {
+          console.error('Failed to load profile:', error);
+          if (!fullName) setFullName('User');
+          if (!workEmail) setWorkEmail('user@example.com');
+        }
+      };
+      fetchProfile();
+    }
+  }, [fullName, workEmail]);
+  
+
+  const addComment = async () => {
     if (!newComment.trim()) return;
+    if (!activeFeedbackId) return;
+    try {
+      const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim());
     const now = new Date();
     const item: CommentItem = {
-      id: `c-${now.getTime()}`,
+        id: String(res.comment_id),
       author: fullName || 'You',
       content: newComment.trim(),
       createdAt: now.toISOString().slice(0, 16).replace('T', ' ')
     };
-    setComments([item, ...comments]);
+      setComments(prev => [item, ...prev]);
     setNewComment('');
+    } catch (e) {
+      // optionally surface error UI
+    }
+  };
+
+  // Fetch full ticket details when viewing a ticket
+  useEffect(() => {
+    if (!activeFeedbackId || !readonly) return;
+    
+    feedbackApi.getFeedbackDetails(activeFeedbackId)
+      .then(details => {
+        // Update all fields with the full ticket data
+        setSubject(details.subject || '');
+        setDescription(details.description || '');
+        // Map priority values to match dropdown options
+        const priorityMap: Record<string, string> = {
+          'LOW': 'low',
+          'MEDIUM': 'medium', 
+          'HIGH': 'high',
+          'CRITICAL': 'critical'
+        };
+        const mappedPriority = priorityMap[details.priority] || details.priority.toLowerCase() || '';
+        setPriority(mappedPriority);
+        setFeedbackType(details.feedback_type || '');
+        
+         // Parse affected modules (it's a single enum value, not comma-separated)
+         const affectedModule = details.affected_modules || '';
+        
+         // Set the checkbox based on the single module
+         // Map backend module value to UI module name and find its index
+         const moduleMap: Record<string, string> = {
+           'track_trace': 'Track & Trace',
+           'quality_monitoring': 'Quality Monitoring',
+           'compliance_automation': 'Compliance Automation',
+           'risk_module': 'Risk Module',
+           'other': 'Other'
+         };
+         
+         const uiModuleName = moduleMap[affectedModule] || affectedModule;
+         const moduleIndex = modules.findIndex(m => m === uiModuleName);
+         
+         if (moduleIndex !== -1) {
+           setSelectedModuleIndices([moduleIndex]);
+         }
+      })
+      .catch(error => {
+        console.error('Failed to load ticket details:', error);
+      });
+  }, [activeFeedbackId, readonly]);
+
+  useEffect(() => {
+    if (!activeFeedbackId) return;
+    feedbackApi.getComments(activeFeedbackId)
+      .then(list => {
+        const mapped: CommentItem[] = list.map(c => ({
+          id: String(c.id),
+          author: c.commented_by,
+          content: c.comment,
+          createdAt: c.created_at
+        }));
+        setComments(mapped.reverse()); // newest last to match prepend behavior
+      })
+      .catch(() => {
+        setComments([]);
+      });
+  }, [activeFeedbackId]);
+
+  const canAddComment = Boolean(newComment.trim() && activeFeedbackId);
+
+  const handleModuleChange = (index: number, checked: boolean) => {
+    // Ensure index is a number
+    const numericIndex = Number(index);
+    
+    if (checked) {
+      setSelectedModuleIndices(prev => [...prev, numericIndex]);
+    } else {
+      setSelectedModuleIndices(prev => prev.filter(i => i !== numericIndex));
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,16 +190,93 @@ const Support: React.FC = () => {
     return null;
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!fullName || fullName.trim().length < 2) errors.push('Full name is required');
+    if (!workEmail || workEmail.trim().length < 5) errors.push('Work email is required');
+    if (workEmail && !workEmail.includes('@')) errors.push('Please enter a valid email address');
+    if (!subject || subject.trim().length < 5) errors.push('Subject must be at least 5 characters');
+    if (!description || description.trim().length < 10) errors.push('Description must be at least 10 characters');
+    if (!priority) errors.push('Priority is required');
+    if (!feedbackType) errors.push('Feedback type is required');
+    if (selectedModuleIndices.length === 0) errors.push('Please select at least one affected module');
+    if (!agreementChecked) errors.push('You must agree to be contacted regarding this issue');
+    return errors;
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (readonly) return;
-    const err = validateName(fullName);
-    if (err) {
-      setFullNameError(err);
+    
+    const nameErr = validateName(fullName);
+    if (nameErr) {
+      setFullNameError(nameErr);
       return;
     }
+    
+    const formErrors = validateForm();
+    if (formErrors.length > 0) {
+      setSubmitMessage(`❌ ${formErrors.join(', ')}`);
+      return;
+    }
+    
     setFullNameError(null);
-    alert('Feedback submitted!');
+    setSubmitMessage(null);
+
+    setIsSubmitting(true);
+    try {
+      // Get selected modules from state
+      const selectedModules = selectedModuleIndices
+        .filter(index => index >= 0 && index < modules.length) // Validate indices
+        .map(index => modules[index])
+        .filter(module => module); // Remove any undefined values
+      
+      // Map UI module names to backend enum values
+      const moduleMap: Record<string, string> = {
+        'Track & Trace': 'track_trace',
+        'Quality Monitoring': 'quality_monitoring',
+        'Compliance Automation': 'compliance_automation',
+        'Risk Module': 'risk_module',
+        'Trust & Safety': 'other',
+        'Monitoring': 'other',
+        'Insights': 'other',
+        'Other': 'other',
+      };
+      
+      // Return the first selected module (backend expects single enum value)
+      const firstSelected = selectedModules[0];
+      const affectedModule = firstSelected ? moduleMap[firstSelected] : 'other';
+      
+      // Ensure we always send a valid enum value
+      const validEnumValues = ['track_trace', 'quality_monitoring', 'compliance_automation', 'risk_module', 'other'];
+      const finalAffectedModule = validEnumValues.includes(affectedModule) ? affectedModule : 'other';
+      
+      const feedbackData: FeedbackSubmission = {
+        department: 'other', // Default department since field is removed
+        feedback_type: feedbackType || 'other',
+        subject,
+        description,
+        priority: priority || 'medium',
+        affected_modules: finalAffectedModule,
+        attachment: undefined, // File upload not implemented yet
+      };
+
+
+      const response = await feedbackApi.submitFeedback(feedbackData);
+      
+      // Navigate to success page with ticket information
+      navigate('/success', {
+        state: {
+          ticketId: response.feedback_id,
+          ticketNumber: response.ticket_id,
+          message: response.message
+        }
+      });
+    } catch (error) {
+      setSubmitMessage(`❌ Failed to submit feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openFileDialog = () => {
@@ -123,28 +297,16 @@ const Support: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="w-full" style={{ backgroundColor: COLORS.primary.purple }}>
-        <div className="px-4 sm:px-6 lg:px-10 py-3">
-          <div className="flex items-center text-white">
-            <button className="mr-2 hover:opacity-90" aria-label="Back">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <span className="text-xs sm:text-sm font-medium">Support & Feedback</span>
-          </div>
-        </div>
-      </div>
+      <Header title="Support & Feedback" />
 
       {/* Page body */}
-      <div className="flex-1 w-full">
+      <div className="flex-1 w-full pt-16">
         <div className="w-full" style={{ background: 'linear-gradient(180deg, #f3f4f6 0%, #f8f9fa 100%)' }}>
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-5 sm:px-6 pt-5 sm:pt-6">
                 <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Grape Support & Feedback</h1>
-                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using Grape. Whether you’ve encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
+                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using Grape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
               </div>
 
               <form onSubmit={onSubmit} className="px-5 sm:px-6 pb-6">
@@ -176,26 +338,9 @@ const Support: React.FC = () => {
                     />
                   </div>
 
-                  {/* Department */}
-                  <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Department or Team</label>
-                    <select
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      disabled={identityDisabled}
-                      className={`${controlBase} ${identityDisabled ? disabledCls : controlBg}`}
-                    >
-                      <option value="">Select</option>
-                      <option>Quality Assurance</option>
-                      <option>Supply Chain Ops</option>
-                      <option>Compliance</option>
-                      <option>Other</option>
-                    </select>
-                  </div>
-
                   {/* Type of Feedback */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Type of Feedback</label>
+                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Type of Feedback<span className="text-red-500"> *</span></label>
                     <select
                       value={feedbackType}
                       onChange={(e) => setFeedbackType(e.target.value)}
@@ -203,17 +348,19 @@ const Support: React.FC = () => {
                       className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
                     >
                       <option value="">Select</option>
-                      <option>Bug / Technical Issue</option>
-                      <option>Feature Request</option>
-                      <option>Data Quality Issue</option>
-                      <option>Usability / UI</option>
-                      <option>Other</option>
+                      <option value="bug">Bug / Technical Issue</option>
+                      <option value="data_quality_issue">Data Quality Issue</option>
+                      <option value="feature_request">Feature Request</option>
+                      <option value="ux_workflow_improvement">Usability / UI</option>
+                      <option value="api_integration">API Integration</option>
+                      <option value="compliance_concern">Compliance Concern</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
 
                   {/* Subject */}
                   <div className="sm:col-span-2">
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Subject / Title</label>
+                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Subject / Title<span className="text-red-500"> *</span></label>
                     <input
                       type="text"
                       value={subject}
@@ -227,7 +374,7 @@ const Support: React.FC = () => {
 
                 {/* Description */}
                 <div className="mt-4">
-                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Detailed Description</label>
+                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Detailed Description<span className="text-red-500"> *</span></label>
                   <textarea
                     rows={5}
                     value={description}
@@ -271,22 +418,28 @@ const Support: React.FC = () => {
                       className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
                     >
                       <option value="">Select priority level</option>
-                      <option>Low</option>
-                      <option>Medium</option>
-                      <option>High</option>
-                      <option>Critical</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
                     </select>
                   </div>
 
                   {/* Affected Modules */}
                   <div>
                     {/* Title outside of container */}
-                    <p className="text-[12px] font-medium text-gray-900 mb-2">Affected Modules</p>
+                    <p className="text-[12px] font-medium text-gray-900 mb-2">Affected Modules<span className="text-red-500"> *</span></p>
                     <div className="rounded-md border border-gray-200 p-3 h-full">
                       <div className="grid grid-cols-1 gap-2">
-                        {modules.map((label) => (
+                        {modules.map((label, index) => (
                           <label key={label} className="flex items-center gap-2">
-                            <input type="checkbox" disabled={readonly} className="h-3.5 w-3.5 rounded border-gray-300 text-purple-700 focus:ring-purple-200" />
+                            <input 
+                              type="checkbox" 
+                              disabled={readonly} 
+                              checked={selectedModuleIndices.includes(index)}
+                              onChange={(e) => handleModuleChange(index, e.target.checked)}
+                              className="h-3.5 w-3.5 rounded border-gray-300 text-purple-700 focus:ring-purple-200" 
+                            />
                             <span className="text-[12px] text-gray-800">{label}</span>
                           </label>
                         ))}
@@ -307,17 +460,9 @@ const Support: React.FC = () => {
                 </div>
                 )}
 
-                {/* Jira-like Comments & History */}
+                {/* Comments Section */}
                 {readonly && (
                 <div className="mt-6">
-                  <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex gap-6" aria-label="Tabs">
-                      <button type="button" onClick={() => setActiveTab('comments')} className={`whitespace-nowrap py-2 text-sm font-medium border-b-2 ${activeTab==='comments' ? 'border-purple-700 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Comments</button>
-                      <button type="button" onClick={() => setActiveTab('history')} className={`whitespace-nowrap py-2 text-sm font-medium border-b-2 ${activeTab==='history' ? 'border-purple-700 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>History</button>
-                    </nav>
-                  </div>
-
-                  {activeTab === 'comments' ? (
                     <div className="pt-4">
                       {/* Add comment */}
                       <div className="flex items-start gap-3">
@@ -331,7 +476,15 @@ const Support: React.FC = () => {
                             placeholder={'Add a comment...'}
                           />
                           <div className="mt-2 flex justify-end">
-                            <button type="button" onClick={addComment} disabled={!newComment.trim()} className={`px-3 py-1.5 text-sm rounded-md text-white ${!newComment.trim()? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-700 hover:bg-purple-800'}`}>Add Comment</button>
+                          <button
+                            type="button"
+                            onClick={addComment}
+                            disabled={!canAddComment}
+                            className={`px-3 py-1.5 text-sm rounded-md text-white ${!canAddComment ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-700 hover:bg-purple-800'}`}
+                            aria-disabled={!canAddComment}
+                          >
+                            Add Comment
+                          </button>
                           </div>
                         </div>
                       </div>
@@ -355,21 +508,6 @@ const Support: React.FC = () => {
                         )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="pt-4">
-                      <ul className="space-y-3">
-                        {history.map(h => (
-                          <li key={h.id} className="flex items-start gap-3">
-                            <div className="h-2 w-2 rounded-full bg-gray-300 mt-2" />
-                            <div>
-                              <p className="text-sm text-gray-800">{h.text}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{h.createdAt}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
                 )}
 
@@ -382,17 +520,40 @@ const Support: React.FC = () => {
                     <a href="https://mygrape.org/contact/" className="text-purple-700 underline">https://mygrape.org/contact/</a>
                   </p>
                   <label className="mt-4 flex items-center gap-2">
-                    <input type="checkbox" disabled={readonly} className="h-4 w-4 rounded border-gray-300 text-purple-700 focus:ring-purple-200" />
+                    <input 
+                      type="checkbox" 
+                      checked={agreementChecked}
+                      onChange={(e) => setAgreementChecked(e.target.checked)}
+                      disabled={readonly} 
+                      className="h-4 w-4 rounded border-gray-300 text-purple-700 focus:ring-purple-200" 
+                    />
                     <span className="text-[14px] text-gray-900">I agree to be contacted regarding this issue. <span className="text-purple-700">*</span></span>
                   </label>
                 </div>
                 )}
 
+                {/* Submit Message */}
+                {submitMessage && (
+                  <div className={`mt-4 p-3 rounded-md text-sm ${submitMessage.startsWith('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                    {submitMessage}
+                  </div>
+                )}
+
                 {/* Footer actions */}
                 {!readonly && (
-                <div className="mt-6 flex items-center justify-end">
-                  <button type="submit" className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-medium text-white shadow-sm hover:opacity-90`} style={{ backgroundColor: COLORS.primary.purple }}>
-                    Submit Feedback
+                <div className="mt-6 flex flex-col items-end space-y-2">
+                  {!agreementChecked && (
+                    <p className="text-xs text-gray-500 text-right">
+                      Please agree to be contacted to enable submission
+                    </p>
+                  )}
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting || !agreementChecked}
+                    className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50`} 
+                    style={{ backgroundColor: COLORS.primary.purple }}
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                   </button>
                 </div>
                 )}
