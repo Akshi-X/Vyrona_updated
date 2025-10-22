@@ -260,7 +260,7 @@ def send_approval_email(
     Clean exception handling!
     """
     subject = EMAIL_APPROVAL_SUBJECT
-    approval_url = f"{settings.BACKEND_URL}/api/approval-screen?registration_id={registration_id}"
+    approval_url = f"{settings.FRONTEND_URL}/approval-screen?registration_id={registration_id}"
     
     # Load and render HTML template
     try:
