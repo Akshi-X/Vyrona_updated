@@ -52,3 +52,4 @@ class User(Base):
     
     # Relationships
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
+    pharma = relationship("Pharma", back_populates="user")
