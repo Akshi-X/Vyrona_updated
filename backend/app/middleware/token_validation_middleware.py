@@ -51,18 +51,28 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
         
         # Protected endpoint - VALIDATE TOKEN
         try:
-            # Extract token from Authorization header
+            # Extract token from Authorization header or cookie fallback
+            token: str | None = None
             auth_header = request.headers.get("Authorization")
             
-            if not auth_header:
-                raise InvalidTokenException()
+            if auth_header:
+                # Parse Authorization header (format: "Bearer <token>")
+                parts = auth_header.split()
+                if len(parts) == 2 and parts[0].lower() == "bearer":
+                    token = parts[1]
+                else:
+                    raise InvalidTokenException()
+            else:
+                # Cookie fallback: support auth_token cookie
+                cookie_token = request.cookies.get("auth_token")
+                if cookie_token:
+                    token = cookie_token
+                else:
+                    raise InvalidTokenException()
             
-            # Extract token (format: "Bearer <token>")
-            parts = auth_header.split()
-            if len(parts) != 2 or parts[0].lower() != "bearer":
+            # Validate token is present
+            if not token:
                 raise InvalidTokenException()
-            
-            token = parts[1]
             
             # Verify token and get payload
             payload = verify_token(token)
