@@ -106,6 +106,18 @@ class ErrorMessages:
     TOO_MANY_REQUESTS = "Too many requests. Please try again later"
     AUTHENTICATION_VALIDATION_FAILED = "Authentication validation failed"
     AUTHENTICATION_ERROR = "Authentication error"
+    
+
+    # Task Management
+    TASK_CREATE_FAILED = "Failed to create task"
+    TASK_NOT_FOUND = "Task not found"
+    TASK_INVALID_ASSIGNEE = "Invalid assignee user"
+    TASK_INVALID_PATIENT = "Invalid patient ID for task"
+    TASK_UPDATE_FAILED = "Failed to update task"
+    TASK_DELETE_FAILED = "Failed to delete task"
+    TASK_UNAUTHORIZED_EDIT = "You are not authorized to edit this task"
+    TASK_UNAUTHORIZED_STATUS = "You are not authorized to change this task's status"
+    TASK_MANAGER_ONLY = "Only managers can create tasks"
 
 
 class SuccessMessages:
@@ -139,6 +151,14 @@ class SuccessMessages:
     # Password Reset
     PASSWORD_RESET_EMAIL_SENT = "Password reset link has been sent to your email"
     PASSWORD_RESET_SUCCESS = "Password reset successful. Please login with your new password"
+    
+ # Task Management
+    TASK_CREATED = "Task created successfully"
+    TASK_UPDATED = "Task updated successfully"
+    TASK_STATUS_UPDATED = "Task status updated successfully"
+    TASK_DELETED = "Task deleted successfully"
+    TASK_RETRIEVED = "Task retrieved successfully"
+    TASKS_RETRIEVED = "Tasks retrieved successfully"
 
 
 class InfoMessages:

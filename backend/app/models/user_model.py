@@ -49,6 +49,7 @@ class User(Base):
     updated_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who last updated
     created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)
-
+    
     # Relationships
+    otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
     pharma = relationship("Pharma", back_populates="user")

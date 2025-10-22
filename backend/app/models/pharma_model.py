@@ -20,3 +20,10 @@ class Pharma(Base):
     user = relationship("User", back_populates="pharma")
     patients = relationship("Patient", back_populates="pharma")
     providers = relationship("Provider", back_populates="pharma")
+
+    # Relationships (commented out until other models are updated)
+    # therapy_parameters = relationship("TherapyParameter", back_populates="pharma")
+    # shipments = relationship("Shipment", back_populates="pharma")
+    # iot_data = relationship("IOTData", back_populates="pharma")
+    # geolocations = relationship("Geolocation", back_populates="pharma")
+
