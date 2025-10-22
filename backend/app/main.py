@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller
+from app.controller import user_controller, feedback_controller, task_controller
 from app.init_db import init_db
 from app.config.config import settings
 from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
