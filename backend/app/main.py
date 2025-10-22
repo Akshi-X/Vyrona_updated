@@ -7,7 +7,7 @@ from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
 
-from app.controller import user_controller, feedback_controller, task_controller
+from app.controller import user_controller, feedback_controller, task_controller,patient_controller
 
 from app.init_db import init_db
 from app.config.config import settings
