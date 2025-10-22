@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RELOAD: bool = True
     # URLs
-    FRONTEND_URL: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:5173"
     BACKEND_URL: str = "http://localhost:8000"
     # CORS
     ALLOWED_ORIGINS: str = "*"
