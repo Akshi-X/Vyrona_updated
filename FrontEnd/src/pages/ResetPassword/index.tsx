@@ -1,0 +1,206 @@
+import React, { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
+import MyGrapeLogo from "../../assets/logo.svg";
+
+const ResetPassword: React.FC = () => {
+    const [searchParams] = useSearchParams();
+    const tokenFromQuery = searchParams.get("token") || "";
+
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [confirmError, setConfirmError] = useState("");
+    
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState("");
+
+    const validatePassword = (value: string) => {
+        return value.length >= 8;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        let valid = true;
+
+        if (!tokenFromQuery) {
+            setMessage("Invalid or missing token");
+            return;
+        }
+
+        if (!password) {
+            setPasswordError("Password is required");
+            valid = false;
+        } else if (!validatePassword(password)) {
+            setPasswordError("Password must be at least 8 characters");
+            valid = false;
+        } else {
+            setPasswordError("");
+        }
+
+        if (!confirmPassword) {
+            setConfirmError("Please confirm your password");
+            valid = false;
+        } else if (confirmPassword !== password) {
+            setConfirmError("Passwords do not match");
+            valid = false;
+        } else {
+            setConfirmError("");
+        }
+
+        if (!valid) return;
+
+        setLoading(true);
+        setMessage("");
+
+        try {
+            const response = await fetch("http://localhost:8000/api/reset-password", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ token: tokenFromQuery, new_password: password, confirm_password: confirmPassword })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const errorMessage = data?.message || "Failed to reset password";
+                setMessage("");
+                setConfirmError("");
+                setPasswordError(errorMessage);
+                return;
+            }
+
+            setMessage( "Password has been reset successfully");
+            setPassword("");
+            setConfirmPassword("");
+        } catch (err: any) {
+            setPasswordError(err?.message || "Network error. Please try again.");
+            setMessage("");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
+            {/* Left Section */}
+            <aside
+                className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden 
+             bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
+             rounded-tr-[40px] rounded-br-[40px]"
+            >
+                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0">
+                    <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
+                    <h1 className="font-semibold text-[30px]">myGrape</h1>
+                </div>
+                <div className="flex items-center overflow-hidden">
+                    <img
+                        src={MyGrapeBanner}
+                        alt="banner"
+                        className="w-full h-[125%] object-fill"
+                    />
+                </div>
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12">
+                    <h2 className="text-2xl font-bold leading-snug mt-8">
+                        Driving Health Forward <br />
+                        One Smart Solution At a Time
+                    </h2>
+                    <p className="mt-4 text-sm opacity-80">
+                        Because every patient is someone's everything.
+                    </p>
+                </div>
+            </aside>
+
+            {/* Right Section */}
+            <main className="flex-1 flex flex-col items-center justify-center px-16 overflow-hidden">
+                <div className="w-full max-w-[22rem]">
+                    <h2
+                        className="font-['Work_Sans'] text-[32px] font-black text-gray-700 mb-2 tracking-tighter"
+                    >
+                        Reset Password
+                    </h2>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* Password Field */}
+                        <div className="relative w-full my-4">
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Enter new password"
+                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"}`}
+                            />
+                            <label
+                                className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
+                                ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                            >
+                                New Password
+                            </label>
+                            {passwordError && (
+                                <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+                            )}
+                        </div>
+
+                        {/* Confirm Password Field */}
+                        <div className="relative w-full my-4">
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Confirm new password"
+                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmError ? "border-red-500" : "border-gray-300"}`}
+                            />
+                            <label
+                                className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
+                                ${confirmError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                            >
+                                Confirm Password
+                            </label>
+                            {confirmError && (
+                                <p className="text-xs text-red-500 mt-1">{confirmError}</p>
+                            )}
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                        >
+                            {loading ? "Resetting..." : "Reset Password"}
+                        </button>
+                    </form>
+                    {/* Server Response Message */}
+                    {!message && (
+                            <div>
+                                <p className="text-sm text-green-600 mt-3 flex justify-center">{message}</p>
+                            </div>
+                        )}
+
+                    {/* Footer */}
+                    <div className="text-center text-sm text-gray-500 mt-3 space-y-2">
+                        <p>
+                            Remembered your password?{" "}
+                            <Link to="/login" className="text-[#8b2a96] font-medium underline">
+                                Sign in
+                            </Link>
+                        </p>
+                        <p>
+                            Need help?{" "}
+                            <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
+                                Forgot Password
+                            </Link>
+                        </p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+};
+
+export default ResetPassword;
+
+
