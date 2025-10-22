@@ -1,11 +1,72 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Dict, Optional, Any
 from passlib.context import CryptContext
+from fastapi.responses import JSONResponse
 
 from ..models.user_model import User
+from ..constants.status_constants import STATUS_FAILED
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ============================================
+# COMMON RESPONSE HEADERS
+# ============================================
+
+COMMON_RESPONSE_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization"
+}
+
+
+# ============================================
+# RESPONSE BUILDER UTILITIES
+# ============================================
+
+def create_error_response(
+    status_code: int,
+    error_code: str,
+    message: str,
+    details: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> JSONResponse:
+    """
+    Create a standardized error response with common structure and headers.
+    
+    Args:
+        status_code: HTTP status code
+        error_code: Application error code
+        message: Error message
+        details: Optional additional details (e.g., remaining_attempts)
+        headers: Optional additional headers (merged with common headers)
+        
+    Returns:
+        JSONResponse with standardized error format
+    """
+    content = {
+        "error_code": error_code,
+        "message": message,
+        "status": STATUS_FAILED,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Add optional details
+    if details:
+        content.update(details)
+    
+    # Merge headers
+    response_headers = COMMON_RESPONSE_HEADERS.copy()
+    if headers:
+        response_headers.update(headers)
+    
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers=response_headers
+    )
 
 def generate_user_id():
     return f"USR-{uuid.uuid4().hex[:6].upper()}"
