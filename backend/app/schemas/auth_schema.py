@@ -6,6 +6,7 @@ from datetime import datetime
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False  # Default to False for security
 
 
 class LoginResponse(BaseModel):
@@ -80,5 +81,10 @@ class ResetPasswordRequest(BaseModel):
 
 
 class ResetPasswordResponse(BaseModel):
+    status: str
+    message: str
+
+
+class LogoutResponse(BaseModel):
     status: str
     message: str

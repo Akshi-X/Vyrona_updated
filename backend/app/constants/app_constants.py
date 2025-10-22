@@ -24,6 +24,16 @@ MANAGER_SESSION_TIMEOUT_MINUTES = 60  # Managers get 60 minutes
 USER_SESSION_TIMEOUT_MINUTES = 30   # Users get 30 minutes
 DEFAULT_SESSION_TIMEOUT_MINUTES = 30  # Fallback
 
+# Remember Me Feature - Session Durations
+# With Remember Me (remember_me=True):
+#   - Token expires after 9 hours from login
+REMEMBER_ME_SESSION_DURATION_MINUTES = 540  # 9 hours
+
+# Without Remember Me (remember_me=False):
+#   - Token expires after 1 hour from login
+#   - Frontend (React) handles idle timeout detection
+NO_REMEMBER_ME_SESSION_DURATION_MINUTES = 60  # 1 hour
+
 # Account Locking (Brute Force Protection)
 MAX_LOGIN_ATTEMPTS = 5  # Lock account after 5 failed attempts
 ACCOUNT_LOCK_DURATION_MINUTES = 30  # Lock for 30 minutes
