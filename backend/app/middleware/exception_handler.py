@@ -97,7 +97,13 @@ def setup_exception_handlers(app):
         
         return JSONResponse(
             status_code=exc.status_code,
-            content=exc.to_dict()
+            content=exc.to_dict(),
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
         )
     
     @app.exception_handler(RequestValidationError)
@@ -116,6 +122,12 @@ def setup_exception_handlers(app):
                 "status": STATUS_FAILED,
                 "details": exc.errors(),
                 "timestamp": datetime.utcnow().isoformat()
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
             }
         )
     
@@ -133,6 +145,12 @@ def setup_exception_handlers(app):
                 "message": exc.detail,
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat()
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
             }
         )
     
@@ -159,6 +177,12 @@ def setup_exception_handlers(app):
                 "status": STATUS_FAILED,
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
             }
         )
 

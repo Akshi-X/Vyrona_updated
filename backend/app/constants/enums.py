@@ -41,6 +41,20 @@ class EmailType(str, Enum):
     WELCOME = "welcome"
 
 
+class PatientStage(str, Enum):
+    """Enum for patient treatment stages"""
+    SCHEDULED = "Scheduled"
+    APHERESIS = "Apheresis"
+    CRYOPRESERVATION = "Cryopreservation"
+    TRANSPORTATION = "Transportation"
+    REENGINEERING = "Reengineering"
+    REINFUSION = "Reinfusion"
+    
+    @classmethod
+    def list(cls):
+        return [stage.value for stage in cls]
+
+
 class LogLevel(str, Enum):
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -111,3 +125,23 @@ class FeedbackStatus(str, Enum):
     @classmethod
     def list(cls):
         return [status.value for status in cls]
+
+class TaskPriority(str, Enum):
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+
+    @classmethod
+    def list(cls):
+        return [priority.value for priority in cls]
+
+
+class TaskStatus(str, Enum):
+    DONE = "Done"
+    IN_PROGRESS = "In progress"
+    NOT_STARTED = "Not started"
+
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]
+

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.config.database import engine, Base, SessionLocal
-from app.models import user_model, otp_model
+from app.models import user_model, otp_model, patient_model, pharma_model, provider_model
 from app.models.user_model import User
 from app.auth.auth import get_password_hash
 from app.config.config import settings

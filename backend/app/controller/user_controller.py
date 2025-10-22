@@ -26,6 +26,7 @@ from app.schemas.response_schema import (
     UserDetailsResponse,
     UserProfileResponse
 )
+from app.schemas.user_schema import UserListResponse
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 
@@ -266,6 +267,35 @@ def reject_user(
     )
     
     # Return DTO (result is already UserRejectionResponse)
+    return result
+
+
+# ---------------------------
+# Get all users (for dropdowns, assignments, etc.)
+# ---------------------------
+@router.get("/users", response_model=UserListResponse)
+def get_all_users(
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get list of all users in the system from the same company.
+    
+    Protected endpoint. Any authenticated user can view.
+    Returns all approved and active users from the same company.
+    
+    **Use Cases:**
+    - Task assignment dropdown
+    - Chat user selection
+    - Team member listing
+    - Any feature requiring user selection
+    
+    **Multi-tenant:** Only shows users from current user's company
+    """
+    # Call service (business logic in service layer)
+    result = user_service.get_all_users(db=db, current_user=current_user)
+    
+    # Return DTO (result is already UserListResponse)
     return result
 
 
