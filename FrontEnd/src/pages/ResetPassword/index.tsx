@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
+import { authService } from "../../services/authService";
 
 const ResetPassword: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -54,27 +55,12 @@ const ResetPassword: React.FC = () => {
         setMessage("");
 
         try {
-            const response = await fetch("http://localhost:8000/api/reset-password", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ token: tokenFromQuery, new_password: password, confirm_password: confirmPassword })
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                const errorMessage = data?.message || "Failed to reset password";
-                setMessage("");
-                setConfirmError("");
-                setPasswordError(errorMessage);
-                return;
-            }
-
-            setMessage( "Password has been reset successfully");
+            const resp = await authService.resetPassword(tokenFromQuery, password, confirmPassword);
+            setMessage(resp?.message || "Password has been reset successfully");
             setPassword("");
             setConfirmPassword("");
+            setConfirmError("");
+            setPasswordError("");
         } catch (err: any) {
             setPasswordError(err?.message || "Network error. Please try again.");
             setMessage("");

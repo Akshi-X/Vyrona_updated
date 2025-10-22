@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
+import { authService } from "../../services/authService";
 
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -44,25 +45,8 @@ const ForgotPassword: React.FC = () => {
         setMessage("");
 
         try {
-            const response = await fetch("http://localhost:8000/api/forgot-password", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                const errorMessage = data?.message || "Failed to send reset instructions";
-                setEmailError(errorMessage);
-                setMessage("");
-                return;
-            }
-
-            // Expecting shape: { email: string, status: string, message: string }
-            setMessage(data?.message || "Password reset link has been sent to your email");
+            const resp = await authService.forgotPassword(email);
+            setMessage(resp?.message || "Password reset link has been sent to your email");
             setEmailError("");
         } catch (err: any) {
             setEmailError(err?.message || "Network error. Please try again.");
