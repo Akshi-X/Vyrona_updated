@@ -41,6 +41,20 @@ class EmailType(str, Enum):
     WELCOME = "welcome"
 
 
+class PatientStage(str, Enum):
+    """Enum for patient treatment stages"""
+    SCHEDULED = "Scheduled"
+    APHERESIS = "Apheresis"
+    CRYOPRESERVATION = "Cryopreservation"
+    TRANSPORTATION = "Transportation"
+    REENGINEERING = "Reengineering"
+    REINFUSION = "Reinfusion"
+    
+    @classmethod
+    def list(cls):
+        return [stage.value for stage in cls]
+
+
 class LogLevel(str, Enum):
     DEBUG = "DEBUG"
     INFO = "INFO"
