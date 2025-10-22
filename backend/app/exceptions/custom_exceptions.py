@@ -1014,3 +1014,125 @@ class FeedbackEmailRecipientInvalidException(FeedbackException):
             recipient=recipient,
             reason=reason
         )
+
+# ============================================
+# TASK EXCEPTIONS
+# ============================================
+
+class TaskException(AppException):
+    """Base exception for task-related errors"""
+
+    def __init__(self, message: str, error_code: str, status_code: int = 400, **kwargs):
+        super().__init__(message, error_code, status_code, kwargs)
+
+
+class TaskCreateFailedException(TaskException):
+    """Failed to create task"""
+
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.TASK_CREATE_FAILED,
+            error_code=ERROR_CODES["TASK_CREATE_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class TaskNotFoundException(TaskException):
+    """Task not found"""
+
+    def __init__(self, task_id: int):
+        super().__init__(
+            message=ErrorMessages.TASK_NOT_FOUND,
+            error_code=ERROR_CODES["TASK_NOT_FOUND"],
+            status_code=404,
+            task_id=task_id
+        )
+
+
+class TaskInvalidAssigneeException(TaskException):
+    """Invalid assignee user for task"""
+
+    def __init__(self, user_id: str):
+        super().__init__(
+            message=ErrorMessages.TASK_INVALID_ASSIGNEE,
+            error_code=ERROR_CODES["TASK_INVALID_ASSIGNEE"],
+            status_code=400,
+            user_id=user_id
+        )
+
+
+class TaskInvalidPatientException(TaskException):
+    """Invalid patient ID for task"""
+
+    def __init__(self, patient_id: str):
+        super().__init__(
+            message=ErrorMessages.TASK_INVALID_PATIENT,
+            error_code=ERROR_CODES["TASK_INVALID_PATIENT"],
+            status_code=400,
+            patient_id=patient_id
+        )
+
+
+class TaskUpdateFailedException(TaskException):
+    """Failed to update task"""
+
+    def __init__(self, task_id: int, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.TASK_UPDATE_FAILED,
+            error_code=ERROR_CODES["TASK_UPDATE_FAILED"],
+            status_code=500,
+            task_id=task_id,
+            reason=reason
+        )
+
+
+class TaskDeleteFailedException(TaskException):
+    """Failed to delete task"""
+
+    def __init__(self, task_id: int, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.TASK_DELETE_FAILED,
+            error_code=ERROR_CODES["TASK_DELETE_FAILED"],
+            status_code=500,
+            task_id=task_id,
+            reason=reason
+        )
+
+
+class TaskUnauthorizedEditException(TaskException):
+    """User not authorized to edit this task"""
+
+    def __init__(self, task_id: int, user_id: str):
+        super().__init__(
+            message=ErrorMessages.TASK_UNAUTHORIZED_EDIT,
+            error_code=ERROR_CODES["TASK_UNAUTHORIZED_EDIT"],
+            status_code=403,
+            task_id=task_id,
+            user_id=user_id
+        )
+
+
+class TaskUnauthorizedStatusException(TaskException):
+    """User not authorized to change task status"""
+
+    def __init__(self, task_id: int, user_id: str):
+        super().__init__(
+            message=ErrorMessages.TASK_UNAUTHORIZED_STATUS,
+            error_code=ERROR_CODES["TASK_UNAUTHORIZED_STATUS"],
+            status_code=403,
+            task_id=task_id,
+            user_id=user_id
+        )
+
+
+class TaskManagerOnlyException(TaskException):
+    """Only managers can create tasks"""
+
+    def __init__(self, user_role: str):
+        super().__init__(
+            message=ErrorMessages.TASK_MANAGER_ONLY,
+            error_code=ERROR_CODES["TASK_MANAGER_ONLY"],
+            status_code=403,
+            user_role=user_role
+        )

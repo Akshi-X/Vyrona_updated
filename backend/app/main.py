@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-from app.controller import user_controller, patient_controller
-from app.controller import user_controller, feedback_controller
+
+from app.controller import user_controller, feedback_controller, task_controller
+
 from app.init_db import init_db
 from app.config.config import settings
 from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
@@ -109,7 +110,7 @@ async def startup_event():
     logger.info("APPLICATION STARTUP EVENT")
     logger.info("=" * 60)
     init_db()
-    logger.info("=" * 60)
+    print("!" * 60 + "\n")
 
 # Enable CORS (add FIRST so it executes FIRST in the chain)
 app.add_middleware(
@@ -142,6 +143,7 @@ if not os.path.exists(FEEDBACK_UPLOAD_DIR):
 app.include_router(user_controller.router, prefix=API_PREFIX)
 app.include_router(patient_controller.router, prefix=API_PREFIX)
 app.include_router(feedback_controller.router, prefix=API_PREFIX)
+app.include_router(task_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")
