@@ -9,7 +9,8 @@ from fastapi.security import HTTPBearer
 
 from app.controller import user_controller, feedback_controller, task_controller,patient_controller
 
-from app.init_db import init_db
+from app.config.database import init_db as create_tables
+from app.init_db import init_db as create_admin
 from app.config.config import settings
 from app.constants.app_constants import APP_NAME, STATIC_DIR, API_PREFIX
 from app.middleware.exception_handler import setup_exception_handlers
@@ -109,7 +110,15 @@ async def startup_event():
     logger.info("=" * 60)
     logger.info("APPLICATION STARTUP EVENT")
     logger.info("=" * 60)
-    init_db()
+    
+    # Step 1: Create database tables first
+    logger.info("Creating database tables...")
+    create_tables()
+    
+    # Step 2: Create super admin user
+    logger.info("Creating super admin user...")
+    create_admin()
+    
     print("!" * 60 + "\n")
 
 # Enable CORS (add FIRST so it executes FIRST in the chain)
