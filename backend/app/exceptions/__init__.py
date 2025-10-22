@@ -53,7 +53,19 @@ from .custom_exceptions import (
     InsufficientPermissionsException,
     CompanyAccessForbiddenException,
     ManagerApprovalOnlyException,
-    ManagerShipmentManagementOnlyException
+    ManagerShipmentManagementOnlyException,
+
+    # Task exceptions
+    TaskException,
+    TaskCreateFailedException,
+    TaskNotFoundException,
+    TaskInvalidAssigneeException,
+    TaskInvalidPatientException,
+    TaskUpdateFailedException,
+    TaskDeleteFailedException,
+    TaskUnauthorizedEditException,
+    TaskUnauthorizedStatusException,
+    TaskManagerOnlyException
 )
 
 __all__ = [
@@ -111,5 +123,17 @@ __all__ = [
     'CompanyAccessForbiddenException',
     'ManagerApprovalOnlyException',
     'ManagerShipmentManagementOnlyException',
+
+    # Task exceptions
+    'TaskException',
+    'TaskCreateFailedException',
+    'TaskNotFoundException',
+    'TaskInvalidAssigneeException',
+    'TaskInvalidPatientException',
+    'TaskUpdateFailedException',
+    'TaskDeleteFailedException',
+    'TaskUnauthorizedEditException',
+    'TaskUnauthorizedStatusException',
+    'TaskManagerOnlyException',
 ]
 

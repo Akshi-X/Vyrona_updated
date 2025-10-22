@@ -8,7 +8,6 @@ Validates requests before reaching controllers.
 import json
 from typing import Callable
 from fastapi import Request, Response
-from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
@@ -22,6 +21,7 @@ from ..dependencies.auth_dependencies import (
     validate_approve_user_request,
     validate_reject_user_request
 )
+from ..utils.utils import create_error_response
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -94,14 +94,10 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             password = data.get("password")
             
             if not email or not password:
-                return JSONResponse(
+                return create_error_response(
                     status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": ErrorMessages.EMAIL_AND_PASSWORD_REQUIRED,
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    error_code="VAL_INPUT_001",
+                    message=ErrorMessages.EMAIL_AND_PASSWORD_REQUIRED
                 )
             
             # Validate using dependency function
@@ -115,37 +111,25 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             except AppException as e:
                 # Catch custom exceptions and return proper JSON
                 db.close()
-                return JSONResponse(
+                return create_error_response(
                     status_code=e.status_code,
-                    content={
-                        "error_code": e.error_code,
-                        "message": e.message,
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        **e.details  # Add any extra details (like remaining_attempts)
-                    }
+                    error_code=e.error_code,
+                    message=e.message,
+                    details=e.details  # Add any extra details (like remaining_attempts)
                 )
             except Exception as e:
                 db.close()
-                return JSONResponse(
+                return create_error_response(
                     status_code=500,
-                    content={
-                        "error_code": "GEN_SERVER_001",
-                        "message": ErrorMessages.INTERNAL_ERROR,
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    error_code="GEN_SERVER_001",
+                    message=ErrorMessages.INTERNAL_ERROR
                 )
                 
         except Exception as e:
-            return JSONResponse(
+            return create_error_response(
                 status_code=500,
-                content={
-                    "error_code": "GEN_SERVER_001",
-                    "message": ErrorMessages.INTERNAL_ERROR,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                error_code="GEN_SERVER_001",
+                message=ErrorMessages.INTERNAL_ERROR
             )
     
     async def _validate_registration(self, request: Request):
@@ -169,28 +153,20 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         except AppException as e:
             # Catch custom exceptions and return proper JSON
             print(f"AppException in middleware: {e.error_code} - {e.message}")
-            return JSONResponse(
+            return create_error_response(
                 status_code=e.status_code,
-                content={
-                    "error_code": e.error_code,
-                    "message": e.message,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    **e.details
-                }
+                error_code=e.error_code,
+                message=e.message,
+                details=e.details
             )
         except Exception as e:
             print(f"Unexpected exception in registration middleware: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
-            return JSONResponse(
+            return create_error_response(
                 status_code=500,
-                content={
-                    "error_code": "GEN_SERVER_001",
-                    "message": ErrorMessages.INTERNAL_ERROR,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                error_code="GEN_SERVER_001",
+                message=ErrorMessages.INTERNAL_ERROR
             )
     
     async def _validate_otp(self, request: Request):
@@ -204,38 +180,26 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             otp = data.get("otp")
             
             if not user_id or not otp:
-                return JSONResponse(
+                return create_error_response(
                     status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": ErrorMessages.USER_ID_AND_OTP_REQUIRED,
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    error_code="VAL_INPUT_001",
+                    message=ErrorMessages.USER_ID_AND_OTP_REQUIRED
                 )
             
             return None  # Validation passed, continue to controller
             
         except AppException as e:
-            return JSONResponse(
+            return create_error_response(
                 status_code=e.status_code,
-                content={
-                    "error_code": e.error_code,
-                    "message": e.message,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    **e.details
-                }
+                error_code=e.error_code,
+                message=e.message,
+                details=e.details
             )
         except Exception as e:
-            return JSONResponse(
+            return create_error_response(
                 status_code=500,
-                content={
-                    "error_code": "GEN_SERVER_001",
-                    "message": ErrorMessages.INTERNAL_ERROR,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                error_code="GEN_SERVER_001",
+                message=ErrorMessages.INTERNAL_ERROR
             )
     
     async def _validate_resend_otp(self, request: Request):
@@ -249,38 +213,26 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             email = data.get("email")
             
             if not user_id or not email:
-                return JSONResponse(
+                return create_error_response(
                     status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": ErrorMessages.USER_ID_AND_EMAIL_REQUIRED,
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    error_code="VAL_INPUT_001",
+                    message=ErrorMessages.USER_ID_AND_EMAIL_REQUIRED
                 )
             
             return None  # Validation passed, continue to controller
             
         except AppException as e:
-            return JSONResponse(
+            return create_error_response(
                 status_code=e.status_code,
-                content={
-                    "error_code": e.error_code,
-                    "message": e.message,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    **e.details
-                }
+                error_code=e.error_code,
+                message=e.message,
+                details=e.details
             )
         except Exception as e:
-            return JSONResponse(
+            return create_error_response(
                 status_code=500,
-                content={
-                    "error_code": "GEN_SERVER_001",
-                    "message": ErrorMessages.INTERNAL_ERROR,
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                error_code="GEN_SERVER_001",
+                message=ErrorMessages.INTERNAL_ERROR
             )
     
     async def _validate_get_user(self, request: Request, user_id: str):
@@ -293,7 +245,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return None
         except AppException as e:
             db.close()
-            return JSONResponse(status_code=e.status_code, content=e.to_dict())
+            return JSONResponse(
+                status_code=e.status_code,
+                content=e.to_dict(),
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
         except Exception as e:
             db.close()
             return JSONResponse(
@@ -303,6 +264,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -322,6 +289,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": "registration_id is required",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -333,7 +306,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return None
             except AppException as e:
                 db.close()
-                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=e.to_dict(),
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -342,6 +324,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     
@@ -361,6 +349,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": "registration_id is required",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
                     }
                 )
             
@@ -372,7 +366,16 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return None
             except AppException as e:
                 db.close()
-                return JSONResponse(status_code=e.status_code, content=e.to_dict())
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=e.to_dict(),
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -381,6 +384,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
                 }
             )
     

@@ -10,7 +10,7 @@ class OTP(Base):
     __tablename__ = "otps"
 
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, index=True)
-    user_id = sqlalchemy.Column(sqlalchemy.String, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = sqlalchemy.Column(sqlalchemy.String, nullable=False, index=True)
     email = sqlalchemy.Column(sqlalchemy.String, nullable=False, index=True)
     otp_code = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.utcnow)
