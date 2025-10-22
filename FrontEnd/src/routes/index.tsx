@@ -7,8 +7,10 @@ import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
 import VerifyOtp from '../pages/Verify'
 import Dashboard from '../pages/Dashboard'
+import Database from '../pages/Database'
 import ApprovalScreen from '../pages/ApprovalScreen'
 import ForgotPassword from '../pages/ForgotPassword'
+import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
 
 export const router = createBrowserRouter([
@@ -21,7 +23,9 @@ export const router = createBrowserRouter([
   { path: '/success', element: <SuccessAlert /> },
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/reset-password', element: <ResetPassword /> },
   { path: '/dashboard', element: <Dashboard /> },
+  { path: '/database', element: <Database /> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])

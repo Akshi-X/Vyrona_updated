@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
+import { authService } from "../../services/authService";
 
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -44,11 +45,12 @@ const ForgotPassword: React.FC = () => {
         setMessage("");
 
         try {
-            // TODO: Integrate actual forgot password API
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            setMessage("Password reset instructions sent to your email");
+            const resp = await authService.forgotPassword(email);
+            setMessage(resp?.message || "Password reset link has been sent to your email");
+            setEmailError("");
         } catch (err: any) {
-            setEmailError(err.message || "Failed to send reset instructions");
+            setEmailError(err?.message || "Network error. Please try again.");
+            setMessage("");
         } finally {
             setLoading(false);
         }
@@ -92,9 +94,6 @@ const ForgotPassword: React.FC = () => {
                     >
                         Forgot Password?
                     </h2>
-                    <p className="text-gray-500 mb-8">
-                        No worries! Enter your email address and we'll send you reset instructions.
-                    </p>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Email Field */}
@@ -112,17 +111,18 @@ const ForgotPassword: React.FC = () => {
                             >
                                 Email
                             </label>
-                            {emailError && (
-                                <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                            {/* Server Response Message */}
+                            {(message || emailError) && (
+                                <div>
+                                    {message && (
+                                        <p className="text-sm text-green-600 mt-2">{message}</p>
+                                    )}
+                                    {emailError && !message && (
+                                        <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                                    )}
+                                </div>
                             )}
                         </div>
-
-                        {/* Success Message */}
-                        {message && (
-                            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                <p className="text-sm text-green-600">{message}</p>
-                            </div>
-                        )}
 
                         {/* Send Instructions Button */}
                         <button
@@ -130,8 +130,10 @@ const ForgotPassword: React.FC = () => {
                             disabled={loading}
                             className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
                         >
-                            {loading ? "Sending..." : "Send Reset Instructions"}
+                            {loading ? "Sending..." : "Send"}
                         </button>
+
+
                     </form>
 
                     {/* Footer */}

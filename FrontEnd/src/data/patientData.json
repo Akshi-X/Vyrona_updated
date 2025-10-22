@@ -1,0 +1,164 @@
+{
+  "patients": [
+    {
+      "id": "P001",
+      "name": "John Smith",
+      "age": 45,
+      "condition": "Diabetes Type 2",
+      "treatment": "Insulin Therapy",
+      "status": "Active"
+    },
+    {
+      "id": "P002", 
+      "name": "Sarah Johnson",
+      "age": 32,
+      "condition": "Hypertension",
+      "treatment": "ACE Inhibitors",
+      "status": "Active"
+    },
+    {
+      "id": "P003",
+      "name": "Michael Brown",
+      "age": 58,
+      "condition": "Cardiovascular Disease",
+      "treatment": "Beta Blockers",
+      "status": "Monitoring"
+    },
+    {
+      "id": "P004",
+      "name": "Emily Davis",
+      "age": 28,
+      "condition": "Asthma",
+      "treatment": "Inhaled Corticosteroids",
+      "status": "Active"
+    },
+    {
+      "id": "P005",
+      "name": "Robert Wilson",
+      "age": 67,
+      "condition": "Osteoarthritis",
+      "treatment": "NSAIDs",
+      "status": "Active"
+    },
+    {
+      "id": "P006",
+      "name": "Lisa Anderson",
+      "age": 41,
+      "condition": "Depression",
+      "treatment": "SSRIs",
+      "status": "Monitoring"
+    },
+    {
+      "id": "P007",
+      "name": "David Miller",
+      "age": 53,
+      "condition": "Chronic Kidney Disease",
+      "treatment": "ACE Inhibitors",
+      "status": "Active"
+    },
+    {
+      "id": "P008",
+      "name": "Jennifer Taylor",
+      "age": 35,
+      "condition": "Migraine",
+      "treatment": "Triptans",
+      "status": "Active"
+    },
+    {
+      "id": "P009",
+      "name": "Christopher Lee",
+      "age": 49,
+      "condition": "COPD",
+      "treatment": "Bronchodilators",
+      "status": "Active"
+    },
+    {
+      "id": "P010",
+      "name": "Amanda White",
+      "age": 29,
+      "condition": "Rheumatoid Arthritis",
+      "treatment": "DMARDs",
+      "status": "Monitoring"
+    },
+    {
+      "id": "P011",
+      "name": "James Garcia",
+      "age": 62,
+      "condition": "Alzheimer's Disease",
+      "treatment": "Cholinesterase Inhibitors",
+      "status": "Active"
+    },
+    {
+      "id": "P012",
+      "name": "Michelle Martinez",
+      "age": 38,
+      "condition": "Thyroid Disorder",
+      "treatment": "Levothyroxine",
+      "status": "Active"
+    },
+    {
+      "id": "P013",
+      "name": "Kevin Rodriguez",
+      "age": 44,
+      "condition": "Gastroesophageal Reflux",
+      "treatment": "Proton Pump Inhibitors",
+      "status": "Active"
+    },
+    {
+      "id": "P014",
+      "name": "Stephanie Thompson",
+      "age": 31,
+      "condition": "Epilepsy",
+      "treatment": "Anticonvulsants",
+      "status": "Monitoring"
+    },
+    {
+      "id": "P015",
+      "name": "Daniel Clark",
+      "age": 56,
+      "condition": "Prostate Cancer",
+      "treatment": "Hormone Therapy",
+      "status": "Active"
+    },
+    {
+      "id": "P016",
+      "name": "Ashley Lewis",
+      "age": 26,
+      "condition": "Multiple Sclerosis",
+      "treatment": "Immunomodulators",
+      "status": "Active"
+    },
+    {
+      "id": "P017",
+      "name": "Matthew Walker",
+      "age": 50,
+      "condition": "Parkinson's Disease",
+      "treatment": "Dopamine Agonists",
+      "status": "Monitoring"
+    },
+    {
+      "id": "P018",
+      "name": "Nicole Hall",
+      "age": 33,
+      "condition": "Lupus",
+      "treatment": "Immunosuppressants",
+      "status": "Active"
+    },
+    {
+      "id": "P019",
+      "name": "Andrew Young",
+      "age": 47,
+      "condition": "Crohn's Disease",
+      "treatment": "Biologics",
+      "status": "Active"
+    },
+    {
+      "id": "P020",
+      "name": "Rachel King",
+      "age": 39,
+      "condition": "Fibromyalgia",
+      "treatment": "Antidepressants",
+      "status": "Monitoring"
+    }
+  ]
+}
