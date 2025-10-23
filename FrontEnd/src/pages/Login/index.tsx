@@ -92,7 +92,6 @@ const Login: React.FC = () => {
                 setApiError(response.message || "Unexpected response");
             }
         } catch (err: any) {
-            console.error(err);
             setApiError(err.message || "Login failed");
         } finally {
             setLoading(false);

@@ -61,7 +61,6 @@ export default function Dashboard({}: DashboardProps) {
         setRiskMetrics(risk);
         setComplianceMetrics(compliance);
       } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
         setError('Failed to load dashboard data');
         // Fallback to static data on error
         setPatientStats({

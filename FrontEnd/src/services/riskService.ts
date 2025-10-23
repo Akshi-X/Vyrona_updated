@@ -44,7 +44,6 @@ export class RiskService extends BaseApiService {
         throw new Error('Failed to fetch risk metrics');
       }
     } catch (error) {
-      console.error('Error fetching risk metrics:', error);
       throw error;
     }
   }

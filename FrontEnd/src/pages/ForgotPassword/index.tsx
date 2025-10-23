@@ -7,6 +7,7 @@ import { authService } from "../../services/authService";
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState("");
     const [emailError, setEmailError] = useState("");
+    const [serverError, setServerError] = useState("");
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
@@ -17,6 +18,7 @@ const ForgotPassword: React.FC = () => {
 
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setEmail(e.target.value);
+        setServerError(""); // Clear server error when user types
         if (!e.target.value) {
             setEmailError("Email is required");
         } else if (!validateEmail(e.target.value)) {
@@ -41,15 +43,16 @@ const ForgotPassword: React.FC = () => {
         if (!valid) return;
 
         setEmailError("");
+        setServerError("");
         setLoading(true);
         setMessage("");
 
         try {
             const resp = await authService.forgotPassword(email);
             setMessage(resp?.message || "Password reset link has been sent to your email");
-            setEmailError("");
+            setServerError("");
         } catch (err: any) {
-            setEmailError(err?.message || "Network error. Please try again.");
+            setServerError(err?.message || "Network error. Please try again.");
             setMessage("");
         } finally {
             setLoading(false);
@@ -112,13 +115,16 @@ const ForgotPassword: React.FC = () => {
                                 Email
                             </label>
                             {/* Server Response Message */}
-                            {(message || emailError) && (
+                            {(message || emailError || serverError) && (
                                 <div>
                                     {message && (
                                         <p className="text-sm text-green-600 mt-2">{message}</p>
                                     )}
                                     {emailError && !message && (
                                         <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                                    )}
+                                    {serverError && !message && (
+                                        <p className="text-sm text-red-600 mt-2">{serverError}</p>
                                     )}
                                 </div>
                             )}

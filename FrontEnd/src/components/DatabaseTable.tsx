@@ -30,17 +30,13 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching patients for pharmaId:', pharmaId);
         
         // Add abort signal to prevent race conditions
         const data = await patientService.getDetailedPatients(pharmaId);
-        console.log('Received data:', data);
         
         setPatients(data);
         setLoading(false);
-        console.log('Patients state updated:', data);
       } catch (err: any) {
-        console.error('Error fetching patients:', err);
         setError(err.message || 'Failed to fetch patients data');
         setLoading(false);
       }
@@ -103,9 +99,6 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
     }
     return sortDirection === 'asc' ? <span>↑</span> : <span>↓</span>;
   };
-
-  // Debug logging
-  console.log('DatabaseTable render - loading:', loading, 'patients:', patients.length, 'error:', error);
 
   // Loading state
   if (loading) {

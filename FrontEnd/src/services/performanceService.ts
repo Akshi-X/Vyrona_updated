@@ -37,7 +37,6 @@ export class PerformanceService extends BaseApiService {
         throw new Error('Failed to fetch performance metrics');
       }
     } catch (error) {
-      console.error('Error fetching performance metrics:', error);
       throw error;
     }
   }
