@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Query, Form
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
-
+from app.constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
 from app.config import database
 from app.schemas.feedback_schema import (
     FeedbackCreateRequest, CommentCreateRequest, FeedbackStatusUpdateRequest,
@@ -35,18 +35,27 @@ router = APIRouter(
     Create a new feedback ticket with optional file attachment.
     """)
 def create_feedback_endpoint(
-    request: Request,
-    attachment: Optional[UploadFile] = File(None, description="Optional file attachment (max 10MB)"),
+    department: str = Form(...),
+    feedback_type: str = Form(...),
+    subject: str = Form(...),
+    description: str = Form(...),
+    priority: str = Form(...),
+    affected_modules: str = Form(...),
+    attachment: Optional[UploadFile] = File(None),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
     """Create a new feedback ticket with optional attachment"""
     
-    # Get pre-validated data from middleware
-    validated_data = request.state.validated_feedback_data
-    
-    # Create request object from validated data
-    feedback_request = FeedbackCreateRequest(**validated_data)
+    # Create request object from form data (matching your frontend format)
+    feedback_request = FeedbackCreateRequest(
+        department=FeedbackDepartment(department),
+        feedback_type=FeedbackType(feedback_type),
+        subject=subject,
+        description=description,
+        priority=FeedbackPriority(priority),
+        affected_modules=AffectedModule(affected_modules)
+    )
     
     # Call service (all business logic there)
     return create_feedback(

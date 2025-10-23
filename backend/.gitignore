@@ -58,3 +58,7 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+
+# Upload directories
+uploads/feedback/
