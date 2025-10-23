@@ -71,7 +71,12 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
     except Exception as e:
         # Rollback on ANY error (including email failure)
         db.rollback()
-        raise Exception(f"Failed to send OTP: {str(e)}")
+        # Handle EmailServiceException properly
+        if hasattr(e, 'details') and 'reason' in e.details:
+            reason = e.details['reason']
+        else:
+            reason = str(e)
+        raise Exception(f"Failed to send OTP: {reason}")
 
 
 def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:

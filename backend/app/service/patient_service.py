@@ -25,26 +25,6 @@ class PatientService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_patient(self, patient_data: PatientCreate) -> PatientResponse:
-        """Create a new patient with business logic validation"""
-        try:
-            # Business logic validations can be added here
-            # For example: check if therapy_id exists, validate insurance, etc.
-            
-            # Generate custom patient ID in format PTddmmyy-001
-            patient_id = generate_patient_id(self.db)
-            
-            db_patient = Patient(
-                id=patient_id,
-                **patient_data.model_dump()
-            )
-            self.db.add(db_patient)
-            self.db.commit()
-            self.db.refresh(db_patient)
-            
-            return PatientResponse.model_validate(db_patient)
-        except Exception as e:
-            raise PatientServiceError("create_patient", f"Failed to create patient: {str(e)}")
 
     def get_patient_by_id(self, patient_id: str) -> PatientResponse:
         """Get patient by ID with business logic"""
@@ -98,17 +78,7 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("get_patients_by_provider", f"Failed to get patients by provider: {str(e)}")
 
-    def get_patients_by_pharma(self, pharma_id: int) -> List[PatientResponse]:
-        """Get all patients for a specific pharma"""
-        try:
-            patients = self.db.query(Patient).filter(Patient.pharma_id == pharma_id).all()
-            return [PatientResponse.model_validate(patient) for patient in patients]
-        except Exception as e:
-            raise PatientServiceError("get_patients_by_pharma", f"Failed to get patients by pharma: {str(e)}")
 
-    def patient_exists(self, patient_id: str) -> bool:
-        """Check if patient exists"""
-        return self.db.query(Patient).filter(Patient.id == patient_id).first() is not None
 
     def create_multiple_patients(self, patients_data: List[PatientCreate]) -> List[Patient]:
         """Create multiple patients in a single transaction"""

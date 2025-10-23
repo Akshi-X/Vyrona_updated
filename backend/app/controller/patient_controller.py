@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.config.database import get_db
+from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.patient_service import PatientService
 from app.schemas.patient_schema import (
     PatientUpdate,
@@ -38,22 +39,43 @@ def get_all_patients(db: Session = Depends(get_db)):
 
 @router.get("/ongoing", response_model=List[PatientSummaryResponse])
 def get_patients_summary(
-    pharma_id: int = Query(..., description="Pharma ID to filter patients"),
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
+    """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for authenticated user's pharma"""
     patient_service = PatientService(db)
     return patient_service.get_patients_summary(pharma_id=pharma_id)
 
 
 @router.get("/detailed", response_model=List[PatientDetailedResponse])
 def get_patients_detailed(
-    pharma_id: int = Query(..., description="Pharma ID to filter patients"),
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Get detailed patient data with docs_report for specific pharma"""
+    """Get detailed patient data with docs_report for authenticated user's pharma"""
     patient_service = PatientService(db)
     return patient_service.get_patients_detailed(pharma_id=pharma_id)
+
+
+@router.get("/statistics", response_model=PharmaStatisticsResponse)
+def get_user_pharma_statistics(
+    pharma_id: int = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """Get comprehensive statistics for authenticated user's pharma"""
+    patient_service = PatientService(db)
+    return patient_service.get_pharma_statistics(pharma_id)
+
+
+@router.get("/provider/{provider_id}", response_model=List[PatientResponse])
+def get_patients_by_provider(
+    provider_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get all patients for a specific provider"""
+    # Call service (all business logic there)
+    patient_service = PatientService(db)
+    return patient_service.get_patients_by_provider(provider_id)
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
@@ -79,34 +101,13 @@ def update_patient(
     return patient_service.update_patient(patient_id, patient_data)
 
 
-@router.get("/provider/{provider_id}", response_model=List[PatientResponse])
-def get_patients_by_provider(
-    provider_id: str,
+@router.delete("/{patient_id}", response_model=dict)
+def delete_patient(
+    patient_id: str,
     db: Session = Depends(get_db)
 ):
-    """Get all patients for a specific provider"""
+    """Delete patient"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_patients_by_provider(provider_id)
-
-
-@router.get("/pharma/{pharma_id}", response_model=List[PatientResponse])
-def get_patients_by_pharma(
-    pharma_id: int,
-    db: Session = Depends(get_db)
-):
-    """Get all patients for a specific pharma"""
-    # Call service (all business logic there)
-    patient_service = PatientService(db)
-    return patient_service.get_patients_by_pharma(pharma_id)
-
-
-@router.get("/statistics/pharma/{pharma_id}", response_model=PharmaStatisticsResponse)
-def get_pharma_statistics(
-    pharma_id: int,
-    db: Session = Depends(get_db)
-):
-    """Get comprehensive statistics for a specific pharma"""
-    # Call service (all business logic there)
-    patient_service = PatientService(db)
-    return patient_service.get_pharma_statistics(pharma_id)
+    patient_service.delete_patient(patient_id)
+    return {"message": "Patient deleted successfully"}

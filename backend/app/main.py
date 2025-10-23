@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-
 from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller
 
 from app.config.database import init_db as create_tables

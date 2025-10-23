@@ -4,6 +4,7 @@ import { COLORS } from '../../constants/colors';
 import { feedbackApi, type FeedbackSubmission } from '../../api/feedbackApi';
 import { userService } from '../../services/userService';
 import Header from '../../components/Header';
+import AttachmentThumbnail from '../../components/AttachmentThumbnail';
 
 const modules = [
   'Track & Trace',
@@ -48,7 +49,8 @@ const Support: React.FC = () => {
   const [selectedModuleIndices, setSelectedModuleIndices] = useState<number[]>([]);
   const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
 
-  const [, setFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingAttachment, setExistingAttachment] = useState<{path: string, filename: string} | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
@@ -135,6 +137,15 @@ const Support: React.FC = () => {
          if (moduleIndex !== -1) {
            setSelectedModuleIndices([moduleIndex]);
          }
+
+         // Set existing attachment if available
+         if (details.attachment_path) {
+           const filename = details.attachment_path.split('/').pop() || 'attachment';
+           setExistingAttachment({
+             path: details.attachment_path,
+             filename: filename
+           });
+         }
       })
       .catch(error => {
       });
@@ -171,13 +182,29 @@ const Support: React.FC = () => {
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setFiles(Array.from(e.target.files));
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const dropped = Array.from(e.dataTransfer.files || []);
-    if (dropped.length) setFiles(prev => [...prev, ...dropped]);
+    if (dropped.length) {
+      setSelectedFiles(prev => [...prev, ...dropped]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const validateName = (name: string) => {
@@ -256,7 +283,7 @@ const Support: React.FC = () => {
         description,
         priority: priority || 'medium',
         affected_modules: finalAffectedModule,
-        attachment: undefined, // File upload not implemented yet
+        attachment: selectedFiles[0] || undefined, // Send first selected file to backend
       };
 
 
@@ -298,7 +325,7 @@ const Support: React.FC = () => {
       <Header title="Support & Feedback" />
 
       {/* Page body */}
-      <div className="flex-1 w-full pt-16">
+      <div className="flex-1 w-full" style={{ paddingTop: 'calc(63px + 1rem)' }}>
         <div className="w-full" style={{ background: 'linear-gradient(180deg, #f3f4f6 0%, #f8f9fa 100%)' }}>
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -385,23 +412,67 @@ const Support: React.FC = () => {
 
                 {/* Attach: full width (conditional) */}
                 {!readonly && !hideAttach && (
-                  <div className="mt-4">
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Attach Supporting Files (Optional)</label>
-                    <div
-                      ref={dropRef}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={handleDrop}
-                      onClick={openFileDialog}
-                      className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 cursor-pointer px-4 py-6 text-center`}
-                    >
-                      <svg className="h-8 w-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4-4m0 0l4 4m-4-4v12" />
-                      </svg>
-                      <div className="text-sm text-gray-700">Click to upload or drag and drop</div>
-                      <div className="text-[11px] text-gray-400">Max size 10MB</div>
-                      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} />
+                    <div className="mt-4">
+                      <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Attach Supporting Files (Optional)</label>
+                      
+                      {/* File Upload Area */}
+                      <div
+                        ref={dropRef}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleDrop}
+                        onClick={openFileDialog}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 cursor-pointer px-4 py-6 text-center hover:border-gray-400 transition-colors`}
+                      >
+                        <svg className="h-8 w-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4-4m0 0l4 4m-4-4v12" />
+                        </svg>
+                        <div className="text-sm text-gray-700">Click to upload or drag and drop</div>
+                        <div className="text-[11px] text-gray-400">Max size 10MB per file</div>
+                        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip,.rar" />
+                      </div>
+
+                      {/* Selected Files Thumbnails */}
+                      {selectedFiles.length > 0 && (
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Selected Files ({selectedFiles.length}):</span>
+                            <button
+                              onClick={clearAllFiles}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                              type="button"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {selectedFiles.map((file, index) => (
+                              <AttachmentThumbnail
+                                key={`${file.name}-${index}`}
+                                file={file}
+                                filename={file.name}
+                                onRemove={() => removeFile(index)}
+                                canRemove={true}
+                                className="w-full"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Existing Attachment (for viewing tickets) */}
+                      {existingAttachment && (
+                        <div className="mt-4">
+                          <span className="text-sm font-medium text-gray-700">Current Attachment:</span>
+                          <div className="mt-2">
+                            <AttachmentThumbnail
+                              attachmentPath={existingAttachment.path}
+                              filename={existingAttachment.filename}
+                              className="w-32"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
                 )}
 
                 {/* Priority and Modules in one alignment (same row) */}
