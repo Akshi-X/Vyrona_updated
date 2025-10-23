@@ -152,6 +152,7 @@ app.include_router(user_controller.router, prefix=API_PREFIX)
 app.include_router(patient_controller.router, prefix=API_PREFIX)
 app.include_router(feedback_controller.router, prefix=API_PREFIX)
 app.include_router(task_controller.router, prefix=API_PREFIX)
+app.include_router(dashboard_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")
