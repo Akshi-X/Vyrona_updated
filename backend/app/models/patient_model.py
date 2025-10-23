@@ -44,7 +44,7 @@ class Patient(Base):
     
     # Relationships
     pharma = relationship("Pharma", back_populates="patients")
-    provider = relationship("Provider", back_populates="patients")
+    provider = relationship("Provider", back_populates="patients", lazy="select")
     
     # Other relationships (already defined in other models via backref)
     # tasks = relationship("Tasks", back_populates="patient")
