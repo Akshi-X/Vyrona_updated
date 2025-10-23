@@ -98,7 +98,7 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("get_patients_by_provider", f"Failed to get patients by provider: {str(e)}")
 
-    def get_patients_by_pharma(self, pharma_id: str) -> List[PatientResponse]:
+    def get_patients_by_pharma(self, pharma_id: int) -> List[PatientResponse]:
         """Get all patients for a specific pharma"""
         try:
             patients = self.db.query(Patient).filter(Patient.pharma_id == pharma_id).all()
@@ -140,7 +140,7 @@ class PatientService:
             self.db.rollback()
             raise e
 
-    def get_pharma_statistics(self, pharma_id: str) -> PharmaStatisticsResponse:
+    def get_pharma_statistics(self, pharma_id: int) -> PharmaStatisticsResponse:
         """Get current month statistics for a specific pharma"""
         try:
             # Get current month start and end dates
@@ -239,7 +239,7 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("create_patients", f"Failed to create patients: {str(e)}")
 
-    def get_patients_summary(self, pharma_id: str) -> List[PatientSummaryResponse]:
+    def get_patients_summary(self, pharma_id: int) -> List[PatientSummaryResponse]:
         """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
         try:
             # Import here to avoid circular imports
@@ -253,14 +253,13 @@ class PatientService:
                 Patient.hospital_name.label('hospital'),
                 Patient.stage,
                 Provider.name.label('provider_name'),
-                Pharma.location.label('pharma_location')
+                Patient.location
             ).outerjoin(
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
                 Pharma, Patient.pharma_id == Pharma.id
             ).filter(
                 Patient.pharma_id == pharma_id,  # Filter by specific pharma
-                Patient.stage == 'Scheduled'     # Only show scheduled patients
             ).order_by(desc(Patient.created_at))
             
             results = query.all()
@@ -274,7 +273,7 @@ class PatientService:
                     hospital=result.hospital,
                     stage=result.stage,
                     provider_name=result.provider_name,
-                    pharma_location=result.pharma_location
+                    location=result.location
                 ))
             
             return summary_data
@@ -282,7 +281,7 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("get_patients_summary", f"Failed to get patients summary: {str(e)}")
 
-    def get_patients_detailed(self, pharma_id: str) -> List[PatientDetailedResponse]:
+    def get_patients_detailed(self, pharma_id: int) -> List[PatientDetailedResponse]:
         """Get detailed patient data with docs_report for specific pharma"""
         try:
             # Import here to avoid circular imports
@@ -296,7 +295,7 @@ class PatientService:
                 Patient.stage,
                 Patient.docs_report,
                 Provider.name.label('provider_name'),
-                Pharma.location.label('pharma_location')
+                Patient.location
             ).outerjoin(
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
@@ -313,7 +312,7 @@ class PatientService:
                 detailed_data.append(PatientDetailedResponse(
                     patient_id=result.patient_id,
                     condition=result.condition,
-                    pharma_location=result.pharma_location,
+                    location=result.location,
                     provider_name=result.provider_name,
                     stage=result.stage,
                     docs_report=result.docs_report

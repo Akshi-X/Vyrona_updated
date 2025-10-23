@@ -38,7 +38,7 @@ def get_all_patients(db: Session = Depends(get_db)):
 
 @router.get("/ongoing", response_model=List[PatientSummaryResponse])
 def get_patients_summary(
-    pharma_id: str = Query(..., description="Pharma ID to filter patients"),
+    pharma_id: int = Query(..., description="Pharma ID to filter patients"),
     db: Session = Depends(get_db)
 ):
     """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
@@ -48,7 +48,7 @@ def get_patients_summary(
 
 @router.get("/detailed", response_model=List[PatientDetailedResponse])
 def get_patients_detailed(
-    pharma_id: str = Query(..., description="Pharma ID to filter patients"),
+    pharma_id: int = Query(..., description="Pharma ID to filter patients"),
     db: Session = Depends(get_db)
 ):
     """Get detailed patient data with docs_report for specific pharma"""
@@ -92,7 +92,7 @@ def get_patients_by_provider(
 
 @router.get("/pharma/{pharma_id}", response_model=List[PatientResponse])
 def get_patients_by_pharma(
-    pharma_id: str,
+    pharma_id: int,
     db: Session = Depends(get_db)
 ):
     """Get all patients for a specific pharma"""
@@ -103,7 +103,7 @@ def get_patients_by_pharma(
 
 @router.get("/statistics/pharma/{pharma_id}", response_model=PharmaStatisticsResponse)
 def get_pharma_statistics(
-    pharma_id: str,
+    pharma_id: int,
     db: Session = Depends(get_db)
 ):
     """Get comprehensive statistics for a specific pharma"""
