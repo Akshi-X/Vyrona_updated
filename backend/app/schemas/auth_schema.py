@@ -34,7 +34,7 @@ class VerifyOTPSuccessResponse(BaseModel):
     auth_token: str
     expires_at: datetime
     message: str
-    pharma_id: Optional[str] = None  # User's pharma ID
+    pharma_id: Optional[int] = None  # User's pharma ID (integer)
 
 
 class VerifyOTPFailureResponse(BaseModel):

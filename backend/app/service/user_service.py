@@ -162,15 +162,15 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         
         # Create pharma if it doesn't exist
         if not existing_pharma:
-            pharma_id = utils.generate_pharma_id(db)
             new_pharma = Pharma(
-                id=pharma_id,
                 pharma_name=request.company_name,
                 user_id=user.user_id,  # Now safe to link to existing user
                 created_by=user.user_id
             )
             db.add(new_pharma)
             db.commit()
+            db.refresh(new_pharma)  # Get the auto-generated integer ID
+            pharma_id = new_pharma.id
             print(f"Created new pharma: {request.company_name} (ID: {pharma_id}) linked to user: {user.user_id}")
         
     except IntegrityError as e:
