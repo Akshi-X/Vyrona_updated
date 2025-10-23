@@ -71,6 +71,27 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Generate custom user ID (USR-XXXXXX format)
     user_id = utils.generate_user_id()
     
+    # ============================================
+    # PHARMA VALIDATION LOGIC
+    # ============================================
+    # Check if pharma exists
+    from app.models.pharma_model import Pharma
+    
+    existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
+    
+    if existing_pharma:
+        # Pharma exists, use existing pharma_id
+        pharma_id = existing_pharma.id
+        print(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
+    else:
+        # Pharma doesn't exist, will create after user is created
+        pharma_id = None
+        print(f"Pharma '{request.company_name}' doesn't exist, will create after user creation")
+    
+    # ============================================
+    # END PHARMA VALIDATION LOGIC
+    # ============================================
+    
     # Create user with custom user_id
     user = user_model.User(
         user_id=user_id,
@@ -138,6 +159,19 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         db.commit()
         db.refresh(user)
         print(f"User created and email sent successfully: {user.user_id}")
+        
+        # Create pharma if it doesn't exist
+        if not existing_pharma:
+            new_pharma = Pharma(
+                pharma_name=request.company_name,
+                user_id=user.user_id,  # Now safe to link to existing user
+                created_by=user.user_id
+            )
+            db.add(new_pharma)
+            db.commit()
+            db.refresh(new_pharma)  # Get the auto-generated integer ID
+            pharma_id = new_pharma.id
+            print(f"Created new pharma: {request.company_name} (ID: {pharma_id}) linked to user: {user.user_id}")
         
     except IntegrityError as e:
         db.rollback()
