@@ -92,7 +92,6 @@ const UserProfilePage: React.FC = () => {
       // Load profile first to populate header fields
       try {
         const profile: UserProfileDto = await userService.getProfile();
-        console.log('Profile data received:', profile);
         setFirstName(profile.first_name || '');
         setLastName(profile.last_name || '');
         setWorkEmail(profile.email || '');
@@ -255,7 +254,7 @@ const UserProfilePage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header title="User Profile" />
 
-      <div className="p-4 sm:p-6 lg:p-8 pt-20" style={{ paddingTop: 'calc(63px + 1.5rem)' }}>
+      <div className="p-4 sm:p-6 lg:p-8 pt-[calc(63px+1.5rem)]">
         <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Basic Information Section */}
