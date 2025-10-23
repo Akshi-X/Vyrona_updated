@@ -94,6 +94,11 @@ ERROR_CODES = {
     "REJECT_DB_ERROR": "ERR_3043",
     "REJECT_UNAUTHORIZED": "ERR_3044",
     
+    # Update User (3061-3080)
+    "UPDATE_USER_NOT_FOUND": "ERR_3061",
+    "UPDATE_USER_FORBIDDEN": "ERR_3062",
+    "UPDATE_USER_DB_ERROR": "ERR_3063",
+    
     # ============================================
     # DATABASE (4xxx)
     # ============================================
