@@ -14,14 +14,17 @@ interface Ticket {
 }
 
 const NAME_MAX = 80;
-const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/; // allows letters, spaces, common punctuation
+const FIRST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for first name
+const LAST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for last name
 
 const UserProfilePage: React.FC = () => {
   const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState(true);
   const [isFeatureUpdatesEnabled, setIsFeatureUpdatesEnabled] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [fullNameError, setFullNameError] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [firstNameError, setFirstNameError] = useState<string | null>(null);
+  const [lastNameError, setLastNameError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState("");
   const [, setRole] = useState(" ");
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ const UserProfilePage: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState<boolean>(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
+
+  // Initialize name fields - removed hardcoded values, will be set by API call
 
   useEffect(() => {
     const getTokenFromCookie = (): string | null => {
@@ -87,14 +92,15 @@ const UserProfilePage: React.FC = () => {
       // Load profile first to populate header fields
       try {
         const profile: UserProfileDto = await userService.getProfile();
-        const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
-        setFullName(name || '');
+        setFirstName(profile.first_name || '');
+        setLastName(profile.last_name || '');
         setWorkEmail(profile.email || '');
         setRole(profile.role || '');
       } catch (error) {
         console.error('Failed to load profile:', error);
         // Set default values if profile fails to load
-        setFullName('User');
+        setFirstName('User');
+        setLastName('');
         setWorkEmail('user@example.com');
         setRole('User');
       }
@@ -147,11 +153,21 @@ const UserProfilePage: React.FC = () => {
     }
   };
 
-  const validateName = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return 'Full name is required';
-    if (trimmed.length > NAME_MAX) return `Full name must be ≤ ${NAME_MAX} characters`;
-    if (!NAME_REGEX.test(trimmed)) return 'Enter a valid name (letters, spaces, , . \" \- allowed)';
+  const validateFirstName = (firstName: string) => {
+    const trimmed = firstName.trim();
+    if (!trimmed) return 'First name is required';
+    if (trimmed.length > NAME_MAX) return `First name must be ≤ ${NAME_MAX} characters`;
+    if (trimmed.length < 1) return 'First name must be at least 1 character';
+    if (!FIRST_NAME_REGEX.test(trimmed)) return 'Enter a valid first name (letters, spaces, , . \' - allowed)';
+    return null;
+  };
+
+  const validateLastName = (lastName: string) => {
+    const trimmed = lastName.trim();
+    if (!trimmed) return 'Last name is required';
+    if (trimmed.length > NAME_MAX) return `Last name must be ≤ ${NAME_MAX} characters`;
+    if (trimmed.length < 1) return 'Last name must be at least 1 character';
+    if (!LAST_NAME_REGEX.test(trimmed)) return 'Enter a valid last name (letters, spaces, , . \' - allowed)';
     return null;
   };
 
@@ -160,20 +176,39 @@ const UserProfilePage: React.FC = () => {
   };
 
   const handleSaveProfile = () => {
-    const err = validateName(fullName);
-    if (err) {
-      setFullNameError(err);
+    const firstNameErr = validateFirstName(firstName);
+    const lastNameErr = validateLastName(lastName);
+    
+    if (firstNameErr) {
+      setFirstNameError(firstNameErr);
+    }
+    if (lastNameErr) {
+      setLastNameError(lastNameErr);
+    }
+    
+    if (firstNameErr || lastNameErr) {
       return;
     }
-    setFullNameError(null);
+    
+    setFirstNameError(null);
+    setLastNameError(null);
     setIsEditingProfile(false);
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = async () => {
     setIsEditingProfile(false);
-    setFullName("Dr. Sarah Johnson");
-    setWorkEmail("jothikaraj272001@gmail.com");
-    setFullNameError(null);
+    // Reset to original values from API
+    try {
+      const profile: UserProfileDto = await userService.getProfile();
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setWorkEmail(profile.email || '');
+    } catch (error) {
+      console.error('Failed to load profile for cancel:', error);
+      // Keep current values if API fails
+    }
+    setFirstNameError(null);
+    setLastNameError(null);
   };
 
   const handleSubmitRequest = () => {
@@ -183,7 +218,7 @@ const UserProfilePage: React.FC = () => {
         hideAttach: false,
         lockIdentity: true, // full name, email are non-editable on Support
         prefill: {
-          fullName: fullName,
+          fullName: `${firstName} ${lastName}`.trim(),
           workEmail: workEmail,
         }
       }
@@ -203,7 +238,7 @@ const UserProfilePage: React.FC = () => {
         hideAttach: true,
         feedbackId: ticket.id,
         prefill: {
-          fullName: fullName,
+          fullName: `${firstName} ${lastName}`.trim(),
           workEmail: 'jothikaraj272001@gmail.com',
           feedbackType: ticket.type,
           subject: ticket.title,
@@ -219,7 +254,7 @@ const UserProfilePage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header title="User Profile" />
 
-      <div className="p-4 sm:p-6 lg:p-8 pt-20">
+      <div className="p-4 sm:p-6 lg:p-8 pt-[calc(63px+1.5rem)]">
         <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Basic Information Section */}
@@ -229,7 +264,7 @@ const UserProfilePage: React.FC = () => {
             {!isEditingProfile ? (
               <button
                 onClick={handleEditProfile}
-                className="inline-flex items-center px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-200 bg-white"
+                className="inline-flex items-center px-4 py-2 border border-[#6b1176] text-[#6b1176] rounded-lg hover:bg-[#6b1176]/10 transition-colors duration-200 bg-white"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -240,7 +275,7 @@ const UserProfilePage: React.FC = () => {
               <div className="flex gap-3">
                 <button
                   onClick={handleSaveProfile}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                  className="inline-flex items-center px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -259,23 +294,62 @@ const UserProfilePage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-bold text-black mb-2">Full Name</label>
+              <label className="block text-sm font-bold text-black mb-2">First Name</label>
               <input
                 type="text"
-                value={fullName}
+                value={firstName}
                 onChange={(e) => {
-                  setFullName(e.target.value);
-                  if (fullNameError) setFullNameError(null);
+                  const value = e.target.value;
+                  setFirstName(value);
+                  // Clear error if user starts typing
+                  if (firstNameError) setFirstNameError(null);
+                  // Real-time validation
+                  if (value.trim()) {
+                    const error = validateFirstName(value);
+                    if (error) setFirstNameError(error);
+                  }
                 }}
                 maxLength={NAME_MAX}
                 disabled={!isEditingProfile}
                 className={`w-full px-3 py-2 border rounded-lg ${
                   isEditingProfile 
-                    ? 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                    ? firstNameError 
+                      ? 'border-red-500 bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
+                placeholder="Enter your first name"
               />
-              {fullNameError && (<p className="mt-1 text-xs text-red-600">{fullNameError}</p>)}
+              {firstNameError && (<p className="mt-1 text-xs text-red-600">{firstNameError}</p>)}
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-black mb-2">Last Name</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setLastName(value);
+                  // Clear error if user starts typing
+                  if (lastNameError) setLastNameError(null);
+                  // Real-time validation
+                  if (value.trim()) {
+                    const error = validateLastName(value);
+                    if (error) setLastNameError(error);
+                  }
+                }}
+                maxLength={NAME_MAX}
+                disabled={!isEditingProfile}
+                className={`w-full px-3 py-2 border rounded-lg ${
+                  isEditingProfile 
+                    ? lastNameError 
+                      ? 'border-red-500 bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                }`}
+                placeholder="Enter your last name"
+              />
+              {lastNameError && (<p className="mt-1 text-xs text-red-600">{lastNameError}</p>)}
             </div>
             <div>
               <label className="block text-sm font-bold text-black mb-2">Email Address</label>
@@ -302,39 +376,40 @@ const UserProfilePage: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleSubmitRequest}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                className="px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
               >
                 Submit New Request
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div>
             <h3 className="text-lg font-medium text-gray-700 mb-4 pl-2">My Tickets & Feedback</h3>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-black">
+            <div className={tickets.length > 5 ? "max-h-[400px] overflow-y-auto" : ""}>
+              <table className="w-full divide-y divide-gray-200 table-fixed">
+              <thead className="bg-white sticky top-0 z-10">
+                <tr className="border-b border-[#eeeeee]">
+                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
                     Ticket ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-black">
+                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[35%] whitespace-nowrap">
                     Title
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-black">
+                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-black">
+                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-black">
+                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[20%] whitespace-nowrap">
                     Submitted On
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white">
                 {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={ticket.id} className="border-b border-[#eeeeee] hover:bg-white/50">
+                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
                       <a
                         href="#"
                         className="font-medium hover:opacity-80"
@@ -347,37 +422,38 @@ const UserProfilePage: React.FC = () => {
                         {ticket.id}
                       </a>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
                       {ticket.title}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
                       {ticket.type}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
                         {ticket.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
                       {ticket.submittedOn.replace(/\./g, '-')}
                     </td>
                   </tr>
                 ))}
                 {(!loadingTickets && tickets.length === 0 && !ticketsError) && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-6 text-sm text-gray-500">No tickets found.</td>
+                    <td colSpan={5} className="bg-white p-[15px] font-normal text-[#333333] text-sm">No tickets found.</td>
                   </tr>
                 )}
                 {ticketsError && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-6 text-sm text-red-600">{ticketsError}</td>
+                    <td colSpan={5} className="bg-white p-[15px] font-normal text-red-600 text-sm">{ticketsError}</td>
                   </tr>
                 )}
               </tbody>
-            </table>
-            {loadingTickets && (
-              <div className="px-6 py-3 text-sm text-gray-500">Loading tickets...</div>
-            )}
+              </table>
+              {loadingTickets && (
+                <div className="px-6 py-3 text-sm text-gray-500">Loading tickets...</div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -394,7 +470,7 @@ const UserProfilePage: React.FC = () => {
               <button
                 onClick={() => setIsEmailNotificationsEnabled(!isEmailNotificationsEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  isEmailNotificationsEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                  isEmailNotificationsEnabled ? 'bg-[#6b1176]' : 'bg-gray-200'
                 }`}
               >
                 <span
@@ -413,7 +489,7 @@ const UserProfilePage: React.FC = () => {
               <button
                 onClick={() => setIsFeatureUpdatesEnabled(!isFeatureUpdatesEnabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  isFeatureUpdatesEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                  isFeatureUpdatesEnabled ? 'bg-[#6b1176]' : 'bg-gray-200'
                 }`}
               >
                 <span
