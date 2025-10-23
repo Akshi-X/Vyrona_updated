@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import { useAuth } from "../../contexts/AuthContext";
+import { authService } from "../../services/authService";
 
 const VerifyOtp: React.FC = () => {
     const location = useLocation();
@@ -18,7 +18,7 @@ const VerifyOtp: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [timer, setTimer] = useState(0);
 
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+    // Removed API_BASE_URL - now using authService
 
     // Countdown for OTP Expiry (if backend sends expiry in ISO)
     useEffect(() => {
@@ -46,27 +46,29 @@ const VerifyOtp: React.FC = () => {
 
         try {
             setLoading(true);
-            const response = await axios.post(`${API_BASE_URL}/api/verify-otp`, {
+            const response = await authService.verifyOTP({
                 user_id: userId,
                 otp,
             });
 
-            if (response.data.status === "Logged In") {
+            if (response.status === "Logged In") {
                 setSuccess("OTP verified successfully!");
-                // Save auth token using context
-                login(response.data.auth_token);
+                // AuthService already saves the token in cookies, just update context
+                if (response.auth_token) {
+                    login(response.auth_token);
+                }
                 // Persist user id for pages that need it (e.g., My Tickets)
                 try {
-                    localStorage.setItem('user_id', response.data.user_id);
+                    localStorage.setItem('user_id', response.user_id);
                 } catch {}
                 // Redirect back to original page if provided, else dashboard
                 const target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
                 setTimeout(() => navigate(target, { replace: true }), 500);
             } else {
-                setError(response.data.message || "Invalid OTP");
+                setError(response.message || "Invalid OTP");
             }
         } catch (err: any) {
-            setError(err.response?.data?.message || "Verification failed");
+            setError(err.message || "Verification failed");
         } finally {
             setLoading(false);
         }

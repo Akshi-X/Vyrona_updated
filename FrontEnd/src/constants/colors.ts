@@ -5,6 +5,7 @@ export const COLORS = {
     purple: '#6B1176',      // Header background
     purpleDark: '#703F99',  // Ticket IDs
     purpleLight: '#F2E4FF', // Light purple accent
+    blue: '#2563EB',        // Primary blue for buttons
   },
   
   // Base colors

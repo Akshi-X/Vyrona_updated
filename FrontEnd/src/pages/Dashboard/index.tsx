@@ -1,9 +1,13 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import dashboardData from '../../data/dashboardData.json';
+import { useState, useEffect } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
 import { CurveBar } from '../../components/CurveBar';
+import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
+import { performanceService, type PerformanceMetrics } from '../../services/performanceService';
+import { riskService, type RiskMetrics } from '../../services/riskService';
+import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -17,23 +21,104 @@ import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
 
-interface DashboardProps {
-  riskData?: {
-    percentage: number;
-    topRiskDriver: string;
-  };
-  complianceData?: {
-    percentage: number;
-    emissionsPerTreatment: number;
-  };
-}
+interface DashboardProps {}
 
-export default function Dashboard({
-  riskData = { percentage: 12, topRiskDriver: "Temperature" },
-  complianceData = { percentage: 76, emissionsPerTreatment: 424 }
-}: DashboardProps) {
+export default function Dashboard({}: DashboardProps) {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // State for patient statistics
+  const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
+  const [logisticsMetrics, setLogisticsMetrics] = useState<LogisticsMetrics | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
+  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
+  const [complianceMetrics, setComplianceMetrics] = useState<ComplianceMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Static pharma ID - in future this will come from verify OTP
+  const PHARMA_ID = 1;
+
+  // Fetch patient statistics and logistics metrics on component mount
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
+        const [stats, logistics, performance, risk, compliance] = await Promise.all([
+          logisticsService.getPatientStatistics(PHARMA_ID),
+          logisticsService.getLogisticsMetrics(PHARMA_ID.toString()),
+          performanceService.getPerformanceMetrics(PHARMA_ID.toString()),
+          riskService.getRiskMetrics(PHARMA_ID.toString()),
+          complianceService.getComplianceMetrics(PHARMA_ID.toString())
+        ]);
+        
+        setPatientStats(stats);
+        setLogisticsMetrics(logistics);
+        setPerformanceMetrics(performance);
+        setRiskMetrics(risk);
+        setComplianceMetrics(compliance);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Failed to load dashboard data');
+        // Fallback to static data on error
+        setPatientStats({
+          pharma_id: PHARMA_ID,
+          current_month_patient_count: 118,
+          current_month_treatment_count: 65
+        });
+        // Fallback to static logistics data
+        setLogisticsMetrics({
+          cold_chain_packaging_failure_percentage: 4.2,
+          avg_quality_lost_per_patient_percentage: 23,
+          total_shipments: 1250,
+          successful_deliveries: 1198,
+          failed_deliveries: 52,
+          average_transit_time_hours: 18.5
+        });
+        // Fallback to static performance data
+        setPerformanceMetrics({
+          on_time_percentage: 87,
+          avg_lead_time_days: 23,
+          failure_cost_million: 6,
+          total_shipments: 1250,
+          completed_shipments: 1087,
+          pending_shipments: 163
+        });
+        // Fallback to static risk data
+        setRiskMetrics({
+          deviation_percentage: 12,
+          top_risk_driver: {
+            name: "Temperature",
+            percentage: 12,
+            severity: "Medium",
+            trend: "Stable"
+          },
+          total_risks: 45,
+          high_risks: 8,
+          medium_risks: 22,
+          low_risks: 15
+        });
+        // Fallback to static compliance data
+        setComplianceMetrics({
+          audit_coverage_percentage: 76,
+          emissions_per_treatment_tco2e: 424,
+          total_audits: 48,
+          passed_audits: 36,
+          failed_audits: 4,
+          pending_audits: 8
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated]);
 
   // Icon mapping function
   const getIcon = (iconName: string) => {
@@ -97,6 +182,21 @@ export default function Dashboard({
 
         {/* Dashboard Content */}
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Error loading data
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    {error}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
 
           <div className="flex gap-6 flex-1 flex-col lg:flex-row">
@@ -116,25 +216,43 @@ export default function Dashboard({
                     {/* Vertical separator */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
 
-                    {dashboardData.volumeMetrics.map((metric, index) => (
-                      <div key={index} className="flex flex-col">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
-                            <img
-                              className="w-[18px] h-[18px]"
-                              alt={metric.label}
-                              src={getIcon(metric.icon)}
-                            />
-                          </div>
-                          <div className="font-semibold text-black text-[28px] mr-4">
-                            {metric.value}
-                          </div>
+                    {/* Patient Count */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Patient Count"
+                            src={getIcon('Patient_Count')}
+                          />
                         </div>
-                        <div className="font-normal text-[#868686] text-[11px] text-left">
-                          {metric.label}
+                        <div className="font-semibold text-black text-[28px] mr-4">
+                          {loading ? '...' : patientStats?.current_month_patient_count || '118'}
                         </div>
                       </div>
-                    ))}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Patient Count:
+                      </div>
+                    </div>
+
+                    {/* Treatment Count */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Treatments Count"
+                            src={getIcon('Treatments_Count')}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mr-4">
+                          {loading ? '...' : patientStats?.current_month_treatment_count || '65'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Treatments Count:
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -149,25 +267,43 @@ export default function Dashboard({
                     {/* Vertical separator */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
 
-                    {dashboardData.logisticsMetrics.map((metric, index) => (
-                      <div key={index} className="flex flex-col">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
-                            <img
-                              className="w-[18px] h-[18px]"
-                              alt={metric.label}
-                              src={getIcon(metric.icon)}
-                            />
-                          </div>
-                          <div className="font-semibold text-black text-[28px]">
-                            {metric.value}
-                          </div>
+                    {/* Cold Chain Packaging Failure */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Cold Chain Packaging Failure"
+                            src={getIcon('Logistics_Chain')}
+                          />
                         </div>
-                        <div className="font-normal text-[#868686] text-[10px] text-left">
-                          {metric.label}
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : logisticsMetrics?.cold_chain_packaging_failure_percentage?.toFixed(1) + '%' || '4.2%'}
                         </div>
                       </div>
-                    ))}
+                      <div className="font-normal text-[#868686] text-[10px] text-left">
+                        Cold Chain Packaging Failure
+                      </div>
+                    </div>
+
+                    {/* Average Quality Lost per Patient */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Average Quality Lost per Patient"
+                            src={getIcon('Logistics_Quality')}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : logisticsMetrics?.avg_quality_lost_per_patient_percentage + '%' || '23%'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[10px] text-left">
+                        Avg Quality Lost/Patient
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -179,16 +315,35 @@ export default function Dashboard({
                 </h2>
                 <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
                   <div className="grid grid-cols-3 gap-12">
-                    {dashboardData.performanceMetrics.map((metric, index) => (
-                      <div key={index}>
-                        <div className="font-normal text-[#868686] text-[11px] mb-2">
-                          {metric.label}
-                        </div>
-                        <div className="font-semibold text-black text-[28px]">
-                          {metric.value}
-                        </div>
+                    {/* On Time Percentage */}
+                    <div>
+                      <div className="font-normal text-[#868686] text-[11px] mb-2">
+                        On Time:
                       </div>
-                    ))}
+                      <div className="font-semibold text-black text-[28px]">
+                        {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '87%'}
+                      </div>
+                    </div>
+                    
+                    {/* Average Lead Time */}
+                    <div>
+                      <div className="font-normal text-[#868686] text-[11px] mb-2">
+                        Avg Lead time:
+                      </div>
+                      <div className="font-semibold text-black text-[28px]">
+                        {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '23d'}
+                      </div>
+                    </div>
+                    
+                    {/* Failure Cost */}
+                    <div>
+                      <div className="font-normal text-[#868686] text-[11px] mb-2">
+                        Failure Cost:
+                      </div>
+                      <div className="font-semibold text-black text-[28px]">
+                        {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$6M'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -293,13 +448,13 @@ export default function Dashboard({
 
                   <div className="relative w-[185px] h-[92px] mb-12 flex items-center justify-center">
                     <CurveBar
-                      percentage={riskData.percentage}
+                      percentage={loading ? 0 : riskMetrics?.deviation_percentage || 12}
                       color="#ff6b35"
                       size="md"
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px] whitespace-nowrap">
-                        {riskData.percentage}%
+                        {loading ? '...' : riskMetrics?.deviation_percentage || 12}%
                       </div>
                       <div className="font-normal text-black text-[11px] whitespace-nowrap">
                         Deviation
@@ -320,7 +475,7 @@ export default function Dashboard({
 
                   <div className="h-[30px] bg-[#fff3ee] rounded-[10px] border border-solid border-[#E7E1E1] px-4">
                     <span className="font-semibold text-orange-600 text-xs whitespace-nowrap mt-2 py-1">
-                      {riskData.topRiskDriver}
+                      {loading ? '...' : riskMetrics?.top_risk_driver?.name || 'Temperature'}
                     </span>
                   </div>
                 </div>
@@ -333,13 +488,13 @@ export default function Dashboard({
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
                     <CurveBar
-                      percentage={complianceData.percentage}
+                      percentage={loading ? 0 : complianceMetrics?.audit_coverage_percentage || 76}
                       color="#1083c5"
                       size="md"
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px]">
-                        {complianceData.percentage}%
+                        {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 76}%
                       </div>
                       <div className="font-normal text-black text-[11px]">
                         Audit Coverage
@@ -360,7 +515,7 @@ export default function Dashboard({
 
                   <div className="bg-[#e4f5ff] border-[#E7E1E1] px-4 h-[30px] rounded mt-0 gap-1 flex items-center justify-center">
                     <span className="font-bold text-[#1083c5] text-sm">
-                      {complianceData.emissionsPerTreatment}
+                      {loading ? '...' : complianceMetrics?.emissions_per_treatment_tco2e || 424}
                     </span>
                     <span className="ml-0.5 font-normal text-black text-[10px] mt-1">
                       tCO2e
@@ -375,7 +530,7 @@ export default function Dashboard({
             <h2 className="font-semibold text-black text-sm mb-4">
               Ongoing Treatments
             </h2>
-            <OngoingTreatments />
+            <OngoingTreatments pharmaId={PHARMA_ID} />
           </section>
         </div>
       </main>

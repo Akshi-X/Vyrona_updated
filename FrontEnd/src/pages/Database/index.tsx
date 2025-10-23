@@ -1,7 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import { DatabaseTable } from '../../components/DatabaseTable';
-import patientData from '../../data/patientData.json';
 
 export default function Database() {
   const { isAuthenticated, logout } = useAuth();
@@ -49,7 +48,7 @@ export default function Database() {
 
           {/* Database Table */}
           <div className="flex-1">
-            <DatabaseTable patients={patientData.patients} />
+            <DatabaseTable pharmaId="1" />
           </div>
         </div>
       </main>

@@ -3,6 +3,8 @@
  * Provides common functionality for all API services
  */
 
+import { authUtils } from '../utils/auth';
+
 export interface ApiResponse<T = any> {
   data?: T;
   message?: string;
@@ -21,7 +23,9 @@ export class BaseApiService {
   protected useMock: boolean;
 
   constructor() {
-    this.baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
+    // Get the API base URL from environment variables
+    const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    this.baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     this.useMock = false; // Set to true for mock responses
   }
 
@@ -29,12 +33,7 @@ export class BaseApiService {
    * Get authentication headers
    */
   protected getAuthHeaders(): Record<string, string> {
-    let token: string | null = null;
-    try {
-      const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
-      if (match) token = decodeURIComponent(match[1]);
-    } catch {}
-    
+    const token = authUtils.getToken();
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -59,7 +58,7 @@ export class BaseApiService {
     const response = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include',
+      // credentials: 'include', // Removed to fix CORS issue
     });
 
     if (!response.ok) {
@@ -87,8 +86,35 @@ export class BaseApiService {
     const response = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include',
+      // credentials: 'include', // Removed to fix CORS issue
       body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Make HTTP request without authentication headers
+   */
+  protected async unauthenticatedRequest<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      // credentials: 'include', // Removed to fix CORS issue
     });
 
     if (!response.ok) {
@@ -104,6 +130,13 @@ export class BaseApiService {
    */
   setBaseUrl(url: string): void {
     this.baseUrl = url;
+  }
+
+  /**
+   * Get current base URL
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   /**

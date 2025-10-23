@@ -6,7 +6,6 @@ import MyGrapeLogo from "../assets/logo.svg";
 import DashboardIcon from "../assets/DashBoardIcons/DashBoard.svg";
 import DatabaseIcon from "../assets/DashBoardIcons/DataBase.svg";
 import ControlTowerIcon from "../assets/DashBoardIcons/Control_Towers.svg";
-import SupportIcon from "../assets/DashBoardIcons/Support.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 interface SidebarProps {
@@ -28,7 +27,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     { icon: DashboardIcon, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIcon, label: "Database", path: "/database" },
     { icon: ControlTowerIcon, label: "Control Tower", path: "/control-tower" },
-    { icon: SupportIcon, label: "Support", path: "/support" },
+    // { icon: SupportIcon, label: "Support", path: "/support" },
   ];
 
   const handleNavigation = (path: string) => {
