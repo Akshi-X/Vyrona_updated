@@ -7,7 +7,7 @@ from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
 
-from app.controller import user_controller, feedback_controller, task_controller,patient_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -153,6 +153,7 @@ app.include_router(user_controller.router, prefix=API_PREFIX)
 app.include_router(patient_controller.router, prefix=API_PREFIX)
 app.include_router(feedback_controller.router, prefix=API_PREFIX)
 app.include_router(task_controller.router, prefix=API_PREFIX)
+app.include_router(dashboard_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")

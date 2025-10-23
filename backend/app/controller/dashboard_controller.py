@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from datetime import datetime
 
 from app.schemas.dashboard_schema import (
@@ -14,11 +14,14 @@ router = APIRouter()
 # 1. Get Performance Metrics
 # ---------------------------
 @router.get("/performance", response_model=DashboardCategoryResponse)
-def get_performance_metrics():
+def get_performance_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
     """
     Get performance metrics only.
     
     Public endpoint. No authentication required.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID to filter metrics
     
     Returns:
     - On Time: 87%
@@ -47,11 +50,14 @@ def get_performance_metrics():
 # 2. Get Risk Metrics
 # ---------------------------
 @router.get("/risk", response_model=DashboardCategoryResponse)
-def get_risk_metrics():
+def get_risk_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
     """
     Get risk metrics only.
     
     Public endpoint. No authentication required.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID to filter metrics
     
     Returns:
     - Deviation: 12%
@@ -84,11 +90,14 @@ def get_risk_metrics():
 # 3. Get Compliance Metrics
 # ---------------------------
 @router.get("/compliance", response_model=DashboardCategoryResponse)
-def get_compliance_metrics():
+def get_compliance_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
     """
     Get compliance metrics only.
     
     Public endpoint. No authentication required.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID to filter metrics
     
     Returns:
     - Audit Coverage: 76%
@@ -116,11 +125,14 @@ def get_compliance_metrics():
 # 4. Get Logistics Metrics
 # ---------------------------
 @router.get("/logistics", response_model=DashboardCategoryResponse)
-def get_logistics_metrics():
+def get_logistics_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
     """
     Get logistics metrics only.
     
     Public endpoint. No authentication required.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID to filter metrics
     
     Returns:
     - Cold Chain Packaging Failure: 4.2%
@@ -148,11 +160,14 @@ def get_logistics_metrics():
 # 5. Get Critical Alerts
 # ---------------------------
 @router.get("/alerts", response_model=CriticalAlertsResponse)
-def get_critical_alerts():
+def get_critical_alerts(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
     """
     Get critical alerts that require immediate attention.
     
     Public endpoint. No authentication required.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID to filter alerts
     
     Returns alerts from the Critical Alerts modal:
     - Temperature Excursion (High severity, Active)
