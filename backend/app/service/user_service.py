@@ -13,7 +13,7 @@ from app.schemas.response_schema import (
     UserRejectionResponse,
     UserDetailsResponse
 )
-from app.schemas.user_schema import UserListResponse, UserListItem
+from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse
 from app.service.email_service import send_approval_email
 from app.utils import utils
 from app.exceptions import (
@@ -22,6 +22,8 @@ from app.exceptions import (
     UserApproveNotFoundException,
     UserRejectNotFoundException,
     UserGetNotFoundException,
+    UserUpdateNotFoundException,
+    UserUpdateForbiddenException,
     CompanyAccessForbiddenException,
     RegistrationEmailFailedException
 )
@@ -416,3 +418,64 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         )
     except Exception as e:
         raise DatabaseQueryException(operation="list users", reason=str(e))
+
+
+def update_user_name(
+    user_id: str, 
+    update_request: user_schema.UserNameUpdateRequest, 
+    current_user: User, 
+    db: Session
+) -> user_schema.UserUpdateResponse:
+    """
+    Update user's first and last name with strict authorization and audit trail.
+    
+    Only the user themselves can update their own profile. No one else (including 
+    managers and admins) can update another user's name.
+    
+    Args:
+        user_id: User ID to update
+        update_request: Update request with new first and last name
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        UserUpdateResponse with update details
+        
+    Raises:
+        UserUpdateNotFoundException: If user not found
+        UserUpdateForbiddenException: If trying to update another user's profile
+        DatabaseQueryException: If database operation fails
+    """
+    # Get target user from database
+    target_user = db.query(user_model.User).filter(user_model.User.user_id == user_id).first()
+    if not target_user:
+        raise UserUpdateNotFoundException(user_id=user_id)
+    
+    # Authorization check: Only the user themselves can update their own profile
+    # No one else (including managers and admins) can update another user's name
+    if target_user.user_id != current_user.user_id:
+        raise UserUpdateForbiddenException(user_id=user_id)
+    
+    try:
+        # Update user fields with audit trail
+        target_user.first_name = update_request.first_name
+        target_user.last_name = update_request.last_name
+        target_user.updated_by = current_user.user_id
+        target_user.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        db.refresh(target_user)
+        
+        # Build response object
+        response = user_schema.UserUpdateResponse(
+            message=SuccessMessages.PROFILE_UPDATED,
+            user_id=target_user.user_id,
+            first_name=target_user.first_name,
+            last_name=target_user.last_name,
+            updated_at=target_user.updated_at
+        )
+        return response
+        
+    except Exception as e:
+        db.rollback()
+        raise DatabaseQueryException(operation="update user name", reason=str(e))

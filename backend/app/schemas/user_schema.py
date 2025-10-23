@@ -69,3 +69,30 @@ class UserListResponse(BaseModel):
     """Response schema for listing all users"""
     total_users: int
     users: List[UserListItem]
+
+
+class UserNameUpdateRequest(BaseModel):
+    """Schema for updating user first and last name"""
+    first_name: str
+    last_name: str
+    
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def validate_names(cls, v):
+        """Validate that names are not empty and contain only valid characters."""
+        if not v or not v.strip():
+            raise ValueError("Name cannot be empty")
+        if len(v.strip()) < 2:
+            raise ValueError("Name must be at least 2 characters long")
+        if len(v.strip()) > 50:
+            raise ValueError("Name cannot exceed 50 characters")
+        return v.strip()
+
+
+class UserUpdateResponse(BaseModel):
+    """Response schema for user update operations"""
+    message: str
+    user_id: str
+    first_name: str
+    last_name: str
+    updated_at: datetime
