@@ -20,6 +20,10 @@ import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
+// Performance Icons
+import OnTimeIcon from '../../assets/DashBoardIcons/OnTime.svg';
+import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
+import FailureCostIcon from '../../assets/DashBoardIcons/FailureCost.svg';
 
 interface DashboardProps {}
 
@@ -313,34 +317,65 @@ export default function Dashboard({}: DashboardProps) {
                   Performance
                 </h2>
                 <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
-                  <div className="grid grid-cols-3 gap-12">
+                  <div className="grid grid-cols-3 gap-12 relative">
+                    {/* Vertical separators */}
+                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+
                     {/* On Time Percentage */}
-                    <div>
-                      <div className="font-normal text-[#868686] text-[11px] mb-2">
-                        On Time:
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="On Time Performance"
+                            src={OnTimeIcon}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '87%'}
+                        </div>
                       </div>
-                      <div className="font-semibold text-black text-[28px]">
-                        {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '87%'}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        On Time:
                       </div>
                     </div>
                     
                     {/* Average Lead Time */}
-                    <div>
-                      <div className="font-normal text-[#868686] text-[11px] mb-2">
-                        Avg Lead time:
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Average Lead Time"
+                            src={AvgLeadTimeIcon}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '23d'}
+                        </div>
                       </div>
-                      <div className="font-semibold text-black text-[28px]">
-                        {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '23d'}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Avg Lead time:
                       </div>
                     </div>
                     
                     {/* Failure Cost */}
-                    <div>
-                      <div className="font-normal text-[#868686] text-[11px] mb-2">
-                        Failure Cost:
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Failure Cost"
+                            src={FailureCostIcon}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$6M'}
+                        </div>
                       </div>
-                      <div className="font-semibold text-black text-[28px]">
-                        {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$6M'}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Failure Cost:
                       </div>
                     </div>
                   </div>
@@ -352,7 +387,28 @@ export default function Dashboard({}: DashboardProps) {
             <div className="flex-1 flex flex-col gap-6 min-w-0">
               {/* Notifications Section */}
               <section className="w-full">
+                
                 <div className="flex justify-end gap-8 mb-4">
+                <div className="relative group">
+                    <img
+                      className="w-[22px] h-[22px] cursor-pointer"
+                      alt="Alerts"
+                      src={CriticalAlertsIcon}
+                    />
+                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <span className="font-semibold text-white text-[10px]">
+                        5
+                      </span>
+                    </div>
+                    {/* Tooltip */}
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      <div className="font-semibold text-black text-xs whitespace-nowrap">
+                        Critical Alerts
+                      </div>
+                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                    </div>
+                  </div>
+                  
                   <div className="relative group">
                     <img
                       className="w-7 h-[24.86px] cursor-pointer"
@@ -373,31 +429,12 @@ export default function Dashboard({}: DashboardProps) {
                     </div>
                   </div>
 
-                  <div className="relative group">
-                    <img
-                      className="w-[22px] h-[22px] cursor-pointer"
-                      alt="Alerts"
-                      src={CriticalAlertsIcon}
-                    />
-                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                      <span className="font-semibold text-white text-[10px]">
-                        5
-                      </span>
-                    </div>
-                    {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                      <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Critical Alerts
-                      </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                    </div>
-                  </div>
 
                   <div className="relative group">
                     <img
                       className="w-[22px] h-[22px] cursor-pointer"
                       alt="Messages"
-                      src={StakeholderChatsIcon}
+                      src={MyTasksIcon}
                     />
                     <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                       <span className="font-semibold text-white text-[10px]">
@@ -407,7 +444,7 @@ export default function Dashboard({}: DashboardProps) {
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Messages
+                        My Tasks
                       </div>
                       <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
