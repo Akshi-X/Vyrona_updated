@@ -317,7 +317,7 @@ def get_user_profile_endpoint(current_user: user_model.User = Depends(get_curren
 # ---------------------------
 # Update user name endpoint
 # ---------------------------
-@router.patch("/user/{user_id}/name", response_model=UserUpdateResponse)
+@router.patch("/user/{user_id}", response_model=UserUpdateResponse)
 def update_user_name_endpoint(
     user_id: str,
     request: UserNameUpdateRequest,
