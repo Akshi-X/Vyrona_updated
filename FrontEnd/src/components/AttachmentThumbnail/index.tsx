@@ -104,3 +104,4 @@ const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({
 };
 
 export default AttachmentThumbnail;
+
