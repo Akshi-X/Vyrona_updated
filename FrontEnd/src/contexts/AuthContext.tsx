@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { authUtils } from '../utils/auth';
+import { authService } from '../services/authService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -46,7 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    authUtils.removeToken();
+    authService.logout();
     setToken(undefined);
     setIsAuthenticated(false);
   };

@@ -214,7 +214,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 mb-2 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96]"
+                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96]"
                                 }`}
                         >
                             {loading ? "Signing in..." : "Sign in"}
@@ -225,7 +225,7 @@ const Login: React.FC = () => {
                     </form>
 
                     {/* Footer */}
-                    <p className="text-center text-sm text-gray-500 mt-8">
+                    <p className="text-center text-sm text-gray-500 mt-2">
                         New to myGrape?{" "}
                         <Link to="/signup" className="text-[#8b2a96] font-medium underline">
                             Create an account

@@ -30,6 +30,11 @@ interface DashboardProps {}
 export default function Dashboard({}: DashboardProps) {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   
   // State for patient statistics
   const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
@@ -166,7 +171,7 @@ export default function Dashboard({}: DashboardProps) {
   return (
     <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
       {/* Left Sidebar */}
-      <Sidebar onLogout={logout} />
+      <Sidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden ml-60">

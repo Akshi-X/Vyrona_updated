@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
@@ -27,15 +27,42 @@ const Signup: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // navigate removed; success panel no longer shows login button
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+    // Handle clicks outside dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const validateEmail = (value: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
     const validatePassword = (value: string) =>
         /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(value);
+
+    const roleOptions = [
+        { value: "Manager", label: "Manager" },
+        { value: "User", label: "User" }
+    ];
+
+    const handleRoleSelect = (selectedRole: string) => {
+        setrole(selectedRole);
+        setIsDropdownOpen(false);
+        if (roleError) setroleError("");
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -247,23 +274,42 @@ const Signup: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* role */}
-                                <div className="relative w-full">
-                                    <select
-                                        value={role}
-                                        onChange={(e) => {
-                                            setrole(e.target.value);
-                                            if (roleError) setroleError("");
-                                        }}
-                                        className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
+                                {/* Role Dropdown */}
+                                <div className="relative w-full" ref={dropdownRef}>
+                                    <div
+                                        className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
                                             } ${!role ? "text-gray-400" : "text-black"}`}
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                     >
-                                        <option value="" disabled>
-                                            Role
-                                        </option>
-                                        <option value="Manager">Manager</option>
-                                        <option value="User">User</option>
-                                    </select>
+                                        <div className="flex justify-between items-center">
+                                            <span>{role || "Role"}</span>
+                                            <svg
+                                                className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    
+                                    {isDropdownOpen && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
+                                            {roleOptions.map((option) => (
+                                                <div
+                                                    key={option.value}
+                                                    className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
+                                                        role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
+                                                    }`}
+                                                    onClick={() => handleRoleSelect(option.value)}
+                                                >
+                                                    {option.label}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
                                     {roleError && (
                                         <p className="text-xs text-red-500 mt-1">{roleError}</p>
                                     )}
