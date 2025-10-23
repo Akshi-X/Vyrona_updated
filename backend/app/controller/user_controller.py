@@ -30,7 +30,7 @@ from app.schemas.user_schema import UserListResponse
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 
-router = APIRouter()
+router = APIRouter(tags=["Users"])
 
 
 # ---------------------------
