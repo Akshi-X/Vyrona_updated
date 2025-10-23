@@ -31,7 +31,7 @@ class Patient(Base):
     
     # References (Foreign Keys)
     provider_id = Column(String, ForeignKey("provider.id"), nullable=True)
-    pharma_id = Column(String, ForeignKey("pharma.id"), nullable=True)
+    pharma_id = Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
     # Patient Stage
     stage = Column(SQLEnum(PatientStage), default=PatientStage.SCHEDULED, nullable=False)

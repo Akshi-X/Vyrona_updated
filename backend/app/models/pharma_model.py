@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.config.database import Base
@@ -7,7 +7,7 @@ from app.config.database import Base
 class Pharma(Base):
     __tablename__ = "pharma"
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     pharma_name = Column(String, nullable=False)
     location = Column(String, nullable=True)
     user_id = Column(String, ForeignKey("users.user_id"), nullable=True)
