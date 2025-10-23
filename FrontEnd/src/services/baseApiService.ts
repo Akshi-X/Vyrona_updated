@@ -68,7 +68,7 @@ export class BaseApiService {
         const response = await fetch(url, {
           ...options,
           headers,
-          // credentials: 'include', // Removed to fix CORS issue
+      //     // credentials: 'include', // Removed to fix CORS issue // Removed to fix CORS issue
         });
 
         if (!response.ok) {
@@ -129,24 +129,7 @@ export class BaseApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `API Error: ${response.status}`;
-      
-      try {
-        // Try to parse the error response as JSON
-        const errorData = JSON.parse(errorText);
-        if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
-        } else {
-          errorMessage = errorText;
-        }
-      } catch {
-        // If parsing fails, use the raw error text
-        errorMessage = errorText;
-      }
-      
-      throw new Error(errorMessage);
+      throw new Error(`API Error: ${response.status} ${errorText}`);
     }
 
     return await response.json();
@@ -173,24 +156,7 @@ export class BaseApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `API Error: ${response.status}`;
-      
-      try {
-        // Try to parse the error response as JSON
-        const errorData = JSON.parse(errorText);
-        if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
-        } else {
-          errorMessage = errorText;
-        }
-      } catch {
-        // If parsing fails, use the raw error text
-        errorMessage = errorText;
-      }
-      
-      throw new Error(errorMessage);
+      throw new Error(`API Error: ${response.status} ${errorText}`);
     }
 
     return await response.json();

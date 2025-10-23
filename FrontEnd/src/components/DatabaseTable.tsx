@@ -32,7 +32,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
         setError(null);
         
         // Add abort signal to prevent race conditions
-        const data = await patientService.getDetailedPatients(pharmaId);
+        const data = await patientService.getDetailedPatients();
         
         setPatients(data);
         setLoading(false);

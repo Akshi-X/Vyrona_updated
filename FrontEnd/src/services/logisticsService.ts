@@ -56,11 +56,13 @@ export class LogisticsService extends BaseApiService {
   /**
    * Get patient statistics for a specific pharma
    */
-  async getPatientStatistics(pharmaId: number): Promise<PatientStatistics> {
+  async getPatientStatistics(pharmaId?: number): Promise<PatientStatistics> {
     try {
-      const response = await this.request<PatientStatistics>(
-        `/api/patients/statistics/pharma/${pharmaId}`
-      );
+      const endpoint = pharmaId 
+        ? `/api/patients/statistics/pharma/${pharmaId}`
+        : `/api/patients/statistics`;
+      
+      const response = await this.request<PatientStatistics>(endpoint);
       
       return response;
     } catch (error) {
