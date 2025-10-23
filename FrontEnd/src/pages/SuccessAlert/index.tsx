@@ -34,7 +34,7 @@ const SuccessAlert: React.FC<SuccessAlertProps> = ({
     <div className="min-h-screen bg-gray-50">
       <Header title="Success" showBackButton={false} />
       
-      <div className="flex items-center justify-center min-h-screen pt-16">
+      <div className="flex items-center justify-center min-h-screen" style={{ paddingTop: 'calc(63px + 1rem)' }}>
         <div className="bg-white rounded-lg shadow-lg p-12 max-w-2xl w-full mx-4">
           {/* Success Icon */}
           <div className="flex justify-center mb-8">
@@ -77,7 +77,7 @@ const SuccessAlert: React.FC<SuccessAlertProps> = ({
           {/* Action Button */}
           <button
             onClick={handleButtonClick}
-            className="w-full bg-blue-600 text-white py-4 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
+            className="w-full bg-[#6b1176] text-white py-4 px-6 rounded-lg font-medium hover:bg-[#8a2a95] transition-colors duration-200"
           >
             {buttonText}
           </button>
