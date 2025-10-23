@@ -59,6 +59,35 @@ def get_current_user(request: Request) -> User:
     return request.state.current_user
 
 
+def get_current_user_pharma_id(request: Request, db: Session = Depends(get_db)) -> int:
+    """
+    Get pharma_id for the current authenticated user.
+    
+    This automatically resolves the pharma_id from the user's company_name.
+    Use this in endpoints that need pharma_id but don't want to require it as a parameter.
+    
+    Usage:
+        @router.get("/ongoing")
+        def get_ongoing(pharma_id: int = Depends(get_current_user_pharma_id)):
+            return get_patients_summary(pharma_id)
+    """
+    from ..utils.utils import get_pharma_id_by_company_name
+    from ..exceptions import UserNotFoundException
+    
+    # Get current user
+    current_user = get_current_user(request)
+    
+    # Get pharma_id from user's company_name
+    pharma_id = get_pharma_id_by_company_name(current_user.company_name, db)
+    
+    if pharma_id is None:
+        raise UserNotFoundException(
+            message=f"No pharma company found for user's company: {current_user.company_name}"
+        )
+    
+    return pharma_id
+
+
 def validate_login_request(email: str, password: str, db: Session) -> User:
     """
     Validate login request.
