@@ -37,7 +37,6 @@ export class ComplianceService extends BaseApiService {
         throw new Error('Failed to fetch compliance metrics');
       }
     } catch (error) {
-      console.error('Error fetching compliance metrics:', error);
       throw error;
     }
   }
