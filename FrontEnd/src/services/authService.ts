@@ -18,7 +18,8 @@ export interface RegisterData {
   email: string;
   password: string;
   confirm_password: string;
-  department: string;
+  role: string;
+  company_name: string;
 }
 
 export interface AuthResponse {
