@@ -1,25 +1,88 @@
+import { useState, useEffect } from 'react';
+import { patientService, type OngoingTreatment } from '../services/patientService';
+
+interface OngoingTreatmentsProps {
+  pharmaId?: number;
+}
+
 const tableHeaders = [
-  { label: "Header", hasSort: false },
-  { label: "Header", hasSort: false },
-  { label: "Header", hasSort: false },
-  { label: "Header", hasSort: false },
-  { label: "Header", hasSort: true },
+  { label: "Patient ID", hasSort: false },
+  { label: "Condition", hasSort: false },
+  { label: "Hospital", hasSort: false },
+  { label: "Stage", hasSort: false },
+  { label: "Location", hasSort: true },
 ];
 
-const tableData = [
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-  ["Cell", "Cell", "Cell", "Cell", "Cell"],
-];
+export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
+  const [treatments, setTreatments] = useState<OngoingTreatment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export const OngoingTreatments = () => {
+  useEffect(() => {
+    const fetchOngoingTreatments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await patientService.getOngoingTreatments(pharmaId.toString());
+        setTreatments(data);
+      } catch (err) {
+        console.error('Failed to fetch ongoing treatments:', err);
+        setError('Failed to load ongoing treatments');
+        // Set fallback data on error
+        setTreatments([
+          {
+            patient_id: "PT250101-001",
+            condition: "Acute Lymphoblastic Leukemia",
+            hospital: "City General Hospital",
+            stage: "Scheduled",
+            provider_name: "City General Hospital",
+            location: "New York, NY"
+          },
+          {
+            patient_id: "PT250101-002",
+            condition: "Multiple Myeloma",
+            hospital: "City General Hospital",
+            stage: "Apheresis",
+            provider_name: "City General Hospital",
+            location: "New York, NY"
+          },
+          {
+            patient_id: "PT250101-003",
+            condition: "Non-Hodgkin Lymphoma",
+            hospital: "Metro Medical Center",
+            stage: "Cryopreservation",
+            provider_name: "Metro Medical Center",
+            location: "New York, NY"
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOngoingTreatments();
+  }, [pharmaId]);
+
+  if (loading) {
+    return (
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+        <div className="p-6 text-center">
+          <div className="text-[#6b1176] text-sm">Loading ongoing treatments...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+        <div className="p-6 text-center">
+          <div className="text-red-600 text-sm">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
       <div 
@@ -50,21 +113,36 @@ export const OngoingTreatments = () => {
             </tr>
           </thead>
           <tbody>
-            {tableData.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className="border-b border-[#eeeeee] hover:bg-white/50"
-              >
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    className="bg-white p-[15px] font-normal text-[#333333] text-sm"
-                  >
-                    {cell}
-                  </td>
-                ))}
+            {treatments.length === 0 ? (
+              <tr>
+                <td colSpan={tableHeaders.length} className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center">
+                  No ongoing treatments found
+                </td>
               </tr>
-            ))}
+            ) : (
+              treatments.map((treatment) => (
+                <tr
+                  key={treatment.patient_id}
+                  className="border-b border-[#eeeeee] hover:bg-white/50"
+                >
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.patient_id}
+                  </td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.condition}
+                  </td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.hospital}
+                  </td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.stage}
+                  </td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.location}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
