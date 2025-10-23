@@ -114,32 +114,31 @@ const ForgotPassword: React.FC = () => {
                             >
                                 Email
                             </label>
-                            {/* Server Response Message */}
-                            {(message || emailError || serverError) && (
-                                <div>
-                                    {message && (
-                                        <p className="text-sm text-green-600 mt-2">{message}</p>
-                                    )}
-                                    {emailError && !message && (
-                                        <p className="text-sm text-red-600 mt-2">{emailError}</p>
-                                    )}
-                                    {serverError && !message && (
-                                        <p className="text-sm text-red-600 mt-2">{serverError}</p>
-                                    )}
-                                </div>
-                            )}
+
                         </div>
 
                         {/* Send Instructions Button */}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
                         >
                             {loading ? "Sending..." : "Send"}
                         </button>
-
-
+                        {/* Server Response Message */}
+                        {(message || emailError || serverError) && (
+                            <div>
+                                {message && (
+                                    <p className="text-sm text-green-600 mt-2">{message}</p>
+                                )}
+                                {emailError && !message && (
+                                    <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                                )}
+                                {serverError && !message && (
+                                    <p className="text-sm text-red-600 mt-2">{serverError}</p>
+                                )}
+                            </div>
+                        )}
                     </form>
 
                     {/* Footer */}
