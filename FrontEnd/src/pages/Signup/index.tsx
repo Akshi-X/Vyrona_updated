@@ -128,7 +128,6 @@ const Signup: React.FC = () => {
             setApiSuccess(respMessage || 'Registration successful');
             setRegistrationSuccess(true);
         } catch (err: any) {
-            console.error("Registration Error:", err);
             const message = err.response?.data?.message;
             if (message === 'This email is already registered') {
                 setEmailError('This email is already registered');
@@ -188,12 +187,6 @@ const Signup: React.FC = () => {
                             </div>
 
                             <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-                                {apiError && (
-                                    <p className="text-sm text-red-500">{apiError}</p>
-                                )}
-                                {apiSuccess && (
-                                    <p className="text-sm text-green-600">{apiSuccess}</p>
-                                )}
                                 {/* First & Last Name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative w-full">
@@ -361,6 +354,12 @@ const Signup: React.FC = () => {
                                 >
                                     {loading ? "Submitting..." : "Sign up"}
                                 </button>
+                                {apiError && (
+                                    <p className="text-sm text-red-500">{apiError}</p>
+                                )}
+                                {apiSuccess && (
+                                    <p className="text-sm text-green-600">{apiSuccess}</p>
+                                )}
                             </form>
 
                             <p className="mt-2 text-center font-normal text-base">
@@ -369,6 +368,7 @@ const Signup: React.FC = () => {
                                     Sign in
                                 </Link>
                             </p>
+                            
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
                                     ITAdmin@MyGrape.com

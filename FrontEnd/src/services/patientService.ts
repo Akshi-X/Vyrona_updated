@@ -34,28 +34,22 @@ export class PatientService extends BaseApiService {
    */
   async getDetailedPatients(pharmaId: string = '1'): Promise<Patient[]> {
     try {
-      console.log('PatientService: Fetching patients for pharmaId:', pharmaId);
       const response = await this.request<Patient[] | Patient[][]>(
         `/api/patients/detailed?pharma_id=${pharmaId}`
       );
-      console.log('PatientService: Raw response:', response);
       
       // Handle different response formats
       if (Array.isArray(response)) {
-        console.log('PatientService: Response is array, length:', response.length);
         // Check if response is nested array and flatten it
         if (response.length > 0 && Array.isArray(response[0])) {
-          console.log('PatientService: Nested array detected, returning first array');
           return (response as unknown as Patient[][])[0]; // Return the first (and likely only) array
         }
         // Response is already a flat array
-        console.log('PatientService: Flat array, returning as is');
         return response as Patient[];
       }
       
       // If response has a data property, extract it
       if (response && typeof response === 'object' && 'data' in response) {
-        console.log('PatientService: Response has data property');
         const data = (response as any).data;
         if (Array.isArray(data)) {
           if (data.length > 0 && Array.isArray(data[0])) {
@@ -65,10 +59,8 @@ export class PatientService extends BaseApiService {
         }
       }
       
-      console.log('PatientService: No valid data found, returning empty array');
       return [];
     } catch (error) {
-      console.error('PatientService: Error fetching patients:', error);
       throw error;
     }
   }

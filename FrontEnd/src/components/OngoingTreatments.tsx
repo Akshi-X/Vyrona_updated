@@ -19,48 +19,65 @@ export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+    
     const fetchOngoingTreatments = async () => {
       try {
         setLoading(true);
         setError(null);
         const data = await patientService.getOngoingTreatments(pharmaId.toString());
-        setTreatments(data);
+        
+        // Only update state if the component is still mounted
+        if (!isCancelled) {
+          setTreatments(data);
+        }
       } catch (err) {
-        console.error('Failed to fetch ongoing treatments:', err);
-        setError('Failed to load ongoing treatments');
-        // Set fallback data on error
-        setTreatments([
-          {
-            patient_id: "PT250101-001",
-            condition: "Acute Lymphoblastic Leukemia",
-            hospital: "City General Hospital",
-            stage: "Scheduled",
-            provider_name: "City General Hospital",
-            location: "New York, NY"
-          },
-          {
-            patient_id: "PT250101-002",
-            condition: "Multiple Myeloma",
-            hospital: "City General Hospital",
-            stage: "Apheresis",
-            provider_name: "City General Hospital",
-            location: "New York, NY"
-          },
-          {
-            patient_id: "PT250101-003",
-            condition: "Non-Hodgkin Lymphoma",
-            hospital: "Metro Medical Center",
-            stage: "Cryopreservation",
-            provider_name: "Metro Medical Center",
-            location: "New York, NY"
-          }
-        ]);
+        
+        // Only update state if the component is still mounted
+        if (!isCancelled) {
+          setError('Failed to load ongoing treatments');
+          // Set fallback data on error
+          setTreatments([
+            {
+              patient_id: "PT250101-001",
+              condition: "Acute Lymphoblastic Leukemia",
+              hospital: "City General Hospital",
+              stage: "Scheduled",
+              provider_name: "City General Hospital",
+              location: "New York, NY"
+            },
+            {
+              patient_id: "PT250101-002",
+              condition: "Multiple Myeloma",
+              hospital: "City General Hospital",
+              stage: "Apheresis",
+              provider_name: "City General Hospital",
+              location: "New York, NY"
+            },
+            {
+              patient_id: "PT250101-003",
+              condition: "Non-Hodgkin Lymphoma",
+              hospital: "Metro Medical Center",
+              stage: "Cryopreservation",
+              provider_name: "Metro Medical Center",
+              location: "New York, NY"
+            }
+          ]);
+        }
       } finally {
-        setLoading(false);
+        // Only update loading state if the component is still mounted
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchOngoingTreatments();
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isCancelled = true;
+    };
   }, [pharmaId]);
 
   if (loading) {

@@ -68,7 +68,6 @@ const Support: React.FC = () => {
           if (!fullName) setFullName(name || 'User');
           if (!workEmail) setWorkEmail(profile.email || '');
         } catch (error) {
-          console.error('Failed to load profile:', error);
           if (!fullName) setFullName('User');
           if (!workEmail) setWorkEmail('user@example.com');
         }
@@ -138,7 +137,6 @@ const Support: React.FC = () => {
          }
       })
       .catch(error => {
-        console.error('Failed to load ticket details:', error);
       });
   }, [activeFeedbackId, readonly]);
 

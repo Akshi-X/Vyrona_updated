@@ -49,7 +49,6 @@ export class LogisticsService extends BaseApiService {
         throw new Error('Failed to fetch logistics metrics');
       }
     } catch (error) {
-      console.error('Error fetching logistics metrics:', error);
       throw error;
     }
   }
@@ -65,7 +64,6 @@ export class LogisticsService extends BaseApiService {
       
       return response;
     } catch (error) {
-      console.error('Error fetching patient statistics:', error);
       throw error;
     }
   }

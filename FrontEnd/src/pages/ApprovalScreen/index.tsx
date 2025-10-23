@@ -57,7 +57,6 @@ const ApprovalScreen: React.FC = () => {
         window.location.href = "/dashboard";
       }, 1500);
     } catch (err: any) {
-      console.error(err);
       if (err.response?.status === 401) {
         setStatus("Session expired. Please login again.");
         logout();
