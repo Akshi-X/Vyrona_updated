@@ -13,7 +13,7 @@ class PatientBase(BaseModel):
     hospital_name: Optional[str] = Field(None, max_length=255, description="Hospital name")
     location: Optional[str] = Field(None, max_length=255, description="Patient location")
     provider_id: Optional[str] = Field(None, description="Reference to provider")
-    pharma_id: Optional[str] = Field(None, description="Reference to pharma")
+    pharma_id: Optional[int] = Field(None, description="Reference to pharma")
     stage: Optional[PatientStage] = Field(PatientStage.SCHEDULED, description="Patient treatment stage")
     created_by: Optional[str] = Field(None, max_length=255, description="User who created the record")
     updated_by: Optional[str] = Field(None, max_length=255, description="User who last updated the record")
@@ -39,7 +39,7 @@ class PatientUpdate(BaseModel):
     hospital_name: Optional[str] = Field(None, max_length=255)
     location: Optional[str] = Field(None, max_length=255)
     provider_id: Optional[str] = None
-    pharma_id: Optional[str] = None
+    pharma_id: Optional[int] = None
     stage: Optional[PatientStage] = None
     updated_by: Optional[str] = Field(None, max_length=255)
 
@@ -79,7 +79,7 @@ class MonthlyStats(BaseModel):
 
 class PharmaStatisticsResponse(BaseModel):
     """Schema for pharma statistics response - current month only"""
-    pharma_id: str
+    pharma_id: int
     current_month_patient_count: int = Field(0, description="Number of patients added in current month")
     current_month_treatment_count: int = Field(0, description="Number of treatments started in current month")
 
@@ -91,7 +91,7 @@ class PatientSummaryResponse(BaseModel):
     hospital: Optional[str] = Field(None, description="Hospital name")
     stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
     provider_name: Optional[str] = Field(None, description="Provider name")
-    pharma_location: Optional[str] = Field(None, description="Pharma company location")
+    location: Optional[str] = Field(None, description="Patient location")
     
     class Config:
         from_attributes = True
@@ -101,7 +101,7 @@ class PatientDetailedResponse(BaseModel):
     """Schema for detailed patient data with docs_report"""
     patient_id: str = Field(..., description="Patient ID")
     condition: str = Field(..., description="Patient condition")
-    pharma_location: Optional[str] = Field(None, description="Pharma company location")
+    location: Optional[str] = Field(None, description="Patient location")
     provider_name: Optional[str] = Field(None, description="Provider name")
     stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
     docs_report: Optional[bytes] = Field(None, description="Patient documents report")
