@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { patientService, type OngoingTreatment } from '../services/patientService';
 
 interface OngoingTreatmentsProps {
-  pharmaId?: number;
+  // No props needed since we don't send pharma_id
 }
 
 const tableHeaders = [
@@ -13,7 +13,7 @@ const tableHeaders = [
   { label: "Location", hasSort: true },
 ];
 
-export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
+export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const [treatments, setTreatments] = useState<OngoingTreatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
       try {
         setLoading(true);
         setError(null);
-        const data = await patientService.getOngoingTreatments(pharmaId.toString());
+         const data = await patientService.getOngoingTreatments();
         
         // Only update state if the component is still mounted
         if (!isCancelled) {
@@ -36,33 +36,7 @@ export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
         // Only update state if the component is still mounted
         if (!isCancelled) {
           setError('Failed to load ongoing treatments');
-          // Set fallback data on error
-          setTreatments([
-            {
-              patient_id: "PT250101-001",
-              condition: "Acute Lymphoblastic Leukemia",
-              hospital: "City General Hospital",
-              stage: "Scheduled",
-              provider_name: "City General Hospital",
-              location: "New York, NY"
-            },
-            {
-              patient_id: "PT250101-002",
-              condition: "Multiple Myeloma",
-              hospital: "City General Hospital",
-              stage: "Apheresis",
-              provider_name: "City General Hospital",
-              location: "New York, NY"
-            },
-            {
-              patient_id: "PT250101-003",
-              condition: "Non-Hodgkin Lymphoma",
-              hospital: "Metro Medical Center",
-              stage: "Cryopreservation",
-              provider_name: "Metro Medical Center",
-              location: "New York, NY"
-            }
-          ]);
+          setTreatments([]);
         }
       } finally {
         // Only update loading state if the component is still mounted
@@ -78,7 +52,7 @@ export const OngoingTreatments = ({ pharmaId = 1 }: OngoingTreatmentsProps) => {
     return () => {
       isCancelled = true;
     };
-  }, [pharmaId]);
+   }, []); // No dependencies needed since we don't use pharmaId
 
   if (loading) {
     return (

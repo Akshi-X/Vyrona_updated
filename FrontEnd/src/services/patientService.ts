@@ -30,12 +30,12 @@ export interface PatientApiResponse extends ApiResponse<Patient[][]> {
 
 export class PatientService extends BaseApiService {
   /**
-   * Get detailed patient information for a specific pharma
+   * Get detailed patient information
    */
-  async getDetailedPatients(pharmaId: string = '1'): Promise<Patient[]> {
+  async getDetailedPatients(): Promise<Patient[]> {
     try {
       const response = await this.request<Patient[] | Patient[][]>(
-        `/api/patients/detailed?pharma_id=${pharmaId}`
+        `/api/patients/detailed`
       );
       
       // Handle different response formats
@@ -66,12 +66,12 @@ export class PatientService extends BaseApiService {
   }
 
   /**
-   * Get ongoing treatments for a specific pharma
+   * Get ongoing treatments
    */
-  async getOngoingTreatments(pharmaId: string = '1'): Promise<OngoingTreatment[]> {
+  async getOngoingTreatments(): Promise<OngoingTreatment[]> {
     try {
       const response = await this.request<OngoingTreatment[]>(
-        `/api/patients/ongoing?pharma_id=${pharmaId}`
+        `/api/patients/ongoing`
       );
       
       // Handle different response formats
