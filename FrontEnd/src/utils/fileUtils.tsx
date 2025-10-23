@@ -194,3 +194,4 @@ export function getFileIconComponent(fileInfo: FileTypeInfo, className: string =
   
   return iconMap[fileInfo.type] || iconMap.other;
 }
+
