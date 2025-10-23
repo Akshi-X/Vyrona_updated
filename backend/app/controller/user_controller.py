@@ -26,7 +26,7 @@ from app.schemas.response_schema import (
     UserDetailsResponse,
     UserProfileResponse
 )
-from app.schemas.user_schema import UserListResponse
+from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 
@@ -312,3 +312,41 @@ def get_user_profile_endpoint(current_user: user_model.User = Depends(get_curren
     Uses Depends(get_current_user) to inject authenticated user.
     """
     return user_service.get_user_profile(current_user)
+
+
+# ---------------------------
+# Update user name endpoint
+# ---------------------------
+@router.patch("/user/{user_id}/name", response_model=UserUpdateResponse)
+def update_user_name_endpoint(
+    user_id: str,
+    request: UserNameUpdateRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Update user's first and last name.
+    
+    Protected endpoint with strict authorization:
+    - Only the user themselves can update their own profile
+    - No one else (including managers and admins) can update another user's name
+    
+    Args:
+        user_id: User ID to update
+        request: Update request with new first and last name
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        UserUpdateResponse with update details
+    """
+    # Call service (all business logic and authorization there)
+    result = user_service.update_user_name(
+        user_id=user_id,
+        update_request=request,
+        current_user=current_user,
+        db=db
+    )
+    
+    # Return DTO (result is already UserUpdateResponse)
+    return result
