@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import axios from "axios";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
+import { authService } from "../../services/authService";
 
 const Signup: React.FC = () => {
     const [firstName, setFirstName] = useState("");
@@ -31,7 +31,6 @@ const Signup: React.FC = () => {
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // navigate removed; success panel no longer shows login button
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
     // Handle clicks outside dropdown
     useEffect(() => {
@@ -136,12 +135,11 @@ const Signup: React.FC = () => {
 
         try {
             setLoading(true);
-            const response = await axios.post(`${API_BASE_URL}/api/register`, payload);
-
+            const response = await authService.register(payload);
 
             // Handle backend-declared failures
-            const respStatus = (response.data?.status || '').toString().toLowerCase();
-            const respMessage = response.data?.message;
+            const respStatus = (response.status || '').toString().toLowerCase();
+            const respMessage = response.message;
             if (respStatus === 'failed' || respStatus === 'error') {
                 if (respMessage === 'This email is already registered') {
                     setEmailError('This email is already registered');
@@ -155,7 +153,7 @@ const Signup: React.FC = () => {
             setApiSuccess(respMessage || 'Registration successful');
             setRegistrationSuccess(true);
         } catch (err: any) {
-            const message = err.response?.data?.message;
+            const message = err.message;
             if (message === 'This email is already registered') {
                 setEmailError('This email is already registered');
                 setApiError("");
