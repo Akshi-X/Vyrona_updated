@@ -71,7 +71,12 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
     except Exception as e:
         # Rollback on ANY error (including email failure)
         db.rollback()
-        raise Exception(f"Failed to send OTP: {str(e)}")
+        # Handle EmailServiceException properly
+        if hasattr(e, 'details') and 'reason' in e.details:
+            reason = e.details['reason']
+        else:
+            reason = str(e)
+        raise Exception(f"Failed to send OTP: {reason}")
 
 
 def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
@@ -179,11 +184,25 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     expires_at = datetime.now(timezone.utc) + access_token_expires
     print(f"Token expires at: {expires_at}")
     
+    # Get user's pharma_id from the pharma relationship
+    pharma_id = None
+    if hasattr(user, 'pharma') and user.pharma:
+        # user.pharma is a list, get the first one
+        if len(user.pharma) > 0:
+            pharma_id = user.pharma[0].id
+    else:
+        # If no direct relationship, query the pharma table
+        from ..models.pharma_model import Pharma
+        pharma = db.query(Pharma).filter(Pharma.user_id == user.user_id).first()
+        if pharma:
+            pharma_id = pharma.id
+    
     return {
         "user_id": str(user.user_id),
         "email": user.email,
         "auth_token": access_token,
-        "expires_at": expires_at
+        "expires_at": expires_at,
+        "pharma_id": pharma_id
     }
 
 

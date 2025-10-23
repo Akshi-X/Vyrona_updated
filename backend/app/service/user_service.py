@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from datetime import datetime, timezone
+import logging
 
 from app.models import user_model
 from app.models.user_model import User
@@ -33,6 +34,9 @@ from app.constants.app_constants import (
 )
 from app.constants.messages import SuccessMessages
 from app.config.config import settings
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
@@ -71,6 +75,27 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Generate custom user ID (USR-XXXXXX format)
     user_id = utils.generate_user_id()
     
+    # ============================================
+    # PHARMA VALIDATION LOGIC
+    # ============================================
+    # Check if pharma exists
+    from app.models.pharma_model import Pharma
+    
+    existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
+    
+    if existing_pharma:
+        # Pharma exists, use existing pharma_id
+        pharma_id = existing_pharma.id
+        logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
+    else:
+        # Pharma doesn't exist, will create after user is created
+        pharma_id = None
+        logger.info(f"Pharma '{request.company_name}' doesn't exist, will create after user creation")
+    
+    # ============================================
+    # END PHARMA VALIDATION LOGIC
+    # ============================================
+    
     # Create user with custom user_id
     user = user_model.User(
         user_id=user_id,
@@ -93,19 +118,34 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         user.session_timeout = DEFAULT_SESSION_TIMEOUT_MINUTES
     
     try:
-        print(f"Adding user to database: {user.email}, role: {user.role}")
+        logger.info(f"Adding user to database: {user.email}, role: {user.role}")
         db.add(user)
         db.flush()  # Flush but don't commit yet - validate first
-        print(f"User flushed to DB (not committed): {user.user_id}")
+        logger.debug(f"User flushed to DB (not committed): {user.user_id}")
+        
+        # Create pharma if it doesn't exist (BEFORE committing user)
+        if not existing_pharma:
+            new_pharma = Pharma(
+                pharma_name=request.company_name,
+                user_id=user.user_id,  # Link to the user we just created
+                created_by=user.user_id
+            )
+            db.add(new_pharma)
+            db.flush()  # Flush pharma but don't commit yet
+            pharma_id = new_pharma.id
+            logger.info(f"Created new pharma: {request.company_name} (ID: {pharma_id}) linked to user: {user.user_id}")
+        else:
+            pharma_id = existing_pharma.id
+            logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
         
         # Determine recipient for approval email
-        print(f"Preparing to send approval email for role: {role_lower}")
+        logger.info(f"Preparing to send approval email for role: {role_lower}")
         recipient_email = None
         
         if role_lower == 'manager':
             # Manager registration → Send to MyGrape Platform Admin
             recipient_email = settings.ADMIN_EMAIL
-            print(f"Manager registration: Sending approval email to MyGrape Admin ({recipient_email})")
+            logger.info(f"Manager registration: Sending approval email to MyGrape Admin ({recipient_email})")
         else:
             # User registration → Send to Company Manager
             # Find approved manager from the same company
@@ -114,12 +154,12 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             if company_manager_email:
                 # Company has an approved manager
                 recipient_email = company_manager_email
-                print(f"User registration: Sending approval email to Company Manager ({recipient_email})")
+                logger.info(f"User registration: Sending approval email to Company Manager ({recipient_email})")
             else:
                 # Company has NO approved manager yet
                 # Fallback: Send to MyGrape admin (for first user registration)
                 recipient_email = settings.ADMIN_EMAIL
-                print(f"WARNING: User registration but no company manager found. Sending to MyGrape Admin ({recipient_email})")
+                logger.warning(f"User registration but no company manager found. Sending to MyGrape Admin ({recipient_email})")
         
         # Send approval email BEFORE committing
         # If email fails, transaction will rollback
@@ -132,16 +172,16 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             company=request.company_name,
             recipient_email=recipient_email
         )
-        print("Approval email sent successfully")
+        logger.info("Approval email sent successfully")
         
-        # Email sent successfully, NOW commit the transaction
+        # Email sent successfully, NOW commit the entire transaction (user + pharma)
         db.commit()
         db.refresh(user)
-        print(f"User created and email sent successfully: {user.user_id}")
+        logger.info(f"User and pharma created successfully: {user.user_id}")
         
     except IntegrityError as e:
         db.rollback()
-        print(f"IntegrityError during registration: {str(e)}")
+        logger.error(f"IntegrityError during registration: {str(e)}")
         # Check if it's a duplicate email error
         if 'email' in str(e).lower() or 'unique' in str(e).lower():
             raise EmailAlreadyExistsException(email=request.email)
@@ -150,9 +190,9 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     except Exception as e:
         # Rollback on ANY error (including email failure)
         db.rollback()
-        print(f"Registration failed, rolling back: {type(e).__name__}: {str(e)}")
+        logger.error(f"Registration failed, rolling back: {type(e).__name__}: {str(e)}")
         import traceback
-        traceback.print_exc()
+        logger.error(f"Traceback: {traceback.format_exc()}")
         
         # If it's an email error, raise a more specific exception
         if 'email' in str(e).lower() or 'smtp' in str(e).lower():

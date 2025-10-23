@@ -23,20 +23,20 @@ class Settings(BaseSettings):
     DB_NAME: str
     # Security - MUST be provided in .env file
     SECRET_KEY: str
-    # Email - Azure AD (Microsoft Graph API)
+    # Email - Basic Configuration
     SENDER_EMAIL: str
     ADMIN_EMAIL: str
-    AZURE_TENANT_ID: str
-    AZURE_CLIENT_ID: str
-    AZURE_CLIENT_SECRET: str
     # Super Admin Setup (required in .env)
     ADMIN_DEFAULT_PASSWORD: str
-    # Email Service Type (for backward compatibility)
-    EMAIL_SERVICE: str = "azure"  # "azure" or "smtp"
+    # Email Service Type
+    EMAIL_SERVICE: str = "smtp"  # "smtp" or "sendgrid"
     # SMTP (Optional - for backward compatibility)
     SENDER_PASSWORD: Optional[str] = None
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
+    # SendGrid (Optional - for enhanced email delivery)
+    SENDGRID_API_KEY: Optional[str] = None
+    SENDGRID_FROM_EMAIL: Optional[str] = None
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RELOAD: bool = True
     # URLs
-    FRONTEND_URL: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:5173"
     BACKEND_URL: str = "http://localhost:8000"
     # CORS
     ALLOWED_ORIGINS: str = "*"

@@ -6,8 +6,8 @@ from pathlib import Path
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from jinja2.exceptions import TemplateError
-import msal
-import requests
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 from ..config.config import settings
 from ..constants.app_constants import (
@@ -31,49 +31,12 @@ jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
 
 # ============================================
-# AZURE AD (Microsoft Graph API) FUNCTIONS
+# SENDGRID FUNCTIONS
 # ============================================
 
-def get_azure_access_token() -> str:
+def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
     """
-    Get access token for Microsoft Graph API using client credentials
-    
-    Returns:
-        Access token string
-        
-    Raises:
-        EmailServiceException if authentication fails
-    """
-    try:
-        app = msal.ConfidentialClientApplication(
-            client_id=settings.AZURE_CLIENT_ID,
-            client_credential=settings.AZURE_CLIENT_SECRET,
-            authority=f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}"
-        )
-        
-        result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
-        
-        if "access_token" in result:
-            return result["access_token"]
-        else:
-            error_msg = result.get("error_description", "Unknown error")
-            raise EmailServiceException(
-                recipient="Azure AD",
-                reason=f"Failed to acquire access token: {error_msg}"
-            )
-    except Exception as e:
-        print(f"Azure AD auth error: {type(e).__name__}: {str(e)}")
-        raise EmailServiceException(
-            recipient="Azure AD",
-            reason=f"Azure AD authentication failed: {str(e)}"
-        )
-
-
-def send_email_via_azure(recipient_email: str, subject: str, html_body: str):
-    """
-    Send email using Microsoft Graph API
+    Send email using SendGrid API
     
     Args:
         recipient_email: Email address to send to
@@ -84,62 +47,53 @@ def send_email_via_azure(recipient_email: str, subject: str, html_body: str):
         EmailServiceException if sending fails
     """
     try:
-        # Get access token
-        access_token = get_azure_access_token()
-        
-        # Prepare email payload for Microsoft Graph API
-        email_payload = {
-            "message": {
-                "subject": subject,
-                "body": {
-                    "contentType": "HTML",
-                    "content": html_body
-                },
-                "toRecipients": [
-                    {
-                        "emailAddress": {
-                            "address": recipient_email
-                        }
-                    }
-                ]
-            },
-            "saveToSentItems": True
-        }
-        
-        # Send email via Microsoft Graph API
-        graph_url = f"https://graph.microsoft.com/v1.0/users/{settings.SENDER_EMAIL}/sendMail"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        
-        print(f"Calling Graph API: {graph_url}")
-        response = requests.post(graph_url, headers=headers, json=email_payload, timeout=10)
-        
-        print(f"Graph API Response Status: {response.status_code}")
-        if response.status_code == 202:
-            print(f"Email sent via Azure AD to {recipient_email}")
-        else:
-            print(f"Graph API Error Response: {response.text}")
+        # Validate SendGrid configuration
+        if not settings.SENDGRID_API_KEY:
             raise EmailServiceException(
                 recipient=recipient_email,
-                reason=f"Microsoft Graph API error: {response.status_code} - {response.text}"
+                reason="SendGrid API key not configured"
+            )
+        
+        if not settings.SENDGRID_FROM_EMAIL:
+            raise EmailServiceException(
+                recipient=recipient_email,
+                reason="SendGrid from email not configured"
+            )
+        
+        # Initialize SendGrid client
+        sg = SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+        
+        # Create email message
+        message = Mail(
+            from_email=settings.SENDGRID_FROM_EMAIL,
+            to_emails=recipient_email,
+            subject=subject,
+            html_content=html_body
+        )
+        
+        # Send email
+        logger.info(f"Sending email via SendGrid to {recipient_email}...")
+        response = sg.send(message)
+        
+        # Check response status
+        if response.status_code in [200, 202]:
+            logger.info(f"Email sent successfully via SendGrid to {recipient_email}")
+            logger.info(f"SendGrid Response Status: {response.status_code}")
+        else:
+            logger.error(f"SendGrid Error Response: {response.status_code} - {response.body}")
+            raise EmailServiceException(
+                recipient=recipient_email,
+                reason=f"SendGrid API error: {response.status_code} - {response.body}"
             )
     
     except EmailServiceException:
-        # Re-raise EmailServiceException as-is (don't wrap it again!)
+        # Re-raise EmailServiceException as-is
         raise
-    except requests.exceptions.RequestException as e:
-        print(f"Azure network error: {type(e).__name__}: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"Network error: {str(e)}"
-        )
     except Exception as e:
-        print(f"Azure send error: {type(e).__name__}: {str(e)}")
+        logger.error(f"SendGrid error: {type(e).__name__}: {str(e)}")
         raise EmailServiceException(
             recipient=recipient_email,
-            reason=f"Azure email send failed: {str(e)}"
+            reason=f"SendGrid email send failed: {str(e)}"
         )
 
 
@@ -171,44 +125,44 @@ def send_email_via_smtp(recipient_email: str, subject: str, html_body: str):
     # Send email via SMTP with improved connection handling
     server = None
     try:
-        print(f"Connecting to SMTP: {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
+        logger.info(f"Connecting to SMTP: {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
         server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=30)
         server.ehlo()
         
-        print(f"Starting TLS...")
+        logger.info(f"Starting TLS...")
         server.starttls()
         server.ehlo()
         
-        print(f"Logging in as {settings.SENDER_EMAIL}...")
+        logger.info(f"Logging in as {settings.SENDER_EMAIL}...")
         server.login(settings.SENDER_EMAIL, settings.SENDER_PASSWORD)
         
-        print(f"Sending email to {recipient_email}...")
+        logger.info(f"Sending email to {recipient_email}...")
         server.sendmail(settings.SENDER_EMAIL, [recipient_email], msg.as_string())
         
-        print(f"Email sent successfully via SMTP to {recipient_email}")
+        logger.info(f"Email sent successfully via SMTP to {recipient_email}")
         
     except EmailServiceException:
         raise
     except smtplib.SMTPAuthenticationError as e:
-        print(f"SMTP auth error: {str(e)}")
+        logger.error(f"SMTP auth error: {str(e)}")
         raise EmailServiceException(
             recipient=recipient_email,
             reason=f"Authentication failed. Check SENDER_EMAIL and SENDER_PASSWORD in .env"
         )
     except smtplib.SMTPServerDisconnected as e:
-        print(f"SMTP disconnected: {str(e)}")
+        logger.error(f"SMTP disconnected: {str(e)}")
         raise EmailServiceException(
             recipient=recipient_email,
             reason=f"SMTP server disconnected. Try regenerating Gmail app password."
         )
     except smtplib.SMTPException as e:
-        print(f"SMTP error: {type(e).__name__}: {str(e)}")
+        logger.error(f"SMTP error: {type(e).__name__}: {str(e)}")
         raise EmailServiceException(
             recipient=recipient_email,
             reason=f"SMTP error: {str(e)}"
         )
     except Exception as e:
-        print(f"General error: {type(e).__name__}: {str(e)}")
+        logger.error(f"General error: {type(e).__name__}: {str(e)}")
         raise EmailServiceException(
             recipient=recipient_email,
             reason=f"Failed to send email: {str(e)}"
@@ -223,7 +177,11 @@ def send_email_via_smtp(recipient_email: str, subject: str, html_body: str):
 
 def send_email(recipient_email: str, subject: str, html_body: str):
     """
-    Send email using Gmail SMTP.
+    Send email using configured service with fallback logic.
+    
+    Service priority based on EMAIL_SERVICE setting:
+    1. SendGrid (if configured and available)
+    2. SMTP (Gmail) - Fallback
     
     Args:
         recipient_email: Email address to send to
@@ -231,10 +189,38 @@ def send_email(recipient_email: str, subject: str, html_body: str):
         html_body: HTML content of email
         
     Raises:
-        EmailServiceException if sending fails
+        EmailServiceException if all services fail
     """
-    logger.info(f"Using Gmail SMTP to send email to {recipient_email}...")
-    send_email_via_smtp(recipient_email, subject, html_body)
+    logger.info(f"Attempting to send email to {recipient_email} using service: {settings.EMAIL_SERVICE}")
+    
+    # Try SendGrid first if configured
+    if settings.EMAIL_SERVICE == "sendgrid":
+        try:
+            logger.info("Trying SendGrid service...")
+            send_email_via_sendgrid(recipient_email, subject, html_body)
+            return
+            print(f"Email sent successfully via SendGrid to {recipient_email}")
+        except EmailServiceException as e:
+            reason = e.details.get('reason', 'Unknown error')
+            logger.warning(f"SendGrid failed: {reason}, falling back to SMTP")
+        except Exception as e:
+            logger.warning(f"SendGrid error: {str(e)}, falling back to SMTP")
+    
+    # Fallback to SMTP
+    try:
+        logger.info("Trying SMTP service...")
+        send_email_via_smtp(recipient_email, subject, html_body)
+        return
+    except EmailServiceException as e:
+        reason = e.details.get('reason', 'Unknown error')
+        logger.error(f"All email services failed. SMTP error: {reason}")
+        raise
+    except Exception as e:
+        logger.error(f"All email services failed. Final error: {str(e)}")
+        raise EmailServiceException(
+            recipient=recipient_email,
+            reason=f"All email services failed: {str(e)}"
+        )
 
 
 # ============================================
@@ -260,7 +246,7 @@ def send_approval_email(
     Clean exception handling!
     """
     subject = EMAIL_APPROVAL_SUBJECT
-    approval_url = f"{settings.BACKEND_URL}/api/approval-screen?registration_id={registration_id}"
+    approval_url = f"{settings.FRONTEND_URL}/approval-screen?registration_id={registration_id}"
     
     # Load and render HTML template
     try:

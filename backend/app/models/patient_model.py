@@ -31,7 +31,7 @@ class Patient(Base):
     
     # References (Foreign Keys)
     provider_id = Column(String, ForeignKey("provider.id"), nullable=True)
-    pharma_id = Column(String, ForeignKey("pharma.id"), nullable=True)
+    pharma_id = Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
     # Patient Stage
     stage = Column(SQLEnum(PatientStage), default=PatientStage.SCHEDULED, nullable=False)
@@ -44,7 +44,7 @@ class Patient(Base):
     
     # Relationships
     pharma = relationship("Pharma", back_populates="patients")
-    provider = relationship("Provider", back_populates="patients")
+    provider = relationship("Provider", back_populates="patients", lazy="select")
     
     # Other relationships (already defined in other models via backref)
     # tasks = relationship("Tasks", back_populates="patient")

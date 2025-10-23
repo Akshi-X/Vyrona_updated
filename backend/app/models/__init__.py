@@ -5,5 +5,5 @@ from .patient_model import Patient
 from .feedback_model import Feedback
 from .feedback_comments import Comment
 from .pharma_model import Pharma
-from .patient_model import Patient
+from .provider_model import Provider
 from .task_model import Tasks
