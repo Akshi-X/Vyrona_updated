@@ -17,7 +17,7 @@ from app.schemas.task_schema import (
 )
 from app.service import task_service
 
-router = APIRouter()
+router = APIRouter(tags=["Tasks"])
 
 
 # ---------------------------

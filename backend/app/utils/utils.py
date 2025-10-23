@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional, Any
 from passlib.context import CryptContext
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from ..models.user_model import User
 from ..constants.status_constants import STATUS_FAILED
@@ -129,3 +130,20 @@ def get_user_by_id(user_id: str, db) -> User:
         User object if found, None otherwise
     """
     return db.query(User).filter(User.user_id == user_id).first()
+
+
+def get_pharma_id_by_company_name(company_name: str, db: Session) -> Optional[int]:
+    """
+    Get pharma ID by company name (pharma_name)
+    
+    Args:
+        company_name: The company/pharma name
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        Pharma ID if found, None otherwise
+    """
+    from ..models.pharma_model import Pharma
+    
+    pharma = db.query(Pharma).filter(Pharma.pharma_name == company_name).first()
+    return pharma.id if pharma else None

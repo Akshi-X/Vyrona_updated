@@ -275,6 +275,30 @@ class UserRejectNotFoundException(UserManagementException):
         )
 
 
+class UserUpdateNotFoundException(UserManagementException):
+    """User not found in UPDATE operation"""
+    
+    def __init__(self, user_id: str):
+        super().__init__(
+            message=ErrorMessages.USER_NOT_FOUND,
+            error_code=ERROR_CODES["UPDATE_USER_NOT_FOUND"],
+            status_code=404,
+            user_id=user_id
+        )
+
+
+class UserUpdateForbiddenException(UserManagementException):
+    """User not allowed to update another user's profile"""
+    
+    def __init__(self, user_id: str):
+        super().__init__(
+            message="You can only update your own profile. Access denied to update another user's information.",
+            error_code=ERROR_CODES["UPDATE_USER_FORBIDDEN"],
+            status_code=403,
+            user_id=user_id
+        )
+
+
 # ============================================
 # REGISTRATION EXCEPTIONS
 # ============================================

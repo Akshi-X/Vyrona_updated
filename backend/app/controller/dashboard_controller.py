@@ -7,7 +7,7 @@ from app.schemas.dashboard_schema import (
     CriticalAlertsResponse
 )
 
-router = APIRouter()
+router = APIRouter(tags=["Dashboard"])
 
 
 # ---------------------------
