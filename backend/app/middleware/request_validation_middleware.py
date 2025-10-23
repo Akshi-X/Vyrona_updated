@@ -62,10 +62,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 if response:
                     return response  # Validation failed, return error
             
-            elif path == "/api/feedback":
-                response = await self._validate_feedback_creation(request)
-                if response:
-                    return response  # Validation failed, return error
+            # fastapi handle directly
         
         elif method == "GET":
             # Validate GET endpoints
@@ -399,12 +396,19 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
         
         try:
-            # For multipart form data, we need to handle it differently
-            # The request body will contain the form data
+            # Handle multipart form data from frontend
             form_data = await request.form()
-            request_json = form_data.get("request")
             
-            if not request_json:
+            # Extract data from direct form fields (frontend format)
+            data = {}
+            required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
+            
+            # Get data from individual form fields
+            for field in required_fields:
+                if field in form_data:
+                    data[field] = form_data[field]
+            
+            if not data:
                 return JSONResponse(
                     status_code=400,
                     content={
@@ -415,22 +419,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     }
                 )
             
-            # Parse JSON from form data
-            try:
-                data = json.loads(request_json)
-            except json.JSONDecodeError as e:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Invalid JSON format: {str(e)}",
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
-                )
-            
             # Validate required fields
-            required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
             missing_fields = [field for field in required_fields if not data.get(field)]
             
             if missing_fields:
