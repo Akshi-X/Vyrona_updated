@@ -114,8 +114,8 @@ async def startup_event():
     logger.info("Creating database tables...")
     create_tables()
     
-    # Step 2: Create super admin user
-    logger.info("Creating super admin user...")
+    # Step 2: Create pharma admin users
+    logger.info("Creating pharma admin users...")
     create_admin()
     
     print("!" * 60 + "\n")

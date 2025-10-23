@@ -2,10 +2,14 @@
 Application Configuration
 Loaded from environment variables (.env file)
 """
- 
+
+import logging
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 from functools import lru_cache
+
+# Configure logger
+logger = logging.getLogger(__name__)
  
  
 class Settings(BaseSettings):
@@ -25,9 +29,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     # Email - Basic Configuration
     SENDER_EMAIL: str
-    ADMIN_EMAIL: str
-    # Super Admin Setup (required in .env)
-    ADMIN_DEFAULT_PASSWORD: str
+    # Pharma Admin Configuration (JSON file path)
+    PHARMA_ADMINS_FILE: str = "pharma_admins.json"  # Path to JSON file containing pharma admins
     # Email Service Type
     EMAIL_SERVICE: str = "smtp"  # "smtp" or "sendgrid"
     # SMTP (Optional - for backward compatibility)
@@ -69,6 +72,55 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+    
+    def get_pharma_admins(self) -> List[dict]:
+        """Get all configured pharma admins from JSON file"""
+        import json
+        from pathlib import Path
+        
+        try:
+            # Get the path to the JSON file
+            json_file_path = Path(self.PHARMA_ADMINS_FILE)
+            
+            # If it's a relative path, make it relative to the backend directory
+            if not json_file_path.is_absolute():
+                # Get the backend directory (parent of app directory)
+                backend_dir = Path(__file__).parent.parent.parent
+                json_file_path = backend_dir / self.PHARMA_ADMINS_FILE
+                logger.info(f"Looking for pharma admins file at: {json_file_path}")
+            
+            # Check if file exists
+            if not json_file_path.exists():
+                logger.warning(f"Pharma admins file not found: {json_file_path}")
+                return []
+            
+            # Read and parse JSON file
+            with open(json_file_path, 'r', encoding='utf-8') as f:
+                pharma_admins = json.load(f)
+            
+            # Validate and format the data
+            formatted_admins = []
+            for admin in pharma_admins:
+                if all(key in admin for key in ['email', 'password', 'company']):
+                    formatted_admins.append({
+                        'email': admin['email'],
+                        'password': admin['password'],
+                        'company': admin['company'],
+                        'first_name': admin.get('first_name', 'Pharma'),
+                        'last_name': admin.get('last_name', 'Admin')
+                    })
+                else:
+                    logger.warning(f"Invalid pharma admin configuration: {admin}")
+            
+            logger.info(f"Loaded {len(formatted_admins)} pharma admins from {json_file_path}")
+            return formatted_admins
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in pharma admins file: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error reading pharma admins file: {e}")
+            return []
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
