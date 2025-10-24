@@ -35,6 +35,7 @@ class VerifyOTPSuccessResponse(BaseModel):
     expires_at: datetime
     message: str
     pharma_id: Optional[int] = None  # User's pharma ID (integer)
+    role: str  # User's role
 
 
 class VerifyOTPFailureResponse(BaseModel):

@@ -7,3 +7,5 @@ from .feedback_comments import Comment
 from .pharma_model import Pharma
 from .provider_model import Provider
 from .task_model import Tasks
+from .chat_model import ChatMessage
+from .chat_read_status import ChatReadStatus
