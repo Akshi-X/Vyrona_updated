@@ -212,7 +212,6 @@ const UserProfilePage: React.FC = () => {
       // Success - exit edit mode
       setIsEditingProfile(false);
     } catch (error: any) {
-      console.error('Failed to update profile:', error);
       setSaveError(error.message || 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
@@ -228,7 +227,6 @@ const UserProfilePage: React.FC = () => {
       setLastName(profile.last_name || '');
       setWorkEmail(profile.email || '');
     } catch (error) {
-      console.error('Failed to load profile for cancel:', error);
       // Keep current values if API fails
     }
     setFirstNameError(null);

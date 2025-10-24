@@ -30,6 +30,7 @@ export interface AuthResponse {
   email?: string;
   otp_expiry?: string;
   auth_token?: string;
+  role?: string;
 }
 
 export interface OTPData {

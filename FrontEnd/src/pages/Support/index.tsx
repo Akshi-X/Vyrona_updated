@@ -120,7 +120,6 @@ const Support: React.FC = () => {
         setFeedbackType(details.feedback_type || '');
         
         // Update status from API response
-        console.log('API Status:', details.status);
         setStatus(details.status || 'Open');
         
          // Parse affected modules (it's a single enum value, not comma-separated)
@@ -335,7 +334,6 @@ const Support: React.FC = () => {
 
   // Debug status value
   useEffect(() => {
-    console.log('Current Status:', status);
   }, [status]);
 
   return (

@@ -5,7 +5,7 @@ interface OngoingTreatmentsProps {
   // No props needed since we don't send pharma_id
 }
 
-type SortField = 'patient_id' | 'condition' | 'hospital' | 'stage' | 'location';
+type SortField = 'patient_id' | 'condition' | 'hospital' | 'stage' | 'location' | 'provider_name';
 type SortDirection = 'asc' | 'desc';
 
 const tableHeaders = [
@@ -13,6 +13,7 @@ const tableHeaders = [
   { label: "Condition", field: 'condition' as SortField, hasSort: true },
   { label: "Hospital", field: 'hospital' as SortField, hasSort: true },
   { label: "Stage", field: 'stage' as SortField, hasSort: true },
+  { label: "3PL", field: 'provider_name' as SortField, hasSort: true },
   { label: "Location", field: 'location' as SortField, hasSort: true },
 ];
 
@@ -26,12 +27,10 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const getStageColor = (stage: string) => {
     switch (stage.toLowerCase()) {
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
-      case 'in progress':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'cancelled':
+      case 'after care':
+        return 'bg-blue-100 text-blue-800';
+      case 'failure':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -201,6 +200,9 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(treatment.stage)}`}>
                       {treatment.stage}
                     </span>
+                  </td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                    {treatment.provider_name}
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.location}

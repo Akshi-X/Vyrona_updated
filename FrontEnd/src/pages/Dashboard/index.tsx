@@ -102,7 +102,6 @@ export default function Dashboard({}: DashboardProps) {
       const response = await criticalAlertsService.getCriticalAlerts(DUMMY_PHARMA_ID);
       setCriticalAlerts(response.alerts || []);
     } catch (error) {
-      console.error('Failed to fetch critical alerts:', error);
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
@@ -121,7 +120,6 @@ export default function Dashboard({}: DashboardProps) {
       const response = await tasksService.getMyTasks();
       setMyTasks(response.tasks || []);
     } catch (error) {
-      console.error('Failed to fetch my tasks:', error);
       setMyTasks([]);
     } finally {
       setLoadingTasks(false);
