@@ -309,7 +309,7 @@ def send_feedback_new_ticket_email(
     submitted_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    pharma_admin_email: str
+    mygrape_admin_email: str
 ):
     """
     Send new feedback ticket notification email
@@ -343,9 +343,9 @@ def send_feedback_new_ticket_email(
     # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to pharma admin (notification)
-    send_email(pharma_admin_email, email_subject, html_body)
-    logger.info(f"Feedback notification sent to pharma admin: {pharma_admin_email}")
+    # Send to MyGrape admin (notification)
+    send_email(mygrape_admin_email, email_subject, html_body)
+    logger.info(f"Feedback notification sent to MyGrape admin: {mygrape_admin_email}")
 
 
 def send_feedback_status_update_email(
@@ -356,7 +356,7 @@ def send_feedback_status_update_email(
     updated_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    pharma_admin_email: str
+    mygrape_admin_email: str
 ):
     """
     Send feedback status update notification email
@@ -387,9 +387,9 @@ def send_feedback_status_update_email(
     # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to pharma admin (notification)
-    send_email(pharma_admin_email, email_subject, html_body)
-    logger.info(f"Feedback status update sent to pharma admin: {pharma_admin_email}")
+    # Send to MyGrape admin (notification)
+    send_email(mygrape_admin_email, email_subject, html_body)
+    logger.info(f"Feedback status update sent to MyGrape admin: {mygrape_admin_email}")
 
 
 def send_feedback_new_comment_email(
@@ -399,7 +399,7 @@ def send_feedback_new_comment_email(
     commented_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    pharma_admin_email: str
+    mygrape_admin_email: str
 ):
     """
     Send new comment notification email
@@ -429,9 +429,9 @@ def send_feedback_new_comment_email(
     # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to pharma admin (notification)
-    send_email(pharma_admin_email, email_subject, html_body)
-    logger.info(f"Feedback comment notification sent to pharma admin: {pharma_admin_email}")
+    # Send to MyGrape admin (notification)
+    send_email(mygrape_admin_email, email_subject, html_body)
+    logger.info(f"Feedback comment notification sent to MyGrape admin: {mygrape_admin_email}")
 def send_password_reset_email(user_email: str, reset_link: str, first_name: str):
     """
     Send password reset link to user's email with HTML template
