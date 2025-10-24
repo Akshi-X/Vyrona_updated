@@ -1160,3 +1160,84 @@ class TaskManagerOnlyException(TaskException):
             status_code=403,
             user_role=user_role
         )
+
+
+# ============================================
+# CHAT EXCEPTIONS
+# ============================================
+
+class ChatException(AppException):
+    """Base exception for chat-related errors"""
+    pass
+
+
+class ChatMessageCreateFailedException(ChatException):
+    """Failed to create chat message"""
+
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message="Failed to create chat message",
+            error_code="CHAT_MESSAGE_CREATE_FAILED",
+            status_code=500,
+            reason=reason
+        )
+
+
+class ChatMessageNotFoundException(ChatException):
+    """Chat message not found"""
+
+    def __init__(self, message_id: Optional[int] = None):
+        super().__init__(
+            message="Chat message not found",
+            error_code="CHAT_MESSAGE_NOT_FOUND",
+            status_code=404,
+            message_id=message_id
+        )
+
+
+class ChatUserNotFoundException(ChatException):
+    """Chat user not found"""
+
+    def __init__(self, user_id: Optional[str] = None):
+        super().__init__(
+            message="User not found",
+            error_code="CHAT_USER_NOT_FOUND",
+            status_code=404,
+            user_id=user_id
+        )
+
+
+class ChatPatientNotFoundException(ChatException):
+    """Patient not found"""
+
+    def __init__(self, patient_id: Optional[str] = None):
+        super().__init__(
+            message="Patient not found",
+            error_code="CHAT_PATIENT_NOT_FOUND",
+            status_code=404,
+            patient_id=patient_id
+        )
+
+
+class ChatPharmaAccessDeniedException(ChatException):
+    """Access denied - users not in same pharma"""
+
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message="Access denied - users must be in same pharma",
+            error_code="CHAT_PHARMA_ACCESS_DENIED",
+            status_code=403,
+            reason=reason
+        )
+
+
+class ChatInvalidDataException(ChatException):
+    """Invalid chat data"""
+
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message="Invalid chat data",
+            error_code="CHAT_INVALID_DATA",
+            status_code=400,
+            reason=reason
+        )
