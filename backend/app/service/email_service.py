@@ -309,7 +309,8 @@ def send_feedback_new_ticket_email(
     submitted_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send new feedback ticket notification email
@@ -340,8 +341,9 @@ def send_feedback_new_ticket_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_ticket.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
@@ -356,7 +358,8 @@ def send_feedback_status_update_email(
     updated_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send feedback status update notification email
@@ -384,8 +387,9 @@ def send_feedback_status_update_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_status_update.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
@@ -399,7 +403,8 @@ def send_feedback_new_comment_email(
     commented_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send new comment notification email
@@ -426,8 +431,9 @@ def send_feedback_new_comment_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_comment.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
