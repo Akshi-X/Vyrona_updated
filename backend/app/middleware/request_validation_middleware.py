@@ -412,8 +412,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(
                         status_code=400,
                         content={
-                            "error_code": "VAL_INPUT_001",
-                            "message": "Request data is required",
+                            "error_code": ERROR_CODES["FEEDBACK_REQUEST_DATA_REQUIRED"],
+                            "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
@@ -426,8 +426,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(
                         status_code=400,
                         content={
-                            "error_code": "VAL_INPUT_001",
-                            "message": f"Invalid JSON format: {str(e)}",
+                            "error_code": ERROR_CODES["FEEDBACK_INVALID_JSON_FORMAT"],
+                            "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
@@ -439,8 +439,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(
                         status_code=400,
                         content={
-                            "error_code": "VAL_INPUT_001",
-                            "message": "Request data is required",
+                            "error_code": ERROR_CODES["FEEDBACK_REQUEST_DATA_REQUIRED"],
+                            "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
@@ -452,8 +452,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(
                         status_code=400,
                         content={
-                            "error_code": "VAL_INPUT_001",
-                            "message": f"Invalid JSON format: {str(e)}",
+                            "error_code": ERROR_CODES["FEEDBACK_INVALID_JSON_FORMAT"],
+                            "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         }
@@ -467,8 +467,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Missing required fields: {', '.join(missing_fields)}",
+                        "error_code": ERROR_CODES["FEEDBACK_MISSING_REQUIRED_FIELDS"],
+                        "message": f"{ErrorMessages.FEEDBACK_MISSING_REQUIRED_FIELDS}: {', '.join(missing_fields)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -484,8 +484,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Invalid enum value: {str(e)}",
+                        "error_code": ERROR_CODES["FEEDBACK_INVALID_ENUM_VALUE"],
+                        "message": f"{ErrorMessages.FEEDBACK_INVALID_ENUM_VALUE}: {str(e)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -496,8 +496,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Subject must be at least 3 characters long",
+                        "error_code": ERROR_CODES["FEEDBACK_SUBJECT_TOO_SHORT"],
+                        "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -507,8 +507,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Description must be at least 10 characters long",
+                        "error_code": ERROR_CODES["FEEDBACK_DESCRIPTION_TOO_SHORT"],
+                        "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -518,8 +518,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Subject must be less than 200 characters",
+                        "error_code": ERROR_CODES["FEEDBACK_SUBJECT_TOO_LONG"],
+                        "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -529,8 +529,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Description must be less than 2000 characters",
+                        "error_code": ERROR_CODES["FEEDBACK_DESCRIPTION_TOO_LONG"],
+                        "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
