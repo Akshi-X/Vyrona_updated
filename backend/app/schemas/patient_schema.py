@@ -101,9 +101,10 @@ class PatientDetailedResponse(BaseModel):
     """Schema for detailed patient data with docs_report"""
     patient_id: str = Field(..., description="Patient ID")
     condition: str = Field(..., description="Patient condition")
-    location: Optional[str] = Field(None, description="Patient location")
-    provider_name: Optional[str] = Field(None, description="Provider name")
+    hospital: Optional[str] = Field(None, description="Hospital name")
     stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
+    provider_name: Optional[str] = Field(None, description="Provider name")
+    location: Optional[str] = Field(None, description="Patient location")
     docs_report: Optional[bytes] = Field(None, description="Patient documents report")
     
     class Config:
