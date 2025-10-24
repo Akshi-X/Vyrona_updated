@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { authUtils } from '../utils/auth';
+import { authService } from '../services/authService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   token: string | undefined;
+  isLoading: boolean;
   login: (token: string) => void;
   logout: () => void;
 }
@@ -26,6 +28,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for existing token on mount
@@ -34,6 +37,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(existingToken);
       setIsAuthenticated(true);
     }
+    setIsLoading(false);
   }, []);
 
   const login = (newToken: string) => {
@@ -43,7 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    authUtils.removeToken();
+    authService.logout();
     setToken(undefined);
     setIsAuthenticated(false);
   };
@@ -51,6 +55,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     isAuthenticated,
     token,
+    isLoading,
     login,
     logout,
   };

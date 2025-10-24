@@ -171,6 +171,54 @@ def create_pharma_companies():
         db.close()
 
 
+def create_mygrape_admin():
+    """
+    Create MyGrape platform admin account.
+    This admin can view all feedback tickets and manage the platform.
+    """
+    logger.info("=" * 60)
+    logger.info("CHECKING MYGRAPE PLATFORM ADMIN...")
+    logger.info("=" * 60)
+    
+    db = SessionLocal()
+    try:
+        # Check if MyGrape admin already exists
+        existing_admin = db.query(User).filter(
+            User.email == settings.MYGRAPE_ADMIN_EMAIL
+        ).first()
+        
+        if existing_admin:
+            logger.info(f"MyGrape admin already exists: {settings.MYGRAPE_ADMIN_EMAIL}")
+            return
+        
+        # Create MyGrape admin
+        mygrape_admin = User(
+            user_id=generate_user_id(),
+            first_name="MyGrape",
+            last_name="Admin",
+            email=settings.MYGRAPE_ADMIN_EMAIL,
+            password_hash=get_password_hash(settings.MYGRAPE_ADMIN_PASSWORD),
+            role="mygrape_admin",
+            company_name="MyGrape Platform",
+            status=True,
+            approved_status="approved",
+            created_by="system",
+            updated_by="system"
+        )
+        
+        db.add(mygrape_admin)
+        db.commit()
+        db.refresh(mygrape_admin)
+        
+        logger.info(f"MyGrape platform admin created successfully: {settings.MYGRAPE_ADMIN_EMAIL}")
+        
+    except Exception as e:
+        logger.error(f"ERROR creating MyGrape admin: {str(e)}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def init_db():
     """
     Initialize database tables and create pharma admins and companies if not exists.
@@ -187,6 +235,9 @@ def init_db():
     
     # Create pharma companies if not exists
     create_pharma_companies()
+    
+    # Create MyGrape platform admin if not exists
+    create_mygrape_admin()
     
     logger.info("Database initialization complete")
     logger.info("=" * 60)

@@ -4,10 +4,12 @@
  */
 
 import { BaseApiService } from './baseApiService';
+import { authUtils } from '../utils/auth';
 
 export interface LoginCredentials {
   email: string;
   password: string;
+  remember_me?: boolean;
 }
 
 export interface RegisterData {
@@ -16,13 +18,18 @@ export interface RegisterData {
   email: string;
   password: string;
   confirm_password: string;
-  department: string;
+  role: string;
+  company_name: string;
 }
 
 export interface AuthResponse {
   message: string;
   user_id: string;
   token?: string;
+  status?: string;
+  email?: string;
+  otp_expiry?: string;
+  auth_token?: string;
 }
 
 export interface OTPData {
@@ -42,7 +49,7 @@ export class AuthService extends BaseApiService {
 
     // Store token in cookie if provided
     if (response.token) {
-      this.setAuthToken(response.token);
+      authUtils.setToken(response.token, credentials.remember_me || false);
     }
 
     return response;
@@ -52,7 +59,7 @@ export class AuthService extends BaseApiService {
    * Register new user
    */
   async register(data: RegisterData): Promise<AuthResponse> {
-    return await this.request<AuthResponse>('/api/register', {
+    return await this.unauthenticatedRequest<AuthResponse>('/api/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -68,8 +75,8 @@ export class AuthService extends BaseApiService {
     });
 
     // Store token in cookie if provided
-    if (response.token) {
-      this.setAuthToken(response.token);
+    if (response.auth_token) {
+      authUtils.setToken(response.auth_token);
     }
 
     return response;
@@ -89,7 +96,7 @@ export class AuthService extends BaseApiService {
    * Forgot password
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
-    return await this.request<{ message: string }>('/api/forgot-password', {
+    return await this.unauthenticatedRequest<{ message: string }>('/api/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
@@ -99,7 +106,7 @@ export class AuthService extends BaseApiService {
    * Reset password
    */
   async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<{ message: string }> {
-    return await this.request<{ message: string }>('/api/reset-password', {
+    return await this.unauthenticatedRequest<{ message: string }>('/api/reset-password', {
       method: 'POST',
       body: JSON.stringify({
         token,
@@ -113,13 +120,13 @@ export class AuthService extends BaseApiService {
    * Logout user
    */
   logout(): void {
-    this.clearAuthToken();
+    authUtils.clearToken();
     // Clear any other auth-related data
     try {
       localStorage.removeItem('user_id');
       localStorage.removeItem('user_data');
     } catch (error) {
-      console.warn('Failed to clear localStorage:', error);
+      // Silently handle localStorage clearing errors
     }
   }
 
@@ -127,12 +134,7 @@ export class AuthService extends BaseApiService {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    try {
-      const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
-      return !!match;
-    } catch {
-      return false;
-    }
+    return authUtils.checkTokenExpiration();
   }
 
   /**
@@ -146,42 +148,12 @@ export class AuthService extends BaseApiService {
     }
   }
 
-  /**
-   * Set auth token in cookie
-   */
-  private setAuthToken(token: string): void {
-    try {
-      if (typeof document !== 'undefined') {
-        document.cookie = `auth_token=${encodeURIComponent(token)}; path=/; max-age=86400; secure; samesite=strict`;
-      }
-    } catch (error) {
-      console.warn('Failed to set auth token:', error);
-    }
-  }
-
-  /**
-   * Clear auth token from cookie
-   */
-  private clearAuthToken(): void {
-    try {
-      if (typeof document !== 'undefined') {
-        document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      }
-    } catch (error) {
-      console.warn('Failed to clear auth token:', error);
-    }
-  }
 
   /**
    * Get auth token from cookie
    */
   getAuthToken(): string | null {
-    try {
-      const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
-      return match ? decodeURIComponent(match[1]) : null;
-    } catch {
-      return null;
-    }
+    return authUtils.getToken() || null;
   }
 }
 
