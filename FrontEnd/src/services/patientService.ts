@@ -3,6 +3,7 @@ import { BaseApiService, type ApiResponse } from './baseApiService';
 export interface Patient {
   patient_id: string;
   condition: string;
+  hospital: string;
   location: string;
   provider_name: string;
   stage: string;
