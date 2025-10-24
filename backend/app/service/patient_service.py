@@ -262,6 +262,7 @@ class PatientService:
             query = self.db.query(
                 Patient.id.label('patient_id'),
                 Patient.condition,
+                Patient.hospital_name.label('hospital'),
                 Patient.stage,
                 Patient.docs_report,
                 Provider.name.label('provider_name'),
@@ -282,9 +283,10 @@ class PatientService:
                 detailed_data.append(PatientDetailedResponse(
                     patient_id=result.patient_id,
                     condition=result.condition,
-                    location=result.location,
-                    provider_name=result.provider_name,
+                    hospital=result.hospital,
                     stage=result.stage,
+                    provider_name=result.provider_name,
+                    location=result.location,
                     docs_report=result.docs_report
                 ))
             
