@@ -44,5 +44,7 @@ def init_db():
         pharma_model,
         provider_model,
         task_model,
+        chat_model,
+        chat_read_status,
     )
     Base.metadata.create_all(bind=engine)

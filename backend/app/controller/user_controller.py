@@ -85,7 +85,8 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
         auth_token=result["auth_token"],
         expires_at=result["expires_at"],
         message=SuccessMessages.OTP_VERIFIED,
-        pharma_id=result.get("pharma_id")  # Include pharma_id in response
+        pharma_id=result.get("pharma_id"),  # Include pharma_id in response
+        role=result["role"]  # Include role in response
     )
 
 
