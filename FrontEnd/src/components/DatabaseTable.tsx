@@ -12,7 +12,6 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   const [sortField, setSortField] = useState<keyof Patient>('patient_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const hasFetchedRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch patients data on component mount
   useEffect(() => {
@@ -23,17 +22,13 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
 
     hasFetchedRef.current = true;
 
-    // Create abort controller for this request
-    abortControllerRef.current = new AbortController();
-
     const fetchPatients = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Add abort signal to prevent race conditions
+
         const data = await patientService.getDetailedPatients();
-        
+
         setPatients(data);
         setLoading(false);
       } catch (err: any) {
@@ -43,13 +38,6 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
     };
 
     fetchPatients();
-
-    // Cleanup function
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
   }, [pharmaId]);
 
   const handleSort = (field: keyof Patient) => {
@@ -64,17 +52,17 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   const sortedPatients = [...patients].sort((a, b) => {
     const aValue = a[sortField];
     const bValue = b[sortField];
-    
+
     if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     }
-    
+
     if (typeof aValue === 'number' && typeof bValue === 'number') {
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
     }
-    
+
     return 0;
   });
 
@@ -120,8 +108,8 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
           <div className="text-center">
             <div className="text-red-500 text-lg font-semibold mb-2">Error Loading Data</div>
             <div className="text-gray-600 mb-4">{error}</div>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="px-4 py-2 bg-[#6b1176] text-white rounded-md hover:bg-[#5a0f66] transition-colors"
             >
               Retry
@@ -150,9 +138,9 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
     <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-[#fdeeff]">
             <tr>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('patient_id')}
               >
@@ -161,7 +149,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   <SortIcon field="patient_id" />
                 </div>
               </th>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('condition')}
               >
@@ -170,16 +158,16 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   <SortIcon field="condition" />
                 </div>
               </th>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('provider_name')}
               >
                 <div className="flex items-center gap-2">
-                  Provider
+                  Hospital
                   <SortIcon field="provider_name" />
                 </div>
               </th>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('location')}
               >
@@ -188,7 +176,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   <SortIcon field="location" />
                 </div>
               </th>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('stage')}
               >
@@ -197,7 +185,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   <SortIcon field="stage" />
                 </div>
               </th>
-              <th 
+              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-2">
@@ -227,9 +215,13 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <button 
+                  <button
                     className="text-[#6b1176] hover:text-[#5a0f66] font-medium underline"
                     onClick={() => {
+                      if (!patient.docs_report) {
+                        alert('No document available for download.');
+                        return;
+                      }
                       // Create a blob and download the PDF
                       const blob = new Blob([patient.docs_report], { type: 'application/pdf' });
                       const url = window.URL.createObjectURL(blob);

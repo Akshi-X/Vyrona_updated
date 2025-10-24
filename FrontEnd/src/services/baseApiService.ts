@@ -204,7 +204,24 @@ export class BaseApiService {
       }
 
       const errorText = await response.text();
-      throw new Error(`API Error: ${response.status} ${errorText}`);
+      let errorMessage = `API Error: ${response.status}`;
+      
+      try {
+        // Try to parse the error response as JSON
+        const errorData = JSON.parse(errorText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else {
+          errorMessage = errorText;
+        }
+      } catch {
+        // If parsing fails, use the raw error text
+        errorMessage = errorText;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return await response.json();
@@ -229,6 +246,16 @@ export class BaseApiService {
    */
   setMockMode(useMock: boolean): void {
     this.useMock = useMock;
+  }
+
+  /**
+   * Make a public POST request
+   */
+  async post<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 }
 
