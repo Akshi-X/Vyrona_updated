@@ -30,31 +30,31 @@ router = APIRouter(
 
 @router.post("", 
     response_model=FeedbackCreateResponse, 
-    summary="Create feedback ticket", 
+    summary="Create feedback ticket (without attachment)", 
     description="""
-    Create a new feedback ticket with optional file attachment.
+    Create a new feedback ticket for testing without file attachment.
     """)
 def create_feedback_endpoint(
-    request: Request,
-    attachment: Optional[UploadFile] = File(None, description="Optional file attachment (max 10MB)"),
+    request: FeedbackCreateRequest,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
-    """Create a new feedback ticket with optional attachment"""
+    """Create a new feedback ticket for testing"""
     
-    # Get pre-validated data from middleware
-    validated_data = request.state.validated_feedback_data
-    
-    # Create request object from validated data
-    feedback_request = FeedbackCreateRequest(**validated_data)
-    
-    # Call service (all business logic there)
-    return create_feedback(
-        db=db,
-        request=feedback_request,
-        submitted_by=current_user.user_id,
-        attachment=attachment
-    )
+    try:
+        # Call service (all business logic there)
+        return create_feedback(
+            db=db,
+            request=request,
+            submitted_by=current_user.user_id,
+            attachment=None
+        )
+    except Exception as e:
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating feedback: {str(e)}", exc_info=True)
+        raise
 
 
 @router.get("/admin", response_model=List[FeedbackSummaryResponse], summary="Get all feedback tickets", description="Retrieve all feedback tickets with optional filtering")
