@@ -33,7 +33,6 @@ class Feedback(Base):
     )
     subject = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
-    attachment_path = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     
     # Classification
     priority = sqlalchemy.Column(
@@ -87,5 +86,6 @@ class Feedback(Base):
     
     # Relationships
     comments = relationship("Comment", back_populates="feedback", cascade="all, delete-orphan")
+    attachments = relationship("FeedbackAttachment", back_populates="feedback", cascade="all, delete-orphan")
 
 
