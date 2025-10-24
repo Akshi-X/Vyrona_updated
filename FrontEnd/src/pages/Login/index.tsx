@@ -9,6 +9,7 @@ const Login: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
     const [emailError, setEmailError] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [apiError, setApiError] = useState("");
@@ -71,6 +72,7 @@ const Login: React.FC = () => {
             const response = await authService.login({
                 email,
                 password,
+                remember_me: rememberMe,
             });
 
             if (response.status === "OTP Sent") {
@@ -201,6 +203,8 @@ const Login: React.FC = () => {
                             <label className="flex items-center space-x-2">
                                 <input
                                     type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
                                     className="w-4 h-4 border-gray-300 accent-[#8b2a96]"
                                 />
                                 <span className="text-gray-700 font-medium">Remember me</span>
