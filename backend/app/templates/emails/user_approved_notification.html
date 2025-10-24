@@ -32,43 +32,37 @@
             font-weight: 600;
             margin-bottom: 5px;
         }
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin: 0;
+        }
         .content {
             padding: 30px;
             color: #374151;
         }
-        .content h2 {
+        .welcome-message {
+            font-size: 16px;
             color: #6B1176;
-            font-size: 18px;
-            margin-top: 0;
+            font-weight: 600;
+            margin-bottom: 15px;
         }
-        .status-update-card {
+        .user-details-card {
             background-color: #F2E4FF;
             border-left: 4px solid #6B1176;
-            padding: 20px;
+            padding: 18px;
             margin: 20px 0;
             border-radius: 8px;
         }
-        .status-update-card p {
-            margin: 8px 0;
+        .user-details-card p {
+            margin: 6px 0;
             font-size: 14px;
             color: #374151;
         }
-        .status-update-card strong {
+        .user-details-card strong {
             color: #6B1176;
             display: inline-block;
-            width: 120px;
-        }
-        .status-change {
-            background-color: #EFF6FF;
-            border-left: 4px solid #2563EB;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .status-change p {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #1E40AF;
+            width: 80px;
         }
         .footer {
             background-color: #F8F9FA;
@@ -95,33 +89,28 @@
 <body>
     <div class="email-container">
         <div class="header">
-            <div class="icon">📊</div>
-            <h1>{{ subject }}</h1>
+            <div class="icon">🎉</div>
+            <h1>Registration Approved!</h1>
+            <p class="subtitle">Welcome to myGrape</p>
         </div>
         
         <div class="content">
-            <h2>Ticket Status Update</h2>
-            <p>Hello,</p>
-            <p>Your support ticket status has been updated. Here are the details:</p>
+            <div class="welcome-message">Congratulations, {{ first_name }} {{ last_name }}!</div>
+            <p>Your registration has been approved and you can now access your myGrape account. We're excited to have you on board!</p>
             
-            <div class="status-update-card">
-                <p><strong>🎫 Ticket ID:</strong> {{ ticket_id }}</p>
-                <p><strong>📧 Subject:</strong> {{ feedback_subject }}</p>
-                <p><strong>📅 Updated:</strong> {{ updated_on }}</p>
-                <p><strong>👤 Updated By:</strong> {{ updated_by_name }}</p>
-            </div>
-            
-            <div class="status-change">
-                <p><strong>📊 Status Change:</strong></p>
-                <p><strong>Previous Status:</strong> {{ old_status }}</p>
-                <p><strong>New Status:</strong> {{ new_status }}</p>
+            <div class="user-details-card">
+                <p><strong>👤 Name:</strong> {{ first_name }} {{ last_name }}</p>
+                <p><strong>📧 Email:</strong> {{ email }}</p>
+                <p><strong>🏢 Role:</strong> {{ role }}</p>
+                <p><strong>🏢 Company:</strong> {{ company }}</p>
+                <p><strong>📅 Approved:</strong> {{ approved_date }}</p>
             </div>
             
             <div class="divider"></div>
             
             <p style="font-size: 14px; color: #6B7280;">
-                You can view your ticket at: 
-                <a href="{{ ticket_url }}" style="color: #2563EB;">{{ ticket_url }}</a>
+                Need help getting started? Contact our support team or check out our 
+                <a href="{{ help_url }}" style="color: #2563EB;">help center</a>.
             </p>
         </div>
         

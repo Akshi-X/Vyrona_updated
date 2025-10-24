@@ -15,7 +15,7 @@ from app.schemas.response_schema import (
     UserDetailsResponse
 )
 from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse
-from app.service.email_service import send_approval_email
+from app.service.email_service import send_approval_email, send_user_approved_notification
 from app.utils import utils
 from app.exceptions import (
     EmailAlreadyExistsException,
@@ -309,6 +309,22 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     db.commit()
     db.refresh(user)
+    
+    # Send approval notification email to the user
+    try:
+        approved_date = user.approved_on.strftime("%B %d, %Y at %I:%M %p")
+        send_user_approved_notification(
+            user_email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            role=user.role,
+            company=user.company_name,
+            approved_date=approved_date
+        )
+        logger.info(f"Approval notification email sent to {user.email}")
+    except Exception as e:
+        # Log email failure but don't fail the approval process
+        logger.error(f"Failed to send approval notification email to {user.email}: {str(e)}")
     
     # Build response object
     response = UserApprovalResponse(

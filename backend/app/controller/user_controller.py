@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.responses import FileResponse
 
 from app.config import database
@@ -95,7 +95,8 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
             auth_token=result["auth_token"],
             expires_at=result["expires_at"],
             message=SuccessMessages.OTP_VERIFIED,
-            pharma_id=result.get("pharma_id")  # Include pharma_id in response
+            pharma_id=result.get("pharma_id"),  # Include pharma_id in response
+            role=result["role"]  # Include role in response
         )
         logger.debug(f"Controller: Returning response: {response}")
         return response
