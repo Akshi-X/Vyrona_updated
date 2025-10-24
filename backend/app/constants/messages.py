@@ -57,6 +57,9 @@ class ErrorMessages:
     EMAIL_AND_PASSWORD_REQUIRED = "Email and password are required"
     USER_ID_AND_OTP_REQUIRED = "User ID and OTP are required"
     USER_ID_AND_EMAIL_REQUIRED = "User ID and email are required"
+    INVALID_REQUEST_DATA = "Invalid request data"
+    VALIDATION_INPUT_ERROR = "Input validation failed"
+    INTERNAL_SERVER_ERROR = "Internal server error occurred"
     
     # RBAC / Permissions
     ACCESS_FORBIDDEN = "Access forbidden"

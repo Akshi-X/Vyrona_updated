@@ -84,8 +84,8 @@ async def exception_handler_middleware(request: Request, call_next):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "error_code": "VAL_4001",
-                    "message": "Invalid request data",
+                    "error_code": ERROR_CODES["INVALID_REQUEST_DATA"],
+                    "message": ErrorMessages.INVALID_REQUEST_DATA,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -112,8 +112,8 @@ async def exception_handler_middleware(request: Request, call_next):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "error_code": "VAL_4001",
-                    "message": "Invalid request data",
+                    "error_code": ERROR_CODES["INVALID_REQUEST_DATA"],
+                    "message": ErrorMessages.INVALID_REQUEST_DATA,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -123,7 +123,7 @@ async def exception_handler_middleware(request: Request, call_next):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error_code": ERROR_CODES["SERVER_ERROR"],
-                "message": "Internal server error occurred",
+                "message": ErrorMessages.INTERNAL_SERVER_ERROR,
                 "status": STATUS_FAILED,
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
@@ -170,7 +170,7 @@ def setup_exception_handlers(app):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
-                "error_code": "VAL_INPUT_001",
+                "error_code": ERROR_CODES["VALIDATION_INPUT_ERROR"],
                 "message": ErrorMessages.VALIDATION_ERROR,
                 "status": STATUS_FAILED,
                 "details": exc.errors(),
@@ -218,8 +218,8 @@ def setup_exception_handlers(app):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "error_code": "VAL_4001",
-                    "message": "Invalid request data",
+                    "error_code": ERROR_CODES["INVALID_REQUEST_DATA"],
+                    "message": ErrorMessages.INVALID_REQUEST_DATA,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
@@ -273,7 +273,7 @@ def setup_exception_handlers(app):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error_code": ERROR_CODES["SERVER_ERROR"],
-                "message": "Internal server error occurred",
+                "message": ErrorMessages.INTERNAL_SERVER_ERROR,
                 "status": STATUS_FAILED,
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
