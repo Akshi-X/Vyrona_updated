@@ -17,6 +17,7 @@ from ..constants.app_constants import (
     EMAIL_APPROVAL_SUBJECT,
     EMAIL_OTP_SUBJECT,
     EMAIL_PASSWORD_RESET_SUBJECT,
+    EMAIL_USER_APPROVED_SUBJECT,
     OTP_EXPIRY_MINUTES,
     PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
 )
@@ -309,7 +310,8 @@ def send_feedback_new_ticket_email(
     submitted_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send new feedback ticket notification email
@@ -340,8 +342,9 @@ def send_feedback_new_ticket_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_ticket.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
@@ -356,7 +359,8 @@ def send_feedback_status_update_email(
     updated_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send feedback status update notification email
@@ -384,8 +388,9 @@ def send_feedback_status_update_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_status_update.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
@@ -399,7 +404,8 @@ def send_feedback_new_comment_email(
     commented_by_name: str,
     submitted_by_email: str,
     feedback_id: str,
-    mygrape_admin_email: str
+    mygrape_admin_email: str,
+    send_to_user: bool = True
 ):
     """
     Send new comment notification email
@@ -426,8 +432,9 @@ def send_feedback_new_comment_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_comment.html", reason=str(e))
     
-    # Send to submitter (confirmation)
-    send_email(submitted_by_email, email_subject, html_body)
+    # Send to submitter (confirmation) only if send_to_user is True
+    if send_to_user:
+        send_email(submitted_by_email, email_subject, html_body)
     
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
@@ -463,6 +470,57 @@ def send_password_reset_email(user_email: str, reset_link: str, first_name: str)
         )
     except TemplateError as e:
         raise TemplateRenderException(template_name="password_reset_email.html", reason=str(e))
+    
+    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    send_email(user_email, subject, html_body)
+
+
+def send_user_approved_notification(
+    user_email: str, 
+    first_name: str, 
+    last_name: str, 
+    role: str, 
+    company: str,
+    approved_date: str
+):
+    """
+    Send user approval notification email with HTML template
+    
+    Args:
+        user_email: User's email address
+        first_name: User's first name
+        last_name: User's last name
+        role: User's role
+        company: User's company
+        approved_date: Date when approved
+        
+    Raises:
+        TemplateNotFoundException: If template file not found
+        TemplateRenderException: If template rendering fails
+        EmailServiceException: If email sending fails
+    """
+    subject = EMAIL_USER_APPROVED_SUBJECT
+    help_url = f"{settings.FRONTEND_URL}/help"
+    
+    # Load and render HTML template
+    try:
+        template = jinja_env.get_template("user_approved_notification.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="user_approved_notification.html")
+    
+    try:
+        html_body = template.render(
+            subject=subject,
+            first_name=first_name,
+            last_name=last_name,
+            email=user_email,
+            role=role,
+            company=company,
+            approved_date=approved_date,
+            help_url=help_url
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="user_approved_notification.html", reason=str(e))
     
     # Send email using configured service (Azure AD or SMTP with auto-fallback)
     send_email(user_email, subject, html_body)

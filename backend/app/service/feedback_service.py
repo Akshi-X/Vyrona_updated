@@ -18,6 +18,7 @@ from ..exceptions.custom_exceptions import (
 
 from ..models.feedback_model import Feedback
 from ..models.feedback_comments import Comment
+from ..models.feedback_attachment import FeedbackAttachment
 from ..models.user_model import User
 from .user_service import get_mygrape_admin_email
 from ..schemas.feedback_schema import (
@@ -64,10 +65,10 @@ def generate_ticket_id(db: Session) -> str:
     return f"{prefix}{ticket_number:03d}"
 
 
-def save_attachment(file: UploadFile, feedback_id: str) -> str:
-    """Save uploaded file and return the file path"""
-    # Create directory structure
-    upload_dir = f"{FEEDBACK_UPLOAD_DIR}/{feedback_id}"
+def save_attachment(file: UploadFile, feedback_id: str) -> dict:
+    """Save uploaded file and return attachment info"""
+    # Create directory structure: uploads/feedback/{ticket_id}/
+    upload_dir = os.path.join(FEEDBACK_UPLOAD_DIR, feedback_id)
     os.makedirs(upload_dir, exist_ok=True)
     
     # Validate file size
@@ -86,10 +87,10 @@ def save_attachment(file: UploadFile, feedback_id: str) -> str:
             allowed_extensions=FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS
         )
     
-    # Generate unique filename
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{timestamp}_{file.filename}"
-    file_path = os.path.join(upload_dir, filename)
+    # Generate unique filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+    stored_filename = f"{timestamp}_{file.filename}"
+    file_path = os.path.join(upload_dir, stored_filename)
     
     # Save file
     try:
@@ -101,14 +102,20 @@ def save_attachment(file: UploadFile, feedback_id: str) -> str:
             reason=str(e)
         )
     
-    return file_path
+    return {
+        "original_filename": file.filename,
+        "stored_filename": stored_filename,
+        "file_path": file_path,
+        "file_size": file.size,
+        "mime_type": file.content_type
+    }
 
 
 def create_feedback(
     db: Session, 
     request: FeedbackCreateRequest, 
     submitted_by: str,
-    attachment: Optional[UploadFile] = None
+    attachments: List[UploadFile] = []
 ) -> FeedbackCreateResponse:
     """Create a new feedback ticket"""
     
@@ -143,27 +150,43 @@ def create_feedback(
         logger.error(f"Database error creating feedback: {str(e)}")
         raise FeedbackCreateFailedException(reason=f"Database error: {str(e)}")
     
-    # Handle attachment if provided (after we have ticket_id)
-    if attachment:
+    # Handle attachments if provided (after we have ticket_id)
+    if attachments:
         try:
-            # Save attachment with correct ticket_id path
-            attachment_path = save_attachment(attachment, feedback.ticket_id)
-            feedback.attachment_path = attachment_path
+            for attachment in attachments:
+                # Save each attachment
+                attachment_info = save_attachment(attachment, feedback.ticket_id)
+                
+                # Create attachment record
+                attachment_record = FeedbackAttachment(
+                    ticket_id=feedback.ticket_id,
+                    original_filename=attachment_info["original_filename"],
+                    stored_filename=attachment_info["stored_filename"],
+                    file_path=attachment_info["file_path"],
+                    file_size=attachment_info["file_size"],
+                    mime_type=attachment_info["mime_type"],
+                    uploaded_by=submitted_by
+                )
+                
+                db.add(attachment_record)
+            
+            # Update feedback record
             feedback.updated_at = datetime.now(timezone.utc)
             feedback.updated_by = submitted_by
+            
             try:
                 db.commit()
             except IntegrityError as e:
                 db.rollback()
-                raise FeedbackCreateFailedException(reason=f"Database integrity error updating attachment: {str(e)}")
+                raise FeedbackCreateFailedException(reason=f"Database integrity error saving attachments: {str(e)}")
             except Exception as e:
                 db.rollback()
-                raise FeedbackCreateFailedException(reason=f"Database error updating attachment: {str(e)}")
+                raise FeedbackCreateFailedException(reason=f"Database error saving attachments: {str(e)}")
         except (FeedbackAttachmentTooLargeException, FeedbackAttachmentInvalidTypeException, FeedbackAttachmentSaveFailedException):
             raise
         except Exception as e:
             raise FeedbackAttachmentSaveFailedException(
-                filename=attachment.filename,
+                filename="multiple files",
                 reason=str(e)
             )
     
@@ -172,7 +195,7 @@ def create_feedback(
     if not user:
         raise FeedbackUserNotFoundException(user_id=submitted_by)
     
-    # Send email notifications
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -186,7 +209,8 @@ def create_feedback(
             submitted_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=user.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -242,7 +266,7 @@ def add_comment(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to MyGrape admin
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -254,7 +278,8 @@ def add_comment(
             commented_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -304,7 +329,7 @@ def update_feedback_status(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to MyGrape admin
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -317,7 +342,8 @@ def update_feedback_status(
             updated_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -401,6 +427,9 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
     # Get comments with user details
     comments = db.query(Comment).filter(Comment.ticket_id == feedback_id).order_by(Comment.created_at).all()
     
+    # Get attachments
+    attachments = db.query(FeedbackAttachment).filter(FeedbackAttachment.ticket_id == feedback_id).order_by(FeedbackAttachment.uploaded_at).all()
+    
     return FeedbackDetailResponse(
         id=feedback.ticket_id,
         ticket_id=feedback.ticket_id,
@@ -408,7 +437,6 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         feedback_type=feedback.feedback_type.value,
         subject=feedback.subject,
         description=feedback.description,
-        attachment_path=feedback.attachment_path,
         priority=feedback.priority.value,
         affected_modules=feedback.affected_modules,
         status=feedback.status.value,
@@ -417,15 +445,8 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         submitted_on=feedback.submitted_on,
         created_at=feedback.created_at,
         updated_at=feedback.updated_at,
-        comments=[
-            CommentResponse(
-                id=comment.id,
-                comment=comment.comment,
-                commented_by=comment.commented_by,
-                created_at=comment.created_at
-            )
-            for comment in comments
-        ]
+        comments=[comment.comment for comment in comments],
+        attachment_paths=[attachment.file_path for attachment in attachments]
     )
 
 
