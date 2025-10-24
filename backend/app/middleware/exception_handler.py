@@ -173,10 +173,16 @@ def setup_exception_handlers(app):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error_code": ERROR_CODES["SERVER_ERROR"],
-                "message": ErrorMessages.INTERNAL_ERROR,
+                "message": f"Internal Server Error: {type(exc).__name__}: {str(exc)}",
                 "status": STATUS_FAILED,
                 "error_id": error_id,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
+                "details": {
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "path": request.url.path,
+                    "method": request.method
+                }
             },
             headers={
                 "Access-Control-Allow-Origin": "*",
