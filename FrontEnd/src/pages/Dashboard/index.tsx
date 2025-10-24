@@ -1,6 +1,15 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import dashboardData from '../../data/dashboardData.json';
+import { OngoingTreatments } from '../../components/OngoingTreatments';
+import { Sidebar } from '../../components/Sidebar';
+import { CurveBar } from '../../components/CurveBar';
+import CriticalAlertsModal from '../../components/CriticalAlertsModal';
+import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
+import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import { criticalAlertsService, type CriticalAlert } from '../../services/criticalAlertsService';
+import { tasksService, type Task } from '../../services/tasksService';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
 import { CurveBar } from '../../components/CurveBar';
@@ -20,6 +29,9 @@ import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
+
+// TODO: Replace with actual user's pharma_id from authentication context
+const DUMMY_PHARMA_ID = 'pharma_12345';
 
 interface StakeholderChat {
   id: string;
@@ -63,6 +75,14 @@ export default function Dashboard({}: DashboardProps) {
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
+  
+  // Real data from APIs
+  const [criticalAlerts, setCriticalAlerts] = useState<CriticalAlert[]>([]);
+  const [myTasks, setMyTasks] = useState<Task[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
+
 
   // Mock stakeholder chats data
   const stakeholderChats: StakeholderChat[] = [
@@ -92,89 +112,71 @@ export default function Dashboard({}: DashboardProps) {
     }
   ];
 
-  // Mock tasks data
-  const myTasks: MyTask[] = [
-    {
-      id: '1',
-      patientId: 'ZQZQ812457',
-      taskName: 'Improve website Copy',
-      description: 'Change header text to better reflect...',
-      assigneeBy: 'Dr. Sarah Johnson',
-      dueDate: '02/03/2025',
-      priority: 'High',
-      status: 'Done'
-    },
-    {
-      id: '2',
-      patientId: 'ZQZQ812457',
-      taskName: 'Update help centre & FAQ',
-      description: 'Change header text to better reflect...',
-      assigneeBy: 'Dr. Sarah Johnson S',
-      dueDate: '02/03/2025',
-      priority: 'Medium',
-      status: 'In Progress'
-    },
-    {
-      id: '3',
-      patientId: 'ZQZQ812457',
-      taskName: 'Update help centre & FAQ',
-      description: 'Change header text to better reflect...',
-      assigneeBy: 'Dr. Sarah Johnson',
-      dueDate: '02/03/2025',
-      priority: 'Low',
-      status: 'Not started'
-    },
-    {
-      id: '4',
-      patientId: 'ZQZQ812457',
-      taskName: 'Update help centre & FAQ',
-      description: 'Change header text to better reflect...',
-      assigneeBy: 'Dr. Sarah Johnson',
-      dueDate: '02/03/2025',
-      priority: 'Low',
-      status: 'Not started'
-    }
-  ];
+  // Calculate dynamic notification counts
+  const stakeholderChatCount = stakeholderChats.length; // Show total chats count
+  const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
+  const myTasksCount = myTasks.length; // Show total tasks count
 
-  // Mock critical alerts data
-  const criticalAlerts: CriticalAlert[] = [
-    {
-      id: '1',
-      type: 'Temperature Excursion',
-      severity: 'High',
-      patientId: 'ZQZQ812457',
-      message: 'Temperature exceeded 8°C for 15 minutes during transport',
-      timestamp: '2024-05-28 (14:30)',
-      status: 'Active'
-    },
-    {
-      id: '2',
-      type: 'Delay Alert',
-      severity: 'Medium',
-      patientId: 'ZQZQ812457',
-      message: 'Manufacturing delay of 2 hours detected',
-      timestamp: '2024-05-28 (14:30)',
-      status: 'Acknowledged'
-    },
-    {
-      id: '3',
-      type: 'Quality Alert',
-      severity: 'High',
-      patientId: 'ZQZQ812457',
-      message: 'Cell viability below threshold at 85%',
-      timestamp: '2024-05-28 (14:30)',
-      status: 'Acknowledged'
-    },
-    {
-      id: '4',
-      type: 'Delay Alert',
-      severity: 'Medium',
-      patientId: 'ZQZQ812457',
-      message: 'Manufacturing delay of 3 hours detected',
-      timestamp: '2024-05-28 (14:30)',
-      status: 'Acknowledged'
+
+  // Fetch critical alerts from API
+  const fetchCriticalAlerts = async () => {
+    setLoadingAlerts(true);
+    try {
+      const response = await criticalAlertsService.getCriticalAlerts(DUMMY_PHARMA_ID);
+      setCriticalAlerts(response.alerts || []);
+    } catch (error) {
+      console.error('Failed to fetch critical alerts:', error);
+      setCriticalAlerts([]);
+    } finally {
+      setLoadingAlerts(false);
     }
-  ];
+  };
+
+  // Fetch critical alerts on component mount
+  useEffect(() => {
+    fetchCriticalAlerts();
+  }, []);
+
+  // Fetch my tasks from API
+  const fetchMyTasks = async () => {
+    setLoadingTasks(true);
+    try {
+      const response = await tasksService.getMyTasks();
+      setMyTasks(response.tasks || []);
+    } catch (error) {
+      console.error('Failed to fetch my tasks:', error);
+      setMyTasks([]);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // Fetch my tasks on component mount
+  useEffect(() => {
+    fetchMyTasks();
+  }, []);
+
+  // Transform API data to match component interface
+  const transformedTasks: MyTask[] = myTasks.map(task => ({
+    id: task.id.toString(),
+    patientId: task.patient_id || 'N/A',
+    taskName: task.task_name,
+    description: task.description || '',
+    assigneeBy: task.assignee_name,
+    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
+    priority: task.priority,
+    status: task.status
+  }));
+
+  const transformedAlerts = criticalAlerts.map(alert => ({
+    id: alert.id,
+    type: alert.type,
+    severity: alert.severity,
+    patientId: alert.patient_id,
+    message: alert.message,
+    timestamp: alert.timestamp,
+    status: alert.status
+  }));
 
   const handleLogout = () => {
     logout();
@@ -483,11 +485,13 @@ export default function Dashboard({}: DashboardProps) {
                       alt="Alerts"
                       src={CriticalAlertsIcon}
                     />
-                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                      <span className="font-semibold text-white text-[10px]">
-                        5
-                      </span>
-                    </div>
+                    {stakeholderChatCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">
+                          {stakeholderChatCount}
+                        </span>
+                      </div>
+                    )}
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
@@ -499,6 +503,21 @@ export default function Dashboard({}: DashboardProps) {
                   
                   <div className="relative group">
                     <img
+                      className="w-[22px] h-[22px] cursor-pointer"
+                      alt="Alerts"
+                      src={CriticalAlertsIcon}
+                      onClick={() => {
+                        fetchCriticalAlerts();
+                        setShowCriticalAlerts(true);
+                      }}
+                    />
+                    {criticalAlertsCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">
+                          {criticalAlertsCount}
+                        </span>
+                      </div>
+                    )}
                       className="w-7 h-[24.86px] cursor-pointer"
                       alt="Notifications"
                       src={StakeholderChatsIcon}
@@ -522,14 +541,21 @@ export default function Dashboard({}: DashboardProps) {
                     <img
                       className="w-[22px] h-[22px] cursor-pointer"
                       alt="Messages"
+                      src={StakeholderChatsIcon}
+                      onClick={() => {
+                        fetchMyTasks();
+                        setShowMyTasks(true);
+                      }}
                       src={MyTasksIcon}
                       onClick={() => setShowMyTasks(true)}
                     />
-                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                      <span className="font-semibold text-white text-[10px]">
-                        4
-                      </span>
-                    </div>
+                    {myTasksCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">
+                          {myTasksCount}
+                        </span>
+                      </div>
+                    )}
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
@@ -548,7 +574,10 @@ export default function Dashboard({}: DashboardProps) {
                     <div 
                       key={index} 
                       className={`flex-1 bg-white border border-[#E7E1E1] rounded-lg ${card.alt === 'My Tasks' ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-                      onClick={card.alt === 'My Tasks' ? () => setShowMyTasks(true) : undefined}
+                      onClick={card.alt === 'My Tasks' ? () => {
+                        fetchMyTasks();
+                        setShowMyTasks(true);
+                      } : undefined}
                     >
                       <div className="flex flex-col items-center justify-center pt-7 pb-6 px-4">
                         <img
@@ -665,286 +694,27 @@ export default function Dashboard({}: DashboardProps) {
       </main>
 
       {/* Critical Alerts Modal */}
-      {showCriticalAlerts && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-20 overflow-hidden h-full w-full z-50"
-          onClick={() => setShowCriticalAlerts(false)}
-        >
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div 
-              className="relative mx-auto border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="p-6">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Critical Alerts</h3>
-                    <p className="text-sm text-gray-500">Review critical alerts that require immediate attention</p>
-                  </div>
-                </div>
-                {/* Close Icon */}
-                <button
-                  onClick={() => setShowCriticalAlerts(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Alerts Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-purple-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[150px]">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[100px]">Severity</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[120px]">Patient ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[300px]">Message</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[150px]">Timestamp</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[120px]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {criticalAlerts.map((alert) => (
-                      <tr key={alert.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[150px]">
-                          <div className="text-sm font-medium text-gray-900">{alert.type}</div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[100px]">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            alert.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                            alert.severity === 'High' ? 'bg-orange-100 text-orange-800' :
-                            alert.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {alert.severity}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono min-w-[120px]">
-                          {alert.patientId}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900 min-w-[300px]">
-                          <div className="break-words max-w-[300px]">{alert.message}</div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 min-w-[150px]">
-                          {alert.timestamp}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[120px]">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            alert.status === 'Active' ? 'bg-red-100 text-red-800' :
-                            alert.status === 'Acknowledged' ? 'bg-yellow-100 text-yellow-800' :
-                            alert.status === 'Resolved' ? 'bg-green-100 text-green-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                            {alert.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Modal Footer - Close button removed */}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
+        <CriticalAlertsModal
+          isOpen={showCriticalAlerts}
+          onClose={() => setShowCriticalAlerts(false)}
+          alerts={transformedAlerts}
+          loading={loadingAlerts}
+        />
 
       {/* My Tasks Modal */}
-      {showMyTasks && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-20 overflow-hidden h-full w-full z-50"
-          onClick={() => setShowMyTasks(false)}
-        >
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div 
-              className="relative mx-auto border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="p-6">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center">
-                  {/* Icon and Title */}
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">My Tasks</h3>
-                    <p className="text-sm text-gray-500">Manage and track your assigned tasks</p>
-                  </div>
-                </div>
-                {/* Close Icon */}
-                <button
-                  onClick={() => setShowMyTasks(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Tasks Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-purple-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[100px]">Patient ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[150px]">Task Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[200px]">Description</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[120px]">Assignee by</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[100px]">Due date</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[80px]">Priority</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider min-w-[100px]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {myTasks.map((task) => (
-                      <tr key={task.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono min-w-[100px]">
-                          {task.patientId}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[150px]">
-                          <div className="text-sm font-medium text-gray-900">{task.taskName}</div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900 min-w-[200px]">
-                          <div className="break-words">{task.description}</div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 min-w-[120px]">
-                          {task.assigneeBy}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 min-w-[100px]">
-                          {task.dueDate}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[80px]">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[100px]">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            task.status === 'Done' ? 'bg-green-100 text-green-800' :
-                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {task.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Modal Footer - Close button removed */}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <MyTasksModal
+        isOpen={showMyTasks}
+        onClose={() => setShowMyTasks(false)}
+        tasks={transformedTasks}
+        loading={loadingTasks}
+      />
 
       {/* Stakeholder Chats Modal */}
-      {showStakeholderChats && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-20 overflow-hidden h-full w-full z-50"
-          onClick={() => setShowStakeholderChats(false)}
-        >
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div 
-              className="relative mx-auto border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="p-6">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center">
-                  {/* Icon and Title */}
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Stakeholder Chats</h3>
-                    <p className="text-sm text-gray-500">Recent message from stakeholders and team members</p>
-                  </div>
-                </div>
-                {/* Close Icon */}
-                <button
-                  onClick={() => setShowStakeholderChats(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Messages List */}
-              <div className="space-y-4">
-                {stakeholderChats.map((chat) => (
-                  <div 
-                    key={chat.id} 
-                    className={`p-4 rounded-lg border ${
-                      chat.isRead 
-                        ? 'bg-gray-50 border-gray-200' 
-                        : 'bg-purple-50 border-purple-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="mb-1">
-                          <span className={`font-semibold ${
-                            chat.isRead ? 'text-gray-700' : 'text-purple-700'
-                          }`}>
-                            {chat.sender}
-                          </span>
-                        </div>
-                        <div className={`text-sm mb-2 ${
-                          chat.isRead ? 'text-gray-500' : 'text-purple-600'
-                        }`}>
-                          {chat.patientId}
-                        </div>
-                        <p className={`text-sm ${
-                          chat.isRead ? 'text-gray-700' : 'text-gray-800'
-                        }`}>
-                          {chat.message}
-                        </p>
-                      </div>
-                      <span className={`text-xs font-medium ${
-                        chat.isRead ? 'text-gray-500' : 'text-purple-600'
-                      }`}>
-                        {chat.timestamp}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Modal Footer - Close button removed */}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <StakeholderChatsModal
+        isOpen={showStakeholderChats}
+        onClose={() => setShowStakeholderChats(false)}
+        chats={stakeholderChats}
+      />
     </div>
   );
 }

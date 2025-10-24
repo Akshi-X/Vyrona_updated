@@ -63,6 +63,21 @@ export class BaseApiService {
       ...options.headers,
     };
 
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} ${errorText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
     const requestPromise = (async () => {
       try {
         const response = await fetch(url, {
@@ -163,8 +178,6 @@ export class BaseApiService {
       const errorText = await response.text();
       throw new Error(`API Error: ${response.status} ${errorText}`);
     }
-
-    return await response.json();
   }
 
   /**

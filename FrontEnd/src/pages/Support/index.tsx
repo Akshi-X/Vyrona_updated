@@ -7,14 +7,15 @@ import Header from '../../components/Header';
 import AttachmentThumbnail from '../../components/AttachmentThumbnail';
 
 const modules = [
-  'Track & Trace',
-  'Quality Monitoring',
-  'Compliance Automation',
-  'Risk Module',
-  'Trust & Safety',
-  'Monitoring',
-  'Insights',
-  'Other',
+  'Dashboard',
+  'Database',
+  'Track shipment',
+  'Control Tower',
+  'After care',
+  'Failure',
+  'Stakeholder chat',
+  'Critical alert',
+  'MyTask',
 ];
 
 interface CommentItem {
@@ -45,7 +46,7 @@ const Support: React.FC = () => {
   const [subject, setSubject] = useState<string>(prefill.subject || '');
   const [description, setDescription] = useState<string>(prefill.description || '');
   const [priority, setPriority] = useState<string>(prefill.priority || '');
-  const [status] = useState<string>(prefill.status || 'Under Review');
+  const [status, setStatus] = useState<string>(prefill.status || 'Open');
   const [selectedModuleIndices, setSelectedModuleIndices] = useState<number[]>([]);
   const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
 
@@ -118,17 +119,26 @@ const Support: React.FC = () => {
         setPriority(mappedPriority);
         setFeedbackType(details.feedback_type || '');
         
+        // Update status from API response
+        console.log('API Status:', details.status);
+        setStatus(details.status || 'Open');
+        
          // Parse affected modules (it's a single enum value, not comma-separated)
          const affectedModule = details.affected_modules || '';
         
          // Set the checkbox based on the single module
          // Map backend module value to UI module name and find its index
          const moduleMap: Record<string, string> = {
-           'track_trace': 'Track & Trace',
-           'quality_monitoring': 'Quality Monitoring',
-           'compliance_automation': 'Compliance Automation',
-           'risk_module': 'Risk Module',
-           'other': 'Other'
+           'dashboard': 'Dashboard',
+           'database': 'Database',
+           'track_shipment': 'Track shipment',
+           'control_tower': 'Control Tower',
+           'after_care': 'After care',
+           'failure': 'Failure',
+           'stakeholder_chat': 'Stakeholder chat',
+           'critical_alert': 'Critical alert',
+           'mytask': 'MyTask',
+           'other': 'Dashboard' // Default fallback
          };
          
          const uiModuleName = moduleMap[affectedModule] || affectedModule;
@@ -157,7 +167,7 @@ const Support: React.FC = () => {
       .then(list => {
         const mapped: CommentItem[] = list.map(c => ({
           id: String(c.id),
-          author: c.commented_by,
+          author: fullName || 'User', // Use the current user's name instead of API response
           content: c.comment,
           createdAt: c.created_at
         }));
@@ -166,7 +176,7 @@ const Support: React.FC = () => {
       .catch(() => {
         setComments([]);
       });
-  }, [activeFeedbackId]);
+  }, [activeFeedbackId, fullName]);
 
   const canAddComment = Boolean(newComment.trim() && activeFeedbackId);
 
@@ -258,14 +268,15 @@ const Support: React.FC = () => {
       
       // Map UI module names to backend enum values
       const moduleMap: Record<string, string> = {
-        'Track & Trace': 'track_trace',
-        'Quality Monitoring': 'quality_monitoring',
-        'Compliance Automation': 'compliance_automation',
-        'Risk Module': 'risk_module',
-        'Trust & Safety': 'other',
-        'Monitoring': 'other',
-        'Insights': 'other',
-        'Other': 'other',
+        'Dashboard': 'dashboard',
+        'Database': 'database',
+        'Track shipment': 'track_shipment',
+        'Control Tower': 'control_tower',
+        'After care': 'after_care',
+        'Failure': 'failure',
+        'Stakeholder chat': 'stakeholder_chat',
+        'Critical alert': 'critical_alert',
+        'MyTask': 'mytask',
       };
       
       // Return the first selected module (backend expects single enum value)
@@ -273,8 +284,8 @@ const Support: React.FC = () => {
       const affectedModule = firstSelected ? moduleMap[firstSelected] : 'other';
       
       // Ensure we always send a valid enum value
-      const validEnumValues = ['track_trace', 'quality_monitoring', 'compliance_automation', 'risk_module', 'other'];
-      const finalAffectedModule = validEnumValues.includes(affectedModule) ? affectedModule : 'other';
+      const validEnumValues = ['dashboard', 'database', 'track_shipment', 'control_tower', 'after_care', 'failure', 'stakeholder_chat', 'critical_alert', 'mytask'];
+      const finalAffectedModule = validEnumValues.includes(affectedModule) ? affectedModule : 'dashboard';
       
       const feedbackData: FeedbackSubmission = {
         department: 'other', // Default department since field is removed
@@ -313,12 +324,19 @@ const Support: React.FC = () => {
   const disabledCls = 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200';
 
   const statusClass = (value: string) => {
-    if (value === 'Created') return 'bg-blue-100 text-blue-800';
+    if (value === 'Open') return 'bg-blue-100 text-blue-800';
+    if (value === 'In Progress') return 'bg-yellow-100 text-yellow-800';
     if (value === 'Completed') return 'bg-green-100 text-green-800';
-    return 'bg-yellow-100 text-yellow-800'; // Under Review
+    if (value === 'Reopen') return 'bg-orange-100 text-orange-800';
+    return 'bg-gray-100 text-gray-800'; // Default
   };
 
   const identityDisabled = readonly || lockIdentity;
+
+  // Debug status value
+  useEffect(() => {
+    console.log('Current Status:', status);
+  }, [status]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -428,6 +446,9 @@ const Support: React.FC = () => {
                         </svg>
                         <div className="text-sm text-gray-700">Click to upload or drag and drop</div>
                         <div className="text-[11px] text-gray-400">Max size 10MB per file</div>
+                        <div className="text-[10px] text-gray-500 mt-1">
+                          Supported: PDF, DOC, DOCX, TXT, JPG, JPEG, PNG, XLSX, XLS, CSV, ZIP, RAR
+                        </div>
                         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip,.rar" />
                       </div>
 
@@ -522,9 +543,10 @@ const Support: React.FC = () => {
                 <div className="mt-4">
                   <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Status</label>
                   <div className="inline-flex rounded-md border border-gray-200 overflow-hidden pointer-events-none select-none">
-                    <span className={`px-3 py-1.5 text-xs font-medium ${status === 'Created' ? statusClass('Created') : 'bg-gray-50 text-gray-400'}`}>Created</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Under Review' ? statusClass('Under Review') : 'bg-gray-50 text-gray-400'}`}>Under Review</span>
+                    <span className={`px-3 py-1.5 text-xs font-medium ${status === 'Open' ? statusClass('Open') : 'bg-gray-50 text-gray-400'}`}>Open</span>
+                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'In Progress' ? statusClass('In Progress') : 'bg-gray-50 text-gray-400'}`}>In Progress</span>
                     <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Completed' ? statusClass('Completed') : 'bg-gray-50 text-gray-400'}`}>Completed</span>
+                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Reopen' ? statusClass('Reopen') : 'bg-gray-50 text-gray-400'}`}>Reopen</span>
                   </div>
                 </div>
                 )}
@@ -611,11 +633,6 @@ const Support: React.FC = () => {
                 {/* Footer actions */}
                 {!readonly && (
                 <div className="mt-6 flex flex-col items-end space-y-2">
-                  {!agreementChecked && (
-                    <p className="text-xs text-gray-500 text-right">
-                      Please agree to be contacted to enable submission
-                    </p>
-                  )}
                   <button 
                     type="submit" 
                     disabled={isSubmitting || !agreementChecked}
