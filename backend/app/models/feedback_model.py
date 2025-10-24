@@ -41,7 +41,7 @@ class Feedback(Base):
         nullable=False
     )
     affected_modules = sqlalchemy.Column(
-        SQLEnum(AffectedModule, name='affected_module'), 
+        sqlalchemy.String(50), 
         nullable=False
     )
     

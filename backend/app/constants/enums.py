@@ -106,10 +106,15 @@ class FeedbackPriority(str, Enum):
 
 
 class AffectedModule(str, Enum):
-    TRACK_TRACE = "track_trace"
-    QUALITY_MONITORING = "quality_monitoring"
-    COMPLIANCE_AUTOMATION = "compliance_automation"
-    RISK_MODULE = "risk_module"
+    DASHBOARD = "dashboard"
+    DATABASE = "database"
+    TRACK_SHIPMENT = "track_shipment"
+    CONTROL_TOWER = "control_tower"
+    AFTER_CARE = "after_care"
+    FAILURE = "failure"
+    STAKEHOLDER_CHAT = "stakeholder_chat"
+    CRITICAL_ALERT = "critical_alert"
+    MY_TASK = "my_task"
     OTHER = "other"
     
     @classmethod
