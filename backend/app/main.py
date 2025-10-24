@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import SecuritySchemeType
 from fastapi.security import HTTPBearer
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -114,8 +114,8 @@ async def startup_event():
     logger.info("Creating database tables...")
     create_tables()
     
-    # Step 2: Create super admin user
-    logger.info("Creating super admin user...")
+    # Step 2: Create pharma admin users
+    logger.info("Creating pharma admin users...")
     create_admin()
     
     print("!" * 60 + "\n")
@@ -153,6 +153,7 @@ app.include_router(patient_controller.router, prefix=API_PREFIX)
 app.include_router(feedback_controller.router, prefix=API_PREFIX)
 app.include_router(task_controller.router, prefix=API_PREFIX)
 app.include_router(dashboard_controller.router, prefix=API_PREFIX)
+app.include_router(chat_controller.router, prefix=API_PREFIX)
 
 # Health check endpoint
 @app.get("/health")

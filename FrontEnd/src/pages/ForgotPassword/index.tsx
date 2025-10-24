@@ -7,6 +7,7 @@ import { authService } from "../../services/authService";
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState("");
     const [emailError, setEmailError] = useState("");
+    const [serverError, setServerError] = useState("");
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
@@ -17,6 +18,7 @@ const ForgotPassword: React.FC = () => {
 
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setEmail(e.target.value);
+        setServerError(""); // Clear server error when user types
         if (!e.target.value) {
             setEmailError("Email is required");
         } else if (!validateEmail(e.target.value)) {
@@ -41,15 +43,18 @@ const ForgotPassword: React.FC = () => {
         if (!valid) return;
 
         setEmailError("");
+        setServerError("");
         setLoading(true);
         setMessage("");
 
         try {
             const resp = await authService.forgotPassword(email);
             setMessage(resp?.message || "Password reset link has been sent to your email");
-            setEmailError("");
+            setServerError("");
         } catch (err: any) {
-            setEmailError(err?.message || "Network error. Please try again.");
+            // Extract error message from backend response
+            const errorMessage = err?.response?.data?.message || err?.message || "Network error. Please try again.";
+            setServerError(errorMessage);
             setMessage("");
         } finally {
             setLoading(false);
@@ -111,29 +116,31 @@ const ForgotPassword: React.FC = () => {
                             >
                                 Email
                             </label>
-                            {/* Server Response Message */}
-                            {(message || emailError) && (
-                                <div>
-                                    {message && (
-                                        <p className="text-sm text-green-600 mt-2">{message}</p>
-                                    )}
-                                    {emailError && !message && (
-                                        <p className="text-sm text-red-600 mt-2">{emailError}</p>
-                                    )}
-                                </div>
-                            )}
+
                         </div>
 
                         {/* Send Instructions Button */}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
                         >
                             {loading ? "Sending..." : "Send"}
                         </button>
-
-
+                        {/* Server Response Message */}
+                        {(message || emailError || serverError) && (
+                            <div>
+                                {message && (
+                                    <p className="text-sm text-green-600 mt-2">{message}</p>
+                                )}
+                                {emailError && !message && (
+                                    <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                                )}
+                                {serverError && !message && (
+                                    <p className="text-sm text-red-600 mt-2">{serverError}</p>
+                                )}
+                            </div>
+                        )}
                     </form>
 
                     {/* Footer */}

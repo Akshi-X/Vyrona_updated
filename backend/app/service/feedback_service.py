@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
 from fastapi import UploadFile, HTTPException
+from ..config.config import settings
 from ..exceptions.custom_exceptions import (
     FeedbackCreateFailedException, FeedbackInvalidDataException,
     FeedbackAttachmentTooLargeException, FeedbackAttachmentInvalidTypeException,
@@ -121,7 +122,7 @@ def create_feedback(
         subject=request.subject,
         description=request.description,
         priority=request.priority,
-        affected_modules=request.affected_modules,
+        affected_modules=request.affected_modules.value,
         status=FeedbackStatus.OPEN,
         submitted_by=submitted_by,
         created_by=submitted_by
@@ -134,9 +135,11 @@ def create_feedback(
         db.refresh(feedback)
     except IntegrityError as e:
         db.rollback()
+        logger.error(f"Database integrity error creating feedback: {str(e)}")
         raise FeedbackCreateFailedException(reason=f"Database integrity error: {str(e)}")
     except Exception as e:
         db.rollback()
+        logger.error(f"Database error creating feedback: {str(e)}")
         raise FeedbackCreateFailedException(reason=f"Database error: {str(e)}")
     
     # Handle attachment if provided (after we have ticket_id)
@@ -170,6 +173,7 @@ def create_feedback(
     
     # Send email notifications
     try:
+        # Send to MyGrape admin (all feedback goes to platform admin)
         send_feedback_new_ticket_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
@@ -178,7 +182,8 @@ def create_feedback(
             department=feedback.department.value,
             submitted_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=user.email,
-            feedback_id=feedback.ticket_id
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -234,15 +239,17 @@ def add_comment(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications
+    # Send email notifications to pharma admin
     try:
+        # Send to MyGrape admin (all feedback goes to platform admin)
         send_feedback_new_comment_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
             comment=request.comment,
             commented_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
-            feedback_id=feedback.ticket_id
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -292,8 +299,9 @@ def update_feedback_status(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications
+    # Send email notifications to pharma admin
     try:
+        # Send to MyGrape admin (all feedback goes to platform admin)
         send_feedback_status_update_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
@@ -301,7 +309,8 @@ def update_feedback_status(
             new_status=request.status.value,
             updated_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
-            feedback_id=feedback.ticket_id
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -394,7 +403,7 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         description=feedback.description,
         attachment_path=feedback.attachment_path,
         priority=feedback.priority.value,
-        affected_modules=feedback.affected_modules.value,
+        affected_modules=feedback.affected_modules,
         status=feedback.status.value,
         submitted_by=f"{user.first_name} {user.last_name}",
         submitted_by_email=user.email,

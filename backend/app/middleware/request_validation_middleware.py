@@ -6,8 +6,10 @@ Validates requests before reaching controllers.
 """
 
 import json
+import logging
 from typing import Callable
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
@@ -22,6 +24,11 @@ from ..dependencies.auth_dependencies import (
     validate_reject_user_request
 )
 from ..utils.utils import create_error_response
+from ..exceptions.custom_exceptions import AppException
+from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -62,7 +69,10 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 if response:
                     return response  # Validation failed, return error
             
-            # fastapi handle directly
+            elif path == "/api/feedback":
+                response = await self._validate_feedback_creation(request)
+                if response:
+                    return response  # Validation failed, return error
         
         elif method == "GET":
             # Validate GET endpoints
@@ -392,42 +402,77 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_feedback_creation(self, request: Request):
         """Validate feedback creation request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
         
         try:
-            # Handle multipart form data from frontend
-            form_data = await request.form()
+            # Check content type to determine how to parse the request
+            content_type = request.headers.get("content-type", "")
             
-            # Extract data from direct form fields (frontend format)
-            data = {}
-            required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
-            
-            # Get data from individual form fields
-            for field in required_fields:
-                if field in form_data:
-                    data[field] = form_data[field]
-            
-            if not data:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Request data is required",
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
-                )
+            if "multipart/form-data" in content_type:
+                # Handle multipart form data (file uploads)
+                form_data = await request.form()
+                request_json = form_data.get("request")
+                
+                if not request_json:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": ERROR_CODES["FEEDBACK_REQUEST_DATA_REQUIRED"],
+                            "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                
+                # Parse JSON from form data
+                try:
+                    data = json.loads(request_json)
+                except json.JSONDecodeError as e:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": ERROR_CODES["FEEDBACK_INVALID_JSON_FORMAT"],
+                            "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+            else:
+                # Handle JSON requests
+                body = await request.body()
+                if not body:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": ERROR_CODES["FEEDBACK_REQUEST_DATA_REQUIRED"],
+                            "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                
+                try:
+                    data = json.loads(body)
+                except json.JSONDecodeError as e:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": ERROR_CODES["FEEDBACK_INVALID_JSON_FORMAT"],
+                            "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
             
             # Validate required fields
+            required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
             missing_fields = [field for field in required_fields if not data.get(field)]
             
             if missing_fields:
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Missing required fields: {', '.join(missing_fields)}",
+                        "error_code": ERROR_CODES["FEEDBACK_MISSING_REQUIRED_FIELDS"],
+                        "message": f"{ErrorMessages.FEEDBACK_MISSING_REQUIRED_FIELDS}: {', '.join(missing_fields)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -440,11 +485,12 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 priority = FeedbackPriority(data["priority"])
                 affected_modules = AffectedModule(data["affected_modules"])
             except ValueError as e:
+                # Provide detailed error message with valid values
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Invalid enum value: {str(e)}",
+                        "error_code": ERROR_CODES["FEEDBACK_INVALID_ENUM_VALUE"],
+                        "message": f"{ErrorMessages.FEEDBACK_INVALID_ENUM_VALUE}: {str(e)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -455,8 +501,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Subject must be at least 3 characters long",
+                        "error_code": ERROR_CODES["FEEDBACK_SUBJECT_TOO_SHORT"],
+                        "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -466,8 +512,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Description must be at least 10 characters long",
+                        "error_code": ERROR_CODES["FEEDBACK_DESCRIPTION_TOO_SHORT"],
+                        "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -477,8 +523,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Subject must be less than 200 characters",
+                        "error_code": ERROR_CODES["FEEDBACK_SUBJECT_TOO_LONG"],
+                        "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -488,8 +534,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Description must be less than 2000 characters",
+                        "error_code": ERROR_CODES["FEEDBACK_DESCRIPTION_TOO_LONG"],
+                        "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -508,6 +554,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return None  # Validation passed
             
         except Exception as e:
+            logger.error(f"Validation error in feedback creation: {str(e)}", exc_info=True)
             return JSONResponse(
                 status_code=500,
                 content={

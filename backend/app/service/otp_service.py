@@ -1,5 +1,6 @@
 import random
 import string
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -11,6 +12,9 @@ from ..auth.auth import create_access_token
 from ..exceptions import ResendOTPFailedException
 from ..utils.utils import get_user_by_email, get_user_by_id
 from .email_service import send_otp_email
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 def generate_otp_code(length: int = 6) -> str:
@@ -141,69 +145,96 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     Returns:
         dict with user_id, email, auth_token, expires_at
     """
-    # Import here to avoid circular dependency
-    from ..dependencies.auth_dependencies import validate_otp_verification
-    from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
-    
-    print(f"Verifying OTP for user_id: {user_id}")
-    
-    # Validation
-    user = validate_otp_verification(user_id, otp, db)
-    print(f"OTP validated for user: {user.email}")
-    
-    # Get the OTP record to check remember_me preference
-    otp_record = db.query(OTP).filter(
-        and_(
-            OTP.user_id == user_id,
-            OTP.otp_code == otp,
-            OTP.is_used == True  # It was just marked as used by validation
+    try:
+        # Import here to avoid circular dependency
+        from ..dependencies.auth_dependencies import validate_otp_verification
+        from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
+
+        logger.info(f"Verifying OTP for user_id: {user_id}")
+        logger.debug(f"OTP code: {otp}")
+
+        # Validation
+        logger.debug("Starting OTP validation...")
+        user = validate_otp_verification(user_id, otp, db)
+        logger.info(f"OTP validated for user: {user.email}")
+        logger.debug(f"User role: {user.role}")
+        logger.debug(f"User company: {user.company_name}")
+
+        # Get the OTP record to check remember_me preference
+        # Since we just validated the OTP, get the most recent one for this user
+        otp_record = db.query(OTP).filter(
+            OTP.user_id == user_id
+        ).order_by(OTP.created_at.desc()).first()
+
+        logger.debug(f"OTP record found: {otp_record is not None}")
+        if otp_record:
+            logger.debug(f"OTP record remember_me: {otp_record.remember_me}")
+
+        # Determine session duration based on remember_me preference
+        if otp_record and otp_record.remember_me:
+            session_duration = REMEMBER_ME_SESSION_DURATION_MINUTES  # 9 hours
+            remember_me = True
+            logger.info(f"Remember Me enabled: Session expires in {session_duration} minutes (9 hours)")
+        else:
+            session_duration = NO_REMEMBER_ME_SESSION_DURATION_MINUTES  # 1 hour
+            remember_me = False
+            logger.info(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
+
+        # Business Logic: Create JWT token with remember_me flag in payload
+        logger.debug(f"Creating JWT token with session duration: {session_duration} minutes")
+        access_token_expires = timedelta(minutes=session_duration)
+        logger.debug(f"Token data: sub={user.user_id}, remember_me={remember_me}")
+
+        access_token = create_access_token(
+            data={
+                "sub": str(user.user_id),
+                "remember_me": remember_me
+            },
+            expires_delta=access_token_expires
         )
-    ).order_by(OTP.created_at.desc()).first()
-    
-    # Determine session duration based on remember_me preference
-    if otp_record and otp_record.remember_me:
-        session_duration = REMEMBER_ME_SESSION_DURATION_MINUTES  # 9 hours
-        remember_me = True
-        print(f"Remember Me enabled: Session expires in {session_duration} minutes (9 hours)")
-    else:
-        session_duration = NO_REMEMBER_ME_SESSION_DURATION_MINUTES  # 1 hour
-        remember_me = False
-        print(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
-    
-    # Business Logic: Create JWT token with remember_me flag in payload
-    access_token_expires = timedelta(minutes=session_duration)
-    access_token = create_access_token(
-        data={
-            "sub": str(user.user_id),
-            "remember_me": remember_me
-        }, 
-        expires_delta=access_token_expires
-    )
-    print(f"JWT token created successfully")
-    
-    expires_at = datetime.now(timezone.utc) + access_token_expires
-    print(f"Token expires at: {expires_at}")
-    
-    # Get user's pharma_id from the pharma relationship
-    pharma_id = None
-    if hasattr(user, 'pharma') and user.pharma:
-        # user.pharma is a list, get the first one
-        if len(user.pharma) > 0:
-            pharma_id = user.pharma[0].id
-    else:
-        # If no direct relationship, query the pharma table
-        from ..models.pharma_model import Pharma
-        pharma = db.query(Pharma).filter(Pharma.user_id == user.user_id).first()
-        if pharma:
-            pharma_id = pharma.id
-    
-    return {
-        "user_id": str(user.user_id),
-        "email": user.email,
-        "auth_token": access_token,
-        "expires_at": expires_at,
-        "pharma_id": pharma_id
-    }
+        logger.debug(f"JWT token created successfully")
+
+        expires_at = datetime.now(timezone.utc) + access_token_expires
+        logger.debug(f"Token expires at: {expires_at}")
+
+        # Get user's pharma_id from the pharma relationship
+        pharma_id = None
+        try:
+            logger.debug(f"Getting pharma_id for user: {user.user_id}")
+            if hasattr(user, 'pharma') and user.pharma:
+                logger.debug(f"User has pharma relationship: {len(user.pharma)} entries")
+                # user.pharma is a list, get the first one
+                if len(user.pharma) > 0:
+                    pharma_id = user.pharma[0].id
+                    logger.debug(f"Found pharma_id from relationship: {pharma_id}")
+            else:
+                logger.debug("No direct pharma relationship, querying pharma table...")
+                # If no direct relationship, query the pharma table
+                from ..models.pharma_model import Pharma
+                pharma = db.query(Pharma).filter(Pharma.user_id == user.user_id).first()
+                if pharma:
+                    pharma_id = pharma.id
+                    logger.debug(f"Found pharma_id from query: {pharma_id}")
+                else:
+                    logger.debug("No pharma found for user")
+        except Exception as e:
+            logger.warning(f"Could not get pharma_id for user {user.user_id}: {e}")
+            pharma_id = None
+
+        result = {
+            "user_id": str(user.user_id),
+            "email": user.email,
+            "auth_token": access_token,
+            "expires_at": expires_at,
+            "pharma_id": pharma_id
+        }
+        logger.debug(f"Returning result: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in verify_otp_and_create_token: {e}")
+        db.rollback()
+        raise Exception(f"Failed to verify OTP and create token: {str(e)}")
 
 
 def resend_otp_to_user(user_id: str, email: str, db: Session) -> dict:
