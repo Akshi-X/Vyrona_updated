@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
 from fastapi import UploadFile, HTTPException
+from ..config.config import settings
 from ..exceptions.custom_exceptions import (
     FeedbackCreateFailedException, FeedbackInvalidDataException,
     FeedbackAttachmentTooLargeException, FeedbackAttachmentInvalidTypeException,

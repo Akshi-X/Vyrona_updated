@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
@@ -31,6 +32,9 @@ from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 
 router = APIRouter(tags=["Users"])
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------
@@ -74,20 +78,34 @@ def login_user(request: LoginRequest, db: Session = Depends(database.get_db)):
 @router.post("/verify-otp", response_model=VerifyOTPSuccessResponse)
 def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(database.get_db)):
     """OTP verification endpoint."""
-    # Call service (all business logic there)
-    result = verify_otp_and_create_token(request.user_id, request.otp, db)
-    
-    # Return DTO
-    return VerifyOTPSuccessResponse(
-        user_id=result["user_id"],
-        email=result["email"],
-        status="Logged In",
-        auth_token=result["auth_token"],
-        expires_at=result["expires_at"],
-        message=SuccessMessages.OTP_VERIFIED,
-        pharma_id=result.get("pharma_id"),  # Include pharma_id in response
-        role=result["role"]  # Include role in response
-    )
+    logger.info(f"Controller: Received verify OTP request for user_id: {request.user_id}")
+    logger.debug(f"Controller: OTP code: {request.otp}")
+
+    try:
+        # Call service (all business logic there)
+        logger.debug("Controller: Calling verify_otp_and_create_token service...")
+        result = verify_otp_and_create_token(request.user_id, request.otp, db)
+        logger.debug(f"Controller: Service returned result: {result}")
+
+        # Return DTO
+        response = VerifyOTPSuccessResponse(
+            user_id=result["user_id"],
+            email=result["email"],
+            status="Logged In",
+            auth_token=result["auth_token"],
+            expires_at=result["expires_at"],
+            message=SuccessMessages.OTP_VERIFIED,
+            pharma_id=result.get("pharma_id")  # Include pharma_id in response
+        )
+        logger.debug(f"Controller: Returning response: {response}")
+        return response
+
+    except Exception as e:
+        logger.error(f"Controller: Exception in verify_otp_endpoint: {e}")
+        logger.error(f"Controller: Exception type: {type(e)}")
+        import traceback
+        logger.error(f"Controller: Traceback: {traceback.format_exc()}")
+        raise
 
 
 # ---------------------------

@@ -9,6 +9,7 @@ from enum import Enum
 class UserRole(str, Enum):
     ADMIN = "admin"
     PHARMA_ADMIN = "pharma_admin"
+    MYGRAPE_ADMIN = "mygrape_admin"
     MANAGER = "manager"
     USER = "user"
     

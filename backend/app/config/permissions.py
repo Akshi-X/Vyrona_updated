@@ -65,6 +65,22 @@ PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
 }
 
 # ============================================
+# MYGRAPE ADMIN ENDPOINTS
+# ============================================
+MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
+    # User management
+    ("GET", "/api/user/{user_id}"),     # View user details
+          # Reject user
+    # Feedback management (all feedback from all pharmas)
+    ("GET", "/api/feedback"),           # View all feedback
+    ("GET", "/api/feedback/admin"),     # View all feedback for admin
+    ("GET", "/api/feedback/{feedback_id}"),       # View specific feedback
+    ("POST", "/api/feedback/{feedback_id}/comments"),  # Add comment
+    ("GET", "/api/feedback/{feedback_id}/comments"),   # Get comments
+    ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
+}
+
+# ============================================
 # MANAGER-ONLY ENDPOINTS
 # ============================================
 MANAGER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
@@ -119,6 +135,16 @@ def get_role_permissions(role: str) -> dict:
             "can_view_all_users": True,
             "can_manage_system": False,
             "role": "pharma_admin"
+        }
+    elif role_lower == "mygrape_admin":
+        return {
+            "can_approve_users": False,
+            "can_reject_users": False,
+            "can_view_all_users": True,
+            "can_manage_feedback": True,
+            "can_view_all_feedback": True,
+            "can_manage_system": False,
+            "role": "mygrape_admin"
         }
     elif role_lower == "manager":
         return {

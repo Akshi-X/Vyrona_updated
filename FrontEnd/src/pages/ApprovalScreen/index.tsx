@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useSearchParams, Navigate } from "react-router-dom";
-import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { authUtils } from "../../utils/auth";
+import { BaseApiService } from "../../services/baseApiService";
 import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 
@@ -17,7 +17,7 @@ const ApprovalScreen: React.FC = () => {
   const [fetching, setFetching] = useState(true);
   const [completed, setCompleted] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const apiService = new BaseApiService();
   const location = useLocation();
 
   // Allow context time to mount, but don't show an auth error if a cookie token exists
@@ -39,32 +39,25 @@ const ApprovalScreen: React.FC = () => {
       const endpoint =
         action === "approve" ? "/api/user/approve" : "/api/user/reject";
 
-      const response = await axios.post(
-        `${API_BASE_URL}${endpoint}`,
-        { registration_id: registrationId },
-        { 
-          headers: { 
-            Authorization: `Bearer ${tokenToUse}`,
-            'Content-Type': 'application/json'
-          } 
-        }
+      const response = await apiService.post<{ detail?: string; message?: string }>(
+        endpoint,
+        { registration_id: registrationId }
       );
 
-      setStatus(response.data.detail);
+      setStatus(response.detail || response.message || "Action completed successfully");
       setCompleted(true);
       // After successful approval or rejection, navigate to dashboard
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1500);
     } catch (err: any) {
-      console.error(err);
-      if (err.response?.status === 401) {
+      if (err.message?.includes('401')) {
         setStatus("Session expired. Please login again.");
         logout();
-      } else if (err.response?.status === 403) {
+      } else if (err.message?.includes('403')) {
         setStatus("Access denied: You don't have permission to perform this action.");
       } else {
-        setStatus(err.response?.data?.message);
+        setStatus(err.message || "An error occurred");
       }
     } finally {
       setLoading(false);

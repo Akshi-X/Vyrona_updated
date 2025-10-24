@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
+import { authService } from "../../services/authService";
 
 const Signup: React.FC = () => {
     const [firstName, setFirstName] = useState("");
@@ -27,15 +27,41 @@ const Signup: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // navigate removed; success panel no longer shows login button
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+    // Handle clicks outside dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const validateEmail = (value: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
     const validatePassword = (value: string) =>
         /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(value);
+
+    const roleOptions = [
+        { value: "Manager", label: "Manager" },
+        { value: "User", label: "User" }
+    ];
+
+    const handleRoleSelect = (selectedRole: string) => {
+        setrole(selectedRole);
+        setIsDropdownOpen(false);
+        if (roleError) setroleError("");
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -109,12 +135,11 @@ const Signup: React.FC = () => {
 
         try {
             setLoading(true);
-            const response = await axios.post(`${API_BASE_URL}/api/register`, payload);
-
+            const response = await authService.register(payload);
 
             // Handle backend-declared failures
-            const respStatus = (response.data?.status || '').toString().toLowerCase();
-            const respMessage = response.data?.message;
+            const respStatus = (response.status || '').toString().toLowerCase();
+            const respMessage = response.message;
             if (respStatus === 'failed' || respStatus === 'error') {
                 if (respMessage === 'This email is already registered') {
                     setEmailError('This email is already registered');
@@ -128,8 +153,7 @@ const Signup: React.FC = () => {
             setApiSuccess(respMessage || 'Registration successful');
             setRegistrationSuccess(true);
         } catch (err: any) {
-            console.error("Registration Error:", err);
-            const message = err.response?.data?.message;
+            const message = err.message;
             if (message === 'This email is already registered') {
                 setEmailError('This email is already registered');
                 setApiError("");
@@ -188,12 +212,6 @@ const Signup: React.FC = () => {
                             </div>
 
                             <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-                                {apiError && (
-                                    <p className="text-sm text-red-500">{apiError}</p>
-                                )}
-                                {apiSuccess && (
-                                    <p className="text-sm text-green-600">{apiSuccess}</p>
-                                )}
                                 {/* First & Last Name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative w-full">
@@ -254,23 +272,42 @@ const Signup: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* role */}
-                                <div className="relative w-full">
-                                    <select
-                                        value={role}
-                                        onChange={(e) => {
-                                            setrole(e.target.value);
-                                            if (roleError) setroleError("");
-                                        }}
-                                        className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
+                                {/* Role Dropdown */}
+                                <div className="relative w-full" ref={dropdownRef}>
+                                    <div
+                                        className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
                                             } ${!role ? "text-gray-400" : "text-black"}`}
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                     >
-                                        <option value="" disabled>
-                                            Role
-                                        </option>
-                                        <option value="Manager">Manager</option>
-                                        <option value="User">User</option>
-                                    </select>
+                                        <div className="flex justify-between items-center">
+                                            <span>{role || "Role"}</span>
+                                            <svg
+                                                className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    
+                                    {isDropdownOpen && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
+                                            {roleOptions.map((option) => (
+                                                <div
+                                                    key={option.value}
+                                                    className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
+                                                        role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
+                                                    }`}
+                                                    onClick={() => handleRoleSelect(option.value)}
+                                                >
+                                                    {option.label}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
                                     {roleError && (
                                         <p className="text-xs text-red-500 mt-1">{roleError}</p>
                                     )}
@@ -361,6 +398,12 @@ const Signup: React.FC = () => {
                                 >
                                     {loading ? "Submitting..." : "Sign up"}
                                 </button>
+                                {apiError && (
+                                    <p className="text-sm text-red-500">{apiError}</p>
+                                )}
+                                {apiSuccess && (
+                                    <p className="text-sm text-green-600">{apiSuccess}</p>
+                                )}
                             </form>
 
                             <p className="mt-2 text-center font-normal text-base">
@@ -369,6 +412,7 @@ const Signup: React.FC = () => {
                                     Sign in
                                 </Link>
                             </p>
+                            
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
                                     ITAdmin@MyGrape.com
