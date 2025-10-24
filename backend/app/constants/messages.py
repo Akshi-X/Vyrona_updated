@@ -28,6 +28,7 @@ class ErrorMessages:
     OTP_INVALID = "Invalid OTP. Please try again"
     OTP_SEND_FAILED = "Failed to send OTP. Please try again"
     OTP_MAX_ATTEMPTS = "Maximum OTP attempts exceeded. Please request a new OTP"
+    OTP_VALIDATION_ERROR = "Invalid or expired OTP"
     
     # Password Reset
     RESET_USER_NOT_FOUND = "If your email is registered, a password reset link has been sent."
