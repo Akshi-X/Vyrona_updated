@@ -122,7 +122,7 @@ def create_feedback(
         subject=request.subject,
         description=request.description,
         priority=request.priority,
-        affected_modules=request.affected_modules,
+        affected_modules=request.affected_modules.value,
         status=FeedbackStatus.OPEN,
         submitted_by=submitted_by,
         created_by=submitted_by
@@ -135,9 +135,11 @@ def create_feedback(
         db.refresh(feedback)
     except IntegrityError as e:
         db.rollback()
+        logger.error(f"Database integrity error creating feedback: {str(e)}")
         raise FeedbackCreateFailedException(reason=f"Database integrity error: {str(e)}")
     except Exception as e:
         db.rollback()
+        logger.error(f"Database error creating feedback: {str(e)}")
         raise FeedbackCreateFailedException(reason=f"Database error: {str(e)}")
     
     # Handle attachment if provided (after we have ticket_id)
@@ -434,7 +436,7 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         description=feedback.description,
         attachment_path=feedback.attachment_path,
         priority=feedback.priority.value,
-        affected_modules=feedback.affected_modules.value,
+        affected_modules=feedback.affected_modules,
         status=feedback.status.value,
         submitted_by=f"{user.first_name} {user.last_name}",
         submitted_by_email=user.email,
