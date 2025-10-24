@@ -19,9 +19,11 @@ export const CurveBar: React.FC<CurveBarProps> = ({
     lg: 'w-[240px] h-[120px]'
   };
 
-  const strokeWidth = size === 'sm' ? 8 : size === 'md' ? 12 : 16;
-  const radius = size === 'sm' ? 50 : size === 'md' ? 75 : 100;
-  const circumference = 2 * Math.PI * radius;
+  const strokeWidth =  9;
+  const radius= 75;
+  
+  // For semi-circle, we use half the circumference
+  const circumference = Math.PI * radius;
   const strokeDasharray = circumference;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
@@ -31,21 +33,17 @@ export const CurveBar: React.FC<CurveBarProps> = ({
         className="absolute inset-0 w-full h-full"
         viewBox={`0 0 ${radius * 2 + strokeWidth} ${radius + strokeWidth}`}
       >
-        {/* Background circle */}
-        <circle
-          cx={radius + strokeWidth / 2}
-          cy={radius + strokeWidth / 2}
-          r={radius}
+        {/* Background semi-circle */}
+        <path
+          d={`M ${strokeWidth / 2} ${radius + strokeWidth / 2} A ${radius} ${radius} 0 0 1 ${radius * 2 + strokeWidth / 2} ${radius + strokeWidth / 2}`}
           fill="none"
           stroke="#f0f0f0"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
         />
-        {/* Progress circle - starts from left (9 o'clock) and goes clockwise */}
-        <circle
-          cx={radius + strokeWidth / 2}
-          cy={radius + strokeWidth / 2}
-          r={radius}
+        {/* Progress semi-circle - starts from left and goes clockwise */}
+        <path
+          d={`M ${strokeWidth / 2} ${radius + strokeWidth / 2} A ${radius} ${radius} 0 0 1 ${radius * 2 + strokeWidth / 2} ${radius + strokeWidth / 2}`}
           fill="none"
           stroke={color}
           strokeWidth={strokeWidth}
@@ -53,7 +51,6 @@ export const CurveBar: React.FC<CurveBarProps> = ({
           strokeDasharray={strokeDasharray}
           strokeDashoffset={strokeDashoffset}
           className="transition-all duration-1000 ease-out"
-          transform={`rotate(-90 ${radius + strokeWidth / 2} ${radius + strokeWidth / 2})`}
         />
       </svg>
     </div>

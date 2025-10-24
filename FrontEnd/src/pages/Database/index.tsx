@@ -1,10 +1,16 @@
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../../components/Sidebar';
 import { DatabaseTable } from '../../components/DatabaseTable';
-import patientData from '../../data/patientData.json';
 
 export default function Database() {
   const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   if (!isAuthenticated) {
     return (
@@ -17,7 +23,7 @@ export default function Database() {
   return (
     <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
       {/* Left Sidebar */}
-      <Sidebar onLogout={logout} />
+      <Sidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
@@ -49,7 +55,7 @@ export default function Database() {
 
           {/* Database Table */}
           <div className="flex-1">
-            <DatabaseTable patients={patientData.patients} />
+            <DatabaseTable pharmaId="1" />
           </div>
         </div>
       </main>

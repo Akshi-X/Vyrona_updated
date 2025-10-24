@@ -1,24 +1,37 @@
-import React, { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import { authService } from "../../services/authService";
 
 const ResetPassword: React.FC = () => {
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const tokenFromQuery = searchParams.get("token") || "";
 
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [confirmError, setConfirmError] = useState("");
-    
+
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const validatePassword = (value: string) => {
         return value.length >= 8;
     };
+
+    // Handle navigation to login page after 3 seconds on success
+    useEffect(() => {
+        if (isSuccess) {
+            const timer = setTimeout(() => {
+                navigate('/login');
+            }, 3000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isSuccess, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,6 +70,7 @@ const ResetPassword: React.FC = () => {
         try {
             const resp = await authService.resetPassword(tokenFromQuery, password, confirmPassword);
             setMessage(resp?.message || "Password has been reset successfully");
+            setIsSuccess(true);
             setPassword("");
             setConfirmPassword("");
             setConfirmError("");
@@ -64,6 +78,7 @@ const ResetPassword: React.FC = () => {
         } catch (err: any) {
             setPasswordError(err?.message || "Network error. Please try again.");
             setMessage("");
+            setIsSuccess(false);
         } finally {
             setLoading(false);
         }
@@ -125,9 +140,7 @@ const ResetPassword: React.FC = () => {
                             >
                                 New Password
                             </label>
-                            {passwordError && (
-                                <p className="text-xs text-red-500 mt-1">{passwordError}</p>
-                            )}
+
                         </div>
 
                         {/* Confirm Password Field */}
@@ -145,35 +158,45 @@ const ResetPassword: React.FC = () => {
                             >
                                 Confirm Password
                             </label>
-                            {confirmError && (
-                                <p className="text-xs text-red-500 mt-1">{confirmError}</p>
-                            )}
+
                         </div>
 
                         {/* Submit Button */}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
                         >
                             {loading ? "Resetting..." : "Reset Password"}
                         </button>
-                    </form>
-                    {/* Server Response Message */}
-                    {!message && (
-                            <div>
-                                <p className="text-sm text-green-600 mt-3 flex justify-center">{message}</p>
-                            </div>
+                        {passwordError && (
+                            <p className="text-xs text-red-500 mt-1 mb-1">{passwordError}</p>
                         )}
+                        {!passwordError && confirmError && (
+                            <p className="text-xs text-red-500 mt-1 mb-1">{confirmError}</p>
+                        )}
+                    </form>
+                    {/* Success Message with Countdown */}
+                    {isSuccess && message && (
+                        <div className="mt-3 flex flex-col items-center">
+                            <p className="text-sm text-green-600 text-center">
+                                {message}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Redirecting to login page in 3 seconds...
+                            </p>
+                        </div>
+                    )}
+                    
+                    {/* Error Message */}
+                    {!isSuccess && message && (
+                        <div className="mt-3 flex justify-center">
+                            <p className="text-sm text-red-500">{message}</p>
+                        </div>
+                    )}
 
                     {/* Footer */}
                     <div className="text-center text-sm text-gray-500 mt-3 space-y-2">
-                        <p>
-                            Remembered your password?{" "}
-                            <Link to="/login" className="text-[#8b2a96] font-medium underline">
-                                Sign in
-                            </Link>
-                        </p>
                         <p>
                             Need help?{" "}
                             <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
