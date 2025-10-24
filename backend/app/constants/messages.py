@@ -28,6 +28,7 @@ class ErrorMessages:
     OTP_INVALID = "Invalid OTP. Please try again"
     OTP_SEND_FAILED = "Failed to send OTP. Please try again"
     OTP_MAX_ATTEMPTS = "Maximum OTP attempts exceeded. Please request a new OTP"
+    OTP_VALIDATION_ERROR = "Invalid or expired OTP"
     
     # Password Reset
     RESET_USER_NOT_FOUND = "If your email is registered, a password reset link has been sent."
@@ -56,6 +57,9 @@ class ErrorMessages:
     EMAIL_AND_PASSWORD_REQUIRED = "Email and password are required"
     USER_ID_AND_OTP_REQUIRED = "User ID and OTP are required"
     USER_ID_AND_EMAIL_REQUIRED = "User ID and email are required"
+    INVALID_REQUEST_DATA = "Invalid request data"
+    VALIDATION_INPUT_ERROR = "Input validation failed"
+    INTERNAL_SERVER_ERROR = "Internal server error occurred"
     
     # RBAC / Permissions
     ACCESS_FORBIDDEN = "Access forbidden"

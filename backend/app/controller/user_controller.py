@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.responses import FileResponse
 
 from app.config import database
