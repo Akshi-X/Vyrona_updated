@@ -242,7 +242,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                       window.URL.revokeObjectURL(url);
                     }}
                   >
-                    View PDF
+                    Download Doc
                   </button>
                 </td>
               </tr>
