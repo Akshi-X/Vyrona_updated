@@ -226,7 +226,8 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             "email": user.email,
             "auth_token": access_token,
             "expires_at": expires_at,
-            "pharma_id": pharma_id
+            "pharma_id": pharma_id,
+            "role": user.role
         }
         logger.debug(f"Returning result: {result}")
         return result
@@ -234,7 +235,8 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
     except Exception as e:
         logger.error(f"Error in verify_otp_and_create_token: {e}")
         db.rollback()
-        raise Exception(f"Failed to verify OTP and create token: {str(e)}")
+        # Re-raise the original exception instead of wrapping it
+        raise
 
 
 def resend_otp_to_user(user_id: str, email: str, db: Session) -> dict:

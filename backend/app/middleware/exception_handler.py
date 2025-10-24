@@ -52,6 +52,45 @@ async def exception_handler_middleware(request: Request, call_next):
             content=exc.to_dict()
         )
         
+    except ValidationError as exc:
+        # Handle Pydantic validation errors
+        logger.warning(
+            f"Pydantic validation error on {request.url.path}: {str(exc)}",
+            extra={"errors": exc.errors()}
+        )
+        
+        # Check if it's an OTP-related error based on the path and error details
+        error_message = str(exc).lower()
+        is_otp_endpoint = "/verify-otp" in request.url.path
+        
+        logger.info(f"Error message: {error_message}")
+        logger.info(f"Is OTP endpoint: {is_otp_endpoint}")
+        
+        if is_otp_endpoint and any(keyword in error_message for keyword in ['role', 'field required']):
+            # This is likely an OTP verification failure
+            logger.info("Returning OTP error response")
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error_code": "OTP_4001",
+                    "message": "Invalid or expired OTP",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+        else:
+            # Generic validation error
+            logger.info("Returning generic validation error response")
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error_code": "VAL_4001",
+                    "message": "Invalid request data",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+        
     except Exception as exc:
         # Handle unexpected exceptions
         error_id = f"ERR-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
@@ -62,15 +101,29 @@ async def exception_handler_middleware(request: Request, call_next):
                 "error_id": error_id,
                 "path": request.url.path,
                 "method": request.method,
+                "exception_type": type(exc).__name__,
                 "traceback": traceback.format_exc()
             }
         )
+        
+        # Check if it's a ValidationError that wasn't caught
+        if isinstance(exc, ValidationError):
+            logger.warning("ValidationError caught in general exception handler - this should not happen")
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error_code": "VAL_4001",
+                    "message": "Invalid request data",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
         
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error_code": ERROR_CODES["SERVER_ERROR"],
-                "message": ErrorMessages.INTERNAL_ERROR,
+                "message": "Internal server error occurred",
                 "status": STATUS_FAILED,
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
@@ -131,6 +184,53 @@ def setup_exception_handlers(app):
             }
         )
     
+    @app.exception_handler(ValidationError)
+    async def pydantic_validation_handler(request: Request, exc: ValidationError):
+        """Handle Pydantic validation errors (not FastAPI RequestValidationError)"""
+        logger.warning(
+            f"Pydantic validation error on {request.url.path}",
+            extra={"errors": exc.errors()}
+        )
+        
+        # Check if it's an OTP-related error based on the path and error details
+        error_message = str(exc).lower()
+        is_otp_endpoint = "/verify-otp" in request.url.path
+        
+        if is_otp_endpoint and any(keyword in error_message for keyword in ['role', 'field required']):
+            # This is likely an OTP verification failure
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error_code": "OTP_4001",
+                    "message": "Invalid or expired OTP",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        else:
+            # Generic validation error
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error_code": "VAL_4001",
+                    "message": "Invalid request data",
+                    "status": STATUS_FAILED,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+    
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         """Handle FastAPI HTTP exceptions"""
@@ -173,16 +273,10 @@ def setup_exception_handlers(app):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error_code": ERROR_CODES["SERVER_ERROR"],
-                "message": f"Internal Server Error: {type(exc).__name__}: {str(exc)}",
+                "message": "Internal server error occurred",
                 "status": STATUS_FAILED,
                 "error_id": error_id,
-                "timestamp": datetime.utcnow().isoformat(),
-                "details": {
-                    "exception_type": type(exc).__name__,
-                    "exception_message": str(exc),
-                    "path": request.url.path,
-                    "method": request.method
-                }
+                "timestamp": datetime.utcnow().isoformat()
             },
             headers={
                 "Access-Control-Allow-Origin": "*",
