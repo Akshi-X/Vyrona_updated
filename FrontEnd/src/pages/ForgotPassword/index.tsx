@@ -144,7 +144,7 @@ const ForgotPassword: React.FC = () => {
                     </form>
 
                     {/* Footer */}
-                    <div className="text-center text-sm text-gray-500 mt-8 space-y-2">
+                    <div className="text-center text-sm text-gray-500 mt-2 space-y-2">
                         <p>
                             Remember your password?{" "}
                             <Link to="/login" className="text-[#8b2a96] font-medium underline">
