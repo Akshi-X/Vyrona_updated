@@ -52,7 +52,9 @@ const ForgotPassword: React.FC = () => {
             setMessage(resp?.message || "Password reset link has been sent to your email");
             setServerError("");
         } catch (err: any) {
-            setServerError(err?.message || "Network error. Please try again.");
+            // Extract error message from backend response
+            const errorMessage = err?.response?.data?.message || err?.message || "Network error. Please try again.";
+            setServerError(errorMessage);
             setMessage("");
         } finally {
             setLoading(false);

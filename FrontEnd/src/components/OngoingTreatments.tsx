@@ -5,18 +5,23 @@ interface OngoingTreatmentsProps {
   // No props needed since we don't send pharma_id
 }
 
+type SortField = 'patient_id' | 'condition' | 'hospital' | 'stage' | 'location';
+type SortDirection = 'asc' | 'desc';
+
 const tableHeaders = [
-  { label: "Patient ID", hasSort: false },
-  { label: "Condition", hasSort: false },
-  { label: "Hospital", hasSort: false },
-  { label: "Stage", hasSort: false },
-  { label: "Location", hasSort: true },
+  { label: "Patient ID", field: 'patient_id' as SortField, hasSort: true },
+  { label: "Condition", field: 'condition' as SortField, hasSort: true },
+  { label: "Hospital", field: 'hospital' as SortField, hasSort: true },
+  { label: "Stage", field: 'stage' as SortField, hasSort: true },
+  { label: "Location", field: 'location' as SortField, hasSort: true },
 ];
 
 export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const [treatments, setTreatments] = useState<OngoingTreatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const getStageColor = (stage: string) => {
     switch (stage.toLowerCase()) {
@@ -31,6 +36,41 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedTreatments = () => {
+    if (!sortField) return treatments;
+
+    return [...treatments].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      // Handle string comparison
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+      
+      // Handle number comparison (for patient_id if it's numeric)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // Fallback to string comparison
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+      const comparison = aStr.localeCompare(bStr);
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
   };
 
   useEffect(() => {
@@ -99,19 +139,36 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
         }}
       >
         <table className="w-full">
-          <thead className="sticky top-0 bg-white z-10">
+          <thead className="sticky top-0 bg-[#fdeeff] z-10">
             <tr className="border-b border-[#eeeeee]">
               {tableHeaders.map((header, index) => (
                 <th
                   key={index}
-                  className="bg-white p-[15px] font-semibold text-[#6b1176] text-sm text-left"
+                  className={`p-[15px] font-semibold text-[#6b1176] text-sm text-left ${
+                    header.hasSort ? 'cursor-pointer hover:bg-[#f0e6f0]' : ''
+                  }`}
+                  onClick={header.hasSort ? () => handleSort(header.field) : undefined}
                 >
                   <div className="flex items-center gap-2">
                     <span>{header.label}</span>
                     {header.hasSort && (
-                      <svg className="w-4 h-4 text-[#6b1176]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                      </svg>
+                      <div className="flex flex-col">
+                        {sortField === header.field ? (
+                          sortDirection === 'asc' ? (
+                            <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          )
+                        ) : (
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                          </svg>
+                        )}
+                      </div>
                     )}
                   </div>
                 </th>
@@ -126,7 +183,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                 </td>
               </tr>
             ) : (
-              treatments.map((treatment) => (
+              getSortedTreatments().map((treatment) => (
                 <tr
                   key={treatment.patient_id}
                   className="border-b border-[#eeeeee] hover:bg-white/50"

@@ -288,21 +288,6 @@ export default function Dashboard({}: DashboardProps) {
 
         {/* Dashboard Content */}
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
-          {/* Error Display */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Error loading data
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    {error}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
 
           <div className="flex gap-6 flex-1 flex-col lg:flex-row">
