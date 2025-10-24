@@ -70,13 +70,8 @@ PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
 MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     # User management
     ("GET", "/api/user/{user_id}"),     # View user details
-          # Reject user
-    # Feedback management (all feedback from all pharmas)
-    ("GET", "/api/feedback"),           # View all feedback
+    # Feedback admin endpoints (only for MyGrape admin)
     ("GET", "/api/feedback/admin"),     # View all feedback for admin
-    ("GET", "/api/feedback/{feedback_id}"),       # View specific feedback
-    ("POST", "/api/feedback/{feedback_id}/comments"),  # Add comment
-    ("GET", "/api/feedback/{feedback_id}/comments"),   # Get comments
     ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
 }
 
