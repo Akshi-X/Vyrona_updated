@@ -8,6 +8,7 @@ Validates requests before reaching controllers.
 import json
 from typing import Callable
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
@@ -399,35 +400,64 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
         
         try:
-            # For multipart form data, we need to handle it differently
-            # The request body will contain the form data
-            form_data = await request.form()
-            request_json = form_data.get("request")
+            # Check content type to determine how to parse the request
+            content_type = request.headers.get("content-type", "")
             
-            if not request_json:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": "Request data is required",
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
-                )
-            
-            # Parse JSON from form data
-            try:
-                data = json.loads(request_json)
-            except json.JSONDecodeError as e:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "error_code": "VAL_INPUT_001",
-                        "message": f"Invalid JSON format: {str(e)}",
-                        "status": STATUS_FAILED,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
-                )
+            if "multipart/form-data" in content_type:
+                # Handle multipart form data (file uploads)
+                form_data = await request.form()
+                request_json = form_data.get("request")
+                
+                if not request_json:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": "VAL_INPUT_001",
+                            "message": "Request data is required",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                
+                # Parse JSON from form data
+                try:
+                    data = json.loads(request_json)
+                except json.JSONDecodeError as e:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": "VAL_INPUT_001",
+                            "message": f"Invalid JSON format: {str(e)}",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+            else:
+                # Handle JSON requests
+                body = await request.body()
+                if not body:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": "VAL_INPUT_001",
+                            "message": "Request data is required",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
+                
+                try:
+                    data = json.loads(body)
+                except json.JSONDecodeError as e:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error_code": "VAL_INPUT_001",
+                            "message": f"Invalid JSON format: {str(e)}",
+                            "status": STATUS_FAILED,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    )
             
             # Validate required fields
             required_fields = ["department", "feedback_type", "subject", "description", "priority", "affected_modules"]
