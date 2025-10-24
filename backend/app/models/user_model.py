@@ -19,7 +19,7 @@ class User(Base):
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Role and Company
-    role = sqlalchemy.Column(SQLEnum('admin', 'pharma_admin', 'manager', 'user', name='user_role'), nullable=False)
+    role = sqlalchemy.Column(SQLEnum('admin', 'pharma_admin', 'mygrape_admin', 'manager', 'user', name='user_role'), nullable=False)
     company_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Account Status

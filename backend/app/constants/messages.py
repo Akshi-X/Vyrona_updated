@@ -30,7 +30,7 @@ class ErrorMessages:
     OTP_MAX_ATTEMPTS = "Maximum OTP attempts exceeded. Please request a new OTP"
     
     # Password Reset
-    RESET_USER_NOT_FOUND = "No account found with this email address"
+    RESET_USER_NOT_FOUND = "If your email is registered, a password reset link has been sent."
     RESET_TOKEN_INVALID = "Invalid or expired password reset link. Please request a new one"
     RESET_TOKEN_EXPIRED = "Password reset link has expired. Please request a new one"
     PASSWORD_RESET_FAILED = "Failed to reset password. Please try again"
