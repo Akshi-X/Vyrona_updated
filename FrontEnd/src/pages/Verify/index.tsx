@@ -53,7 +53,7 @@ const VerifyOtp: React.FC = () => {
 
             if (response.status === "Logged In") {
                 setSuccess("OTP verified successfully!");
-                // AuthService already saves the token in cookies, just update context
+                // Save auth token using context
                 if (response.auth_token) {
                     login(response.auth_token);
                 }

@@ -63,27 +63,12 @@ export class BaseApiService {
       ...options.headers,
     };
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.status} ${errorText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw error;
     const requestPromise = (async () => {
       try {
         const response = await fetch(url, {
           ...options,
           headers,
-      //     // credentials: 'include', // Removed to fix CORS issue // Removed to fix CORS issue
+          // credentials: 'include', // Removed to fix CORS issue
         });
 
         if (!response.ok) {
@@ -178,6 +163,8 @@ export class BaseApiService {
       const errorText = await response.text();
       throw new Error(`API Error: ${response.status} ${errorText}`);
     }
+
+    return await response.json();
   }
 
   /**
@@ -200,22 +187,6 @@ export class BaseApiService {
     });
 
     if (!response.ok) {
-      // Handle 401 Unauthorized - clear auth token and redirect to login
-      if (response.status === 401) {
-        authUtils.clearToken();
-        // Clear any other auth-related data
-        try {
-          localStorage.removeItem('user_id');
-          localStorage.removeItem('user_data');
-        } catch (error) {
-          // Silently handle localStorage clearing errors
-        }
-        // Optionally redirect to login page
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-      }
-
       const errorText = await response.text();
       let errorMessage = `API Error: ${response.status}`;
       
@@ -262,11 +233,49 @@ export class BaseApiService {
   }
 
   /**
+   * Make a public GET request
+   */
+  async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'GET'
+    });
+  }
+
+  /**
    * Make a public POST request
    */
   async post<T>(endpoint: string, data: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  /**
+   * Make a public PUT request
+   */
+  async put<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  /**
+   * Make a public DELETE request
+   */
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE'
+    });
+  }
+
+  /**
+   * Make a public PATCH request
+   */
+  async patch<T>(endpoint: string, data: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: JSON.stringify(data)
     });
   }

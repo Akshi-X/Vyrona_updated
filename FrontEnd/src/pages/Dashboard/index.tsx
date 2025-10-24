@@ -1,18 +1,14 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import dashboardData from '../../data/dashboardData.json';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
 import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
-import { criticalAlertsService, type CriticalAlert } from '../../services/criticalAlertsService';
+import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
-import { OngoingTreatments } from '../../components/OngoingTreatments';
-import { Sidebar } from '../../components/Sidebar';
-import { CurveBar } from '../../components/CurveBar';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
 import { performanceService, type PerformanceMetrics } from '../../services/performanceService';
 import { riskService, type RiskMetrics } from '../../services/riskService';
@@ -42,26 +38,7 @@ interface StakeholderChat {
   isRead: boolean;
 }
 
-interface MyTask {
-  id: string;
-  patientId: string;
-  taskName: string;
-  description: string;
-  assigneeBy: string;
-  dueDate: string;
-  priority: 'Low' | 'Medium' | 'High';
-  status: 'Not started' | 'In Progress' | 'Done';
-}
 
-interface CriticalAlert {
-  id: string;
-  type: 'Temperature Excursion' | 'Delay Alert' | 'Quality Alert' | 'System Failure' | 'Compliance Issue';
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  patientId: string;
-  message: string;
-  timestamp: string;
-  status: 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated';
-}
 // Performance Icons
 import OnTimeIcon from '../../assets/DashBoardIcons/OnTime.svg';
 import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
@@ -77,7 +54,7 @@ export default function Dashboard({}: DashboardProps) {
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
   
   // Real data from APIs
-  const [criticalAlerts, setCriticalAlerts] = useState<CriticalAlert[]>([]);
+  const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
@@ -172,7 +149,7 @@ export default function Dashboard({}: DashboardProps) {
     id: alert.id,
     type: alert.type,
     severity: alert.severity,
-    patientId: alert.patient_id,
+    patientId:  alert.patient_id,
     message: alert.message,
     timestamp: alert.timestamp,
     status: alert.status
@@ -190,7 +167,7 @@ export default function Dashboard({}: DashboardProps) {
   const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
   const [complianceMetrics, setComplianceMetrics] = useState<ComplianceMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   // Static pharma ID - in future this will come from verify OTP
   const PHARMA_ID = 1;
@@ -217,7 +194,7 @@ export default function Dashboard({}: DashboardProps) {
         setRiskMetrics(risk);
         setComplianceMetrics(compliance);
       } catch (err) {
-        setError('Failed to load dashboard data');
+         setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -477,34 +454,12 @@ export default function Dashboard({}: DashboardProps) {
             <div className="flex-1 flex flex-col gap-6 min-w-0">
               {/* Notifications Section */}
               <section className="w-full">
-                
                 <div className="flex justify-end gap-8 mb-4">
-                <div className="relative group">
-                    <img
-                      className="w-[22px] h-[22px] cursor-pointer"
-                      alt="Alerts"
-                      src={CriticalAlertsIcon}
-                    />
-                    {stakeholderChatCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">
-                          {stakeholderChatCount}
-                        </span>
-                      </div>
-                    )}
-                    {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                      <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Critical Alerts
-                      </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                    </div>
-                  </div>
-                  
+                  {/* Critical Alerts */}
                   <div className="relative group">
                     <img
                       className="w-[22px] h-[22px] cursor-pointer"
-                      alt="Alerts"
+                      alt="Critical Alerts"
                       src={CriticalAlertsIcon}
                       onClick={() => {
                         fetchCriticalAlerts();
@@ -518,16 +473,30 @@ export default function Dashboard({}: DashboardProps) {
                         </span>
                       </div>
                     )}
-                      className="w-7 h-[24.86px] cursor-pointer"
-                      alt="Notifications"
+                    {/* Tooltip */}
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      <div className="font-semibold text-black text-xs whitespace-nowrap">
+                        Critical Alerts
+                      </div>
+                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                    </div>
+                  </div>
+
+                  {/* Stakeholder Chats */}
+                  <div className="relative group">
+                    <img
+                      className="w-[22px] h-[22px] cursor-pointer"
+                      alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => setShowStakeholderChats(true)}
                     />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                      <span className="font-semibold text-white text-[10px]">
-                        1
-                      </span>
-                    </div>
+                    {stakeholderChatCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">
+                          {stakeholderChatCount}
+                        </span>
+                      </div>
+                    )}
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
@@ -537,17 +506,16 @@ export default function Dashboard({}: DashboardProps) {
                     </div>
                   </div>
 
+                  {/* My Tasks */}
                   <div className="relative group">
                     <img
                       className="w-[22px] h-[22px] cursor-pointer"
-                      alt="Messages"
-                      src={StakeholderChatsIcon}
+                      alt="My Tasks"
+                      src={MyTasksIcon}
                       onClick={() => {
                         fetchMyTasks();
                         setShowMyTasks(true);
                       }}
-                      src={MyTasksIcon}
-                      onClick={() => setShowMyTasks(true)}
                     />
                     {myTasksCount > 0 && (
                       <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
