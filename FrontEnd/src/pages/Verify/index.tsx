@@ -4,6 +4,7 @@ import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import { authService } from "../../services/authService";
+import { authUtils } from "../../utils/auth";
 
 const VerifyOtp: React.FC = () => {
     const location = useLocation();
@@ -55,14 +56,24 @@ const VerifyOtp: React.FC = () => {
                 setSuccess("OTP verified successfully!");
                 // Save auth token using context
                 if (response.auth_token) {
-                    login(response.auth_token);
+                    // Set token with proper expiration (1 hour for non-remember me)
+                    authUtils.setToken(response.auth_token, false);
+                    login(response.auth_token, response.role);
                 }
                 // Persist user id for pages that need it (e.g., My Tickets)
                 try {
                     localStorage.setItem('user_id', response.user_id);
                 } catch {}
-                // Redirect back to original page if provided, else dashboard
-                const target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
+                
+                // Check if user role is admin and redirect accordingly
+                let target;
+                if (response.role === "admin") {
+                    target = "/user-profile";
+                } else {
+                    // Redirect back to original page if provided, else dashboard
+                    target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
+                }
+                
                 setTimeout(() => navigate(target, { replace: true }), 500);
             } else {
                 setError(response.message || "Invalid OTP");

@@ -12,6 +12,7 @@ import ApprovalScreen from '../pages/ApprovalScreen'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
+import { RoleBasedRoute } from '../components/RoleBasedRoute'
 
 export const router = createBrowserRouter([
   { path: '/', element:<Login /> },
@@ -24,8 +25,8 @@ export const router = createBrowserRouter([
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/dashboard', element: <Dashboard /> },
-  { path: '/database', element: <Database /> },
+  { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['admin']}><Dashboard /></RoleBasedRoute> },
+  { path: '/database', element: <RoleBasedRoute restrictedRoles={['admin']}><Database /></RoleBasedRoute> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])
