@@ -226,7 +226,8 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             "email": user.email,
             "auth_token": access_token,
             "expires_at": expires_at,
-            "pharma_id": pharma_id
+            "pharma_id": pharma_id,
+            "role": user.role
         }
         logger.debug(f"Returning result: {result}")
         return result
