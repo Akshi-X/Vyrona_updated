@@ -72,8 +72,8 @@ async def exception_handler_middleware(request: Request, call_next):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "error_code": "OTP_4001",
-                    "message": "Invalid or expired OTP",
+                    "error_code": ERROR_CODES["OTP_VALIDATION_ERROR"],
+                    "message": ErrorMessages.OTP_VALIDATION_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -201,8 +201,8 @@ def setup_exception_handlers(app):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "error_code": "OTP_4001",
-                    "message": "Invalid or expired OTP",
+                    "error_code": ERROR_CODES["OTP_VALIDATION_ERROR"],
+                    "message": ErrorMessages.OTP_VALIDATION_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
