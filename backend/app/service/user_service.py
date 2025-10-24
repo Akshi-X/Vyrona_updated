@@ -41,6 +41,39 @@ from app.config.config import settings
 logger = logging.getLogger(__name__)
 
 
+def get_pharma_admin_email(company_name: str, db: Session) -> Optional[str]:
+    """
+    Get the email of a pharma admin from the specified company.
+    
+    Used for pharma-specific approval: Each pharma admin can only approve users from their own company.
+    
+    Args:
+        company_name: Company name to search for
+        db: Database session
+        
+    Returns:
+        Pharma admin's email if found, None otherwise
+    """
+    try:
+        # Validate input
+        if not company_name or not company_name.strip():
+            logger.warning("Empty or None company_name provided to get_pharma_admin_email")
+            return None
+        
+        pharma_admin = db.query(user_model.User).filter(
+            user_model.User.company_name == company_name,
+            user_model.User.role == 'pharma_admin',
+            user_model.User.approved_status == 'approved',
+            user_model.User.status == True
+        ).first()
+        
+        return pharma_admin.email if pharma_admin else None
+        
+    except Exception as e:
+        logger.error(f"Error getting pharma admin email for company '{company_name}': {str(e)}")
+        return None
+
+
 def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
     """
     Get the email of an approved manager from the specified company.
@@ -144,24 +177,21 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         logger.info(f"Preparing to send approval email for role: {role_lower}")
         recipient_email = None
         
-        if role_lower == 'manager':
-            # Manager registration → Send to MyGrape Platform Admin
-            recipient_email = settings.ADMIN_EMAIL
-            logger.info(f"Manager registration: Sending approval email to MyGrape Admin ({recipient_email})")
-        else:
-            # User registration → Send to Company Manager
-            # Find approved manager from the same company
-            company_manager_email = get_company_manager_email(request.company_name, db)
-            
-            if company_manager_email:
-                # Company has an approved manager
-                recipient_email = company_manager_email
-                logger.info(f"User registration: Sending approval email to Company Manager ({recipient_email})")
-            else:
-                # Company has NO approved manager yet
-                # Fallback: Send to MyGrape admin (for first user registration)
-                recipient_email = settings.ADMIN_EMAIL
-                logger.warning(f"User registration but no company manager found. Sending to MyGrape Admin ({recipient_email})")
+        # Check if pharma admin exists for this company
+        pharma_admin_email = get_pharma_admin_email(request.company_name, db)
+        
+        if not pharma_admin_email:
+            # No pharma admin for this company - registration not allowed
+            db.rollback()
+            logger.error(f"No pharma admin found for company: {request.company_name}")
+            raise DatabaseQueryException(
+                operation="user registration", 
+                reason=f"Registration not allowed for company '{request.company_name}'. No pharma admin configured for this company."
+            )
+        
+        # Both manager and user registrations go to pharma admin
+        recipient_email = pharma_admin_email
+        logger.info(f"Registration: Sending approval email to Pharma Admin ({recipient_email}) for company: {request.company_name}")
         
         # Send approval email BEFORE committing
         # If email fails, transaction will rollback
@@ -196,6 +226,10 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         
+        # If it's already a custom exception, re-raise it
+        if hasattr(e, 'error_code'):
+            raise e
+        
         # If it's an email error, raise a more specific exception
         if 'email' in str(e).lower() or 'smtp' in str(e).lower():
             raise RegistrationEmailFailedException(email=request.email, reason=str(e))
@@ -204,13 +238,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
 
     # Build response message using constants
     # If we reach here, email was sent successfully (otherwise exception would have been raised)
-    if role_lower == 'manager':
-        message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
-    else:
-        if recipient_email == settings.ADMIN_EMAIL:
-            message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN_NO_MANAGER
-        else:
-            message = SuccessMessages.REGISTRATION_SENT_TO_MANAGER
+    # Both manager and user registrations go to pharma admin
+    message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
     
     # Build structured response
     response = UserRegistrationResponse(
@@ -231,7 +260,7 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     Args:
         registration_id: User ID to approve
-        approved_by_user_id: Admin/Manager user ID
+        approved_by_user_id: Pharma Admin user ID
         db: Database session
         
     Returns:
@@ -239,11 +268,24 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         
     Raises:
         UserApproveNotFoundException: If user not found
+        CompanyAccessForbiddenException: If pharma admin cannot approve this company
     """
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
         raise UserApproveNotFoundException(registration_id=registration_id)
+    
+    # Get approver from database
+    approver = db.query(user_model.User).filter(user_model.User.user_id == approved_by_user_id).first()
+    if not approver:
+        raise UserApproveNotFoundException(registration_id=approved_by_user_id)
+    
+    # Validate that approver is a pharma admin for the same company
+    if approver.role != 'pharma_admin' or approver.company_name != user.company_name:
+        raise CompanyAccessForbiddenException(
+            company_name=user.company_name,
+            reason="Only pharma admin from the same company can approve users"
+        )
     
     # Business Logic: Set approval status and audit trail
     user.approved_status = 'approved'
@@ -277,7 +319,7 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     
     Args:
         registration_id: User ID to reject
-        rejected_by_user_id: Admin/Manager user ID
+        rejected_by_user_id: Pharma Admin user ID
         db: Database session
         
     Returns:
@@ -285,11 +327,24 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
         
     Raises:
         UserRejectNotFoundException: If user not found
+        CompanyAccessForbiddenException: If pharma admin cannot reject this company
     """
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
         raise UserRejectNotFoundException(registration_id=registration_id)
+    
+    # Get rejector from database
+    rejector = db.query(user_model.User).filter(user_model.User.user_id == rejected_by_user_id).first()
+    if not rejector:
+        raise UserRejectNotFoundException(registration_id=rejected_by_user_id)
+    
+    # Validate that rejector is a pharma admin for the same company
+    if rejector.role != 'pharma_admin' or rejector.company_name != user.company_name:
+        raise CompanyAccessForbiddenException(
+            company_name=user.company_name,
+            reason="Only pharma admin from the same company can reject users"
+        )
     
     # Business Logic: Set rejection status and audit trail
     user.approved_status = 'rejected'

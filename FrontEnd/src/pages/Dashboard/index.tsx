@@ -10,6 +10,13 @@ import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import { criticalAlertsService, type CriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
+import { OngoingTreatments } from '../../components/OngoingTreatments';
+import { Sidebar } from '../../components/Sidebar';
+import { CurveBar } from '../../components/CurveBar';
+import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
+import { performanceService, type PerformanceMetrics } from '../../services/performanceService';
+import { riskService, type RiskMetrics } from '../../services/riskService';
+import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -35,21 +42,34 @@ interface StakeholderChat {
   isRead: boolean;
 }
 
-interface DashboardProps {
-  riskData?: {
-    percentage: number;
-    topRiskDriver: string;
-  };
-  complianceData?: {
-    percentage: number;
-    emissionsPerTreatment: number;
-  };
+interface MyTask {
+  id: string;
+  patientId: string;
+  taskName: string;
+  description: string;
+  assigneeBy: string;
+  dueDate: string;
+  priority: 'Low' | 'Medium' | 'High';
+  status: 'Not started' | 'In Progress' | 'Done';
 }
 
-export default function Dashboard({
-  riskData = { percentage: 12, topRiskDriver: "Temperature" },
-  complianceData = { percentage: 76, emissionsPerTreatment: 424 }
-}: DashboardProps) {
+interface CriticalAlert {
+  id: string;
+  type: 'Temperature Excursion' | 'Delay Alert' | 'Quality Alert' | 'System Failure' | 'Compliance Issue';
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  patientId: string;
+  message: string;
+  timestamp: string;
+  status: 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated';
+}
+// Performance Icons
+import OnTimeIcon from '../../assets/DashBoardIcons/OnTime.svg';
+import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
+import FailureCostIcon from '../../assets/DashBoardIcons/FailureCost.svg';
+
+interface DashboardProps {}
+
+export default function Dashboard({}: DashboardProps) {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -158,6 +178,56 @@ export default function Dashboard({
     status: alert.status
   }));
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+  
+  // State for patient statistics
+  const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
+  const [logisticsMetrics, setLogisticsMetrics] = useState<LogisticsMetrics | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
+  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
+  const [complianceMetrics, setComplianceMetrics] = useState<ComplianceMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Static pharma ID - in future this will come from verify OTP
+  const PHARMA_ID = 1;
+
+  // Fetch patient statistics and logistics metrics on component mount
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
+        const [stats, logistics, performance, risk, compliance] = await Promise.all([
+          logisticsService.getPatientStatistics(), // Call without pharma_id
+          logisticsService.getLogisticsMetrics(PHARMA_ID.toString()),
+          performanceService.getPerformanceMetrics(PHARMA_ID.toString()),
+          riskService.getRiskMetrics(PHARMA_ID.toString()),
+          complianceService.getComplianceMetrics(PHARMA_ID.toString())
+        ]);
+        
+        setPatientStats(stats);
+        setLogisticsMetrics(logistics);
+        setPerformanceMetrics(performance);
+        setRiskMetrics(risk);
+        setComplianceMetrics(compliance);
+      } catch (err) {
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated]);
+
   // Icon mapping function
   const getIcon = (iconName: string) => {
     const iconMap: { [key: string]: string } = {
@@ -201,7 +271,7 @@ export default function Dashboard({
   return (
     <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
       {/* Left Sidebar */}
-      <Sidebar onLogout={logout} />
+      <Sidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
@@ -239,25 +309,43 @@ export default function Dashboard({
                     {/* Vertical separator */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
 
-                    {dashboardData.volumeMetrics.map((metric, index) => (
-                      <div key={index} className="flex flex-col">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
-                            <img
-                              className="w-[18px] h-[18px]"
-                              alt={metric.label}
-                              src={getIcon(metric.icon)}
-                            />
-                          </div>
-                          <div className="font-semibold text-black text-[28px] mr-4">
-                            {metric.value}
-                          </div>
+                    {/* Patient Count */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Patient Count"
+                            src={getIcon('Patient_Count')}
+                          />
                         </div>
-                        <div className="font-normal text-[#868686] text-[11px] text-left">
-                          {metric.label}
+                        <div className="font-semibold text-black text-[28px] mr-4">
+                          {loading ? '...' : patientStats?.current_month_patient_count || '0'}
                         </div>
                       </div>
-                    ))}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Patient Count:
+                      </div>
+                    </div>
+
+                    {/* Treatment Count */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Treatments Count"
+                            src={getIcon('Treatments_Count')}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mr-4">
+                          {loading ? '...' : patientStats?.current_month_treatment_count || '0'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Treatments Count:
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -272,25 +360,43 @@ export default function Dashboard({
                     {/* Vertical separator */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
 
-                    {dashboardData.logisticsMetrics.map((metric, index) => (
-                      <div key={index} className="flex flex-col">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
-                            <img
-                              className="w-[18px] h-[18px]"
-                              alt={metric.label}
-                              src={getIcon(metric.icon)}
-                            />
-                          </div>
-                          <div className="font-semibold text-black text-[28px]">
-                            {metric.value}
-                          </div>
+                    {/* Cold Chain Packaging Failure */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Cold Chain Packaging Failure"
+                            src={getIcon('Logistics_Chain')}
+                          />
                         </div>
-                        <div className="font-normal text-[#868686] text-[10px] text-left">
-                          {metric.label}
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : logisticsMetrics?.cold_chain_packaging_failure_percentage?.toFixed(1) + '%' || '0%'}
                         </div>
                       </div>
-                    ))}
+                      <div className="font-normal text-[#868686] text-[10px] text-left">
+                        Cold Chain Packaging Failure
+                      </div>
+                    </div>
+
+                    {/* Average Quality Lost per Patient */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Average Quality Lost per Patient"
+                            src={getIcon('Logistics_Quality')}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : logisticsMetrics?.avg_quality_lost_per_patient_percentage + '%' || '0%'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[10px] text-left">
+                        Avg Quality Lost/Patient
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -301,17 +407,67 @@ export default function Dashboard({
                   Performance
                 </h2>
                 <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
-                  <div className="grid grid-cols-3 gap-12">
-                    {dashboardData.performanceMetrics.map((metric, index) => (
-                      <div key={index}>
-                        <div className="font-normal text-[#868686] text-[11px] mb-2">
-                          {metric.label}
+                  <div className="grid grid-cols-3 gap-12 relative">
+                    {/* Vertical separators */}
+                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+
+                    {/* On Time Percentage */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="On Time Performance"
+                            src={OnTimeIcon}
+                          />
                         </div>
                         <div className="font-semibold text-black text-[28px]">
-                          {metric.value}
+                          {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '0%'}
                         </div>
                       </div>
-                    ))}
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        On Time:
+                      </div>
+                    </div>
+                    
+                    {/* Average Lead Time */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Average Lead Time"
+                            src={AvgLeadTimeIcon}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '0d'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Avg Lead time:
+                      </div>
+                    </div>
+                    
+                    {/* Failure Cost */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt="Failure Cost"
+                            src={FailureCostIcon}
+                          />
+                        </div>
+                        <div className="font-semibold text-black text-[28px]">
+                          {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$0M'}
+                        </div>
+                      </div>
+                      <div className="font-normal text-[#868686] text-[11px] text-left">
+                        Failure Cost:
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -321,13 +477,13 @@ export default function Dashboard({
             <div className="flex-1 flex flex-col gap-6 min-w-0">
               {/* Notifications Section */}
               <section className="w-full">
+                
                 <div className="flex justify-end gap-8 mb-4">
-                  <div className="relative group">
+                <div className="relative group">
                     <img
-                      className="w-7 h-[24.86px] cursor-pointer"
-                      alt="Notifications"
-                      src={StakeholderChatsIcon}
-                      onClick={() => setShowStakeholderChats(true)}
+                      className="w-[22px] h-[22px] cursor-pointer"
+                      alt="Alerts"
+                      src={CriticalAlertsIcon}
                     />
                     {stakeholderChatCount > 0 && (
                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -339,12 +495,12 @@ export default function Dashboard({
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Stakeholder Chats
+                        Critical Alerts
                       </div>
                       <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
                   </div>
-
+                  
                   <div className="relative group">
                     <img
                       className="w-[22px] h-[22px] cursor-pointer"
@@ -362,10 +518,20 @@ export default function Dashboard({
                         </span>
                       </div>
                     )}
+                      className="w-7 h-[24.86px] cursor-pointer"
+                      alt="Notifications"
+                      src={StakeholderChatsIcon}
+                      onClick={() => setShowStakeholderChats(true)}
+                    />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <span className="font-semibold text-white text-[10px]">
+                        1
+                      </span>
+                    </div>
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Critical Alerts
+                        Stakeholder Chats
                       </div>
                       <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
@@ -380,6 +546,8 @@ export default function Dashboard({
                         fetchMyTasks();
                         setShowMyTasks(true);
                       }}
+                      src={MyTasksIcon}
+                      onClick={() => setShowMyTasks(true)}
                     />
                     {myTasksCount > 0 && (
                       <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -391,7 +559,7 @@ export default function Dashboard({
                     {/* Tooltip */}
                     <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Messages
+                        My Tasks
                       </div>
                       <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
@@ -438,13 +606,13 @@ export default function Dashboard({
 
                   <div className="relative w-[185px] h-[92px] mb-12 flex items-center justify-center">
                     <CurveBar
-                      percentage={riskData.percentage}
+                      percentage={loading ? 0 : riskMetrics?.deviation_percentage || 0}
                       color="#ff6b35"
                       size="md"
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px] whitespace-nowrap">
-                        {riskData.percentage}%
+                        {loading ? '...' : riskMetrics?.deviation_percentage || 0}%
                       </div>
                       <div className="font-normal text-black text-[11px] whitespace-nowrap">
                         Deviation
@@ -465,7 +633,7 @@ export default function Dashboard({
 
                   <div className="h-[30px] bg-[#fff3ee] rounded-[10px] border border-solid border-[#E7E1E1] px-4">
                     <span className="font-semibold text-orange-600 text-xs whitespace-nowrap mt-2 py-1">
-                      {riskData.topRiskDriver}
+                      {loading ? '...' : riskMetrics?.top_risk_driver?.name || 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -478,13 +646,13 @@ export default function Dashboard({
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
                     <CurveBar
-                      percentage={complianceData.percentage}
+                      percentage={loading ? 0 : complianceMetrics?.audit_coverage_percentage || 0}
                       color="#1083c5"
                       size="md"
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px]">
-                        {complianceData.percentage}%
+                        {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
                       </div>
                       <div className="font-normal text-black text-[11px]">
                         Audit Coverage
@@ -505,7 +673,7 @@ export default function Dashboard({
 
                   <div className="bg-[#e4f5ff] border-[#E7E1E1] px-4 h-[30px] rounded mt-0 gap-1 flex items-center justify-center">
                     <span className="font-bold text-[#1083c5] text-sm">
-                      {complianceData.emissionsPerTreatment}
+                      {loading ? '...' : complianceMetrics?.emissions_per_treatment_tco2e || 0}
                     </span>
                     <span className="ml-0.5 font-normal text-black text-[10px] mt-1">
                       tCO2e

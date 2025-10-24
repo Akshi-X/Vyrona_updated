@@ -4,9 +4,14 @@ export const AUTH_TOKEN_KEY = 'auth_token';
 
 export const authUtils = {
   // Save auth token to cookies with secure settings
-  setToken: (token: string) => {
+  setToken: (token: string, rememberMe: boolean = false) => {
+    // Set expiration based on remember me setting
+    // If remember me is true: 9 hours, if false: 1 hour
+    const expirationHours = rememberMe ? 9 : 1;
+    const expirationDays = expirationHours / 24; // Convert hours to days for js-cookie
+    
     Cookies.set(AUTH_TOKEN_KEY, token, {
-      expires: 1, // 1 day
+      expires: expirationDays,
       secure: true, // Only send over HTTPS
       sameSite: 'strict' // CSRF protection
     });
@@ -31,5 +36,23 @@ export const authUtils = {
   getAuthHeader: (): { Authorization: string } | {} => {
     const token = Cookies.get(AUTH_TOKEN_KEY);
     return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+
+  // Check if token is expired and clean up if necessary
+  checkTokenExpiration: (): boolean => {
+    const token = Cookies.get(AUTH_TOKEN_KEY);
+    if (!token) {
+      return false; // No token to check
+    }
+    
+    // The js-cookie library automatically handles expiration
+    // If the cookie is still present, it's not expired
+    // If it's expired, js-cookie will return undefined
+    return !!token;
+  },
+
+  // Force clear token (for logout)
+  clearToken: (): void => {
+    Cookies.remove(AUTH_TOKEN_KEY);
   }
 };

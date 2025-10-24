@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str
     # Super Admin Setup (required in .env)
     ADMIN_DEFAULT_PASSWORD: str
+    # MyGrape Platform Admin (required in .env)
+    MYGRAPE_ADMIN_EMAIL: str
+    MYGRAPE_ADMIN_PASSWORD: str
     # Email Service Type
     EMAIL_SERVICE: str = "smtp"  # "smtp" or "sendgrid"
     # SMTP (Optional - for backward compatibility)
@@ -73,6 +76,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"  # Allow extra fields from environment
  
  
 @lru_cache()

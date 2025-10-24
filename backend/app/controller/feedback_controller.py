@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Query, Form
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
-from app.constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+
 from app.config import database
 from app.schemas.feedback_schema import (
     FeedbackCreateRequest, CommentCreateRequest, FeedbackStatusUpdateRequest,
@@ -30,40 +30,31 @@ router = APIRouter(
 
 @router.post("", 
     response_model=FeedbackCreateResponse, 
-    summary="Create feedback ticket", 
+    summary="Create feedback ticket (without attachment)", 
     description="""
-    Create a new feedback ticket with optional file attachment.
+    Create a new feedback ticket for testing without file attachment.
     """)
 def create_feedback_endpoint(
-    department: str = Form(...),
-    feedback_type: str = Form(...),
-    subject: str = Form(...),
-    description: str = Form(...),
-    priority: str = Form(...),
-    affected_modules: str = Form(...),
-    attachment: Optional[UploadFile] = File(None),
+    request: FeedbackCreateRequest,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
-    """Create a new feedback ticket with optional attachment"""
+    """Create a new feedback ticket for testing"""
     
-    # Create request object from form data (matching your frontend format)
-    feedback_request = FeedbackCreateRequest(
-        department=FeedbackDepartment(department),
-        feedback_type=FeedbackType(feedback_type),
-        subject=subject,
-        description=description,
-        priority=FeedbackPriority(priority),
-        affected_modules=AffectedModule(affected_modules)
-    )
-    
-    # Call service (all business logic there)
-    return create_feedback(
-        db=db,
-        request=feedback_request,
-        submitted_by=current_user.user_id,
-        attachment=attachment
-    )
+    try:
+        # Call service (all business logic there)
+        return create_feedback(
+            db=db,
+            request=request,
+            submitted_by=current_user.user_id,
+            attachment=None
+        )
+    except Exception as e:
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating feedback: {str(e)}", exc_info=True)
+        raise
 
 
 @router.get("/admin", response_model=List[FeedbackSummaryResponse], summary="Get all feedback tickets", description="Retrieve all feedback tickets with optional filtering")

@@ -101,7 +101,6 @@ const UserProfilePage: React.FC = () => {
         setRole(profile.role || '');
         setUserId(profile.user_id || '');
       } catch (error) {
-        console.error('Failed to load profile:', error);
         // Set default values if profile fails to load
         setFirstName('User');
         setLastName('');
