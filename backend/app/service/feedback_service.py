@@ -19,6 +19,7 @@ from ..exceptions.custom_exceptions import (
 from ..models.feedback_model import Feedback
 from ..models.feedback_comments import Comment
 from ..models.user_model import User
+from .user_service import get_mygrape_admin_email
 from ..schemas.feedback_schema import (
     FeedbackCreateRequest, CommentCreateRequest, FeedbackStatusUpdateRequest,
     FeedbackCreateResponse, CommentCreateResponse, FeedbackStatusUpdateResponse,
@@ -173,7 +174,9 @@ def create_feedback(
     
     # Send email notifications
     try:
-        # Send to MyGrape admin (all feedback goes to platform admin)
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
+        
         send_feedback_new_ticket_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
@@ -183,7 +186,7 @@ def create_feedback(
             submitted_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=user.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
+            mygrape_admin_email=mygrape_admin_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -239,9 +242,11 @@ def add_comment(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to pharma admin
+    # Send email notifications to MyGrape admin
     try:
-        # Send to MyGrape admin (all feedback goes to platform admin)
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
+        
         send_feedback_new_comment_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
@@ -249,7 +254,7 @@ def add_comment(
             commented_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
+            mygrape_admin_email=mygrape_admin_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -299,9 +304,11 @@ def update_feedback_status(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to pharma admin
+    # Send email notifications to MyGrape admin
     try:
-        # Send to MyGrape admin (all feedback goes to platform admin)
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
+        
         send_feedback_status_update_email(
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
@@ -310,7 +317,7 @@ def update_feedback_status(
             updated_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=settings.MYGRAPE_ADMIN_EMAIL
+            mygrape_admin_email=mygrape_admin_email
         )
     except Exception as e:
         # Log error but don't fail the request
