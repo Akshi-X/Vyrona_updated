@@ -97,7 +97,6 @@ const UserProfilePage: React.FC = () => {
         setWorkEmail(profile.email || '');
         setRole(profile.role || '');
       } catch (error) {
-        console.error('Failed to load profile:', error);
         // Set default values if profile fails to load
         setFirstName('User');
         setLastName('');

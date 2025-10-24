@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
+import { authService } from "../../services/authService";
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
     const [emailError, setEmailError] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [apiError, setApiError] = useState("");
@@ -16,7 +17,7 @@ const Login: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+    // Removed API_BASE_URL - now using authService
     const validateEmail = (email: string) => {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return regex.test(email);
@@ -68,12 +69,13 @@ const Login: React.FC = () => {
 
         try {
             setLoading(true);
-            const response = await axios.post(`${API_BASE_URL}/api/login`, {
+            const response = await authService.login({
                 email,
                 password,
+                remember_me: rememberMe,
             });
 
-            if (response.data.status === "OTP Sent") {
+            if (response.status === "OTP Sent") {
                 // Preserve original destination (if any) to return after OTP login
                 const from = (location.state as any)?.from;
                 const fromPath = from
@@ -82,18 +84,17 @@ const Login: React.FC = () => {
                 // Example: navigate to OTP page
                 navigate("/verify-otp", {
                     state: {
-                        userId: response.data.user_id,
-                        email: response.data.email,
-                        otpExpiry: response.data.otp_expiry,
+                        userId: response.user_id,
+                        email: response.email,
+                        otpExpiry: response.otp_expiry,
                         fromPath,
                     },
                 });
             } else {
-                setApiError(response.data.message || "Unexpected response");
+                setApiError(response.message || "Unexpected response");
             }
         } catch (err: any) {
-            console.error(err);
-            setApiError(err.response?.data?.message || "Login failed");
+            setApiError(err.message || "Login failed");
         } finally {
             setLoading(false);
         }
@@ -202,6 +203,8 @@ const Login: React.FC = () => {
                             <label className="flex items-center space-x-2">
                                 <input
                                     type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
                                     className="w-4 h-4 border-gray-300 accent-[#8b2a96]"
                                 />
                                 <span className="text-gray-700 font-medium">Remember me</span>
@@ -215,7 +218,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 mb-2 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96]"
+                            className={`w-full py-3 mb-1 text-white rounded-md font-medium transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#8b2a96]"
                                 }`}
                         >
                             {loading ? "Signing in..." : "Sign in"}
@@ -226,7 +229,7 @@ const Login: React.FC = () => {
                     </form>
 
                     {/* Footer */}
-                    <p className="text-center text-sm text-gray-500 mt-8">
+                    <p className="text-center text-sm text-gray-500 mt-2">
                         New to myGrape?{" "}
                         <Link to="/signup" className="text-[#8b2a96] font-medium underline">
                             Create an account

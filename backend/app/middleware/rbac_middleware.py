@@ -14,6 +14,7 @@ from ..config.permissions import (
     PUBLIC_ENDPOINTS,
     ADMIN_ONLY_ENDPOINTS,
     PHARMA_ADMIN_ENDPOINTS,
+    MYGRAPE_ADMIN_ENDPOINTS,
     MANAGER_ONLY_ENDPOINTS,
     USER_ONLY_ENDPOINTS,
     AUTHENTICATED_ENDPOINTS
@@ -58,6 +59,10 @@ class RBACMiddleware(BaseHTTPMiddleware):
             if user_role not in ['admin', 'pharma_admin']:  # Admin can access pharma admin endpoints
                 raise ManagerRoleRequiredException(user_role=user_role)
         
+        elif self._requires_mygrape_admin(method, path):
+            if user_role not in ['admin', 'mygrape_admin']:  # Admin can access MyGrape admin endpoints
+                raise AdminRoleRequiredException(user_role=user_role)
+        
         elif self._requires_manager(method, path):
             if user_role not in ['admin', 'manager']:  # Admin can access manager endpoints
                 raise ManagerRoleRequiredException(user_role=user_role)
@@ -81,6 +86,10 @@ class RBACMiddleware(BaseHTTPMiddleware):
     def _requires_pharma_admin(self, method: str, path: str) -> bool:
         """Check if endpoint requires pharma admin role"""
         return self._matches_endpoint_set(method, path, PHARMA_ADMIN_ENDPOINTS)
+    
+    def _requires_mygrape_admin(self, method: str, path: str) -> bool:
+        """Check if endpoint requires MyGrape admin role"""
+        return self._matches_endpoint_set(method, path, MYGRAPE_ADMIN_ENDPOINTS)
     
     def _requires_manager(self, method: str, path: str) -> bool:
         """Check if endpoint requires manager role"""
