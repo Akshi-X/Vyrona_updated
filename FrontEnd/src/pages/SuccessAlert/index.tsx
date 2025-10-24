@@ -32,7 +32,7 @@ const SuccessAlert: React.FC<SuccessAlertProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="Success" showBackButton={false} />
+      <Header title="" showBackButton={false} />
       
       <div className="flex items-center justify-center min-h-screen" style={{ paddingTop: 'calc(63px + 1rem)' }}>
         <div className="bg-white rounded-lg shadow-lg p-12 max-w-2xl w-full mx-4">
