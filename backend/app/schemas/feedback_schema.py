@@ -19,6 +19,7 @@ class FeedbackCreateRequest(BaseModel):
     description: str
     priority: FeedbackPriority
     affected_modules: AffectedModule
+    send_email: bool = True  # Default to True for backward compatibility
     
     @field_validator('subject')
     @classmethod
@@ -38,6 +39,7 @@ class FeedbackCreateRequest(BaseModel):
 class CommentCreateRequest(BaseModel):
     """Schema for adding a comment to a feedback ticket"""
     comment: str
+    send_email: bool = True  # Default to True for backward compatibility
     
     @field_validator('comment')
     @classmethod
@@ -50,6 +52,7 @@ class CommentCreateRequest(BaseModel):
 class FeedbackStatusUpdateRequest(BaseModel):
     """Schema for updating feedback status"""
     status: FeedbackStatus
+    send_email: bool = True  # Default to True for backward compatibility
 
 
 # ============================================
@@ -87,7 +90,6 @@ class FeedbackDetailResponse(BaseModel):
     feedback_type: str
     subject: str
     description: str
-    attachment_path: Optional[str]
     priority: str
     affected_modules: str
     status: str
@@ -96,7 +98,8 @@ class FeedbackDetailResponse(BaseModel):
     submitted_on: datetime
     created_at: datetime
     updated_at: Optional[datetime]
-    comments: List[CommentResponse] = []
+    comments: List[str] = []
+    attachment_paths: List[str] = []
     
     class Config:
         from_attributes = True

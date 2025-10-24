@@ -61,3 +61,5 @@ alembic/versions/*.pyc
 
 # Pharma Admins
 pharma_admins.json
+# Uploads
+uploads/feedback/

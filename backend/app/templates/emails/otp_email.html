@@ -7,101 +7,98 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f4;
+            background-color: #F8F9FA;
             margin: 0;
             padding: 0;
+            line-height: 1.6;
         }
         .email-container {
             max-width: 600px;
             margin: 20px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
+            background-color: #FFFFFF;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            color: #ffffff;
-            padding: 30px;
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
+            padding: 25px 30px;
             text-align: center;
         }
         .header h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 600;
+            margin-bottom: 5px;
         }
         .content {
             padding: 30px;
-            color: #333333;
-        }
-        .content h2 {
-            color: #11998e;
-            font-size: 20px;
-            margin-top: 0;
+            color: #374151;
         }
         .otp-box {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
             padding: 25px;
             margin: 25px 0;
             text-align: center;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(107, 17, 118, 0.3);
         }
         .otp-code {
             font-size: 36px;
             font-weight: bold;
-            letter-spacing: 8px;
-            margin: 10px 0;
+            letter-spacing: 10px;
+            margin: 12px 0;
             font-family: 'Courier New', monospace;
         }
         .otp-label {
             font-size: 14px;
             opacity: 0.9;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         .warning-box {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
+            background-color: #FEF3C7;
+            border-left: 4px solid #F59E0B;
             padding: 15px;
             margin: 20px 0;
-            border-radius: 4px;
+            border-radius: 8px;
         }
         .warning-box p {
-            margin: 5px 0;
-            font-size: 13px;
-            color: #856404;
+            margin: 6px 0;
+            font-size: 14px;
+            color: #92400E;
         }
         .info-box {
-            background-color: #d1ecf1;
-            border-left: 4px solid #17a2b8;
+            background-color: #EFF6FF;
+            border-left: 4px solid #2563EB;
             padding: 15px;
             margin: 20px 0;
-            border-radius: 4px;
+            border-radius: 8px;
         }
         .info-box p {
-            margin: 5px 0;
-            font-size: 13px;
-            color: #0c5460;
+            margin: 6px 0;
+            font-size: 14px;
+            color: #1E40AF;
         }
         .footer {
-            background-color: #f8f9fa;
+            background-color: #F8F9FA;
             padding: 20px;
             text-align: center;
             font-size: 12px;
-            color: #6c757d;
-            border-top: 1px solid #e9ecef;
+            color: #6B7280;
+            border-top: 1px solid #E5E7EB;
         }
         .footer p {
             margin: 5px 0;
         }
         .divider {
             height: 1px;
-            background-color: #e9ecef;
+            background-color: #E5E7EB;
             margin: 20px 0;
         }
         .icon {
-            font-size: 48px;
+            font-size: 32px;
             margin-bottom: 10px;
         }
     </style>
@@ -114,13 +111,13 @@
         </div>
         
         <div class="content">
-            <h2>Your One-Time Password</h2>
-            <p>Hello,</p>
+            <h2 style="color: #6B1176; font-size: 18px; margin-top: 0;">Hello,</h2>
             <p>You've requested to log in to your myGrape account. Please use the OTP below to complete your login:</p>
             
             <div class="otp-box">
                 <div class="otp-label">Your OTP Code</div>
                 <div class="otp-code">{{ otp_code }}</div>
+                <div style="font-size: 12px; opacity: 0.9;">Valid for {{ expiry_minutes }} minutes</div>
             </div>
             
             <div class="info-box">
@@ -136,20 +133,13 @@
                 <p>• myGrape will never ask for your OTP via email or phone</p>
                 <p>• If you didn't request this OTP, please ignore this email</p>
             </div>
-            
-            <p style="font-size: 14px; color: #6c757d; margin-top: 20px;">
-                Need help? Contact our support team if you're having trouble logging in.
-            </p>
         </div>
         
         <div class="footer">
             <p><strong>myGrape</strong></p>
             <p>This is an automated message. Please do not reply to this email.</p>
-            <p style="margin-top: 10px; font-size: 11px;">
-                © 2025 myGrape. All rights reserved.
-            </p>
+            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>
-
