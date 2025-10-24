@@ -19,6 +19,7 @@ class FeedbackCreateRequest(BaseModel):
     description: str
     priority: FeedbackPriority
     affected_modules: AffectedModule
+    send_email: bool = True  # Default to True for backward compatibility
     
     @field_validator('subject')
     @classmethod
@@ -38,6 +39,7 @@ class FeedbackCreateRequest(BaseModel):
 class CommentCreateRequest(BaseModel):
     """Schema for adding a comment to a feedback ticket"""
     comment: str
+    send_email: bool = True  # Default to True for backward compatibility
     
     @field_validator('comment')
     @classmethod
@@ -50,6 +52,7 @@ class CommentCreateRequest(BaseModel):
 class FeedbackStatusUpdateRequest(BaseModel):
     """Schema for updating feedback status"""
     status: FeedbackStatus
+    send_email: bool = True  # Default to True for backward compatibility
 
 
 # ============================================

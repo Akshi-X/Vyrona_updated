@@ -171,7 +171,7 @@ def create_feedback(
     if not user:
         raise FeedbackUserNotFoundException(user_id=submitted_by)
     
-    # Send email notifications
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -185,7 +185,8 @@ def create_feedback(
             submitted_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=user.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -241,7 +242,7 @@ def add_comment(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to MyGrape admin
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -253,7 +254,8 @@ def add_comment(
             commented_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -303,7 +305,7 @@ def update_feedback_status(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to MyGrape admin
+    # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
@@ -316,7 +318,8 @@ def update_feedback_status(
             updated_by_name=f"{user.first_name} {user.last_name}",
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
-            mygrape_admin_email=mygrape_admin_email
+            mygrape_admin_email=mygrape_admin_email,
+            send_to_user=request.send_email
         )
     except Exception as e:
         # Log error but don't fail the request
