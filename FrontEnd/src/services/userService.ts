@@ -58,6 +58,16 @@ export class UserService extends BaseApiService {
   }
 
   /**
+   * Update user profile (first name and last name)
+   */
+  async updateProfile(userId: string, data: { first_name: string; last_name: string }): Promise<{ message: string; user_id: string; first_name: string; last_name: string; updated_at: string }> {
+    return await this.request<{ message: string; user_id: string; first_name: string; last_name: string; updated_at: string }>(`/api/user/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
    * Register new user
    */
   async register(data: UserRegistration): Promise<{ message: string; user_id: string }> {
