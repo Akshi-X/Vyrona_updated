@@ -69,12 +69,10 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   const getStageColor = (stage: string) => {
     switch (stage.toLowerCase()) {
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
-      case 'in progress':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'cancelled':
+      case 'after care':
+        return 'bg-blue-100 text-blue-800';
+      case 'failure':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -163,8 +161,17 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('provider_name')}
               >
                 <div className="flex items-center gap-2">
-                  Hospital
+                  3PL
                   <SortIcon field="provider_name" />
+                </div>
+              </th>
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('hospital')}
+              >
+                <div className="flex items-center gap-2">
+                  Hospital
+                  <SortIcon field="hospital" />
                 </div>
               </th>
               <th
@@ -205,6 +212,9 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {patient.provider_name}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {patient.hospital}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {patient.location}
