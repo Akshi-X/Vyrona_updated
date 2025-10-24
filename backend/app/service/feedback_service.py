@@ -18,7 +18,7 @@ from ..exceptions.custom_exceptions import (
 from ..models.feedback_model import Feedback
 from ..models.feedback_comments import Comment
 from ..models.user_model import User
-from .user_service import get_pharma_admin_email
+from .user_service import get_mygrape_admin_email
 from ..schemas.feedback_schema import (
     FeedbackCreateRequest, CommentCreateRequest, FeedbackStatusUpdateRequest,
     FeedbackCreateResponse, CommentCreateResponse, FeedbackStatusUpdateResponse,
@@ -173,29 +173,20 @@ def create_feedback(
     
     # Send email notifications
     try:
-        # Get pharma admin email for this user's company
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
         
-        # Validate user has company_name
-        if not user.company_name:
-            logger.warning(f"User {user.user_id} has no company_name, skipping pharma admin notification")
-            pharma_admin_email = None
-        else:
-            pharma_admin_email = get_pharma_admin_email(user.company_name, db)
-        
-        if pharma_admin_email:
-            send_feedback_new_ticket_email(
-                ticket_id=feedback.ticket_id,
-                subject=feedback.subject,
-                description=feedback.description,
-                priority=feedback.priority.value,
-                department=feedback.department.value,
-                submitted_by_name=f"{user.first_name} {user.last_name}",
-                submitted_by_email=user.email,
-                feedback_id=feedback.ticket_id,
-                pharma_admin_email=pharma_admin_email
-            )
-        else:
-            logger.warning(f"No pharma admin found for company: {user.company_name}, skipping feedback notification")
+        send_feedback_new_ticket_email(
+            ticket_id=feedback.ticket_id,
+            subject=feedback.subject,
+            description=feedback.description,
+            priority=feedback.priority.value,
+            department=feedback.department.value,
+            submitted_by_name=f"{user.first_name} {user.last_name}",
+            submitted_by_email=user.email,
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=mygrape_admin_email
+        )
     except Exception as e:
         # Log error but don't fail the request
         logger.error(f"Failed to send email notification for ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
@@ -250,29 +241,20 @@ def add_comment(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to pharma admin
+    # Send email notifications to MyGrape admin
     try:
-        # Get pharma admin email for this user's company
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
         
-        # Validate user has company_name
-        if not user.company_name:
-            logger.warning(f"User {user.user_id} has no company_name, skipping pharma admin notification")
-            pharma_admin_email = None
-        else:
-            pharma_admin_email = get_pharma_admin_email(user.company_name, db)
-        
-        if pharma_admin_email:
-            send_feedback_new_comment_email(
-                ticket_id=feedback.ticket_id,
-                subject=feedback.subject,
-                comment=request.comment,
-                commented_by_name=f"{user.first_name} {user.last_name}",
-                submitted_by_email=submitter.email,
-                feedback_id=feedback.ticket_id,
-                pharma_admin_email=pharma_admin_email
-            )
-        else:
-            logger.warning(f"No pharma admin found for company: {user.company_name}, skipping comment notification")
+        send_feedback_new_comment_email(
+            ticket_id=feedback.ticket_id,
+            subject=feedback.subject,
+            comment=request.comment,
+            commented_by_name=f"{user.first_name} {user.last_name}",
+            submitted_by_email=submitter.email,
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=mygrape_admin_email
+        )
     except Exception as e:
         # Log error but don't fail the request
         logger.error(f"Failed to send email notification for comment on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
@@ -321,30 +303,21 @@ def update_feedback_status(
     if not submitter:
         raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
     
-    # Send email notifications to pharma admin
+    # Send email notifications to MyGrape admin
     try:
-        # Get pharma admin email for this user's company
+        # Get common MyGrape admin email
+        mygrape_admin_email = get_mygrape_admin_email()
         
-        # Validate user has company_name
-        if not user.company_name:
-            logger.warning(f"User {user.user_id} has no company_name, skipping pharma admin notification")
-            pharma_admin_email = None
-        else:
-            pharma_admin_email = get_pharma_admin_email(user.company_name, db)
-        
-        if pharma_admin_email:
-            send_feedback_status_update_email(
-                ticket_id=feedback.ticket_id,
-                subject=feedback.subject,
-                old_status=old_status,
-                new_status=request.status.value,
-                updated_by_name=f"{user.first_name} {user.last_name}",
-                submitted_by_email=submitter.email,
-                feedback_id=feedback.ticket_id,
-                pharma_admin_email=pharma_admin_email
-            )
-        else:
-            logger.warning(f"No pharma admin found for company: {user.company_name}, skipping status update notification")
+        send_feedback_status_update_email(
+            ticket_id=feedback.ticket_id,
+            subject=feedback.subject,
+            old_status=old_status,
+            new_status=request.status.value,
+            updated_by_name=f"{user.first_name} {user.last_name}",
+            submitted_by_email=submitter.email,
+            feedback_id=feedback.ticket_id,
+            mygrape_admin_email=mygrape_admin_email
+        )
     except Exception as e:
         # Log error but don't fail the request
         logger.error(f"Failed to send email notification for status update on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
