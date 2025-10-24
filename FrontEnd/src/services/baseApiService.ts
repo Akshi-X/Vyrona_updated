@@ -72,6 +72,22 @@ export class BaseApiService {
         });
 
         if (!response.ok) {
+          // Handle 401 Unauthorized - clear auth token and redirect to login
+          if (response.status === 401) {
+            authUtils.clearToken();
+            // Clear any other auth-related data
+            try {
+              localStorage.removeItem('user_id');
+              localStorage.removeItem('user_data');
+            } catch (error) {
+              // Silently handle localStorage clearing errors
+            }
+            // Optionally redirect to login page
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+          }
+
           const errorText = await response.text();
           let errorMessage = `API Error: ${response.status}`;
           
@@ -128,6 +144,22 @@ export class BaseApiService {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - clear auth token and redirect to login
+      if (response.status === 401) {
+        authUtils.clearToken();
+        // Clear any other auth-related data
+        try {
+          localStorage.removeItem('user_id');
+          localStorage.removeItem('user_data');
+        } catch (error) {
+          // Silently handle localStorage clearing errors
+        }
+        // Optionally redirect to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+
       const errorText = await response.text();
       throw new Error(`API Error: ${response.status} ${errorText}`);
     }
@@ -155,6 +187,22 @@ export class BaseApiService {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - clear auth token and redirect to login
+      if (response.status === 401) {
+        authUtils.clearToken();
+        // Clear any other auth-related data
+        try {
+          localStorage.removeItem('user_id');
+          localStorage.removeItem('user_data');
+        } catch (error) {
+          // Silently handle localStorage clearing errors
+        }
+        // Optionally redirect to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+
       const errorText = await response.text();
       throw new Error(`API Error: ${response.status} ${errorText}`);
     }
