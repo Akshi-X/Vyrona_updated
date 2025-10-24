@@ -74,6 +74,18 @@ def get_pharma_admin_email(company_name: str, db: Session) -> Optional[str]:
         return None
 
 
+def get_mygrape_admin_email() -> str:
+    """
+    Get the common MyGrape admin email for all pharma companies.
+    
+    Returns:
+        MyGrape admin email from configuration
+    """
+    from ..config.config import get_settings
+    settings = get_settings()
+    return settings.MYGRAPE_ADMIN_EMAIL
+
+
 def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
     """
     Get the email of an approved manager from the specified company.
