@@ -90,7 +90,6 @@ class FeedbackDetailResponse(BaseModel):
     feedback_type: str
     subject: str
     description: str
-    attachment_path: Optional[str]
     priority: str
     affected_modules: str
     status: str
@@ -99,7 +98,8 @@ class FeedbackDetailResponse(BaseModel):
     submitted_on: datetime
     created_at: datetime
     updated_at: Optional[datetime]
-    comments: List[CommentResponse] = []
+    comments: List[str] = []
+    attachment_paths: List[str] = []
     
     class Config:
         from_attributes = True

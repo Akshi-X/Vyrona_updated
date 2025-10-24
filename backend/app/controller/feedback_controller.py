@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Query
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
+import json
 
 from app.config import database
 from app.schemas.feedback_schema import (
@@ -28,33 +29,72 @@ router = APIRouter(
 # FEEDBACK ENDPOINTS
 # ============================================
 
-@router.post("", 
+@router.post("/create", 
     response_model=FeedbackCreateResponse, 
-    summary="Create feedback ticket (without attachment)", 
+    summary="Create feedback ticket with optional file attachments", 
     description="""
-    Create a new feedback ticket for testing without file attachment.
+    Create a new feedback ticket with optional multiple file attachments.
+    Send individual form fields for feedback data and optional files.
+    Files will be saved to uploads/feedback/{ticket_id}/ folder.
+    If no files are provided, no attachments will be stored.
     """)
-def create_feedback_endpoint(
-    request: FeedbackCreateRequest,
+async def create_feedback_with_attachments_endpoint(
+    request: Request,
     db: Session = Depends(database.get_db),
-    current_user: user_model.User = Depends(get_current_user)
+    current_user: user_model.User = Depends(get_current_user),
+    attachments: Optional[List[UploadFile]] = File(None)
 ):
-    """Create a new feedback ticket for testing"""
+    """Create a new feedback ticket with optional multiple file attachments"""
     
     try:
+        # Parse form data manually
+        form_data = await request.form()
+        
+        # Log received form data for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Form data keys: {list(form_data.keys())}")
+        logger.info(f"Attachments count: {len(attachments) if attachments else 0}")
+        
+        # Extract JSON data from 'request' field
+        request_json = form_data.get("request")
+        
+        if not request_json:
+            logger.error("Missing 'request' field in form data")
+            raise HTTPException(
+                status_code=400, 
+                detail="Missing 'request' field in form data"
+            )
+        
+        # Parse JSON from request field
+        try:
+            data = json.loads(request_json)
+            logger.info(f"Parsed JSON data: {data}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in request field: {str(e)}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid JSON in request field: {str(e)}"
+            )
+        
+        # Create the request object from JSON data
+        request_data = FeedbackCreateRequest(**data)
+        
         # Call service (all business logic there)
         return create_feedback(
             db=db,
-            request=request,
+            request=request_data,
             submitted_by=current_user.user_id,
-            attachment=None
+            attachments=attachments or []
         )
+    except HTTPException:
+        raise
     except Exception as e:
         # Log the error for debugging
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Error creating feedback: {str(e)}", exc_info=True)
-        raise
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/admin", response_model=List[FeedbackSummaryResponse], summary="Get all feedback tickets", description="Retrieve all feedback tickets with optional filtering")
