@@ -6,6 +6,7 @@ Validates requests before reaching controllers.
 """
 
 import json
+import logging
 from typing import Callable
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -23,6 +24,11 @@ from ..dependencies.auth_dependencies import (
     validate_reject_user_request
 )
 from ..utils.utils import create_error_response
+from ..exceptions.custom_exceptions import AppException
+from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -396,8 +402,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_feedback_creation(self, request: Request):
         """Validate feedback creation request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
         
         try:
             # Check content type to determine how to parse the request
@@ -481,6 +485,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 priority = FeedbackPriority(data["priority"])
                 affected_modules = AffectedModule(data["affected_modules"])
             except ValueError as e:
+                # Provide detailed error message with valid values
                 return JSONResponse(
                     status_code=400,
                     content={
@@ -549,6 +554,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return None  # Validation passed
             
         except Exception as e:
+            logger.error(f"Validation error in feedback creation: {str(e)}", exc_info=True)
             return JSONResponse(
                 status_code=500,
                 content={
