@@ -6,8 +6,10 @@ Validates requests before reaching controllers.
 """
 
 import json
+import logging
 from typing import Callable
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
@@ -22,6 +24,11 @@ from ..dependencies.auth_dependencies import (
     validate_reject_user_request
 )
 from ..utils.utils import create_error_response
+from ..exceptions.custom_exceptions import AppException
+from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
@@ -392,8 +399,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     
     async def _validate_feedback_creation(self, request: Request):
         """Validate feedback creation request."""
-        from ..exceptions.custom_exceptions import AppException
-        from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
         
         try:
             # Handle multipart form data from frontend
@@ -440,11 +445,24 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 priority = FeedbackPriority(data["priority"])
                 affected_modules = AffectedModule(data["affected_modules"])
             except ValueError as e:
+                # Provide detailed error message with valid values
                 return JSONResponse(
                     status_code=400,
                     content={
                         "error_code": "VAL_INPUT_001",
                         "message": f"Invalid enum value: {str(e)}",
+                        "details": {
+                            "valid_departments": FeedbackDepartment.list(),
+                            "valid_types": FeedbackType.list(),
+                            "valid_priorities": FeedbackPriority.list(),
+                            "valid_modules": AffectedModule.list(),
+                            "received_values": {
+                                "department": data.get("department"),
+                                "feedback_type": data.get("feedback_type"),
+                                "priority": data.get("priority"),
+                                "affected_modules": data.get("affected_modules")
+                            }
+                        },
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
@@ -508,6 +526,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return None  # Validation passed
             
         except Exception as e:
+            logger.error(f"Validation error in feedback creation: {str(e)}", exc_info=True)
             return JSONResponse(
                 status_code=500,
                 content={

@@ -56,12 +56,19 @@ ADMIN_ONLY_ENDPOINTS: Set[EndpointPermission] = {
 
 
 # ============================================
-# MANAGER-ONLY ENDPOINTS
+# PHARMA ADMIN ENDPOINTS
 # ============================================
-MANAGER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
+PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/user/{user_id}"),     # View user details
     ("POST", "/api/user/approve"),      # Approve user
     ("POST", "/api/user/reject"),       # Reject user
+}
+
+# ============================================
+# MANAGER-ONLY ENDPOINTS
+# ============================================
+MANAGER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
+    # Managers can no longer approve users - only pharma admins can
 }
 
 
@@ -105,11 +112,19 @@ def get_role_permissions(role: str) -> dict:
             "can_manage_system": True,
             "role": "admin"
         }
-    elif role_lower == "manager":
+    elif role_lower == "pharma_admin":
         return {
             "can_approve_users": True,
             "can_reject_users": True,
             "can_view_all_users": True,
+            "can_manage_system": False,
+            "role": "pharma_admin"
+        }
+    elif role_lower == "manager":
+        return {
+            "can_approve_users": False,  # Managers can no longer approve users
+            "can_reject_users": False,
+            "can_view_all_users": False,
             "can_manage_system": False,
             "role": "manager"
         }

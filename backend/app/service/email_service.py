@@ -239,9 +239,8 @@ def send_approval_email(
     """
     Send approval request email with HTML template
     
-    Two-level approval system:
-    - Manager registration → Sent to MyGrape Admin
-    - User registration → Sent to Company Manager
+    Pharma admin approval system:
+    - All registrations → Sent to Pharma Admin for that company
     
     Clean exception handling!
     """
@@ -309,7 +308,8 @@ def send_feedback_new_ticket_email(
     department: str,
     submitted_by_name: str,
     submitted_by_email: str,
-    feedback_id: str
+    feedback_id: str,
+    pharma_admin_email: str
 ):
     """
     Send new feedback ticket notification email
@@ -340,11 +340,12 @@ def send_feedback_new_ticket_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_ticket.html", reason=str(e))
     
-    # Send to submitter
+    # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to admin
-    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+    # Send to pharma admin (notification)
+    send_email(pharma_admin_email, email_subject, html_body)
+    logger.info(f"Feedback notification sent to pharma admin: {pharma_admin_email}")
 
 
 def send_feedback_status_update_email(
@@ -354,7 +355,8 @@ def send_feedback_status_update_email(
     new_status: str,
     updated_by_name: str,
     submitted_by_email: str,
-    feedback_id: str
+    feedback_id: str,
+    pharma_admin_email: str
 ):
     """
     Send feedback status update notification email
@@ -382,11 +384,12 @@ def send_feedback_status_update_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_status_update.html", reason=str(e))
     
-    # Send to submitter
+    # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to admin
-    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+    # Send to pharma admin (notification)
+    send_email(pharma_admin_email, email_subject, html_body)
+    logger.info(f"Feedback status update sent to pharma admin: {pharma_admin_email}")
 
 
 def send_feedback_new_comment_email(
@@ -395,7 +398,8 @@ def send_feedback_new_comment_email(
     comment: str,
     commented_by_name: str,
     submitted_by_email: str,
-    feedback_id: str
+    feedback_id: str,
+    pharma_admin_email: str
 ):
     """
     Send new comment notification email
@@ -422,11 +426,12 @@ def send_feedback_new_comment_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="feedback_new_comment.html", reason=str(e))
     
-    # Send to submitter
+    # Send to submitter (confirmation)
     send_email(submitted_by_email, email_subject, html_body)
     
-    # Send to admin
-    send_email(settings.ADMIN_EMAIL, email_subject, html_body)
+    # Send to pharma admin (notification)
+    send_email(pharma_admin_email, email_subject, html_body)
+    logger.info(f"Feedback comment notification sent to pharma admin: {pharma_admin_email}")
 def send_password_reset_email(user_email: str, reset_link: str, first_name: str):
     """
     Send password reset link to user's email with HTML template
