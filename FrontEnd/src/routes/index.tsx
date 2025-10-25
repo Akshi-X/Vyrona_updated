@@ -25,8 +25,8 @@ export const router = createBrowserRouter([
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['admin']}><Dashboard /></RoleBasedRoute> },
-  { path: '/database', element: <RoleBasedRoute restrictedRoles={['admin']}><Database /></RoleBasedRoute> },
+  { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Dashboard /></RoleBasedRoute> },
+  { path: '/database', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Database /></RoleBasedRoute> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])

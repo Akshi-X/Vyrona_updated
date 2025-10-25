@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '../Modal';
+import AlertCard from '../AlertCard';
 
 interface StakeholderChat {
   id: string;
@@ -14,15 +14,17 @@ interface StakeholderChatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   chats: StakeholderChat[];
+  loading?: boolean;
 }
 
 const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
   isOpen,
   onClose,
-  chats
+  chats,
+  loading = false
 }) => {
   return (
-    <Modal
+    <AlertCard
       isOpen={isOpen}
       onClose={onClose}
       title="Stakeholder Chats"
@@ -32,17 +34,20 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       }
+      loading={loading}
+      loadingText="Loading chats..."
+      emptyText="No chats found"
+      dataLength={chats.length}
     >
-      {/* Chats List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {chats.map((chat) => (
           <div 
             key={chat.id} 
-            className="p-4 rounded-lg border bg-purple-50 border-purple-200"
+            className="p-3 rounded-lg border bg-purple-50 border-purple-200 hover:bg-purple-100 transition-colors"
           >
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold bg-purple-600">
+            <div className="flex items-start justify-between mb-1">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold bg-purple-600">
                   {chat.sender.charAt(0)}
                 </div>
                 <div>
@@ -62,7 +67,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
           </div>
         ))}
       </div>
-    </Modal>
+    </AlertCard>
   );
 };
 

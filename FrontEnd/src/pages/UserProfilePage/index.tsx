@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
+import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
+
 
 interface Ticket {
   id: string;
@@ -18,8 +20,6 @@ const FIRST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, com
 const LAST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for last name
 
 const UserProfilePage: React.FC = () => {
-  const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState(true);
-  const [isFeatureUpdatesEnabled, setIsFeatureUpdatesEnabled] = useState(true);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -31,6 +31,7 @@ const UserProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled } = useAuth();
 
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -280,17 +281,40 @@ const UserProfilePage: React.FC = () => {
     });
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="User Profile" />
+      <Header 
+        title="User Profile" 
+        showBackButton={!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin')}
+        rightContent={
+          (role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
+            <button
+              onClick={handleLogout}
+              className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+              title="Logout"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Logout
+            </button>
+          ) : undefined
+        }
+      />
 
-      <div className="p-4 sm:p-6 lg:p-8 pt-[calc(63px+1.5rem)]">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="pt-[calc(63px+2rem)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-8">
 
         {/* Basic Information Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Basic Information</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Basic Information</h2>
             {!isEditingProfile ? (
               <button
                 onClick={handleEditProfile}
@@ -335,7 +359,7 @@ const UserProfilePage: React.FC = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <label className="block text-sm font-bold text-black mb-2">First Name</label>
               <input
@@ -429,9 +453,9 @@ const UserProfilePage: React.FC = () => {
         </div>
 
         {/* Support Activity Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
             {/* Only show Submit New Request button for non-admin users */}
             {!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
               <div className="flex flex-col sm:flex-row gap-3">
@@ -539,8 +563,8 @@ const UserProfilePage: React.FC = () => {
         </div>
 
         {/* Notifications Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Notifications</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">Notifications</h2>
           
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -579,6 +603,7 @@ const UserProfilePage: React.FC = () => {
             </div>
           </div>
         </div>
+          </div>
         </div>
       </div>
     </div>
