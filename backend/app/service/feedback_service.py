@@ -105,7 +105,7 @@ def save_attachment(file: UploadFile, feedback_id: str) -> dict:
     return {
         "original_filename": file.filename,
         "stored_filename": stored_filename,
-        "file_path": file_path,
+        "file_path": file_path.replace("\\", "/"),  # Normalize path separators for cross-platform compatibility
         "file_size": file.size,
         "mime_type": file.content_type
     }
@@ -446,7 +446,7 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         created_at=feedback.created_at,
         updated_at=feedback.updated_at,
         comments=[comment.comment for comment in comments],
-        attachment_paths=[attachment.file_path for attachment in attachments]
+        attachment_paths=[f"/uploads/feedback/{feedback.ticket_id}/{os.path.basename(attachment.file_path)}" for attachment in attachments]
     )
 
 
