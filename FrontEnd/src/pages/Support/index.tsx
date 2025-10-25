@@ -293,7 +293,7 @@ const Support: React.FC = () => {
         description,
         priority: priority || 'medium',
         affected_modules: finalAffectedModule,
-        attachment: selectedFiles[0] || undefined, // Send first selected file to backend
+        attachments: selectedFiles, // Send all selected files to backend
       };
 
 
