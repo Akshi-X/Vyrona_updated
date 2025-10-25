@@ -44,8 +44,8 @@ class CommentCreateRequest(BaseModel):
     @field_validator('comment')
     @classmethod
     def validate_comment(cls, v):
-        if not v or len(v.strip()) < 5:
-            raise ValueError("Comment must be at least 5 characters long")
+        if not v or len(v.strip()) < 1:
+            raise ValueError("Comment cannot be empty")
         return v.strip()
 
 
