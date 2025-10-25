@@ -67,7 +67,7 @@ const VerifyOtp: React.FC = () => {
                 
                 // Check if user role is admin and redirect accordingly
                 let target;
-                if (response.role === "admin") {
+                if (response.role === "mygrape_admin") {
                     target = "/user-profile";
                 } else {
                     // Redirect back to original page if provided, else dashboard

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type FeedbackSubmission } from '../../api/feedbackApi';
 import { userService } from '../../services/userService';
+import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
 import AttachmentThumbnail from '../../components/AttachmentThumbnail';
 
@@ -32,6 +33,7 @@ const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 const Support: React.FC = () => {
   const location = useLocation() as { state?: any };
   const navigate = useNavigate();
+  const { isEmailNotificationsEnabled } = useAuth();
   const readonly = Boolean(location.state?.readonly);
   const hideAttach = Boolean(location.state?.hideAttach);
   const lockIdentity = Boolean(location.state?.lockIdentity);
@@ -51,7 +53,7 @@ const Support: React.FC = () => {
   const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [existingAttachment, setExistingAttachment] = useState<{path: string, filename: string} | null>(null);
+  const [existingAttachments, setExistingAttachments] = useState<{path: string, filename: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
@@ -60,6 +62,9 @@ const Support: React.FC = () => {
   // Comments
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState<string | null>(null);
 
   // Fetch user profile data if not provided via prefill
   useEffect(() => {
@@ -84,7 +89,7 @@ const Support: React.FC = () => {
     if (!newComment.trim()) return;
     if (!activeFeedbackId) return;
     try {
-      const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim());
+      const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim(), isEmailNotificationsEnabled);
     const now = new Date();
     const item: CommentItem = {
         id: String(res.comment_id),
@@ -99,15 +104,68 @@ const Support: React.FC = () => {
     }
   };
 
+  const updateStatus = async (newStatus: string) => {
+    if (!activeFeedbackId) {
+      console.error('No active feedback ID available');
+      return;
+    }
+    if (newStatus === status) return; // No change needed
+    
+    console.log(`Updating status for feedback ${activeFeedbackId} from ${status} to ${newStatus}`);
+    
+    const previousStatus = status; // Store the previous status
+    setIsUpdatingStatus(true);
+    setStatusUpdateError(null);
+    setStatusUpdateSuccess(null);
+    
+    // Optimistically update the UI
+    setStatus(newStatus);
+    
+    try {
+      console.log('Calling feedbackApi.updateFeedbackStatus with:', {
+        feedbackId: activeFeedbackId,
+        status: newStatus,
+        sendEmail: isEmailNotificationsEnabled
+      });
+      
+      const response = await feedbackApi.updateFeedbackStatus(activeFeedbackId, newStatus, isEmailNotificationsEnabled);
+      console.log('Status update response:', response);
+      
+      setStatusUpdateSuccess(`Status updated from ${response.old_status} to ${response.new_status}`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setStatusUpdateSuccess(null);
+      }, 3000);
+    } catch (error: any) {
+      console.error('Status update failed:', error);
+      setStatusUpdateError(error.message || 'Failed to update status');
+      // Revert to the previous status on error
+      setStatus(previousStatus);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   // Fetch full ticket details when viewing a ticket
   useEffect(() => {
     if (!activeFeedbackId || !readonly) return;
     
+    console.log('Loading ticket details for feedbackId:', activeFeedbackId);
+    
     feedbackApi.getFeedbackDetails(activeFeedbackId)
       .then(details => {
+        console.log('Ticket details loaded:', details);
+        console.log('Attachment paths:', details.attachment_paths);
+        
         // Update all fields with the full ticket data
         setSubject(details.subject || '');
         setDescription(details.description || '');
+        
+        // Update user information from ticket creator (not current user)
+        setFullName(details.submitted_by || '');
+        setWorkEmail(details.submitted_by_email || '');
+        
         // Map priority values to match dropdown options
         const priorityMap: Record<string, string> = {
           'LOW': 'low',
@@ -124,7 +182,7 @@ const Support: React.FC = () => {
         
          // Parse affected modules (it's a single enum value, not comma-separated)
          const affectedModule = details.affected_modules || '';
-        
+         
          // Set the checkbox based on the single module
          // Map backend module value to UI module name and find its index
          const moduleMap: Record<string, string> = {
@@ -147,16 +205,24 @@ const Support: React.FC = () => {
            setSelectedModuleIndices([moduleIndex]);
          }
 
-         // Set existing attachment if available
-         if (details.attachment_path) {
-           const filename = details.attachment_path.split('/').pop() || 'attachment';
-           setExistingAttachment({
-             path: details.attachment_path,
+         // Set existing attachments if available
+         if (details.attachment_paths && details.attachment_paths.length > 0) {
+           console.log('Setting attachments:', details.attachment_paths);
+           const attachments = details.attachment_paths.map(attachmentPath => {
+             const filename = attachmentPath.split('/').pop() || 'attachment';
+             return {
+               path: attachmentPath,
              filename: filename
+             };
            });
+           setExistingAttachments(attachments);
+         } else {
+           console.log('No attachment paths found');
+           setExistingAttachments([]);
          }
       })
-      .catch(error => {
+      .catch((error) => {
+        console.error('Error loading ticket details:', error);
       });
   }, [activeFeedbackId, readonly]);
 
@@ -293,7 +359,7 @@ const Support: React.FC = () => {
         description,
         priority: priority || 'medium',
         affected_modules: finalAffectedModule,
-        attachment: selectedFiles[0] || undefined, // Send first selected file to backend
+        attachments: selectedFiles, // Send all selected files to backend
       };
 
 
@@ -322,12 +388,20 @@ const Support: React.FC = () => {
   const controlBg = 'bg-slate-50';
   const disabledCls = 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200';
 
-  const statusClass = (value: string) => {
-    if (value === 'Open') return 'bg-blue-100 text-blue-800';
-    if (value === 'In Progress') return 'bg-yellow-100 text-yellow-800';
-    if (value === 'Completed') return 'bg-green-100 text-green-800';
-    if (value === 'Reopen') return 'bg-orange-100 text-orange-800';
-    return 'bg-gray-100 text-gray-800'; // Default
+  // Jira-style status colors and icons
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'Open':
+        return '#3B82F6'; // Blue
+      case 'In Progress':
+        return '#F59E0B'; // Amber/Orange
+      case 'Completed':
+        return '#10B981'; // Green
+      case 'Reopen':
+        return '#EF4444'; // Red
+      default:
+        return '#6B7280'; // Gray
+    }
   };
 
   const identityDisabled = readonly || lockIdentity;
@@ -426,6 +500,34 @@ const Support: React.FC = () => {
                   />
                 </div>
 
+                {/* Debug info - Remove in production */}
+                {false && (
+                  <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <p>Debug: existingAttachments = {JSON.stringify(existingAttachments)}</p>
+                    <p>Debug: readonly = {readonly.toString()}</p>
+                    <p>Debug: activeFeedbackId = {activeFeedbackId}</p>
+                  </div>
+                )}
+
+                {/* Existing Attachments (for viewing tickets) - Always visible */}
+                {existingAttachments.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Ticket Attachments ({existingAttachments.length}):</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {existingAttachments.map((attachment, index) => (
+                        <AttachmentThumbnail
+                          key={`${attachment.filename}-${index}`}
+                          attachmentPath={attachment.path}
+                          filename={attachment.filename}
+                          className="w-full"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Attach: full width (conditional) */}
                 {!readonly && !hideAttach && (
                     <div className="mt-4">
@@ -477,20 +579,6 @@ const Support: React.FC = () => {
                           </div>
                         </div>
                       )}
-
-                      {/* Existing Attachment (for viewing tickets) */}
-                      {existingAttachment && (
-                        <div className="mt-4">
-                          <span className="text-sm font-medium text-gray-700">Current Attachment:</span>
-                          <div className="mt-2">
-                            <AttachmentThumbnail
-                              attachmentPath={existingAttachment.path}
-                              filename={existingAttachment.filename}
-                              className="w-32"
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                 )}
 
@@ -536,16 +624,55 @@ const Support: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status (non-editable segmented control) */}
+                {/* Status (Integrated Jira-style component) */}
                 {readonly && (
                 <div className="mt-4">
-                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Status</label>
-                  <div className="inline-flex rounded-md border border-gray-200 overflow-hidden pointer-events-none select-none">
-                    <span className={`px-3 py-1.5 text-xs font-medium ${status === 'Open' ? statusClass('Open') : 'bg-gray-50 text-gray-400'}`}>Open</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'In Progress' ? statusClass('In Progress') : 'bg-gray-50 text-gray-400'}`}>In Progress</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Completed' ? statusClass('Completed') : 'bg-gray-50 text-gray-400'}`}>Completed</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Reopen' ? statusClass('Reopen') : 'bg-gray-50 text-gray-400'}`}>Reopen</span>
+                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">
+                    Status {isUpdatingStatus && <span className="text-xs text-gray-500">(Updating...)</span>}
+                  </label>
+                  
+                  {/* Integrated Status Badge/Dropdown */}
+                  <div className="relative inline-block">
+                    <select
+                      value={status}
+                      onChange={(e) => updateStatus(e.target.value)}
+                      disabled={isUpdatingStatus}
+                      className={`appearance-none inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white shadow-sm transition-all duration-200 cursor-pointer hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 ${
+                        isUpdatingStatus ? 'cursor-not-allowed opacity-70' : ''
+                      }`}
+                      style={{
+                        backgroundColor: getStatusColor(status),
+                        boxShadow: `0 2px 4px ${getStatusColor(status)}40`,
+                        minWidth: '120px'
+                      }}
+                    >
+                      <option value="Open" style={{ backgroundColor: 'white', color: 'black' }}>Open</option>
+                      <option value="In Progress" style={{ backgroundColor: 'white', color: 'black' }}>In Progress</option>
+                      <option value="Completed" style={{ backgroundColor: 'white', color: 'black' }}>Completed</option>
+                      <option value="Reopen" style={{ backgroundColor: 'white', color: 'black' }}>Reopen</option>
+                    </select>
+                    
+                    {/* Custom dropdown arrow */}
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      {isUpdatingStatus ? (
+                        <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
+                  
+                  {statusUpdateError && (
+                    <p className="mt-1 text-xs text-red-600">{statusUpdateError}</p>
+                  )}
+                  {statusUpdateSuccess && (
+                    <p className="mt-1 text-xs text-green-600">{statusUpdateSuccess}</p>
+                  )}
                 </div>
                 )}
 
