@@ -12,7 +12,7 @@ export interface FeedbackSubmission {
   description: string;
   priority: string;
   affected_modules: string;
-  attachment?: File;
+  attachments?: File[];
 }
 
 export interface FeedbackResponse {
@@ -74,11 +74,14 @@ export class FeedbackService extends BaseApiService {
     
     formData.append('request', JSON.stringify(requestData));
     
-    if (data.attachment) {
-      formData.append('attachment', data.attachment);
+    // Append all attachments
+    if (data.attachments && data.attachments.length > 0) {
+      data.attachments.forEach((file) => {
+        formData.append('attachments', file);
+      });
     }
 
-    return await this.requestFormData<FeedbackResponse>('/api/feedback', formData, {
+    return await this.requestFormData<FeedbackResponse>('/api/feedback/create', formData, {
       method: 'POST',
     });
   }
