@@ -138,14 +138,45 @@ export class FeedbackService extends BaseApiService {
   /**
    * Update feedback status
    */
-  async updateFeedbackStatus(feedbackId: string, status: string): Promise<{ message: string; status: string }> {
-    return await this.request<{ message: string; status: string }>(
+  async updateFeedbackStatus(feedbackId: string, status: string, sendEmail: boolean = true): Promise<{ message: string; ticket_id: string; old_status: string; new_status: string }> {
+    const requestBody = { 
+      status: status,
+      send_email: sendEmail 
+    };
+    
+    console.log('FeedbackService: Making status update request to:', `/api/feedback/${encodeURIComponent(feedbackId)}/status`);
+    console.log('FeedbackService: Request body:', requestBody);
+    
+    return await this.request<{ message: string; ticket_id: string; old_status: string; new_status: string }>(
       `/api/feedback/${encodeURIComponent(feedbackId)}/status`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(requestBody),
       }
     );
+  }
+
+  /**
+   * Get all feedback tickets (admin only)
+   */
+  async getAllFeedbackTickets(filters?: {
+    feedback_type?: string;
+    status?: string;
+    submitted_on?: string;
+  }): Promise<UserTicketSummary[]> {
+    const queryParams = new URLSearchParams();
+    if (filters?.feedback_type) queryParams.append('feedback_type', filters.feedback_type);
+    if (filters?.status) queryParams.append('status', filters.status);
+    if (filters?.submitted_on) queryParams.append('submitted_on', filters.submitted_on);
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/api/feedback/admin?${queryString}` : '/api/feedback/admin';
+    
+    console.log('FeedbackService: Fetching all feedback tickets from:', endpoint);
+    
+    return await this.request<UserTicketSummary[]>(endpoint, {
+      method: 'GET',
+    });
   }
 }
 

@@ -60,6 +60,9 @@ const Support: React.FC = () => {
   // Comments
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState<string | null>(null);
 
   // Fetch user profile data if not provided via prefill
   useEffect(() => {
@@ -96,6 +99,49 @@ const Support: React.FC = () => {
     setNewComment('');
     } catch (e) {
       // optionally surface error UI
+    }
+  };
+
+  const updateStatus = async (newStatus: string) => {
+    if (!activeFeedbackId) {
+      console.error('No active feedback ID available');
+      return;
+    }
+    if (newStatus === status) return; // No change needed
+    
+    console.log(`Updating status for feedback ${activeFeedbackId} from ${status} to ${newStatus}`);
+    
+    const previousStatus = status; // Store the previous status
+    setIsUpdatingStatus(true);
+    setStatusUpdateError(null);
+    setStatusUpdateSuccess(null);
+    
+    // Optimistically update the UI
+    setStatus(newStatus);
+    
+    try {
+      console.log('Calling feedbackApi.updateFeedbackStatus with:', {
+        feedbackId: activeFeedbackId,
+        status: newStatus,
+        sendEmail: true
+      });
+      
+      const response = await feedbackApi.updateFeedbackStatus(activeFeedbackId, newStatus, true);
+      console.log('Status update response:', response);
+      
+      setStatusUpdateSuccess(`Status updated from ${response.old_status} to ${response.new_status}`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setStatusUpdateSuccess(null);
+      }, 3000);
+    } catch (error: any) {
+      console.error('Status update failed:', error);
+      setStatusUpdateError(error.message || 'Failed to update status');
+      // Revert to the previous status on error
+      setStatus(previousStatus);
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -156,7 +202,7 @@ const Support: React.FC = () => {
            });
          }
       })
-      .catch(error => {
+      .catch(() => {
       });
   }, [activeFeedbackId, readonly]);
 
@@ -322,13 +368,23 @@ const Support: React.FC = () => {
   const controlBg = 'bg-slate-50';
   const disabledCls = 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200';
 
-  const statusClass = (value: string) => {
-    if (value === 'Open') return 'bg-blue-100 text-blue-800';
-    if (value === 'In Progress') return 'bg-yellow-100 text-yellow-800';
-    if (value === 'Completed') return 'bg-green-100 text-green-800';
-    if (value === 'Reopen') return 'bg-orange-100 text-orange-800';
-    return 'bg-gray-100 text-gray-800'; // Default
+  // Jira-style status colors and icons
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'Open':
+        return '#3B82F6'; // Blue
+      case 'In Progress':
+        return '#F59E0B'; // Amber/Orange
+      case 'Completed':
+        return '#10B981'; // Green
+      case 'Reopen':
+        return '#EF4444'; // Red
+      default:
+        return '#6B7280'; // Gray
+    }
   };
+
+
 
   const identityDisabled = readonly || lockIdentity;
 
@@ -536,16 +592,55 @@ const Support: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status (non-editable segmented control) */}
+                {/* Status (Integrated Jira-style component) */}
                 {readonly && (
                 <div className="mt-4">
-                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Status</label>
-                  <div className="inline-flex rounded-md border border-gray-200 overflow-hidden pointer-events-none select-none">
-                    <span className={`px-3 py-1.5 text-xs font-medium ${status === 'Open' ? statusClass('Open') : 'bg-gray-50 text-gray-400'}`}>Open</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'In Progress' ? statusClass('In Progress') : 'bg-gray-50 text-gray-400'}`}>In Progress</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Completed' ? statusClass('Completed') : 'bg-gray-50 text-gray-400'}`}>Completed</span>
-                    <span className={`px-3 py-1.5 text-xs font-medium border-l border-gray-200 ${status === 'Reopen' ? statusClass('Reopen') : 'bg-gray-50 text-gray-400'}`}>Reopen</span>
+                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">
+                    Status {isUpdatingStatus && <span className="text-xs text-gray-500">(Updating...)</span>}
+                  </label>
+                  
+                  {/* Integrated Status Badge/Dropdown */}
+                  <div className="relative inline-block">
+                    <select
+                      value={status}
+                      onChange={(e) => updateStatus(e.target.value)}
+                      disabled={isUpdatingStatus}
+                      className={`appearance-none inline-flex items-center px-4 py-2 rounded-full text-xs font-semibold text-white shadow-sm transition-all duration-200 cursor-pointer hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 ${
+                        isUpdatingStatus ? 'cursor-not-allowed opacity-70' : ''
+                      }`}
+                      style={{
+                        backgroundColor: getStatusColor(status),
+                        boxShadow: `0 2px 4px ${getStatusColor(status)}40`,
+                        minWidth: '120px'
+                      }}
+                    >
+                      <option value="Open" style={{ backgroundColor: 'white', color: 'black' }}>Open</option>
+                      <option value="In Progress" style={{ backgroundColor: 'white', color: 'black' }}>In Progress</option>
+                      <option value="Completed" style={{ backgroundColor: 'white', color: 'black' }}>Completed</option>
+                      <option value="Reopen" style={{ backgroundColor: 'white', color: 'black' }}>Reopen</option>
+                    </select>
+                    
+                    {/* Custom dropdown arrow */}
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      {isUpdatingStatus ? (
+                        <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
+                  
+                  {statusUpdateError && (
+                    <p className="mt-1 text-xs text-red-600">{statusUpdateError}</p>
+                  )}
+                  {statusUpdateSuccess && (
+                    <p className="mt-1 text-xs text-green-600">{statusUpdateSuccess}</p>
+                  )}
                 </div>
                 )}
 

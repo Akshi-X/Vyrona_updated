@@ -26,7 +26,7 @@ const UserProfilePage: React.FC = () => {
   const [firstNameError, setFirstNameError] = useState<string | null>(null);
   const [lastNameError, setLastNameError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState("");
-  const [, setRole] = useState(" ");
+  const [role, setRole] = useState("");
   const [userId, setUserId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -117,8 +117,16 @@ const UserProfilePage: React.FC = () => {
       }
       setTicketsError(null);
       setLoadingTickets(true);
-      feedbackApi
-        .getUserTickets(userId)
+      
+      // Check if user is admin and use appropriate endpoint
+      const isAdmin = role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin';
+      console.log('User role:', role, 'Is admin:', isAdmin);
+      
+      const ticketPromise = isAdmin 
+        ? feedbackApi.getAllFeedbackTickets() // Admin gets all tickets
+        : feedbackApi.getUserTickets(userId);  // Regular users get their own tickets
+      
+      ticketPromise
         .then((data: UserTicketSummary[]) => {
           const mapped: Ticket[] = data.map((t) => ({
             id: t.feedback_id,
@@ -141,7 +149,7 @@ const UserProfilePage: React.FC = () => {
     })();
 
     return () => { isMounted = false; };
-  }, []);
+  }, [role]); // Re-fetch when role changes
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -261,7 +269,7 @@ const UserProfilePage: React.FC = () => {
         feedbackId: ticket.id,
         prefill: {
           fullName: `${firstName} ${lastName}`.trim(),
-          workEmail: 'jothikaraj272001@gmail.com',
+          workEmail: workEmail,
           feedbackType: ticket.type,
           subject: ticket.title,
           description: `Ticket ${ticket.id} reported on ${ticket.submittedOn.replace(/\./g, '-')}`,
@@ -390,7 +398,7 @@ const UserProfilePage: React.FC = () => {
               <label className="block text-sm font-bold text-black mb-2">Email Address</label>
               <input
                 type="email"
-                value="jothikaraj272001@gmail.com"
+                value={workEmail}
                 disabled
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
               />
@@ -398,7 +406,7 @@ const UserProfilePage: React.FC = () => {
             <div>
               <label className="block text-sm font-bold text-black mb-2">Role</label>
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700">
-                Manager
+                {role || 'User'}
               </div>
             </div>
           </div>
@@ -424,18 +432,40 @@ const UserProfilePage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleSubmitRequest}
-                className="px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
-              >
-                Submit New Request
-              </button>
-            </div>
+            {/* Only show Submit New Request button for non-admin users */}
+            {!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleSubmitRequest}
+                  className="px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
+                >
+                  Submit New Request
+                </button>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 italic">
+                Admin view - Viewing all system tickets
+              </div>
+            )}
           </div>
 
           <div>
-            <h3 className="text-lg font-medium text-gray-700 mb-4 pl-2">My Tickets & Feedback</h3>
+            <div className="flex items-center justify-between mb-4 pl-2">
+              <h3 className="text-lg font-medium text-gray-700">
+                {role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin' 
+                  ? 'All Tickets & Feedback' 
+                  : 'My Tickets & Feedback'
+                }
+              </h3>
+              {(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clipRule="evenodd" />
+                  </svg>
+                  Admin View
+                </span>
+              )}
+            </div>
             <div className={tickets.length > 5 ? "max-h-[400px] overflow-y-auto" : ""}>
               <table className="w-full divide-y divide-gray-200 table-fixed">
               <thead className="bg-white sticky top-0 z-10">
