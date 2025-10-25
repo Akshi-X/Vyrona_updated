@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type FeedbackSubmission } from '../../api/feedbackApi';
 import { userService } from '../../services/userService';
+import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
 import AttachmentThumbnail from '../../components/AttachmentThumbnail';
 
@@ -32,6 +33,7 @@ const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 const Support: React.FC = () => {
   const location = useLocation() as { state?: any };
   const navigate = useNavigate();
+  const { isEmailNotificationsEnabled } = useAuth();
   const readonly = Boolean(location.state?.readonly);
   const hideAttach = Boolean(location.state?.hideAttach);
   const lockIdentity = Boolean(location.state?.lockIdentity);
@@ -51,7 +53,7 @@ const Support: React.FC = () => {
   const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [existingAttachment, setExistingAttachment] = useState<{path: string, filename: string} | null>(null);
+  const [existingAttachments, setExistingAttachments] = useState<{path: string, filename: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
@@ -87,7 +89,7 @@ const Support: React.FC = () => {
     if (!newComment.trim()) return;
     if (!activeFeedbackId) return;
     try {
-      const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim());
+      const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim(), isEmailNotificationsEnabled);
     const now = new Date();
     const item: CommentItem = {
         id: String(res.comment_id),
@@ -123,10 +125,10 @@ const Support: React.FC = () => {
       console.log('Calling feedbackApi.updateFeedbackStatus with:', {
         feedbackId: activeFeedbackId,
         status: newStatus,
-        sendEmail: true
+        sendEmail: isEmailNotificationsEnabled
       });
       
-      const response = await feedbackApi.updateFeedbackStatus(activeFeedbackId, newStatus, true);
+      const response = await feedbackApi.updateFeedbackStatus(activeFeedbackId, newStatus, isEmailNotificationsEnabled);
       console.log('Status update response:', response);
       
       setStatusUpdateSuccess(`Status updated from ${response.old_status} to ${response.new_status}`);
@@ -149,11 +151,21 @@ const Support: React.FC = () => {
   useEffect(() => {
     if (!activeFeedbackId || !readonly) return;
     
+    console.log('Loading ticket details for feedbackId:', activeFeedbackId);
+    
     feedbackApi.getFeedbackDetails(activeFeedbackId)
       .then(details => {
+        console.log('Ticket details loaded:', details);
+        console.log('Attachment paths:', details.attachment_paths);
+        
         // Update all fields with the full ticket data
         setSubject(details.subject || '');
         setDescription(details.description || '');
+        
+        // Update user information from ticket creator (not current user)
+        setFullName(details.submitted_by || '');
+        setWorkEmail(details.submitted_by_email || '');
+        
         // Map priority values to match dropdown options
         const priorityMap: Record<string, string> = {
           'LOW': 'low',
@@ -170,7 +182,7 @@ const Support: React.FC = () => {
         
          // Parse affected modules (it's a single enum value, not comma-separated)
          const affectedModule = details.affected_modules || '';
-        
+         
          // Set the checkbox based on the single module
          // Map backend module value to UI module name and find its index
          const moduleMap: Record<string, string> = {
@@ -193,16 +205,24 @@ const Support: React.FC = () => {
            setSelectedModuleIndices([moduleIndex]);
          }
 
-         // Set existing attachment if available
-         if (details.attachment_path) {
-           const filename = details.attachment_path.split('/').pop() || 'attachment';
-           setExistingAttachment({
-             path: details.attachment_path,
+         // Set existing attachments if available
+         if (details.attachment_paths && details.attachment_paths.length > 0) {
+           console.log('Setting attachments:', details.attachment_paths);
+           const attachments = details.attachment_paths.map(attachmentPath => {
+             const filename = attachmentPath.split('/').pop() || 'attachment';
+             return {
+               path: attachmentPath,
              filename: filename
+             };
            });
+           setExistingAttachments(attachments);
+         } else {
+           console.log('No attachment paths found');
+           setExistingAttachments([]);
          }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Error loading ticket details:', error);
       });
   }, [activeFeedbackId, readonly]);
 
@@ -384,8 +404,6 @@ const Support: React.FC = () => {
     }
   };
 
-
-
   const identityDisabled = readonly || lockIdentity;
 
   // Debug status value
@@ -482,6 +500,34 @@ const Support: React.FC = () => {
                   />
                 </div>
 
+                {/* Debug info - Remove in production */}
+                {false && (
+                  <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <p>Debug: existingAttachments = {JSON.stringify(existingAttachments)}</p>
+                    <p>Debug: readonly = {readonly.toString()}</p>
+                    <p>Debug: activeFeedbackId = {activeFeedbackId}</p>
+                  </div>
+                )}
+
+                {/* Existing Attachments (for viewing tickets) - Always visible */}
+                {existingAttachments.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Ticket Attachments ({existingAttachments.length}):</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {existingAttachments.map((attachment, index) => (
+                        <AttachmentThumbnail
+                          key={`${attachment.filename}-${index}`}
+                          attachmentPath={attachment.path}
+                          filename={attachment.filename}
+                          className="w-full"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Attach: full width (conditional) */}
                 {!readonly && !hideAttach && (
                     <div className="mt-4">
@@ -530,20 +576,6 @@ const Support: React.FC = () => {
                                 className="w-full"
                               />
                             ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Existing Attachment (for viewing tickets) */}
-                      {existingAttachment && (
-                        <div className="mt-4">
-                          <span className="text-sm font-medium text-gray-700">Current Attachment:</span>
-                          <div className="mt-2">
-                            <AttachmentThumbnail
-                              attachmentPath={existingAttachment.path}
-                              filename={existingAttachment.filename}
-                              className="w-32"
-                            />
                           </div>
                         </div>
                       )}

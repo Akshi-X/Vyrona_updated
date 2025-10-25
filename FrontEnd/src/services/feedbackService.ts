@@ -44,7 +44,7 @@ export interface FeedbackDetailResponse {
   feedback_type: string;
   subject: string;
   description: string;
-  attachment_path?: string;
+  attachment_paths?: string[];
   priority: string;
   affected_modules: string;
   status: string;
@@ -125,12 +125,12 @@ export class FeedbackService extends BaseApiService {
   /**
    * Add comment to feedback
    */
-  async addComment(feedbackId: string, comment: string): Promise<{ message: string; comment_id: number; ticket_id: string }> {
+  async addComment(feedbackId: string, comment: string, sendEmail: boolean = true): Promise<{ message: string; comment_id: number; ticket_id: string }> {
     return await this.request<{ message: string; comment_id: number; ticket_id: string }>(
       `/api/feedback/${encodeURIComponent(feedbackId)}/comments`,
       {
         method: 'POST',
-        body: JSON.stringify({ comment }),
+        body: JSON.stringify({ comment, send_email: sendEmail }),
       }
     );
   }
@@ -177,6 +177,15 @@ export class FeedbackService extends BaseApiService {
     return await this.request<UserTicketSummary[]>(endpoint, {
       method: 'GET',
     });
+  }
+
+  /**
+   * Get attachment URL for viewing/downloading attachments
+   */
+  getAttachmentUrl(attachmentPath: string): string {
+    // Remove leading slash if present to avoid double slashes
+    const cleanPath = attachmentPath.startsWith('/') ? attachmentPath.slice(1) : attachmentPath;
+    return `${this.getBaseUrl()}/${cleanPath}`;
   }
 }
 

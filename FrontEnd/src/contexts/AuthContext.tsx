@@ -8,6 +8,8 @@ interface AuthContextType {
   token: string | undefined;
   isLoading: boolean;
   userRole?: string;
+  isEmailNotificationsEnabled: boolean;
+  setIsEmailNotificationsEnabled: (enabled: boolean) => void;
   login: (token: string, role?: string, rememberMe?: boolean) => void;
   logout: () => void;
 }
@@ -32,6 +34,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState<number | null>(null);
+  const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState(true);
 
   // Function to set session timeout
   const setSessionTimeoutHandler = (rememberMe: boolean = false) => {
@@ -78,10 +81,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authUtils.setToken(newToken, rememberMe);
     setToken(newToken);
     setIsAuthenticated(true);
+
     if (role) {
       setUserRole(role);
       localStorage.setItem('user_role', role);
     }
+
     // Set session timeout
     setSessionTimeoutHandler(rememberMe);
   };
@@ -105,6 +110,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     isLoading,
     userRole,
+    isEmailNotificationsEnabled,
+    setIsEmailNotificationsEnabled,
     login,
     logout,
   };
