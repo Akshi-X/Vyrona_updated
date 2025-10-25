@@ -149,6 +149,9 @@ from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
 if not os.path.exists(FEEDBACK_UPLOAD_DIR):
     os.makedirs(FEEDBACK_UPLOAD_DIR, exist_ok=True)
 
+# Mount uploads directory for feedback attachments
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Include API routes
 app.include_router(user_controller.router, prefix=API_PREFIX)
 app.include_router(patient_controller.router, prefix=API_PREFIX)
