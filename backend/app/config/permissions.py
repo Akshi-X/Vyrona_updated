@@ -72,7 +72,7 @@ MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/user/{user_id}"),     # View user details
     # Feedback admin endpoints (only for MyGrape admin)
     ("GET", "/api/feedback/admin"),     # View all feedback for admin
-    ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
+    # ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
 }
 
 # ============================================
