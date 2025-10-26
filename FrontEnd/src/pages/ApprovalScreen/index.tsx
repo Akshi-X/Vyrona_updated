@@ -3,6 +3,8 @@ import { useLocation, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
+import { userService } from "../../services/userService";
+import type { UserProfileDto } from "../../services/userService";
 import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 
@@ -16,6 +18,8 @@ const ApprovalScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [completed, setCompleted] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserProfileDto | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
 
   const apiService = new BaseApiService();
   const location = useLocation();
@@ -24,6 +28,34 @@ const ApprovalScreen: React.FC = () => {
   useEffect(() => {
     setFetching(false);
   }, [isAuthenticated]);
+
+  // Fetch user information
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        // Get user ID from localStorage
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+          setStatus("User ID not found in localStorage");
+          setUserLoading(false);
+          return;
+        }
+
+        // Fetch user details from API
+        const userData = await userService.getUserById(userId);
+        setUserInfo(userData);
+      } catch (error: any) {
+        console.error('Error fetching user info:', error);
+        setStatus("Failed to fetch user information");
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    if (!fetching) {
+      fetchUserInfo();
+    }
+  }, [fetching]);
 
 
   // Approve / Reject Handler
@@ -64,7 +96,7 @@ const ApprovalScreen: React.FC = () => {
     }
   };
 
-  if (fetching) {
+  if (fetching || userLoading) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-600">
         Loading...
@@ -118,24 +150,70 @@ const ApprovalScreen: React.FC = () => {
                 </div>
             </aside>
       {/* Right Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-16 overflow-hidden">
-        <div className="w-full max-w-[22rem]">
+      <main className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
+        <div className="w-full max-w-[28rem]">
           {!completed && (
             <>
               <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">
                 Approval Request
               </h2>
               <p className="text-gray-500 mb-6">
-                Proceed to approve or reject.
+                Review user details and proceed to approve or reject.
               </p>
             </>
           )}
 
+          {/* User Information Card */}
+          {userInfo && !completed && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">User Information</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Name:</span>
+                  <span className="text-gray-800">{userInfo.first_name} {userInfo.last_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Email:</span>
+                  <span className="text-gray-800">{userInfo.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Role:</span>
+                  <span className="text-gray-800">{userInfo.role}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Company:</span>
+                  <span className="text-gray-800">{userInfo.company_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Status:</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    userInfo.approved_status === 'pending' 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : userInfo.approved_status === 'approved'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {userInfo.approved_status}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">Account Status:</span>
+                  <span className={`font-medium ${
+                    userInfo.status ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {userInfo.status ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
           <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
             {!completed && (
               <div className="flex gap-4 justify-center">
                 <button
-                  className="w-full py-3 bg-[#8b2a96]  text-white rounded-md font-medium transition disabled:opacity-50"
+                  className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
                   onClick={() => handleAction("approve")}
                   disabled={loading}
                 >

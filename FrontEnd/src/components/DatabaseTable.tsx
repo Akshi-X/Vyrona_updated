@@ -179,7 +179,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-2">
-                  Location
+                  Manufacturing Location
                   <SortIcon field="location" />
                 </div>
               </th>

@@ -73,7 +73,8 @@ export class BaseApiService {
 
         if (!response.ok) {
           // Handle 401 Unauthorized - clear auth token and redirect to login
-          if (response.status === 401) {
+          // BUT NOT for authentication endpoints (to show error messages)
+          if (response.status === 401 && !endpoint.includes('/login') && !endpoint.includes('/verify-otp')) {
             authUtils.clearToken();
             // Clear any other auth-related data
             try {
