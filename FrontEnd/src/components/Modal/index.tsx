@@ -21,7 +21,7 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-20 overflow-hidden h-full w-full z-50"
+      className="fixed inset-0 bg-transparent backdrop-blur-sm overflow-hidden h-full w-full z-50"
       onClick={onClose}
     >
       <div className="flex items-center justify-center min-h-screen p-4">

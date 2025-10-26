@@ -458,14 +458,15 @@ def get_feedback_comments(db: Session, feedback_id: str) -> List[CommentResponse
     if not feedback:
         raise FeedbackNotFoundException(feedback_id=feedback_id)
     
-    comments = db.query(Comment).filter(Comment.ticket_id == feedback_id).order_by(Comment.created_at).all()
+    # Join with User table to get user names
+    comments = db.query(Comment, User).join(User, Comment.commented_by == User.user_id).filter(Comment.ticket_id == feedback_id).order_by(Comment.created_at).all()
     
     return [
         CommentResponse(
             id=comment.id,
             comment=comment.comment,
-            commented_by=comment.commented_by,
+            commented_by=f"{user.first_name} {user.last_name}".strip() if user.first_name and user.last_name else user.user_id,
             created_at=comment.created_at
         )
-        for comment in comments
+        for comment, user in comments
     ]

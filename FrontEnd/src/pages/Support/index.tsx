@@ -44,6 +44,7 @@ const Support: React.FC = () => {
   const [fullName, setFullName] = useState<string>(prefill.fullName || '');
   const [fullNameError, setFullNameError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState<string>(prefill.workEmail || '');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
   const [feedbackType, setFeedbackType] = useState<string>(prefill.feedbackType || '');
   const [subject, setSubject] = useState<string>(prefill.subject || '');
   const [description, setDescription] = useState<string>(prefill.description || '');
@@ -83,7 +84,20 @@ const Support: React.FC = () => {
       fetchProfile();
     }
   }, [fullName, workEmail]);
-  
+
+  // Fetch current user's name for comments
+  useEffect(() => {
+    const fetchCurrentUserName = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+        setCurrentUserName(name || 'User');
+      } catch (error) {
+        setCurrentUserName('User');
+      }
+    };
+    fetchCurrentUserName();
+  }, []);
 
   const addComment = async () => {
     if (!newComment.trim()) return;
@@ -93,7 +107,7 @@ const Support: React.FC = () => {
     const now = new Date();
     const item: CommentItem = {
         id: String(res.comment_id),
-      author: fullName || 'You',
+      author: currentUserName || 'You',
       content: newComment.trim(),
       createdAt: now.toISOString().slice(0, 16).replace('T', ' ')
     };
@@ -232,7 +246,7 @@ const Support: React.FC = () => {
       .then(list => {
         const mapped: CommentItem[] = list.map(c => ({
           id: String(c.id),
-          author: fullName || 'User', // Use the current user's name instead of API response
+          author: c.commented_by || 'Unknown User', // Now returns full name from backend
           content: c.comment,
           createdAt: c.created_at
         }));
@@ -241,7 +255,7 @@ const Support: React.FC = () => {
       .catch(() => {
         setComments([]);
       });
-  }, [activeFeedbackId, fullName]);
+  }, [activeFeedbackId]);
 
   const canAddComment = Boolean(newComment.trim() && activeFeedbackId);
 
