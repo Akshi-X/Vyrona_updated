@@ -167,13 +167,34 @@ def setup_exception_handlers(app):
             extra={"errors": exc.errors()}
         )
         
+        # Extract user-friendly error message
+        error_messages = []
+        for error in exc.errors():
+            field = ".".join(str(loc) for loc in error["loc"])
+            if field == "body.email":
+                error_messages.append("Please provide a valid email address")
+            elif field == "body.password":
+                error_messages.append("Password is required")
+            elif field == "body.first_name":
+                error_messages.append("First name is required")
+            elif field == "body.last_name":
+                error_messages.append("Last name is required")
+            elif field == "body.role":
+                error_messages.append("Please select a valid role")
+            elif field == "body.company_name":
+                error_messages.append("Company name is required")
+            else:
+                error_messages.append(f"Invalid {field}")
+        
+        # Use the first error message or a generic one
+        user_message = error_messages[0] if error_messages else "Please check your input and try again"
+        
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "error_code": ERROR_CODES["VALIDATION_INPUT_ERROR"],
-                "message": ErrorMessages.VALIDATION_ERROR,
+                "message": user_message,
                 "status": STATUS_FAILED,
-                "details": exc.errors(),
                 "timestamp": datetime.utcnow().isoformat()
             },
             headers={
