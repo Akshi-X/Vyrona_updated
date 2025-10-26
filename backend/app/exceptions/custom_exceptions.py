@@ -578,9 +578,10 @@ class IntegrityConstraintException(AppException):
 class DatabaseQueryException(AppException):
     """Database query failed"""
     
-    def __init__(self, operation: str, reason: Optional[str] = None):
+    def __init__(self, operation: str, reason: Optional[str] = None, custom_message: Optional[str] = None):
+        message = custom_message if custom_message else f"Database query failed: {operation}"
         super().__init__(
-            message=f"Database query failed: {operation}",
+            message=message,
             error_code=ERROR_CODES["DB_QUERY_FAILED"],
             status_code=500,
             details={"operation": operation, "reason": reason}
