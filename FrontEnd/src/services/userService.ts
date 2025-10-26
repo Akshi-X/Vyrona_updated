@@ -11,6 +11,13 @@ export interface UserProfileDto {
   last_name: string;
   email: string;
   role: string;
+  company_name: string;
+  approved_status: string;
+  status: boolean;
+  is_locked: boolean;
+  login_attempts: number;
+  last_login: string;
+  session_timeout: number;
 }
 
 export interface UserRegistration {
