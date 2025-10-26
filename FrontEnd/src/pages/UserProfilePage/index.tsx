@@ -11,7 +11,7 @@ interface Ticket {
   id: string;
   title: string;
   type: string;
-  status: 'In Progress' | 'Completed' | 'Under Review';
+  status: string; // Allow any status value from API
   submittedOn: string;
 }
 
@@ -133,7 +133,7 @@ const UserProfilePage: React.FC = () => {
             id: t.feedback_id,
             title: t.feedback,
             type: t.type,
-            status: t.status === 'OPEN' ? 'In Progress' : (t.status === 'CLOSED' ? 'Completed' : 'Under Review'),
+            status: t.status, // Use the actual status from API response
             submittedOn: new Date(t.submitted_on).toISOString().slice(0,10).replace(/-/g, '.'),
           }));
           if (!isMounted) return;
@@ -154,12 +154,18 @@ const UserProfilePage: React.FC = () => {
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case 'In Progress':
+      case 'Open':
         return 'bg-blue-100 text-blue-800';
+      case 'In Progress':
+        return 'bg-yellow-100 text-yellow-800';
       case 'Completed':
         return 'bg-green-100 text-green-800';
-      case 'Under Review':
-        return 'bg-yellow-100 text-yellow-800';
+      case 'Reopen':
+        return 'bg-red-100 text-red-800';
+      case 'CLOSED':
+        return 'bg-green-100 text-green-800';
+      case 'OPEN':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -258,11 +264,6 @@ const UserProfilePage: React.FC = () => {
 
 
   const navigateToTicketPrefilled = (ticket: Ticket) => {
-    const mapStatus = (s: string) => {
-      if (s === 'In Progress') return 'Created';
-      if (s === 'Completed') return 'Completed';
-      return 'Under Review';
-    };
     navigate('/support', {
       state: {
         readonly: true,
@@ -275,7 +276,7 @@ const UserProfilePage: React.FC = () => {
           subject: ticket.title,
           description: `Ticket ${ticket.id} reported on ${ticket.submittedOn.replace(/\./g, '-')}`,
           priority: 'Medium',
-          status: mapStatus(ticket.status)
+          status: ticket.status // Use the actual status from API
         }
       }
     });
