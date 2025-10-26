@@ -14,7 +14,7 @@ const tableHeaders = [
   { label: "Hospital", field: 'hospital' as SortField, hasSort: true },
   { label: "Stage", field: 'stage' as SortField, hasSort: true },
   { label: "3PL", field: 'provider_name' as SortField, hasSort: true },
-  { label: "Location", field: 'location' as SortField, hasSort: true },
+  { label: "Manufacturing Location", field: 'location' as SortField, hasSort: true },
 ];
 
 export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
