@@ -11,8 +11,8 @@ interface SuccessAlertProps {
 
 const SuccessAlert: React.FC<SuccessAlertProps> = ({
   title = "Thank You!",
-  message = "Thank you for submitting your feedback. A member of our team will be in touch shortly. You can track your past tickets in the 'Support' section of your dashboard.",
-  buttonText = "Return to Dashboard",
+  message = "Thank you for submitting your feedback. A member of our team will be in touch shortly. You can track your past tickets in the 'Support' section of your profile.",
+  buttonText = "Return to Profile",
   onButtonClick
 }) => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const SuccessAlert: React.FC<SuccessAlertProps> = ({
     if (onButtonClick) {
       onButtonClick();
     } else {
-      navigate('/dashboard');
+      navigate('/user-profile');
     }
   };
 
