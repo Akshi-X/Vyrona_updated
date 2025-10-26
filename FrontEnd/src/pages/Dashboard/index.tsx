@@ -137,7 +137,7 @@ export default function Dashboard({}: DashboardProps) {
     patientId: task.patient_id || 'N/A',
     taskName: task.task_name,
     description: task.description || '',
-    assigneeBy: task.assignee_name,
+    assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
     dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
     priority: task.priority,
     status: task.status
