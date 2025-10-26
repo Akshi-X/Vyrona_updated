@@ -121,7 +121,6 @@ const UserProfilePage: React.FC = () => {
       
       // Check if user is admin and use appropriate endpoint
       const isAdmin = role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin';
-      console.log('User role:', role, 'Is admin:', isAdmin);
       
       const ticketPromise = isAdmin 
         ? feedbackApi.getAllFeedbackTickets() // Admin gets all tickets
