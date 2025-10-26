@@ -198,7 +198,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             logger.error(f"No pharma admin found for company: {request.company_name}")
             raise DatabaseQueryException(
                 operation="user registration", 
-                reason=f"Registration not allowed for company '{request.company_name}'. No pharma admin configured for this company."
+                reason=f"{request.email} tried to register. For further support, kindly reach out to ITAdmin@MyGrape.com.",
+                custom_message=f"{request.email} tried to register. For further support, kindly reach out to ITAdmin@MyGrape.com."
             )
         
         # Both manager and user registrations go to pharma admin
