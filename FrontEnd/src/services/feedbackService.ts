@@ -144,9 +144,6 @@ export class FeedbackService extends BaseApiService {
       send_email: sendEmail 
     };
     
-    console.log('FeedbackService: Making status update request to:', `/api/feedback/${encodeURIComponent(feedbackId)}/status`);
-    console.log('FeedbackService: Request body:', requestBody);
-    
     return await this.request<{ message: string; ticket_id: string; old_status: string; new_status: string }>(
       `/api/feedback/${encodeURIComponent(feedbackId)}/status`,
       {
@@ -171,8 +168,6 @@ export class FeedbackService extends BaseApiService {
     
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/api/feedback/admin?${queryString}` : '/api/feedback/admin';
-    
-    console.log('FeedbackService: Fetching all feedback tickets from:', endpoint);
     
     return await this.request<UserTicketSummary[]>(endpoint, {
       method: 'GET',
