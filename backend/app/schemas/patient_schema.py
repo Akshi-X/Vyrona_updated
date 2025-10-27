@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, RootModel
 from typing import Optional, List, Union
 from datetime import datetime
-from app.constants.enums import PatientStage
+from app.constants.enums import PatientStage, TreatmentStatus
 
 
 class PatientBase(BaseModel):
@@ -15,6 +15,7 @@ class PatientBase(BaseModel):
     provider_id: Optional[str] = Field(None, description="Reference to provider")
     pharma_id: Optional[int] = Field(None, description="Reference to pharma")
     stage: Optional[PatientStage] = Field(PatientStage.SCHEDULED, description="Patient treatment stage")
+    treatment_status: Optional[TreatmentStatus] = Field(None, description="Patient treatment status")
     created_by: Optional[str] = Field(None, max_length=255, description="User who created the record")
     updated_by: Optional[str] = Field(None, max_length=255, description="User who last updated the record")
 
@@ -41,6 +42,7 @@ class PatientUpdate(BaseModel):
     provider_id: Optional[str] = None
     pharma_id: Optional[int] = None
     stage: Optional[PatientStage] = None
+    treatment_status: Optional[TreatmentStatus] = None
     updated_by: Optional[str] = Field(None, max_length=255)
 
 
@@ -90,8 +92,9 @@ class PatientSummaryResponse(BaseModel):
     condition: str = Field(..., description="Patient condition")
     hospital: Optional[str] = Field(None, description="Hospital name")
     stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
+    treatment_status: Optional[TreatmentStatus] = Field(None, description="Patient treatment status")
     provider_name: Optional[str] = Field(None, description="Provider name")
-    location: Optional[str] = Field(None, description="Patient location")
+    location: Optional[str] = Field(None, description="Pharma location")
     
     class Config:
         from_attributes = True
@@ -103,8 +106,9 @@ class PatientDetailedResponse(BaseModel):
     condition: str = Field(..., description="Patient condition")
     hospital: Optional[str] = Field(None, description="Hospital name")
     stage: Optional[PatientStage] = Field(None, description="Patient treatment stage")
+    treatment_status: Optional[TreatmentStatus] = Field(None, description="Patient treatment status")
     provider_name: Optional[str] = Field(None, description="Provider name")
-    location: Optional[str] = Field(None, description="Patient location")
+    location: Optional[str] = Field(None, description="Pharma location")
     docs_report: Optional[bytes] = Field(None, description="Patient documents report")
     
     class Config:

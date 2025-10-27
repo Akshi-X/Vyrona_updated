@@ -24,8 +24,8 @@ class Tasks(Base):
     
     # Task Fields
     due_date = Column(DateTime, nullable=True)
-    priority = Column(SQLEnum(TaskPriority), nullable=False)
-    status = Column(SQLEnum(TaskStatus), default=TaskStatus.NOT_STARTED, nullable=False)
+    priority = Column(SQLEnum(TaskPriority, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    status = Column(SQLEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.NOT_STARTED, nullable=False)
     
     # Patient Reference
     patient_id = Column(String, ForeignKey("patient.id"), nullable=True)

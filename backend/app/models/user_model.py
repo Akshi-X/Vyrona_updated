@@ -4,6 +4,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from ..config.database import Base
+from ..constants.enums import UserRole, ApprovalStatus
 
 
 class User(Base):
@@ -19,12 +20,12 @@ class User(Base):
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Role and Company
-    role = sqlalchemy.Column(SQLEnum('admin', 'pharma_admin', 'mygrape_admin', 'manager', 'user', name='user_role'), nullable=False)
+    role = sqlalchemy.Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj], name='user_role'), nullable=False)
     company_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Account Status
     status = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Account active/inactive
-    approved_status = sqlalchemy.Column(SQLEnum('pending', 'approved', 'rejected', name='approval_status'), default='pending')
+    approved_status = sqlalchemy.Column(SQLEnum(ApprovalStatus, values_callable=lambda obj: [e.value for e in obj], name='approval_status'), default=ApprovalStatus.PENDING)
     
     # Approval Audit Trail
     approved_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # User ID of approver
