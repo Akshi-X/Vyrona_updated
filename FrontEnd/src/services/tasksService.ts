@@ -9,19 +9,30 @@ export interface Task {
   id: number;
   task_name: string;
   description?: string;
-  assignee_id: number;
-  assignee_name: string;
+  assignee: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+  };
+  created_by: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+  };
   patient_id?: string;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
   status: 'Not started' | 'In progress' | 'Done';
-  created_by: number;
-  created_by_name: string;
   created_at: string;
   updated_at?: string;
-  can_edit: boolean;
-  can_delete: boolean;
-  can_update_status: boolean;
+  permissions?: {
+    can_edit_all: boolean;
+    can_edit_status_only: boolean;
+  };
 }
 
 export interface TaskListResponse {
