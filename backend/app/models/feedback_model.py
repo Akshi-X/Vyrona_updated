@@ -24,11 +24,11 @@ class Feedback(Base):
     
     # Feedback Details
     department = sqlalchemy.Column(
-        SQLEnum(FeedbackDepartment, name='feedback_department'), 
+        SQLEnum(FeedbackDepartment, values_callable=lambda obj: [e.value for e in obj], name='feedback_department'), 
         nullable=False
     )
     feedback_type = sqlalchemy.Column(
-        SQLEnum(FeedbackType, name='feedback_type'), 
+        SQLEnum(FeedbackType, values_callable=lambda obj: [e.value for e in obj], name='feedback_type'), 
         nullable=False
     )
     subject = sqlalchemy.Column(sqlalchemy.String, nullable=False)
@@ -36,7 +36,7 @@ class Feedback(Base):
     
     # Classification
     priority = sqlalchemy.Column(
-        SQLEnum(FeedbackPriority, name='feedback_priority'), 
+        SQLEnum(FeedbackPriority, values_callable=lambda obj: [e.value for e in obj], name='feedback_priority'), 
         nullable=False
     )
     affected_modules = sqlalchemy.Column(
@@ -46,7 +46,7 @@ class Feedback(Base):
     
     # Status and Assignment
     status = sqlalchemy.Column(
-        SQLEnum(FeedbackStatus, name='feedback_status'), 
+        SQLEnum(FeedbackStatus, values_callable=lambda obj: [e.value for e in obj], name='feedback_status'), 
         default=FeedbackStatus.OPEN,
         nullable=False
     )
