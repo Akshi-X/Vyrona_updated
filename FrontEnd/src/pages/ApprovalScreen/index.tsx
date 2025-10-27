@@ -33,16 +33,15 @@ const ApprovalScreen: React.FC = () => {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        // Get user ID from localStorage
-        const userId = localStorage.getItem('user_id');
-        if (!userId) {
-          setStatus("User ID not found in localStorage");
+        // Get user ID from URL registration_id parameter
+        if (!registrationId) {
+          setStatus("Registration ID not found in URL");
           setUserLoading(false);
           return;
         }
 
         // Fetch user details from API
-        const userData = await userService.getUserById(userId);
+        const userData = await userService.getUserById(registrationId);
         setUserInfo(userData);
       } catch (error: any) {
         console.error('Error fetching user info:', error);
@@ -55,7 +54,7 @@ const ApprovalScreen: React.FC = () => {
     if (!fetching) {
       fetchUserInfo();
     }
-  }, [fetching]);
+  }, [fetching, registrationId]);
 
 
   // Approve / Reject Handler
@@ -240,3 +239,4 @@ const ApprovalScreen: React.FC = () => {
 };
 
 export default ApprovalScreen;
+
