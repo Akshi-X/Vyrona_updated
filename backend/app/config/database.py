@@ -39,6 +39,7 @@ def init_db():
         user_model,
         otp_model,
         patient_model,
+        patient_stage_model,
         feedback_model,
         feedback_comments,
         pharma_model,
