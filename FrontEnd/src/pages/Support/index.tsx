@@ -120,7 +120,6 @@ const Support: React.FC = () => {
 
   const updateStatus = async (newStatus: string) => {
     if (!activeFeedbackId) {
-      console.error('No active feedback ID available');
       return;
     }
     if (newStatus === status) return; // No change needed
@@ -143,7 +142,6 @@ const Support: React.FC = () => {
         setStatusUpdateSuccess(null);
       }, 3000);
     } catch (error: any) {
-      console.error('Status update failed:', error);
       setStatusUpdateError(error.message || 'Failed to update status');
       // Revert to the previous status on error
       setStatus(previousStatus);
@@ -219,8 +217,7 @@ const Support: React.FC = () => {
            setExistingAttachments([]);
          }
       })
-      .catch((error) => {
-        console.error('Error loading ticket details:', error);
+      .catch(() => {
       });
   }, [activeFeedbackId, readonly]);
 
@@ -413,7 +410,7 @@ const Support: React.FC = () => {
       <Header title="Support & Feedback" />
 
       {/* Page body */}
-      <div className="flex-1 w-full" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+      <div className="flex-1 w-full" style={{ paddingTop: '63px' }}>
         <div className="w-full" style={{ background: 'linear-gradient(180deg, #f3f4f6 0%, #f8f9fa 100%)' }}>
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
