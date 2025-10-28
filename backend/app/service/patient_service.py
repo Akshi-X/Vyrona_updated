@@ -222,8 +222,9 @@ class PatientService:
                 Patient.condition,
                 Patient.hospital_name.label('hospital'),
                 Patient.stage,
+                Patient.treatment_status,
                 Provider.name.label('provider_name'),
-                Patient.location
+                Pharma.location.label('pharma_location')
             ).outerjoin(
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
@@ -242,8 +243,9 @@ class PatientService:
                     condition=result.condition,
                     hospital=result.hospital,
                     stage=result.stage,
+                    treatment_status=result.treatment_status,
                     provider_name=result.provider_name,
-                    location=result.location
+                    location=result.pharma_location
                 ))
             
             return summary_data
@@ -264,9 +266,10 @@ class PatientService:
                 Patient.condition,
                 Patient.hospital_name.label('hospital'),
                 Patient.stage,
+                Patient.treatment_status,
                 Patient.docs_report,
                 Provider.name.label('provider_name'),
-                Patient.location
+                Pharma.location.label('pharma_location')
             ).outerjoin(
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
@@ -285,8 +288,9 @@ class PatientService:
                     condition=result.condition,
                     hospital=result.hospital,
                     stage=result.stage,
+                    treatment_status=result.treatment_status,
                     provider_name=result.provider_name,
-                    location=result.location,
+                    location=result.pharma_location,
                     docs_report=result.docs_report
                 ))
             

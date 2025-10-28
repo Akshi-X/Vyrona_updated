@@ -57,6 +57,17 @@ class PatientStage(str, Enum):
         return [stage.value for stage in cls]
 
 
+class TreatmentStatus(str, Enum):
+    """Enum for patient treatment status"""
+    AFTER_CARE = "after_care"
+    FAILURE = "failure"
+    ONGOING = "ongoing"
+    
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]
+
+
 class LogLevel(str, Enum):
     DEBUG = "DEBUG"
     INFO = "INFO"
