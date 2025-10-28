@@ -120,7 +120,6 @@ const Support: React.FC = () => {
 
   const updateStatus = async (newStatus: string) => {
     if (!activeFeedbackId) {
-      console.error('No active feedback ID available');
       return;
     }
     if (newStatus === status) return; // No change needed
@@ -143,7 +142,6 @@ const Support: React.FC = () => {
         setStatusUpdateSuccess(null);
       }, 3000);
     } catch (error: any) {
-      console.error('Status update failed:', error);
       setStatusUpdateError(error.message || 'Failed to update status');
       // Revert to the previous status on error
       setStatus(previousStatus);
@@ -219,8 +217,7 @@ const Support: React.FC = () => {
            setExistingAttachments([]);
          }
       })
-      .catch((error) => {
-        console.error('Error loading ticket details:', error);
+      .catch(() => {
       });
   }, [activeFeedbackId, readonly]);
 
