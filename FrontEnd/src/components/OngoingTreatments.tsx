@@ -1,18 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { patientService, type OngoingTreatment } from '../services/patientService';
 
 interface OngoingTreatmentsProps {
   // No props needed since we don't send pharma_id
 }
 
-type SortField = 'patient_id' | 'condition' | 'hospital' | 'stage' | 'location' | 'provider_name';
+type SortField = 'patient_id' | 'condition' | 'hospital' | 'location' | 'provider_name';
 type SortDirection = 'asc' | 'desc';
 
-const tableHeaders = [
+interface TableHeader {
+  label: string;
+  field: SortField | null;
+  hasSort: boolean;
+  hasFilter?: boolean;
+}
+
+const tableHeaders: TableHeader[] = [
   { label: "Patient ID", field: 'patient_id' as SortField, hasSort: true },
   { label: "Condition", field: 'condition' as SortField, hasSort: true },
   { label: "Hospital", field: 'hospital' as SortField, hasSort: true },
-  { label: "Stage", field: 'stage' as SortField, hasSort: true },
+  { label: "Stage", field: null, hasSort: false, hasFilter: true },
   { label: "3PL", field: 'provider_name' as SortField, hasSort: true },
   { label: "Manufacturing Location", field: 'location' as SortField, hasSort: true },
 ];
@@ -23,11 +30,23 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // All possible stage values
+  const allStages = ['Scheduled', 'Apheresis', 'Cryopreservation', 'Transportation', 'Reengineering', 'Reinfusion', 'AfterCare', 'Failure'];
 
   const getStageColor = (stage: string) => {
     switch (stage.toLowerCase()) {
       case 'scheduled':
+      case 'apheresis':
+      case 'cryopreservation':
+      case 'transportation':
+      case 'reengineering':
+      case 'reinfusion':
         return 'bg-green-100 text-green-800';
+      case 'aftercare':
       case 'after care':
         return 'bg-blue-100 text-blue-800';
       case 'failure':
@@ -47,9 +66,16 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   };
 
   const getSortedTreatments = () => {
-    if (!sortField) return treatments;
+    // First, filter by stage if needed
+    let filtered = treatments;
+    if (stageFilter !== 'all') {
+      filtered = treatments.filter(t => t.stage === stageFilter);
+    }
 
-    return [...treatments].sort((a, b) => {
+    // Then sort if sort field is selected
+    if (!sortField) return filtered;
+
+    return [...filtered].sort((a, b) => {
       const aValue = a[sortField];
       const bValue = b[sortField];
       
@@ -108,6 +134,20 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
     };
    }, []); // No dependencies needed since we don't use pharmaId
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
@@ -131,7 +171,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   return (
     <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
       <div 
-        className="max-h-[420px] overflow-y-auto"
+        className="h-[360px] overflow-y-auto"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: '#af6eb7 transparent'
@@ -146,43 +186,113 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                   className={`p-[15px] font-semibold text-[#6b1176] text-sm text-left ${
                     header.hasSort ? 'cursor-pointer hover:bg-[#f0e6f0]' : ''
                   }`}
-                  onClick={header.hasSort ? () => handleSort(header.field) : undefined}
+                  onClick={header.hasSort && header.field ? () => handleSort(header.field as SortField) : undefined}
                 >
-                  <div className="flex items-center gap-2">
-                    <span>{header.label}</span>
-                    {header.hasSort && (
-                      <div className="flex flex-col">
-                        {sortField === header.field ? (
-                          sortDirection === 'asc' ? (
-                            <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                            </svg>
-                          ) : (
-                            <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          )
-                        ) : (
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  {header.hasFilter ? (
+                    <div className="flex items-center gap-2 relative" ref={dropdownRef}>
+                      <span>{header.label}</span>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsDropdownOpen(!isDropdownOpen);
+                          }}
+                          className={`text-xs p-1.5 text-[#6b1176] hover:bg-gray-50 transition-all duration-200 ${
+                            stageFilter !== 'all' ? 'text-[#6b1176]' : ''
+                          }`}
+                          title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
+                        >
+                          <svg 
+                            className="w-4 h-4"
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                           </svg>
+                        </button>
+                        
+                        {isDropdownOpen && (
+                          <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[150px] overflow-hidden">
+                            {['all', ...allStages].map((stage) => (
+                              <button
+                                key={stage}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStageFilter(stage);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                  stageFilter === stage
+                                    ? 'bg-[#6b1176] text-white'
+                                    : 'text-[#6b1176] hover:bg-gray-100'
+                                }`}
+                              >
+                                {stage === 'all' ? 'All Stages' : stage}
+                              </button>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span>{header.label}</span>
+                      {header.hasSort && (
+                        <div className="flex flex-col">
+                          {sortField === header.field ? (
+                            sortDirection === 'asc' ? (
+                              <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-[#6b1176]" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            )
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {treatments.length === 0 ? (
-              <tr>
-                <td colSpan={tableHeaders.length} className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center">
-                  No ongoing treatments found
-                </td>
-              </tr>
-            ) : (
-              getSortedTreatments().map((treatment) => (
+            {(() => {
+              const filteredTreatments = getSortedTreatments();
+              const hasData = treatments.length > 0;
+              const hasFilteredData = filteredTreatments.length > 0;
+              const isFiltered = stageFilter !== 'all';
+
+              if (!hasData) {
+                return (
+                  <tr>
+                    <td colSpan={tableHeaders.length} className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center">
+                      No ongoing treatments found
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (!hasFilteredData && isFiltered) {
+                return (
+                  <tr>
+                    <td colSpan={tableHeaders.length} className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center">
+                      No data found for this filter
+                    </td>
+                  </tr>
+                );
+              }
+
+              return filteredTreatments.map((treatment) => (
                 <tr
                   key={treatment.patient_id}
                   className="border-b border-[#eeeeee] hover:bg-white/50"
@@ -208,8 +318,8 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                     {treatment.location}
                   </td>
                 </tr>
-              ))
-            )}
+              ));
+            })()}
           </tbody>
         </table>
       </div>
