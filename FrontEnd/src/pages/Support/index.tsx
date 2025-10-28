@@ -413,7 +413,7 @@ const Support: React.FC = () => {
       <Header title="Support & Feedback" />
 
       {/* Page body */}
-      <div className="flex-1 w-full" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+      <div className="flex-1 w-full" style={{ paddingTop: '63px' }}>
         <div className="w-full" style={{ background: 'linear-gradient(180deg, #f3f4f6 0%, #f8f9fa 100%)' }}>
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
