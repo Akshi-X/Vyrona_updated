@@ -9,7 +9,7 @@ from ..constants.enums import PatientStage
 
 class PatientStage(Base):
     """Model to store patient stage history"""
-    __tablename__ = "patient_stages"
+    __tablename__ = "process_phase"
 
     # Primary Key
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
