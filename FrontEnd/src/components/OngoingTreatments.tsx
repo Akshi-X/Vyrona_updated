@@ -24,7 +24,11 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const getStageColor = (stage: string) => {
+  const getStageColor = (stage: string | null) => {
+    if (!stage) {
+      return 'bg-gray-100 text-gray-800';
+    }
+    
     switch (stage.toLowerCase()) {
       case 'scheduled':
         return 'bg-green-100 text-green-800';
@@ -198,7 +202,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(treatment.stage)}`}>
-                      {treatment.stage}
+                      {treatment.stage || 'N/A'}
                     </span>
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">

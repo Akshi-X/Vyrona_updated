@@ -13,6 +13,7 @@ import { logisticsService, type PatientStatistics, type LogisticsMetrics } from 
 import { performanceService, type PerformanceMetrics } from '../../services/performanceService';
 import { riskService, type RiskMetrics } from '../../services/riskService';
 import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
+import { chatService, type UnreadMessageResponse } from '../../services/chatService';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -26,9 +27,6 @@ import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
-
-// TODO: Replace with actual user's pharma_id from authentication context
-const DUMMY_PHARMA_ID = 'pharma_12345';
 
 interface StakeholderChat {
   id: string;
@@ -57,38 +55,37 @@ export default function Dashboard({}: DashboardProps) {
   // Real data from APIs
   const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
+  const [stakeholderChats, setStakeholderChats] = useState<StakeholderChat[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [loadingChats, setLoadingChats] = useState(false);
 
 
 
-  // Mock stakeholder chats data
-  const stakeholderChats: StakeholderChat[] = [
-    {
-      id: '1',
-      sender: 'Dr. Sarah Johnson',
-      patientId: 'Patient ID : ZQ812457',
-      message: 'Need update on patient transport status',
-      timestamp: '2024-05-28 14:20',
-      isRead: false
-    },
-    {
-      id: '2',
-      sender: 'Dr. Sarah Johnson',
-      patientId: 'Patient ID : ZQ812457',
-      message: 'Need update on patient transport status',
-      timestamp: '2024-05-28 14:20',
-      isRead: true
-    },
-    {
-      id: '3',
-      sender: 'Dr. Sarah Johnson',
-      patientId: 'Patient ID : ZQ812457',
-      message: 'Need update on patient transport status',
-      timestamp: '2024-05-28 14:20',
-      isRead: false
+  // Fetch stakeholder chats from API
+  const fetchStakeholderChats = async () => {
+    setLoadingChats(true);
+    try {
+      console.log('Fetching stakeholder chats...');
+      const response = await chatService.getUnreadMessages();
+      console.log('Chat API response:', response);
+      const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
+        id: msg.message_id.toString(),
+        sender: msg.sender_name,
+        patientId: `Patient ID: ${msg.patient_id}`,
+        message: msg.message_content,
+        timestamp: new Date(msg.created_at).toLocaleString(),
+        isRead: false // These are unread messages
+      }));
+      console.log('Transformed chats:', transformedChats);
+      setStakeholderChats(transformedChats);
+    } catch (error) {
+      console.error('Error fetching stakeholder chats:', error);
+      setStakeholderChats([]);
+    } finally {
+      setLoadingChats(false);
     }
-  ];
+  };
 
   // Calculate dynamic notification counts
   const stakeholderChatCount = stakeholderChats.length; // Show total chats count
@@ -100,9 +97,13 @@ export default function Dashboard({}: DashboardProps) {
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const response = await criticalAlertsService.getCriticalAlerts(DUMMY_PHARMA_ID);
+      // TODO: Get pharma_id from user context or modify API to use current user context
+      // For now, using a default pharma_id - this should be replaced with actual user's pharma_id
+      const pharmaId = '1'; // Default pharma_id - needs to be replaced with actual user's pharma_id
+      const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
       setCriticalAlerts(response.alerts || []);
     } catch (error) {
+      console.error('Error fetching critical alerts:', error);
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
@@ -131,6 +132,16 @@ export default function Dashboard({}: DashboardProps) {
   useEffect(() => {
     fetchMyTasks();
   }, []);
+
+  // Fetch stakeholder chats on component mount
+  useEffect(() => {
+    console.log('Dashboard mounted, isAuthenticated:', isAuthenticated);
+    if (isAuthenticated) {
+      fetchStakeholderChats();
+    } else {
+      console.log('User not authenticated, skipping chat fetch');
+    }
+  }, [isAuthenticated]);
 
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => ({
@@ -490,7 +501,10 @@ export default function Dashboard({}: DashboardProps) {
                       className="w-[22px] h-[22px] cursor-pointer"
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
-                      onClick={() => setShowStakeholderChats(true)}
+                      onClick={() => {
+                        fetchStakeholderChats();
+                        setShowStakeholderChats(true);
+                      }}
                     />
                     {stakeholderChatCount > 0 && (
                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -684,6 +698,7 @@ export default function Dashboard({}: DashboardProps) {
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
         chats={stakeholderChats}
+        loading={loadingChats}
       />
     </div>
   );
