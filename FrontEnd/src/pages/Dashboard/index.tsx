@@ -66,9 +66,7 @@ export default function Dashboard({}: DashboardProps) {
   const fetchStakeholderChats = async () => {
     setLoadingChats(true);
     try {
-      console.log('Fetching stakeholder chats...');
       const response = await chatService.getUnreadMessages();
-      console.log('Chat API response:', response);
       const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
         id: msg.message_id.toString(),
         sender: msg.sender_name,
@@ -77,7 +75,6 @@ export default function Dashboard({}: DashboardProps) {
         timestamp: new Date(msg.created_at).toLocaleString(),
         isRead: false // These are unread messages
       }));
-      console.log('Transformed chats:', transformedChats);
       setStakeholderChats(transformedChats);
     } catch (error) {
       console.error('Error fetching stakeholder chats:', error);
@@ -135,11 +132,8 @@ export default function Dashboard({}: DashboardProps) {
 
   // Fetch stakeholder chats on component mount
   useEffect(() => {
-    console.log('Dashboard mounted, isAuthenticated:', isAuthenticated);
     if (isAuthenticated) {
       fetchStakeholderChats();
-    } else {
-      console.log('User not authenticated, skipping chat fetch');
     }
   }, [isAuthenticated]);
 
