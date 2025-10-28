@@ -230,43 +230,7 @@ GET /patients/PT131025-001
 DELETE /patients/PT131025-001
 ```
 
-### 6. Get Patients by Provider
-
-- **GET** `/patients/provider/{provider_id}`
-- **Description**: Get all patients for a specific provider
-- **Response**: List[PatientResponse]
-
-**Sample Request:**
-
-```bash
-GET /patients/provider/oncologist_001
-```
-
-**Sample Response:**
-
-```json
-[
-  {
-    "id": "PT131025-001",
-    "patient_name": "Sarah Johnson",
-    "condition": "Acute Lymphoblastic Leukemia (ALL)",
-    "therapy_id": "car-t-all-001",
-    "insurance_provider": "Blue Cross Blue Shield",
-    "insurance_type": "private",
-    "hospital_name": "Memorial Sloan Kettering Cancer Center",
-    "location": "New York, NY",
-    "provider_id": "oncologist_001",
-    "pharma_id": "novartis_001",
-    "stage_id": 4,
-    "created_at": "2025-10-13T17:43:00.425359+05:30",
-    "updated_at": null,
-    "created_by": "dr_smith",
-    "updated_by": null
-  }
-]
-```
-
-### 7. Get Patients by Pharma
+### 6. Get Patients by Pharma
 
 - **GET** `/patients/pharma/{pharma_id}`
 - **Description**: Get all patients for a specific pharma
