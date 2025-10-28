@@ -7,6 +7,7 @@ import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
@@ -58,6 +59,7 @@ export default function Dashboard({}: DashboardProps) {
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showTrackShipment, setShowTrackShipment] = useState(false);
 
 
 
@@ -539,11 +541,15 @@ export default function Dashboard({}: DashboardProps) {
                   {volumeCards.map((card, index) => (
                     <div 
                       key={index} 
-                      className={`flex-1 bg-white border border-[#E7E1E1] rounded-lg ${card.alt === 'My Tasks' ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-                      onClick={card.alt === 'My Tasks' ? () => {
-                        fetchMyTasks();
-                        setShowMyTasks(true);
-                      } : undefined}
+                      className={`flex-1 bg-white border border-[#E7E1E1] rounded-lg ${(card.alt === 'My Tasks' || card.alt === 'Tracking Shipment') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                      onClick={() => {
+                        if (card.alt === 'My Tasks') {
+                          fetchMyTasks();
+                          setShowMyTasks(true);
+                        } else if (card.alt === 'Tracking Shipment') {
+                          setShowTrackShipment(true);
+                        }
+                      }}
                     >
                       <div className="flex flex-col items-center justify-center pt-7 pb-6 px-4">
                         <img
@@ -680,6 +686,13 @@ export default function Dashboard({}: DashboardProps) {
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
         chats={stakeholderChats}
+      />
+
+      {/* Track Shipment Modal */}
+      <TrackShipmentModal
+        isOpen={showTrackShipment}
+        onClose={() => setShowTrackShipment(false)}
+        onTrack={(pid) => navigate(`/track/${encodeURIComponent(pid)}`)}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import Login from '../pages/Login'
 import Signup from '../pages/Signup'
 import TrackAndTrace from '../pages/TrackAndTrace'
+import TrackPage from '../pages/Track'
 import UserProfilePage from '../pages/UserProfilePage'
 import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPassword /> },
   { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Dashboard /></RoleBasedRoute> },
   { path: '/database', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Database /></RoleBasedRoute> },
+  { path: '/track/:patientId', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><TrackPage /></RoleBasedRoute> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])
