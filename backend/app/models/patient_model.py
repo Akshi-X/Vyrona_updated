@@ -1,10 +1,9 @@
 import sqlalchemy
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, LargeBinary, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, LargeBinary, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ..config.database import Base
-from ..constants.enums import PatientStage, TreatmentStatus
 
 
 class Patient(Base):
@@ -33,12 +32,6 @@ class Patient(Base):
     provider_id = Column(String, ForeignKey("provider.id"), nullable=True)
     pharma_id = Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
-    # Patient Stage
-    stage = Column(SQLEnum(PatientStage, values_callable=lambda obj: [e.value for e in obj]), default=PatientStage.SCHEDULED, nullable=False)
-    
-    # Treatment Status
-    treatment_status = Column(SQLEnum(TreatmentStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=True)
-    
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -48,6 +41,7 @@ class Patient(Base):
     # Relationships
     pharma = relationship("Pharma", back_populates="patients")
     provider = relationship("Provider", back_populates="patients", lazy="select")
+    stage_history = relationship("PatientStage", back_populates="patient", cascade="all, delete-orphan")
     
     # Other relationships (already defined in other models via backref)
     # tasks = relationship("Tasks", back_populates="patient")

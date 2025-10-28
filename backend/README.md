@@ -19,7 +19,6 @@ A comprehensive Patient Information System API built with FastAPI, SQLAlchemy, a
 - `GET /patients/{patient_id}` - Get patient by ID
 - `PUT /patients/{patient_id}` - Update patient
 - `DELETE /patients/{patient_id}` - Delete patient
-- `GET /patients/provider/{provider_id}` - Get patients by provider
 - `GET /patients/pharma/{pharma_id}` - Get patients by pharma
 - `GET /patients/statistics/pharma/{pharma_id}` - Get pharma statistics
 - `GET /patients/search/advanced` - Advanced search
