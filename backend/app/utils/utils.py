@@ -4,7 +4,8 @@ from typing import Dict, Optional, Any
 from passlib.context import CryptContext
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-
+import bcrypt
+from ..models.pharma_model import Pharma
 from ..models.user_model import User
 from ..constants.status_constants import STATUS_FAILED
 
@@ -79,10 +80,28 @@ def generate_patient_id():
     return f"PAT-{uuid.uuid4().hex[:8].upper()}"
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except ValueError as e:
+        if "password cannot be longer than 72 bytes" in str(e):
+
+            # Use bcrypt directly with a fixed salt
+            salt = bcrypt.gensalt()
+            hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+            return hashed.decode('utf-8')
+        else:
+            raise e
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # If passlib verification fails, try direct bcrypt verification
+        try:
+
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        except Exception:
+            return False
 
 
 def ensure_timezone_aware(dt: datetime) -> datetime:
@@ -143,7 +162,7 @@ def get_pharma_id_by_company_name(company_name: str, db: Session) -> Optional[in
     Returns:
         Pharma ID if found, None otherwise
     """
-    from ..models.pharma_model import Pharma
+
     
     pharma = db.query(Pharma).filter(Pharma.pharma_name == company_name).first()
     return pharma.id if pharma else None

@@ -324,14 +324,17 @@ def get_all_users(
 # Protected endpoint example
 # ---------------------------
 @router.get("/profile", response_model=UserProfileResponse)
-def get_user_profile_endpoint(current_user: user_model.User = Depends(get_current_user)):
+def get_user_profile_endpoint(
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
     """
     Get current user's profile.
     
     Protected endpoint. Any authenticated user.
     Uses Depends(get_current_user) to inject authenticated user.
     """
-    return user_service.get_user_profile(current_user)
+    return user_service.get_user_profile(current_user, db)
 
 
 # ---------------------------
