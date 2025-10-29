@@ -4,13 +4,15 @@
     "password": "PharmaAdmin1@123",
     "company": "Pharma Company 1",
     "first_name": "John",
-    "last_name": "Admin"
+    "last_name": "Admin",
+    "location": "New York, USA"
   },
   {
     "email": "admin2@pharma2.com",
     "password": "PharmaAdmin2@123",
     "company": "Pharma Company 2",
     "first_name": "Jane",
-    "last_name": "Admin"
+    "last_name": "Admin",
+    "location": "London, UK"
   }
 ]
