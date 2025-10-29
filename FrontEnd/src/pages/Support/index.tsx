@@ -609,7 +609,8 @@ const Support: React.FC = () => {
                               disabled={readonly} 
                               checked={selectedModuleIndices.includes(index)}
                               onChange={(e) => handleModuleChange(index, e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-gray-300 text-purple-700 focus:ring-purple-200" 
+                              className="h-3.5 w-3.5 rounded border-gray-300 focus:outline-none focus:ring-0"
+                              style={{ accentColor: COLORS.primary.purple }}
                             />
                             <span className="text-[12px] text-gray-800">{label}</span>
                           </label>
