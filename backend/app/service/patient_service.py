@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, or_, desc, func
 from typing import List, Optional, Dict
 from datetime import datetime
 
@@ -14,6 +14,7 @@ from app.schemas.patient_schema import (
     PatientDetailedResponse
 )
 from app.models.patient_model import Patient
+from app.models.patient_stage_model import PatientStage
 from app.utils.patient_utils import generate_patient_id
 from app.exceptions.patient_exceptions import (
     PatientNotFoundError,
@@ -69,16 +70,6 @@ class PatientService:
             raise
         except Exception as e:
             raise PatientServiceError("update_patient", f"Failed to update patient: {str(e)}")
-
-    def get_patients_by_provider(self, provider_id: str) -> List[PatientResponse]:
-        """Get all patients for a specific provider"""
-        try:
-            patients = self.db.query(Patient).filter(Patient.provider_id == provider_id).all()
-            return [PatientResponse.model_validate(patient) for patient in patients]
-        except Exception as e:
-            raise PatientServiceError("get_patients_by_provider", f"Failed to get patients by provider: {str(e)}")
-
-
 
     def create_multiple_patients(self, patients_data: List[PatientCreate]) -> List[Patient]:
         """Create multiple patients in a single transaction"""
@@ -210,27 +201,54 @@ class PatientService:
             raise PatientServiceError("create_patients", f"Failed to create patients: {str(e)}")
 
     def get_patients_summary(self, pharma_id: int) -> List[PatientSummaryResponse]:
-        """Get patient summary data with joined provider and pharma information - only patients with 'Scheduled' stage for specific pharma"""
+        """Get patient summary data with joined provider and pharma information - includes all patients plus failure and aftercare data from last 2 weeks"""
         try:
             # Import here to avoid circular imports
             from app.models.pharma_model import Pharma
             from app.models.provider_model import Provider
+            from datetime import datetime, timedelta, timezone
+            from app.constants.enums import PatientStage as PatientStageEnum
             
-            # Query with joins to get related data - filter for specific pharma and scheduled patients
+            # Calculate date 2 weeks ago from today
+            two_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=2)
+            
+            # Query with joins to get related data - filter for specific pharma
+            # Include all patients OR failure/aftercare patients from last 2 weeks
             query = self.db.query(
                 Patient.id.label('patient_id'),
                 Patient.condition,
                 Patient.hospital_name.label('hospital'),
-                Patient.stage,
-                Patient.treatment_status,
+                PatientStage.stage,
+                PatientStage.is_success.label('treatment_status'),  # Map is_success to treatment_status for compatibility
                 Provider.name.label('provider_name'),
                 Pharma.location.label('pharma_location')
             ).outerjoin(
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
                 Pharma, Patient.pharma_id == Pharma.id
+            ).outerjoin(
+                PatientStage, and_(
+                    Patient.id == PatientStage.patient_id,
+                    PatientStage.is_active == True
+                )
             ).filter(
                 Patient.pharma_id == pharma_id,  # Filter by specific pharma
+                # Include all patients OR failure/aftercare patients updated in last 2 weeks
+                or_(
+                    # All patients (no stage filter)
+                    PatientStage.stage.is_(None),
+                    PatientStage.stage == PatientStageEnum.SCHEDULED,
+                    PatientStage.stage == PatientStageEnum.APHERESIS,
+                    PatientStage.stage == PatientStageEnum.CRYOPRESERVATION,
+                    PatientStage.stage == PatientStageEnum.TRANSPORTATION,
+                    PatientStage.stage == PatientStageEnum.REENGINEERING,
+                    PatientStage.stage == PatientStageEnum.REINFUSION,
+                    # OR failure/aftercare patients updated in last 2 weeks
+                    and_(
+                        PatientStage.is_success.in_([False, True]),
+                        PatientStage.updated_at >= two_weeks_ago
+                    )
+                )
             ).order_by(desc(Patient.created_at))
             
             results = query.all()
@@ -238,12 +256,20 @@ class PatientService:
             # Convert to PatientSummaryResponse objects
             summary_data = []
             for result in results:
+                # Map is_success to treatment_status for backward compatibility
+                treatment_status = "ongoing"  # Default to ongoing for active stages
+                if result.treatment_status is not None:
+                    if result.treatment_status == False:
+                        treatment_status = "failure"
+                    elif result.treatment_status == True:
+                        treatment_status = "after_care"
+                
                 summary_data.append(PatientSummaryResponse(
                     patient_id=result.patient_id,
                     condition=result.condition,
                     hospital=result.hospital,
                     stage=result.stage,
-                    treatment_status=result.treatment_status,
+                    treatment_status=treatment_status,
                     provider_name=result.provider_name,
                     location=result.pharma_location
                 ))
@@ -265,8 +291,8 @@ class PatientService:
                 Patient.id.label('patient_id'),
                 Patient.condition,
                 Patient.hospital_name.label('hospital'),
-                Patient.stage,
-                Patient.treatment_status,
+                PatientStage.stage,
+                PatientStage.is_success.label('treatment_status'),  # Map is_success to treatment_status for compatibility
                 Patient.docs_report,
                 Provider.name.label('provider_name'),
                 Pharma.location.label('pharma_location')
@@ -274,6 +300,11 @@ class PatientService:
                 Provider, Patient.provider_id == Provider.id
             ).outerjoin(
                 Pharma, Patient.pharma_id == Pharma.id
+            ).outerjoin(
+                PatientStage, and_(
+                    Patient.id == PatientStage.patient_id,
+                    PatientStage.is_active == True
+                )
             ).filter(
                 Patient.pharma_id == pharma_id  # Filter by specific pharma
             ).order_by(desc(Patient.created_at))
@@ -283,12 +314,20 @@ class PatientService:
             # Convert to PatientDetailedResponse objects
             detailed_data = []
             for result in results:
+                # Map is_success to treatment_status for backward compatibility
+                treatment_status = "ongoing"  # Default to ongoing for active stages
+                if result.treatment_status is not None:
+                    if result.treatment_status == False:
+                        treatment_status = "failure"
+                    elif result.treatment_status == True:
+                        treatment_status = "after_care"
+                
                 detailed_data.append(PatientDetailedResponse(
                     patient_id=result.patient_id,
                     condition=result.condition,
                     hospital=result.hospital,
                     stage=result.stage,
-                    treatment_status=result.treatment_status,
+                    treatment_status=treatment_status,
                     provider_name=result.provider_name,
                     location=result.pharma_location,
                     docs_report=result.docs_report

@@ -67,17 +67,6 @@ def get_user_pharma_statistics(
     return patient_service.get_pharma_statistics(pharma_id)
 
 
-@router.get("/provider/{provider_id}", response_model=List[PatientResponse])
-def get_patients_by_provider(
-    provider_id: str,
-    db: Session = Depends(get_db)
-):
-    """Get all patients for a specific provider"""
-    # Call service (all business logic there)
-    patient_service = PatientService(db)
-    return patient_service.get_patients_by_provider(provider_id)
-
-
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient_by_id(
     patient_id: str,

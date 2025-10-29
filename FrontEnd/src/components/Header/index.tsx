@@ -1,19 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { COLORS } from '../../constants/colors';
+ 
 
 interface HeaderProps {
   title: string;
   showBackButton?: boolean;
   onBackClick?: () => void;
   rightContent?: React.ReactNode;
+  className?: string;
+  offsetLeft?: string; // e.g., '15rem' to avoid sidebar collision
 }
 
 const Header: React.FC<HeaderProps> = ({ 
   title, 
   showBackButton = true, 
   onBackClick,
-  rightContent 
+  rightContent,
+  className,
+  offsetLeft
 }) => {
   const navigate = useNavigate();
 
@@ -25,9 +29,12 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const leftOffset = offsetLeft || '0px';
+
   return (
     <div 
-      className="w-full fixed top-0 left-0 right-0 z-50 bg-black h-[63px] flex items-center justify-between px-6 gap-6 flex-shrink-0"
+      className={`w-full fixed top-0 left-0 right-0 z-[100] pointer-events-auto bg-black h-[63px] flex items-center justify-between px-6 gap-6 flex-shrink-0 ${className || ''}`}
+      style={{ left: leftOffset, width: `calc(100% - ${leftOffset})` }}
     >
       <div className="flex items-center">
         {showBackButton && (
@@ -41,7 +48,9 @@ const Header: React.FC<HeaderProps> = ({
             </svg>
           </button>
         )}
-        <span className="text-xs sm:text-sm font-medium text-white">{title}</span>
+        {title ? (
+          <span className="text-xs sm:text-sm font-medium text-white">{title}</span>
+        ) : null}
       </div>
       {rightContent && (
         <div className="flex items-center">

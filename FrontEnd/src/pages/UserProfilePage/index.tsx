@@ -40,99 +40,107 @@ const UserProfilePage: React.FC = () => {
 
   // Initialize name fields - removed hardcoded values, will be set by API call
 
-  useEffect(() => {
-    const getTokenFromCookie = (): string | null => {
-      try {
-        const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
-        return match ? decodeURIComponent(match[1]) : null;
-      } catch {
-        return null;
-      }
-    };
-
-    const decodeJwtPayload = (token: string): any | null => {
-      try {
-        const parts = token.split('.');
-        if (parts.length < 2) return null;
-        const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-        return JSON.parse(json);
-      } catch {
-        return null;
-      }
-    };
-
-    /* eslint-disable @typescript-eslint/no-unused-vars */
-    const resolveUserId = async (): Promise<string | null> => {
-      // 1) localStorage
-      try {
-        const ls = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || '') : '';
-        if (ls) return ls;
-      } catch {}
-      // 2) decode JWT from cookie/localStorage
-      const token = getTokenFromCookie() || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
-      if (token) {
-        const payload = decodeJwtPayload(token);
-        const candidate = payload?.user_id || payload?.sub || payload?.uid || null;
-        if (candidate) {
-          try { localStorage.setItem('user_id', candidate); } catch {}
-          return candidate;
-        }
-      }
-      // 3) call profile endpoint as fallback
-      try {
-        const profile = await userService.getProfile();
-        const profileUserId = profile.user_id;
-        if (profileUserId) {
-          try { localStorage.setItem('user_id', profileUserId); } catch {}
-          return profileUserId;
-        }
-      } catch {}
+  const getTokenFromCookie = (): string | null => {
+    try {
+      const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
+      return match ? decodeURIComponent(match[1]) : null;
+    } catch {
       return null;
-    };
-    /* eslint-enable @typescript-eslint/no-unused-vars */
+    }
+  };
 
+  const decodeJwtPayload = (token: string): any | null => {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  };
+
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const resolveUserId = async (): Promise<string | null> => {
+    // Prefer state first
+    if (userId) return userId;
+    // 1) localStorage
+    try {
+      const ls = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || '') : '';
+      if (ls) return ls;
+    } catch {}
+    // 2) decode JWT from cookie/localStorage
+    const token = getTokenFromCookie() || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    if (token) {
+      const payload = decodeJwtPayload(token);
+      const candidate = payload?.user_id || payload?.sub || payload?.uid || null;
+      if (candidate) {
+        try { localStorage.setItem('user_id', candidate); } catch {}
+        return candidate;
+      }
+    }
+    // 3) fallback: attempt profile only if needed
+    try {
+      const profile = await userService.getProfile();
+      const profileUserId = profile.user_id;
+      if (profileUserId) {
+        try { localStorage.setItem('user_id', profileUserId); } catch {}
+        return profileUserId;
+      }
+    } catch {}
+    return null;
+  };
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  // Load profile once on mount
+  useEffect(() => {
     let isMounted = true;
     (async () => {
-      // Load profile first to populate header fields
       try {
         const profile: UserProfileDto = await userService.getProfile();
+        if (!isMounted) return;
         setFirstName(profile.first_name || '');
         setLastName(profile.last_name || '');
         setWorkEmail(profile.email || '');
         setRole(profile.role || '');
         setUserId(profile.user_id || '');
       } catch (error) {
-        // Set default values if profile fails to load
-        setFirstName('User');
+        if (!isMounted) return;
+        setFirstName('');
         setLastName('');
-        setWorkEmail('user@example.com');
-        setRole('User');
+        setWorkEmail('');
+        setRole('');
       }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
-      // Require authenticated user_id again
-      const userId = await resolveUserId();
+  // Load tickets when role is known
+  useEffect(() => {
+    if (!role) return; // wait until role is resolved
+    let isMounted = true;
+    (async () => {
+      const uid = await resolveUserId();
       if (!isMounted) return;
-      if (!userId) {
+      if (!uid) {
         setTicketsError('Not logged in');
         return;
       }
       setTicketsError(null);
       setLoadingTickets(true);
-      
-      // Check if user is admin and use appropriate endpoint
+
       const isAdmin = role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin';
-      
       const ticketPromise = isAdmin 
-        ? feedbackApi.getAllFeedbackTickets() // Admin gets all tickets
-        : feedbackApi.getUserTickets(userId);  // Regular users get their own tickets
-      
+        ? feedbackApi.getAllFeedbackTickets()
+        : feedbackApi.getUserTickets(uid);
+
       ticketPromise
         .then((data: UserTicketSummary[]) => {
           const mapped: Ticket[] = data.map((t) => ({
             id: t.feedback_id,
             title: t.feedback,
             type: t.type,
-            status: t.status, // Use the actual status from API response
+            status: t.status,
             submittedOn: new Date(t.submitted_on).toISOString().slice(0,10).replace(/-/g, '.'),
           }));
           if (!isMounted) return;
@@ -147,9 +155,8 @@ const UserProfilePage: React.FC = () => {
           setLoadingTickets(false);
         });
     })();
-
     return () => { isMounted = false; };
-  }, [role]); // Re-fetch when role changes
+  }, [role]);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -307,7 +314,7 @@ const UserProfilePage: React.FC = () => {
         }
       />
 
-      <div className="pt-[calc(63px+2rem)]">
+      <div className="pt-[calc(63px+1rem)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-8">
 
