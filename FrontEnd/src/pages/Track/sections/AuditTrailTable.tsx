@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function AuditTrailTable() {
   const rows = [
     { date: 'April 20', user: 'j.doe', doc: 'Agency' },
@@ -19,13 +17,19 @@ export default function AuditTrailTable() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rows.map((r, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-3 py-2">{r.date}</td>
-                <td className="px-3 py-2">{r.user}</td>
-                <td className="px-3 py-2">{r.doc}</td>
+            {rows.length === 0 ? (
+              <tr>
+                <td className="px-3 py-4 text-gray-500 text-center" colSpan={3}>No audit trail available</td>
               </tr>
-            ))}
+            ) : (
+              rows.map((r, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-3 py-2">{r.date}</td>
+                  <td className="px-3 py-2">{r.user}</td>
+                  <td className="px-3 py-2">{r.doc}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
