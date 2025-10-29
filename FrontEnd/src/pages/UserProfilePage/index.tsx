@@ -595,7 +595,7 @@ const UserProfilePage: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-900">Include me in Grape feature update emails</h3>
+                <h3 className="text-sm font-medium text-gray-900">Include me in myGrape feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>
                 <p className="text-xs text-gray-400 mt-1">Coming soon</p>
               </div>

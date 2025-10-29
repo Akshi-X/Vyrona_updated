@@ -415,8 +415,8 @@ const Support: React.FC = () => {
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-5 sm:px-6 pt-5 sm:pt-6">
-                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Grape Support & Feedback</h1>
-                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using Grape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
+                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">myGrape Support & Feedback</h1>
+                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using myGrape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
               </div>
 
               <form onSubmit={onSubmit} className="px-5 sm:px-6 pb-6">
