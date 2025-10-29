@@ -302,7 +302,8 @@ const UserProfilePage: React.FC = () => {
           (role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
             <button
               onClick={handleLogout}
-              className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-200"
+              className="flex items-center px-3 py-1.5 text-sm font-medium text-white rounded-md transition-opacity duration-200 hover:opacity-90"
+              style={{ backgroundColor: COLORS.primary.purple }}
               title="Logout"
             >
               <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
