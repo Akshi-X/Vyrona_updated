@@ -48,13 +48,13 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     RELOAD: bool = True
-    # URLs - Should be set in .env file (defaults provided for local development)
-    FRONTEND_URL: str = "http://localhost:5173"
-    BACKEND_URL: str = "http://localhost:8000"
-    # CORS - Should be set in .env file (defaults provided for local development)
+    # URLs - MUST be provided in .env file
+    FRONTEND_URL: str
+    BACKEND_URL: str
+    # CORS - MUST be provided in .env file
     # Can be comma-separated list: "http://localhost:5173,http://localhost:3000"
     # Or "*" for all origins (not recommended for production)
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================

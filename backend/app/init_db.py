@@ -126,6 +126,7 @@ def create_pharma_companies():
         
         for pharma_admin in pharma_admins:
             company_name = pharma_admin['company']
+            location = pharma_admin.get('location')  # Get location if provided, None otherwise
             
             logger.info(f"Processing pharma company: {company_name}")
             
@@ -134,6 +135,11 @@ def create_pharma_companies():
             
             if existing_pharma:
                 logger.info(f"Pharma company already exists: {company_name}")
+                # Update location if provided and different
+                if location and existing_pharma.location != location:
+                    existing_pharma.location = location
+                    db.commit()
+                    logger.info(f"Updated location for {company_name}: {location}")
                 continue
             
             # Create new pharma company
@@ -141,6 +147,7 @@ def create_pharma_companies():
             
             new_pharma = pharma_model.Pharma(
                 pharma_name=company_name,
+                location=location,
                 created_by="system"
             )
             
@@ -154,7 +161,8 @@ def create_pharma_companies():
         all_pharmas = db.query(pharma_model.Pharma).all()
         logger.info(f"All pharma companies in database ({len(all_pharmas)} total):")
         for pharma in all_pharmas:
-            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}")
+            location_info = f", Location: {pharma.location}" if pharma.location else ""
+            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}{location_info}")
         
         logger.info("=" * 60)
         logger.info(f"PHARMA COMPANIES SETUP COMPLETE: {len(all_pharmas)} companies")
