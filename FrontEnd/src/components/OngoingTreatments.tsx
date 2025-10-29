@@ -175,7 +175,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   return (
     <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
       <div 
-        className="h-[360px] overflow-y-auto"
+        className="h-[385px] overflow-y-auto"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: '#af6eb7 transparent'

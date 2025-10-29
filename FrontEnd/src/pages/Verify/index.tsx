@@ -164,7 +164,12 @@ const VerifyOtp: React.FC = () => {
                             </p>
                         ) : timer > 0 ? (
                             <p className="text-sm text-gray-500 text-center mb-3">
-                                OTP expires in <span className="font-medium">{timer}s</span>
+                                OTP expires in {(() => {
+                                    const minutes = Math.floor((timer as number) / 60);
+                                    const seconds = (timer as number) % 60;
+                                    const formatted = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                    return <span className="font-medium">{formatted}</span>;
+                                })()}
                             </p>
                         ) : (
                             <p className="text-sm text-red-500 text-center mb-3">
