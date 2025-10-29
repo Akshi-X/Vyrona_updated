@@ -4,6 +4,7 @@ from .otp_model import OTP
 from .patient_model import Patient
 from .patient_stage_model import PatientStage
 from .feedback_model import Feedback
+from .feedback_attachment import FeedbackAttachment
 from .feedback_comments import Comment
 from .pharma_model import Pharma
 from .provider_model import Provider
