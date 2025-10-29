@@ -37,7 +37,11 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   // All possible stage values
   const allStages = ['Scheduled', 'Apheresis', 'Cryopreservation', 'Transportation', 'Reengineering', 'Reinfusion', 'AfterCare', 'Failure'];
 
-  const getStageColor = (stage: string) => {
+  const getStageColor = (stage: string | null) => {
+    if (!stage) {
+      return 'bg-gray-100 text-gray-800';
+    }
+    
     switch (stage.toLowerCase()) {
       case 'scheduled':
       case 'apheresis':
@@ -308,7 +312,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(treatment.stage)}`}>
-                      {treatment.stage}
+                      {treatment.stage || 'N/A'}
                     </span>
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">

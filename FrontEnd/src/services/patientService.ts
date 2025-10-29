@@ -14,7 +14,7 @@ export interface OngoingTreatment {
   patient_id: string;
   condition: string;
   hospital: string;
-  stage: string;
+  stage: string | null;
   provider_name: string;
   location: string;
 }
