@@ -44,7 +44,6 @@ const ApprovalScreen: React.FC = () => {
         const userData = await userService.getUserById(registrationId);
         setUserInfo(userData);
       } catch (error: any) {
-        console.error('Error fetching user info:', error);
         setStatus("Failed to fetch user information");
       } finally {
         setUserLoading(false);

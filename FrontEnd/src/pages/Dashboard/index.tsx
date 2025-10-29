@@ -21,6 +21,7 @@ import TreatmentsCountIcon from '../../assets/DashBoardIcons/Treatments_Count.sv
 import PatientCountIcon from '../../assets/DashBoardIcons/Patient_Count.svg';
 import TrackingShipmentIcon from '../../assets/DashBoardIcons/Tracking_Shipment.svg';
 import AftercareIcon from '../../assets/DashBoardIcons/Atercare.svg';
+import Header from '../../components/Header';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
@@ -252,21 +253,24 @@ export default function Dashboard({ }: DashboardProps) {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
-        {/* Header */}
-        <header className="h-[63px] bg-black flex items-center justify-end px-6 gap-6 flex-shrink-0">
-          <div
-            className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-            onClick={() => navigate('/user-profile')}
-            title="Go to User Profile"
-          >
-            <span className="text-white text-xs font-semibold">
-              MV
-            </span>
-          </div>
-        </header>
+        <Header
+          title=""
+          showBackButton={false}
+          className=""
+          offsetLeft="15rem"
+          rightContent={(
+            <div 
+              className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
+              onClick={() => navigate('/user-profile')}
+              title="Go to User Profile"
+            >
+              <span className="text-white text-xs font-semibold">MV</span>
+            </div>
+          )}
+        />
 
         {/* Dashboard Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
+        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
 
 
           <div className="flex gap-6 flex-1 flex-col lg:flex-row">
