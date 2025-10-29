@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends
 from datetime import datetime
 
 from app.schemas.dashboard_schema import (
@@ -6,6 +6,7 @@ from app.schemas.dashboard_schema import (
     CriticalAlert,
     CriticalAlertsResponse
 )
+from app.dependencies.auth_dependencies import get_pharma_id_from_request
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -14,14 +15,14 @@ router = APIRouter(tags=["Dashboard"])
 # 1. Get Performance Metrics
 # ---------------------------
 @router.get("/performance", response_model=DashboardCategoryResponse)
-def get_performance_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
+def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
     """
     Get performance metrics only.
     
-    Public endpoint. No authentication required.
+    Protected endpoint. Auth token required; pharma_id taken from token.
     
     Args:
-        pharma_id: Pharmaceutical company ID to filter metrics
+        pharma_id: Pharmaceutical company ID from token
     
     Returns:
     - On Time: 87%
@@ -50,14 +51,14 @@ def get_performance_metrics(pharma_id: str = Query(..., description="Pharmaceuti
 # 2. Get Risk Metrics
 # ---------------------------
 @router.get("/risk", response_model=DashboardCategoryResponse)
-def get_risk_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
+def get_risk_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
     """
     Get risk metrics only.
     
-    Public endpoint. No authentication required.
+    Protected endpoint. Auth token required; pharma_id taken from token.
     
     Args:
-        pharma_id: Pharmaceutical company ID to filter metrics
+        pharma_id: Pharmaceutical company ID from token
     
     Returns:
     - Deviation: 12%
@@ -90,14 +91,14 @@ def get_risk_metrics(pharma_id: str = Query(..., description="Pharmaceutical com
 # 3. Get Compliance Metrics
 # ---------------------------
 @router.get("/compliance", response_model=DashboardCategoryResponse)
-def get_compliance_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
+def get_compliance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
     """
     Get compliance metrics only.
     
-    Public endpoint. No authentication required.
+    Protected endpoint. Auth token required; pharma_id taken from token.
     
     Args:
-        pharma_id: Pharmaceutical company ID to filter metrics
+        pharma_id: Pharmaceutical company ID from token
     
     Returns:
     - Audit Coverage: 76%
@@ -125,14 +126,14 @@ def get_compliance_metrics(pharma_id: str = Query(..., description="Pharmaceutic
 # 4. Get Logistics Metrics
 # ---------------------------
 @router.get("/logistics", response_model=DashboardCategoryResponse)
-def get_logistics_metrics(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
+def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
     """
     Get logistics metrics only.
     
-    Public endpoint. No authentication required.
+    Protected endpoint. Auth token required; pharma_id taken from token.
     
     Args:
-        pharma_id: Pharmaceutical company ID to filter metrics
+        pharma_id: Pharmaceutical company ID from token
     
     Returns:
     - Cold Chain Packaging Failure: 4.2%
@@ -160,14 +161,14 @@ def get_logistics_metrics(pharma_id: str = Query(..., description="Pharmaceutica
 # 5. Get Critical Alerts
 # ---------------------------
 @router.get("/alerts", response_model=CriticalAlertsResponse)
-def get_critical_alerts(pharma_id: str = Query(..., description="Pharmaceutical company ID")):
+def get_critical_alerts(pharma_id: int = Depends(get_pharma_id_from_request)):
     """
     Get critical alerts that require immediate attention.
     
-    Public endpoint. No authentication required.
+    Protected endpoint. Auth token required; pharma_id taken from token.
     
     Args:
-        pharma_id: Pharmaceutical company ID to filter alerts
+        pharma_id: Pharmaceutical company ID from token
     
     Returns alerts from the Critical Alerts modal:
     - Temperature Excursion (High severity, Active)

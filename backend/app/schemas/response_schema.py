@@ -35,7 +35,8 @@ class UserDetailsResponse(BaseModel):
     last_name: str
     email: str
     role: str
-    company_name: str
+    pharma_id: Optional[int]
+    company_name: Optional[str]  # Will be populated from pharma table
     approved_status: str
     status: bool
     is_locked: bool
@@ -60,7 +61,8 @@ class UserProfileResponse(BaseModel):
     first_name: str
     last_name: str
     role: str
-    company_name: str
+    pharma_id: Optional[int]
+    company_name: Optional[str]  # Will be populated from pharma table
     approved_status: str
     status: bool
     session_timeout: int  # Auto-logout for security compliance
