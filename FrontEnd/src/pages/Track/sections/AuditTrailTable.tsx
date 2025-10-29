@@ -17,11 +17,7 @@ export default function AuditTrailTable() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rows.length === 0 ? (
-              <tr>
-                <td className="px-3 py-4 text-gray-500 text-center" colSpan={3}>No audit trail available</td>
-              </tr>
-            ) : (
+            {rows.length ? (
               rows.map((r, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2">{r.date}</td>
@@ -29,6 +25,10 @@ export default function AuditTrailTable() {
                   <td className="px-3 py-2">{r.doc}</td>
                 </tr>
               ))
+            ) : (
+              <tr>
+                <td className="px-3 py-4 text-gray-500 text-center" colSpan={3}>No audit trail available</td>
+              </tr>
             )}
           </tbody>
         </table>
