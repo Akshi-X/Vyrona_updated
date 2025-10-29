@@ -10,14 +10,12 @@ class Pharma(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     pharma_name = Column(String, nullable=False)
     location = Column(String, nullable=True)
-    user_id = Column(String, ForeignKey("users.user_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
 
     # Relationships
-    admin_user = relationship("User", foreign_keys=[user_id])
     users = relationship("User", foreign_keys="[User.pharma_id]", back_populates="pharma_company")
     patients = relationship("Patient", back_populates="pharma")
     providers = relationship("Provider", back_populates="pharma")

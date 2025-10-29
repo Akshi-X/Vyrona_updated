@@ -110,6 +110,7 @@ def create_pharma_admins():
 def create_pharma_companies():
     """
     Create pharma companies in the pharma table for each pharma admin.
+    Pharma companies are created first, then admin users are created and linked to them.
     """
     logger.info("=" * 60)
     logger.info("CREATING PHARMA COMPANIES...")
@@ -125,7 +126,6 @@ def create_pharma_companies():
         
         for pharma_admin in pharma_admins:
             company_name = pharma_admin['company']
-            admin_email = pharma_admin['email']
             
             logger.info(f"Processing pharma company: {company_name}")
             
@@ -136,36 +136,25 @@ def create_pharma_companies():
                 logger.info(f"Pharma company already exists: {company_name}")
                 continue
             
-            # Get the pharma admin user for this company
-            pharma_admin_user = db.query(user_model.User).filter(
-                user_model.User.email == admin_email,
-                user_model.User.role == 'pharma_admin'
-            ).first()
-            
-            if not pharma_admin_user:
-                logger.error(f"Pharma admin user not found for {company_name}")
-                continue
-            
             # Create new pharma company
             logger.info(f"Creating pharma company: {company_name}")
             
             new_pharma = pharma_model.Pharma(
                 pharma_name=company_name,
-                user_id=pharma_admin_user.user_id,  # Link to pharma admin
-                created_by=pharma_admin_user.user_id
+                created_by="system"
             )
             
             db.add(new_pharma)
             db.commit()
             db.refresh(new_pharma)
             
-            logger.info(f"✅ PHARMA COMPANY CREATED: {company_name} (ID: {new_pharma.id}) linked to admin: {pharma_admin_user.email}")
+            logger.info(f"PHARMA COMPANY CREATED: {company_name} (ID: {new_pharma.id})")
         
         # Show all pharma companies
         all_pharmas = db.query(pharma_model.Pharma).all()
         logger.info(f"All pharma companies in database ({len(all_pharmas)} total):")
         for pharma in all_pharmas:
-            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}, Admin ID: {pharma.user_id}")
+            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}")
         
         logger.info("=" * 60)
         logger.info(f"PHARMA COMPANIES SETUP COMPLETE: {len(all_pharmas)} companies")
