@@ -107,9 +107,7 @@ const Signup: React.FC = () => {
             setPasswordError("Password is required");
             valid = false;
         } else if (!validatePassword(password)) {
-            setPasswordError(
-                "Password must be ≥8 chars, include 1 uppercase, 1 number, and 1 special character"
-            );
+            setPasswordError("Weak password");
             valid = false;
         }
         if (!confirmPassword) {
@@ -362,7 +360,7 @@ const Signup: React.FC = () => {
                                             <p className="text-xs text-red-500 mt-1">{passwordError}</p>
                                         )}
                                         <p
-                                            className={`text-[10px] mt-1 ${passwordError ? "text-red-500" : "text-[#9a9a9a]"
+                                            className={`text-[10px] mt-1 ${password && !validatePassword(password) ? "text-red-500" : "text-[#9a9a9a]"
                                                 }`}
                                         >
                                             Use at least 8 characters, including a number, an
@@ -415,7 +413,7 @@ const Signup: React.FC = () => {
                             
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
-                                    ITAdmin@MyGrape.com
+                                    ITAdmin@myGrape.com
                                 </a>{" "} for help.
                             </p>
 

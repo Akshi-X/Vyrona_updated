@@ -17,7 +17,7 @@ const VerifyOtp: React.FC = () => {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
-    const [timer, setTimer] = useState(0);
+    const [timer, setTimer] = useState<number | null>(null);
 
     // Removed API_BASE_URL - now using authService
 
@@ -25,11 +25,28 @@ const VerifyOtp: React.FC = () => {
     useEffect(() => {
         if (otpExpiry) {
             const expiry = new Date(otpExpiry).getTime();
+            const now = new Date().getTime();
+            const initialRemaining = Math.max(0, Math.floor((expiry - now) / 1000));
+            setTimer(initialRemaining);
+            
             const interval = setInterval(() => {
-                const now = new Date().getTime();
-                const remaining = Math.max(0, Math.floor((expiry - now) / 1000));
+                const currentTime = new Date().getTime();
+                const remaining = Math.max(0, Math.floor((expiry - currentTime) / 1000));
                 setTimer(remaining);
                 if (remaining <= 0) clearInterval(interval);
+            }, 1000);
+            return () => clearInterval(interval);
+        } else {
+            // If no expiry provided, set a default timer (e.g., 5 minutes)
+            setTimer(300); // 5 minutes default
+            const interval = setInterval(() => {
+                setTimer(prev => {
+                    if (prev === null || prev <= 1) {
+                        clearInterval(interval);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
             }, 1000);
             return () => clearInterval(interval);
         }
@@ -141,9 +158,18 @@ const VerifyOtp: React.FC = () => {
                         {success && <p className="text-green-600 text-sm text-center mt-1">{success}</p>}
                         </div>
 
-                        {timer > 0 ? (
+                        {timer === null ? (
                             <p className="text-sm text-gray-500 text-center mb-3">
-                                OTP expires in <span className="font-medium">{timer}s</span>
+                                Loading timer...
+                            </p>
+                        ) : timer > 0 ? (
+                            <p className="text-sm text-gray-500 text-center mb-3">
+                                OTP expires in {(() => {
+                                    const minutes = Math.floor((timer as number) / 60);
+                                    const seconds = (timer as number) % 60;
+                                    const formatted = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                    return <span className="font-medium">{formatted}</span>;
+                                })()}
                             </p>
                         ) : (
                             <p className="text-sm text-red-500 text-center mb-3">
