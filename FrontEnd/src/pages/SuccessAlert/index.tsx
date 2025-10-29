@@ -10,8 +10,8 @@ interface SuccessAlertProps {
 }
 
 const SuccessAlert: React.FC<SuccessAlertProps> = ({
-  title = "Thank You!",
-  message = "Thank you for submitting your feedback. A member of our team will be in touch shortly. You can track your past tickets in the 'Support' section of your profile.",
+  title = "Thank you for submitting your feedback.",
+  message = "A member of our team will be in touch shortly. You can track your past tickets in the 'Support' section of your profile.",
   buttonText = "Go to Dashboard",
   onButtonClick
 }) => {
