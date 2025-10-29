@@ -12,8 +12,10 @@ User: View assigned tasks, update status, view sensor data
 
 from fastapi import Depends
 from typing import List
+from sqlalchemy.orm import Session
 from ..models.user_model import User
 from ..dependencies.auth_dependencies import get_current_user
+from ..config.database import get_db
 from ..config.permissions import get_role_permissions
 from ..constants.roles import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER, MANAGEMENT_ROLES
 from ..exceptions import (
@@ -96,13 +98,14 @@ def require_roles(allowed_roles: List[str]):
     return check_role
 
 
-def check_same_company(target_company: str, current_user: User = Depends(get_current_user)) -> bool:
+def check_same_company(target_company: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> bool:
     """
     Check if user belongs to same company (multi-tenant isolation).
     
     Args:
         target_company: Company name to check
         current_user: Current authenticated user
+        db: Database session
     
     Returns:
         True if same company
@@ -110,9 +113,19 @@ def check_same_company(target_company: str, current_user: User = Depends(get_cur
     Raises:
         CompanyAccessForbiddenException if different company
     """
-    if current_user.company_name != target_company:
+    from ..models.pharma_model import Pharma
+    
+    # Get the pharma_id for the target company
+    target_pharma = db.query(Pharma).filter(Pharma.pharma_name == target_company).first()
+    if not target_pharma:
         raise CompanyAccessForbiddenException(
-            user_company=current_user.company_name,
+            user_company=f"pharma_id_{current_user.pharma_id}",
+            target_company=target_company
+        )
+    
+    if current_user.pharma_id != target_pharma.id:
+        raise CompanyAccessForbiddenException(
+            user_company=f"pharma_id_{current_user.pharma_id}",
             target_company=target_company
         )
     return True

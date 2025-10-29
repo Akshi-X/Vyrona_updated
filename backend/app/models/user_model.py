@@ -1,6 +1,6 @@
 import sqlalchemy
 from datetime import datetime, timezone
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ..config.database import Base
@@ -20,8 +20,8 @@ class User(Base):
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Role and Company
-    role = sqlalchemy.Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj], name='user_role'), nullable=False)
-    company_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
+    role = sqlalchemy.Column(SQLEnum('admin', 'pharma_admin', 'mygrape_admin', 'manager', 'user', name='user_role'), nullable=False)
+    pharma_id = sqlalchemy.Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
     # Account Status
     status = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Account active/inactive
@@ -53,4 +53,4 @@ class User(Base):
     
     # Relationships
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
-    pharma = relationship("Pharma", back_populates="user")
+    pharma_company = relationship("Pharma", foreign_keys="[User.pharma_id]", back_populates="users")

@@ -25,7 +25,8 @@ class UserResponse(BaseModel):
     last_name: str
     email: str
     role: str
-    company_name: str
+    pharma_id: Optional[int]
+    company_name: Optional[str]  # Will be populated from pharma table
     status: bool
     approved_status: str
     approved_by: Optional[str]
@@ -47,7 +48,8 @@ class UserRegistrationResponse(BaseModel):
     user_id: str
     email: str
     role: str
-    company_name: str
+    pharma_id: Optional[int]
+    company_name: Optional[str]  # Will be populated from pharma table
     approval_status: str
     approval_sent_to: str  # Who the approval email was sent to
 
@@ -59,7 +61,8 @@ class UserListItem(BaseModel):
     last_name: str
     email: str
     role: str
-    company_name: str
+    pharma_id: Optional[int]
+    company_name: Optional[str]  # Will be populated from pharma table
     
     class Config:
         from_attributes = True

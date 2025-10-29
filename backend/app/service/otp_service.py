@@ -158,7 +158,7 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
         user = validate_otp_verification(user_id, otp, db)
         logger.info(f"OTP validated for user: {user.email}")
         logger.debug(f"User role: {user.role}")
-        logger.debug(f"User company: {user.company_name}")
+        logger.debug(f"User pharma_id: {user.pharma_id}")
 
         # Get the OTP record to check remember_me preference
         # Since we just validated the OTP, get the most recent one for this user
@@ -180,15 +180,20 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             remember_me = False
             logger.info(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
 
-        # Business Logic: Create JWT token with remember_me flag in payload
+        # Get user's pharma_id directly from user.pharma_id field
+        pharma_id = user.pharma_id
+        logger.debug(f"User pharma_id: {pharma_id}")
+
+        # Business Logic: Create JWT token with remember_me flag and pharma_id in payload
         logger.debug(f"Creating JWT token with session duration: {session_duration} minutes")
         access_token_expires = timedelta(minutes=session_duration)
-        logger.debug(f"Token data: sub={user.user_id}, remember_me={remember_me}")
+        logger.debug(f"Token data: sub={user.user_id}, remember_me={remember_me}, pharma_id={pharma_id}")
 
         access_token = create_access_token(
             data={
                 "sub": str(user.user_id),
-                "remember_me": remember_me
+                "remember_me": remember_me,
+                "pharma_id": pharma_id
             },
             expires_delta=access_token_expires
         )
@@ -196,30 +201,6 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
 
         expires_at = datetime.now(timezone.utc) + access_token_expires
         logger.debug(f"Token expires at: {expires_at}")
-
-        # Get user's pharma_id from the pharma relationship
-        pharma_id = None
-        try:
-            logger.debug(f"Getting pharma_id for user: {user.user_id}")
-            if hasattr(user, 'pharma') and user.pharma:
-                logger.debug(f"User has pharma relationship: {len(user.pharma)} entries")
-                # user.pharma is a list, get the first one
-                if len(user.pharma) > 0:
-                    pharma_id = user.pharma[0].id
-                    logger.debug(f"Found pharma_id from relationship: {pharma_id}")
-            else:
-                logger.debug("No direct pharma relationship, querying pharma table...")
-                # If no direct relationship, query the pharma table
-                from ..models.pharma_model import Pharma
-                pharma = db.query(Pharma).filter(Pharma.user_id == user.user_id).first()
-                if pharma:
-                    pharma_id = pharma.id
-                    logger.debug(f"Found pharma_id from query: {pharma_id}")
-                else:
-                    logger.debug("No pharma found for user")
-        except Exception as e:
-            logger.warning(f"Could not get pharma_id for user {user.user_id}: {e}")
-            pharma_id = None
 
         result = {
             "user_id": str(user.user_id),

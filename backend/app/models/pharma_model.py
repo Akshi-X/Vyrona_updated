@@ -17,7 +17,8 @@ class Pharma(Base):
     updated_by = Column(String, nullable=True)
 
     # Relationships
-    user = relationship("User", back_populates="pharma")
+    admin_user = relationship("User", foreign_keys=[user_id])
+    users = relationship("User", foreign_keys="[User.pharma_id]", back_populates="pharma_company")
     patients = relationship("Patient", back_populates="pharma")
     providers = relationship("Provider", back_populates="pharma")
 

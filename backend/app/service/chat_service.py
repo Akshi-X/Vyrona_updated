@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 def create_chat_message(
     request: ChatMessageCreateRequest,
     sender_id: str,
+    sender_pharma_id: int,
+    sender_name: str,
     db: Session
 ) -> ChatMessageCreateResponse:
     """Create a new chat message"""
@@ -36,11 +38,6 @@ def create_chat_message(
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise ChatPatientNotFoundException(f"Patient with ID {request.patient_id} not found")
-        
-        # Get sender's pharma
-        sender = db.query(User).filter(User.user_id == sender_id).first()
-        if not sender:
-            raise ChatUserNotFoundException(f"Sender with ID {sender_id} not found")
         
         # Validate tagged users are in same pharma
         if request.tagged_user_ids:
@@ -53,7 +50,7 @@ def create_chat_message(
             
             # Check if all tagged users are in same pharma as sender
             for user in tagged_users:
-                if user.company_name != sender.company_name:
+                if user.pharma_id != sender_pharma_id:
                     raise ChatPharmaAccessDeniedException(
                         f"User {user.user_id} is not in the same pharma as sender"
                     )
@@ -91,8 +88,7 @@ def create_chat_message(
         
         db.commit()
         
-        # Get sender name for response
-        sender_name = f"{sender.first_name} {sender.last_name}"
+        # sender_name passed in
         
         return ChatMessageCreateResponse(
             message_id=chat_message.id,
@@ -116,6 +112,7 @@ def create_chat_message(
 def get_patient_messages(
     patient_id: str,
     current_user_id: str,
+    current_user_pharma_id: int,
     db: Session
 ) -> PatientMessagesResponse:
     """Get all messages for a specific patient and mark them as read"""
@@ -125,16 +122,11 @@ def get_patient_messages(
         if not patient:
             raise ChatPatientNotFoundException(f"Patient with ID {patient_id} not found")
         
-        # Get current user
-        current_user = db.query(User).filter(User.user_id == current_user_id).first()
-        if not current_user:
-            raise ChatUserNotFoundException(f"User with ID {current_user_id} not found")
-        
         # Get all messages for this patient from same pharma
         messages = db.query(ChatMessage).join(User, ChatMessage.sender_id == User.user_id).filter(
             and_(
                 ChatMessage.patient_id == patient_id,
-                User.company_name == current_user.company_name
+                User.pharma_id == current_user_pharma_id
             )
         ).order_by(ChatMessage.created_at.asc()).all()
         
@@ -218,25 +210,23 @@ def get_patient_messages(
 
 def get_unread_messages(
     current_user_id: str,
+    current_user_pharma_id: int,
     db: Session
 ) -> UnreadMessagesResponse:
     """Get all unread messages for the current user"""
     try:
-        # Get current user
-        current_user = db.query(User).filter(User.user_id == current_user_id).first()
-        if not current_user:
-            raise ChatUserNotFoundException(f"User with ID {current_user_id} not found")
-        
         # Get all unread messages where user was tagged
+        # Filter by patient's pharma_id, not sender's pharma_id
+        # Users should see messages for patients in their pharma
         unread_messages = db.query(ChatMessage).join(
             ChatReadStatus, ChatMessage.id == ChatReadStatus.message_id
         ).join(
-            User, ChatMessage.sender_id == User.user_id
+            Patient, ChatMessage.patient_id == Patient.id
         ).filter(
             and_(
                 ChatReadStatus.user_id == current_user_id,
                 ChatReadStatus.is_read == False,
-                User.company_name == current_user.company_name
+                Patient.pharma_id == current_user_pharma_id
             )
         ).order_by(desc(ChatMessage.created_at)).all()
         
