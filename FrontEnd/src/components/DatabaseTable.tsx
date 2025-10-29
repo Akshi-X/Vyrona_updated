@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { patientService, type Patient } from '../services/patientService';
+import { ALL_STAGES, getStageColor } from '../constants/stages';
 
 interface DatabaseTableProps {
   pharmaId?: string;
@@ -79,26 +80,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
   })();
 
   // All possible stage values
-  const allStages = [ 'Scheduled', 'Apheresis','Cryopreservation', 'Transportation', 'Reengineering', 'Reinfusion', 'AfterCare', 'Failure'];
-
-  const getStageColor = (stage: string) => {
-    switch (stage.toLowerCase()) {
-      case 'scheduled':
-      case 'apheresis':
-      case 'cryopreservation':
-      case 'transportation':
-      case 'reengineering':
-      case 'reinfusion':
-        return 'bg-green-100 text-green-800';
-      case 'aftercare':
-      case 'after care':
-        return 'bg-blue-100 text-blue-800';
-      case 'failure':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const allStages = ALL_STAGES;
 
   const SortIcon = ({ field }: { field: keyof Patient }) => {
     if (sortField !== field) {
@@ -171,7 +153,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
     <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
       <div className="h-[565px] overflow-y-auto overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-[#fdeeff]">
+          <thead className="sticky top-0 bg-[#fdeeff] z-10">
             <tr>
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
