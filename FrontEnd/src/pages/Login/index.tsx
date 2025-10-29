@@ -239,7 +239,7 @@ const Login: React.FC = () => {
                 </div>
                 <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                     Having trouble logging in? Contact <a href="#" className="text-[#6b1176] inline">
-                        ITAdmin@MyGrape.com
+                        ITAdmin@mygrape.com
                     </a>{" "} for help.
                 </p>
             </main>

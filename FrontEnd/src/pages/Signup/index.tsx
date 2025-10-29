@@ -415,7 +415,7 @@ const Signup: React.FC = () => {
                             
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
-                                    ITAdmin@MyGrape.com
+                                    ITAdmin@mygrape.com
                                 </a>{" "} for help.
                             </p>
 
