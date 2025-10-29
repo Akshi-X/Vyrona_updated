@@ -26,7 +26,7 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div className="flex items-center justify-center min-h-screen p-4">
         <div 
-          className="relative mx-auto border w-11/12 md:w-5/6 lg:w-4/5 xl:w-3/4 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
+          className="relative mx-auto border w-2/5 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">

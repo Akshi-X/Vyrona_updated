@@ -7,6 +7,7 @@ import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
@@ -43,21 +44,22 @@ import OnTimeIcon from '../../assets/DashBoardIcons/OnTime.svg';
 import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
 import FailureCostIcon from '../../assets/DashBoardIcons/FailureCost.svg';
 
-interface DashboardProps {}
+interface DashboardProps { }
 
-export default function Dashboard({}: DashboardProps) {
+export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
-  
+
   // Real data from APIs
   const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [stakeholderChats, setStakeholderChats] = useState<StakeholderChat[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showTrackShipment, setShowTrackShipment] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
 
 
@@ -153,7 +155,7 @@ export default function Dashboard({}: DashboardProps) {
     id: alert.id,
     type: alert.type,
     severity: alert.severity,
-    patientId:  alert.patient_id,
+    patientId: alert.patient_id,
     message: alert.message,
     timestamp: alert.timestamp,
     status: alert.status
@@ -163,7 +165,7 @@ export default function Dashboard({}: DashboardProps) {
     logout();
     navigate('/login');
   };
-  
+
   // State for patient statistics
   const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
   const [logisticsMetrics, setLogisticsMetrics] = useState<LogisticsMetrics | null>(null);
@@ -182,7 +184,7 @@ export default function Dashboard({}: DashboardProps) {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
         const [stats, logistics, performance, risk, compliance] = await Promise.all([
           logisticsService.getPatientStatistics(), // Call without pharma_id
@@ -191,14 +193,14 @@ export default function Dashboard({}: DashboardProps) {
           riskService.getRiskMetrics(PHARMA_ID.toString()),
           complianceService.getComplianceMetrics(PHARMA_ID.toString())
         ]);
-        
+
         setPatientStats(stats);
         setLogisticsMetrics(logistics);
         setPerformanceMetrics(performance);
         setRiskMetrics(risk);
         setComplianceMetrics(compliance);
       } catch (err) {
-         setError('Failed to load dashboard data');
+        setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -232,9 +234,9 @@ export default function Dashboard({}: DashboardProps) {
 
   const volumeCards = [
     {
-      label: "Tracking Shipment",
+      label: "Track Shipment",
       icon: TrackingShipmentIcon,
-      alt: "Tracking Shipment",
+      alt: "Track Shipment",
     },
     {
       label: "Aftercare",
@@ -288,14 +290,12 @@ export default function Dashboard({}: DashboardProps) {
                 <h2 className="font-semibold text-black text-base mb-4">
                   Volume
                 </h2>
-                <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
-                  <div className="grid grid-cols-2 gap-12 relative">
-                    {/* Vertical separator */}
-                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+                <div className="p-0">
+                  <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Patient Count */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                      <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -303,18 +303,18 @@ export default function Dashboard({}: DashboardProps) {
                             src={getIcon('Patient_Count')}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px] mr-4">
+                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                          Patient Count:
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : patientStats?.current_month_patient_count || '0'}
                         </div>
-                      </div>
-                      <div className="font-normal text-[#868686] text-[11px] text-left">
-                        Patient Count:
                       </div>
                     </div>
 
                     {/* Treatment Count */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                      <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -322,12 +322,12 @@ export default function Dashboard({}: DashboardProps) {
                             src={getIcon('Treatments_Count')}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px] mr-4">
+                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                          Treatments Count:
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : patientStats?.current_month_treatment_count || '0'}
                         </div>
-                      </div>
-                      <div className="font-normal text-[#868686] text-[11px] text-left">
-                        Treatments Count:
                       </div>
                     </div>
                   </div>
@@ -339,33 +339,31 @@ export default function Dashboard({}: DashboardProps) {
                 <h2 className="font-semibold text-black text-base mb-4">
                   Logistics
                 </h2>
-                <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
-                  <div className="grid grid-cols-2 gap-12 relative">
-                    {/* Vertical separator */}
-                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
+                <div className="p-0">
+                  <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Cold Chain Packaging Failure */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                      <div className="flex flex-col items-start mb-2 ml-3">
+                        <div className="w-8 h-8 mr-4 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
                             alt="Cold Chain Packaging Failure"
                             src={getIcon('Logistics_Chain')}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px]">
+                        <div className="font-normal text-[#868686] text-[10px] mt-2">
+                          Cold Chain Packaging Failure
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : logisticsMetrics?.cold_chain_packaging_failure_percentage?.toFixed(1) + '%' || '0%'}
                         </div>
-                      </div>
-                      <div className="font-normal text-[#868686] text-[10px] text-left">
-                        Cold Chain Packaging Failure
                       </div>
                     </div>
 
                     {/* Average Quality Lost per Patient */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                      <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -373,12 +371,12 @@ export default function Dashboard({}: DashboardProps) {
                             src={getIcon('Logistics_Quality')}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px]">
+                        <div className="font-normal text-[#868686] text-[10px] mt-2">
+                          Avg Quality Lost/Patient
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : logisticsMetrics?.avg_quality_lost_per_patient_percentage + '%' || '0%'}
                         </div>
-                      </div>
-                      <div className="font-normal text-[#868686] text-[10px] text-left">
-                        Avg Quality Lost/Patient
                       </div>
                     </div>
                   </div>
@@ -390,15 +388,12 @@ export default function Dashboard({}: DashboardProps) {
                 <h2 className="font-semibold text-black text-base mb-4">
                   Performance
                 </h2>
-                <div className="bg-white border border-[#E7E1E1] rounded-lg p-6">
+                <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
                   <div className="grid grid-cols-3 gap-12 relative">
-                    {/* Vertical separators */}
-                    <div className="absolute left-1/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
-                    <div className="absolute left-2/3 top-0 bottom-0 w-px bg-[#E7E1E1] transform -translate-x-1/2"></div>
 
                     {/* On Time Percentage */}
                     <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -406,18 +401,18 @@ export default function Dashboard({}: DashboardProps) {
                             src={OnTimeIcon}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px]">
+                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                          On Time:
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '0%'}
                         </div>
                       </div>
-                      <div className="font-normal text-[#868686] text-[11px] text-left">
-                        On Time:
-                      </div>
                     </div>
-                    
+
                     {/* Average Lead Time */}
                     <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col items-start mb-2">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -425,18 +420,18 @@ export default function Dashboard({}: DashboardProps) {
                             src={AvgLeadTimeIcon}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px]">
+                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                          Avg Lead time:
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '0d'}
                         </div>
                       </div>
-                      <div className="font-normal text-[#868686] text-[11px] text-left">
-                        Avg Lead time:
-                      </div>
                     </div>
-                    
+
                     {/* Failure Cost */}
                     <div className="flex flex-col">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col items-start mb-2">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -444,12 +439,12 @@ export default function Dashboard({}: DashboardProps) {
                             src={FailureCostIcon}
                           />
                         </div>
-                        <div className="font-semibold text-black text-[28px]">
+                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                          Failure Cost:
+                        </div>
+                        <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$0M'}
                         </div>
-                      </div>
-                      <div className="font-normal text-[#868686] text-[11px] text-left">
-                        Failure Cost:
                       </div>
                     </div>
                   </div>
@@ -549,13 +544,17 @@ export default function Dashboard({}: DashboardProps) {
               <section className="w-full">
                 <div className="flex gap-6 mt-7">
                   {volumeCards.map((card, index) => (
-                    <div 
-                      key={index} 
-                      className={`flex-1 bg-white border border-[#E7E1E1] rounded-lg ${card.alt === 'My Tasks' ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-                      onClick={card.alt === 'My Tasks' ? () => {
-                        fetchMyTasks();
-                        setShowMyTasks(true);
-                      } : undefined}
+                    <div
+                      key={index}
+                      className={`flex-1 bg-white border h-[125px] border-[#E7E1E1] rounded-lg ${(card.alt === 'My Tasks' || card.alt === 'Tracking Shipment') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                      onClick={() => {
+                        if (card.alt === 'My Tasks') {
+                          fetchMyTasks();
+                          setShowMyTasks(true);
+                        } else if (card.alt === 'Track Shipment') {
+                          setShowTrackShipment(true);
+                        }
+                      }}
                     >
                       <div className="flex flex-col items-center justify-center pt-7 pb-6 px-4">
                         <img
@@ -575,7 +574,7 @@ export default function Dashboard({}: DashboardProps) {
               {/* Risk and Compliance Section */}
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Risk Section */}
-                <div className="flex-1 bg-white rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center">
+                <div className="flex-1 bg-[#fff3ee] rounded-lg border border-[#E7E1E1] p-5 h-[349px] flex flex-col items-center">
                   <div className="w-full mb-12">
                     <h3 className="font-semibold text-black text-base">
                       Risk
@@ -592,7 +591,7 @@ export default function Dashboard({}: DashboardProps) {
                       <div className="font-semibold text-black text-[28px] whitespace-nowrap">
                         {loading ? '...' : riskMetrics?.deviation_percentage || 0}%
                       </div>
-                      <div className="font-normal text-black text-[11px] whitespace-nowrap">
+                      <div className="font-normal text-black text-[12px] whitespace-nowrap">
                         Deviation
                       </div>
                     </div>
@@ -604,12 +603,12 @@ export default function Dashboard({}: DashboardProps) {
                       alt="Risk"
                       src={RiskIcon}
                     />
-                    <div className="font-normal text-black text-[11px] whitespace-nowrap">
+                    <div className="font-normal text-black text-[12px] whitespace-nowrap">
                       Top Risk Driver
                     </div>
                   </div>
 
-                  <div className="h-[30px] bg-[#fff3ee] rounded-[10px] border border-solid border-[#E7E1E1] px-4">
+                  <div className="h-[30px] bg-[#ffffff] rounded-[10px] border border-solid border-[#E7E1E1] px-4">
                     <span className="font-semibold text-orange-600 text-xs whitespace-nowrap mt-2 py-1">
                       {loading ? '...' : riskMetrics?.top_risk_driver?.name || 'N/A'}
                     </span>
@@ -617,7 +616,7 @@ export default function Dashboard({}: DashboardProps) {
                 </div>
 
                 {/* Compliance Section */}
-                <div className="flex-1 bg-white rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
+                <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
                     Compliance
                   </h2>
@@ -632,7 +631,7 @@ export default function Dashboard({}: DashboardProps) {
                       <div className="font-semibold text-black text-[28px]">
                         {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
                       </div>
-                      <div className="font-normal text-black text-[11px]">
+                      <div className="font-normal text-black text-[12px]">
                         Audit Coverage
                       </div>
                     </div>
@@ -644,12 +643,12 @@ export default function Dashboard({}: DashboardProps) {
                       alt="Compliance icon"
                       src={ComplianceIcon}
                     />
-                    <span className="font-normal text-black text-[11px] whitespace-nowrap">
+                    <span className="font-normal text-black text-[12px] whitespace-nowrap">
                       Emissions per Treatment
                     </span>
                   </div>
 
-                  <div className="bg-[#e4f5ff] border-[#E7E1E1] px-4 h-[30px] rounded mt-0 gap-1 flex items-center justify-center">
+                  <div className="bg-[#ffffff] border-[#E7E1E1] px-4 h-[30px] rounded mt-0 gap-1 flex items-center justify-center">
                     <span className="font-bold text-[#1083c5] text-sm">
                       {loading ? '...' : complianceMetrics?.emissions_per_treatment_tco2e || 0}
                     </span>
@@ -672,12 +671,12 @@ export default function Dashboard({}: DashboardProps) {
       </main>
 
       {/* Critical Alerts Modal */}
-        <CriticalAlertsModal
-          isOpen={showCriticalAlerts}
-          onClose={() => setShowCriticalAlerts(false)}
-          alerts={transformedAlerts}
-          loading={loadingAlerts}
-        />
+      <CriticalAlertsModal
+        isOpen={showCriticalAlerts}
+        onClose={() => setShowCriticalAlerts(false)}
+        alerts={transformedAlerts}
+        loading={loadingAlerts}
+      />
 
       {/* My Tasks Modal */}
       <MyTasksModal
@@ -693,6 +692,13 @@ export default function Dashboard({}: DashboardProps) {
         onClose={() => setShowStakeholderChats(false)}
         chats={stakeholderChats}
         loading={loadingChats}
+      />
+
+      {/* Track Shipment Modal */}
+      <TrackShipmentModal
+        isOpen={showTrackShipment}
+        onClose={() => setShowTrackShipment(false)}
+        onTrack={(pid) => navigate(`/track/${encodeURIComponent(pid)}`)}
       />
     </div>
   );
