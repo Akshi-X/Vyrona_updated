@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { patientService, type OngoingTreatment } from '../services/patientService';
+import { ALL_STAGES, getStageColor } from '../constants/stages';
 
 interface OngoingTreatmentsProps {
   // No props needed since we don't send pharma_id
@@ -35,30 +36,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // All possible stage values
-  const allStages = ['Scheduled', 'Apheresis', 'Cryopreservation', 'Transportation', 'Reengineering', 'Reinfusion', 'AfterCare', 'Failure'];
-
-  const getStageColor = (stage: string | null) => {
-    if (!stage) {
-      return 'bg-gray-100 text-gray-800';
-    }
-    
-    switch (stage.toLowerCase()) {
-      case 'scheduled':
-      case 'apheresis':
-      case 'cryopreservation':
-      case 'transportation':
-      case 'reengineering':
-      case 'reinfusion':
-        return 'bg-green-100 text-green-800';
-      case 'aftercare':
-      case 'after care':
-        return 'bg-blue-100 text-blue-800';
-      case 'failure':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const allStages = ALL_STAGES;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

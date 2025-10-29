@@ -234,9 +234,9 @@ export default function Dashboard({ }: DashboardProps) {
 
   const volumeCards = [
     {
-      label: "Tracking Shipment",
+      label: "Track Shipment",
       icon: TrackingShipmentIcon,
-      alt: "Tracking Shipment",
+      alt: "Track Shipment",
     },
     {
       label: "Aftercare",
@@ -546,12 +546,12 @@ export default function Dashboard({ }: DashboardProps) {
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}
-                      className={`flex-1 bg-white border border-[#E7E1E1] rounded-lg ${(card.alt === 'My Tasks' || card.alt === 'Tracking Shipment') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                      className={`flex-1 bg-white border h-[125px] border-[#E7E1E1] rounded-lg ${(card.alt === 'My Tasks' || card.alt === 'Tracking Shipment') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
                           setShowMyTasks(true);
-                        } else if (card.alt === 'Tracking Shipment') {
+                        } else if (card.alt === 'Track Shipment') {
                           setShowTrackShipment(true);
                         }
                       }}
@@ -574,7 +574,7 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Risk and Compliance Section */}
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Risk Section */}
-                <div className="flex-1 bg-[#fff3ee] rounded-lg border border-[#E7E1E1] p-5 h-[358px] flex flex-col items-center">
+                <div className="flex-1 bg-[#fff3ee] rounded-lg border border-[#E7E1E1] p-5 h-[349px] flex flex-col items-center">
                   <div className="w-full mb-12">
                     <h3 className="font-semibold text-black text-base">
                       Risk
