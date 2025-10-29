@@ -58,11 +58,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {tasks.map((task) => (
             <tr key={task.id} className="hover:bg-gray-50">
-              <td className="px-4 py-4 text-sm text-gray-900 font-mono truncate">
+              <td className="px-4 py-4 text-sm text-gray-900 font-mono font-normal truncate">
                 {task.patientId}
               </td>
               <td className="px-4 py-4">
-                <div className="text-sm font-medium text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
+                <div className="text-sm font-normal text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
               </td>
               <td className="px-4 py-4 text-sm text-gray-900">
                 <div className="truncate" title={task.description}>{task.description}</div>
