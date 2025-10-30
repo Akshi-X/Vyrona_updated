@@ -4,9 +4,13 @@ from .otp_model import OTP
 from .patient_model import Patient
 from .patient_stage_model import PatientStage
 from .feedback_model import Feedback
+from .feedback_attachment import FeedbackAttachment
 from .feedback_comments import Comment
 from .pharma_model import Pharma
 from .provider_model import Provider
+from .carrier_model import Carrier
+from .provider_carrier_model import ProviderCarrier
+from .shipment_model import Shipment
 from .task_model import Tasks
 from .chat_model import ChatMessage
 from .chat_read_status import ChatReadStatus
