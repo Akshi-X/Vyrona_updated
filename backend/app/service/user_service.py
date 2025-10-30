@@ -41,14 +41,14 @@ from app.config.config import settings
 logger = logging.getLogger(__name__)
 
 
-def get_pharma_admin_email(company_name: str, db: Session) -> Optional[str]:
+def get_pharma_admin_email(pharma_id: int, db: Session) -> Optional[str]:
     """
-    Get the email of a pharma admin from the specified company.
+    Get the email of a pharma admin from the specified pharma company.
     
     Used for pharma-specific approval: Each pharma admin can only approve users from their own company.
     
     Args:
-        company_name: Company name to search for
+        pharma_id: Pharma ID to search for
         db: Database session
         
     Returns:
@@ -56,21 +56,26 @@ def get_pharma_admin_email(company_name: str, db: Session) -> Optional[str]:
     """
     try:
         # Validate input
-        if not company_name or not company_name.strip():
-            logger.warning("Empty or None company_name provided to get_pharma_admin_email")
+        if not pharma_id:
+            logger.warning("Empty or None pharma_id provided to get_pharma_admin_email")
             return None
         
+        # Look for pharma admin users by pharma_id instead of using pharma.user_id
         pharma_admin = db.query(user_model.User).filter(
-            user_model.User.company_name == company_name,
+            user_model.User.pharma_id == pharma_id,
             user_model.User.role == 'pharma_admin',
             user_model.User.approved_status == 'approved',
             user_model.User.status == True
         ).first()
         
-        return pharma_admin.email if pharma_admin else None
+        if not pharma_admin:
+            logger.warning(f"No pharma admin found for pharma_id: {pharma_id}")
+            return None
+        
+        return pharma_admin.email
         
     except Exception as e:
-        logger.error(f"Error getting pharma admin email for company '{company_name}': {str(e)}")
+        logger.error(f"Error getting pharma admin email for pharma_id '{pharma_id}': {str(e)}")
         return None
 
 
@@ -86,21 +91,21 @@ def get_mygrape_admin_email() -> str:
     return settings.MYGRAPE_ADMIN_EMAIL
 
 
-def get_company_manager_email(company_name: str, db: Session) -> Optional[str]:
+def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
     """
-    Get the email of an approved manager from the specified company.
+    Get the email of an approved manager from the specified pharma company.
     
     Used for two-level approval: Users need approval from their company manager.
     
     Args:
-        company_name: Company name to search for
+        pharma_id: Pharma ID to search for
         db: Database session
         
     Returns:
         Manager's email if found, None otherwise
     """
     manager = db.query(user_model.User).filter(
-        user_model.User.company_name == company_name,
+        user_model.User.pharma_id == pharma_id,
         user_model.User.role == 'manager',
         user_model.User.approved_status == 'approved',
         user_model.User.status == True
@@ -135,9 +140,14 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         pharma_id = existing_pharma.id
         logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
     else:
-        # Pharma doesn't exist, will create after user is created
-        pharma_id = None
-        logger.info(f"Pharma '{request.company_name}' doesn't exist, will create after user creation")
+        # Pharma doesn't exist - reject registration
+        logger.error(f"Pharma '{request.company_name}' doesn't exist - registration not allowed")
+        raise DatabaseQueryException(
+            operation="user registration", 
+            reason=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+            custom_message=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+            status_code=400
+        )
     
     # ============================================
     # END PHARMA VALIDATION LOGIC
@@ -151,7 +161,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         email=request.email,
         password_hash=utils.hash_password(request.password),
         role=role_lower,
-        company_name=request.company_name,
+        pharma_id=pharma_id,
     )
     
     # Set session timeout based on role (from constants)
@@ -170,41 +180,27 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         db.flush()  # Flush but don't commit yet - validate first
         logger.debug(f"User flushed to DB (not committed): {user.user_id}")
         
-        # Create pharma if it doesn't exist (BEFORE committing user)
-        if not existing_pharma:
-            new_pharma = Pharma(
-                pharma_name=request.company_name,
-                user_id=user.user_id,  # Link to the user we just created
-                created_by=user.user_id
-            )
-            db.add(new_pharma)
-            db.flush()  # Flush pharma but don't commit yet
-            pharma_id = new_pharma.id
-            logger.info(f"Created new pharma: {request.company_name} (ID: {pharma_id}) linked to user: {user.user_id}")
-        else:
-            pharma_id = existing_pharma.id
-            logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
-        
         # Determine recipient for approval email
         logger.info(f"Preparing to send approval email for role: {role_lower}")
         recipient_email = None
         
-        # Check if pharma admin exists for this company
-        pharma_admin_email = get_pharma_admin_email(request.company_name, db)
+        # Check if pharma admin exists for this pharma
+        pharma_admin_email = get_pharma_admin_email(pharma_id, db)
         
         if not pharma_admin_email:
-            # No pharma admin for this company - registration not allowed
+            # No pharma admin for this pharma - registration not allowed
             db.rollback()
-            logger.error(f"No pharma admin found for company: {request.company_name}")
+            logger.error(f"No pharma admin found for pharma_id: {pharma_id}")
             raise DatabaseQueryException(
                 operation="user registration", 
-                reason=f"user cannot be registered. For further support, kindly reach out to itadmin@mygrape.com.",
-                custom_message=f"user cannot be registered. For further support, kindly reach out to itadmin@mygrape.com."
+                reason=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+                custom_message=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+                status_code=400
             )
         
         # Both manager and user registrations go to pharma admin
         recipient_email = pharma_admin_email
-        logger.info(f"Registration: Sending approval email to Pharma Admin ({recipient_email}) for company: {request.company_name}")
+        logger.info(f"Registration: Sending approval email to Pharma Admin ({recipient_email}) for pharma_id: {pharma_id}")
         
         # Send approval email BEFORE committing
         # If email fails, transaction will rollback
@@ -214,7 +210,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             last_name=request.last_name,
             email=request.email,
             role=request.role,
-            company=request.company_name,
+            company=existing_pharma.pharma_name,
             recipient_email=recipient_email
         )
         logger.info("Approval email sent successfully")
@@ -260,7 +256,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         user_id=user.user_id,
         email=user.email,
         role=user.role,
-        company_name=user.company_name,
+        pharma_id=user.pharma_id,
+        company_name=existing_pharma.pharma_name,
         approval_status=user.approved_status,
         approval_sent_to=recipient_email
     )
@@ -293,10 +290,10 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     if not approver:
         raise UserApproveNotFoundException(registration_id=approved_by_user_id)
     
-    # Validate that approver is a pharma admin for the same company
-    if approver.role != 'pharma_admin' or approver.company_name != user.company_name:
+    # Validate that approver is a pharma admin for the same pharma
+    if approver.role != 'pharma_admin' or approver.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
-            company_name=user.company_name,
+            company_name=f"pharma_id_{user.pharma_id}",
             reason="Only pharma admin from the same company can approve users"
         )
     
@@ -313,13 +310,18 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     # Send approval notification email to the user
     try:
+        # Get company name from pharma table
+        from app.models.pharma_model import Pharma
+        pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
+        company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
+        
         approved_date = user.approved_on.strftime("%B %d, %Y at %I:%M %p")
         send_user_approved_notification(
             user_email=user.email,
             first_name=user.first_name,
             last_name=user.last_name,
             role=user.role,
-            company=user.company_name,
+            company=company_name,
             approved_date=approved_date
         )
         logger.info(f"Approval notification email sent to {user.email}")
@@ -328,6 +330,11 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         logger.error(f"Failed to send approval notification email to {user.email}: {str(e)}")
     
     # Build response object
+    # Get company name from pharma table
+    from app.models.pharma_model import Pharma
+    pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
+    company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
+    
     response = UserApprovalResponse(
         detail=f"{SuccessMessages.USER_APPROVED}: {user.first_name}",
         user_id=user.user_id,
@@ -335,7 +342,7 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         first_name=user.first_name,
         last_name=user.last_name,
         role=user.role,
-        company_name=user.company_name,
+        company_name=company_name,
         approved_by=user.approved_by,
         approved_on=user.approved_on.isoformat()
     )
@@ -368,10 +375,10 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     if not rejector:
         raise UserRejectNotFoundException(registration_id=rejected_by_user_id)
     
-    # Validate that rejector is a pharma admin for the same company
-    if rejector.role != 'pharma_admin' or rejector.company_name != user.company_name:
+    # Validate that rejector is a pharma admin for the same pharma
+    if rejector.role != 'pharma_admin' or rejector.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
-            company_name=user.company_name,
+            company_name=f"pharma_id_{user.pharma_id}",
             reason="Only pharma admin from the same company can reject users"
         )
     
@@ -413,14 +420,19 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
     if not target_user:
         raise UserGetNotFoundException(registration_id=user_id)
     
-    # Multi-tenant check: Manager can only view users from their company
+    # Multi-tenant check: Manager can only view users from their pharma
     # Admin can view all users
     if current_user.role.lower() != 'admin':
-        if target_user.company_name != current_user.company_name:
+        if target_user.pharma_id != current_user.pharma_id:
             raise CompanyAccessForbiddenException(
-                user_company=current_user.company_name,
-                target_company=target_user.company_name
+                user_company=f"pharma_id_{current_user.pharma_id}",
+                target_company=f"pharma_id_{target_user.pharma_id}"
             )
+    
+    # Get company name from pharma table
+    from app.models.pharma_model import Pharma
+    pharma = db.query(Pharma).filter(Pharma.id == target_user.pharma_id).first()
+    company_name = pharma.pharma_name if pharma else None
     
     # Build response object
     response = UserDetailsResponse(
@@ -429,7 +441,8 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
         last_name=target_user.last_name,
         email=target_user.email,
         role=target_user.role,
-        company_name=target_user.company_name,
+        pharma_id=target_user.pharma_id,
+        company_name=company_name,
         approved_status=target_user.approved_status,
         status=target_user.status,
         is_locked=target_user.is_locked,
@@ -440,16 +453,22 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
     return response
 
 
-def get_user_profile(user: user_model.User) -> UserProfileResponse:
+def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
     """
     Build UserProfileResponse DTO from User model.
     
     Args:
         user: User model from authentication
+        db: Database session
         
     Returns:
         UserProfileResponse DTO with all profile fields
     """
+    # Get company name from pharma table
+    from app.models.pharma_model import Pharma
+    pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
+    company_name = pharma.pharma_name if pharma else None
+    
     # Build response object
     response = UserProfileResponse(
         user_id=user.user_id,
@@ -457,7 +476,8 @@ def get_user_profile(user: user_model.User) -> UserProfileResponse:
         first_name=user.first_name,
         last_name=user.last_name,
         role=user.role,
-        company_name=user.company_name,
+        pharma_id=user.pharma_id,
+        company_name=company_name,
         approved_status=user.approved_status,
         status=user.status,
         session_timeout=user.session_timeout,
@@ -482,12 +502,17 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         UserListResponse with users from current user's company
     """
     try:
-        # Query all approved and active users FROM SAME COMPANY (multi-tenant filtering)
+        # Query all approved and active users FROM SAME PHARMA (multi-tenant filtering)
         users = db.query(User).filter(
             User.approved_status == 'approved',
             User.status == True,
-            User.company_name == current_user.company_name  # ✅ FILTER BY COMPANY
+            User.pharma_id == current_user.pharma_id  # ✅ FILTER BY PHARMA
         ).all()
+        
+        # Get company names from pharma table
+        from app.models.pharma_model import Pharma
+        pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
+        company_name = pharma.pharma_name if pharma else None
         
         # Convert to UserListItem
         user_items = [
@@ -497,7 +522,8 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
                 last_name=user.last_name,
                 email=user.email,
                 role=user.role,
-                company_name=user.company_name
+                pharma_id=user.pharma_id,
+                company_name=company_name
             )
             for user in users
         ]
