@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
-    
+   
     def get_pharma_admins(self) -> List[Dict[str, Any]]:
         """
         Load pharma admins from pharma_admins.json file.
@@ -88,21 +88,21 @@ class Settings(BaseSettings):
             # Go up two levels from app/config/config.py to backend directory
             backend_dir = os.path.dirname(os.path.dirname(current_dir))
             pharma_admins_path = os.path.join(backend_dir, "pharma_admins.json")
-            
+           
             if not os.path.exists(pharma_admins_path):
                 return []
-            
+           
             with open(pharma_admins_path, 'r', encoding='utf-8') as f:
                 pharma_admins = json.load(f)
                 return pharma_admins if isinstance(pharma_admins, list) else []
-                
+               
         except Exception as e:
             # Log the error but don't raise it to avoid breaking the app
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error loading pharma admins: {str(e)}")
             return []
-    
+   
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -118,3 +118,4 @@ def get_settings() -> Settings:
  
 # Global settings instance
 settings = get_settings()
+ 
