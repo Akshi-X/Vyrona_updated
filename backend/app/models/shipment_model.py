@@ -32,8 +32,6 @@ class Shipment(Base):
     
     # Success tracking for transportation phase
     transportation_success = Column(Boolean, nullable=True)  # True/False/None (pending)
-    pharma_decision = Column(String, nullable=True)  # approved, rejected, pending
-    pharma_decision_notes = Column(Text, nullable=True)
     
     # Loss/Physical Damage Tracking (Shipment Level)
     physical_damage_reported = Column(Boolean, default=False, nullable=False)
