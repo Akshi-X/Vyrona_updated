@@ -34,6 +34,14 @@ def create_pharma_admins():
             
             logger.info(f"Processing pharma admin: {email} for company: {company}")
             
+            # First, ensure the pharma company exists
+            existing_pharma = db.query(pharma_model.Pharma).filter(pharma_model.Pharma.pharma_name == company).first()
+            if not existing_pharma:
+                logger.error(f"Pharma company '{company}' not found. Please create pharma companies first.")
+                continue
+            
+            pharma_id = existing_pharma.id
+            
             # Check if pharma admin already exists
             existing_admin = db.query(User).filter(User.email == email).first()
             
@@ -48,8 +56,8 @@ def create_pharma_admins():
                 if existing_admin.approved_status != 'approved':
                     existing_admin.approved_status = 'approved'
                     needs_update = True
-                if existing_admin.company_name != company:
-                    existing_admin.company_name = company
+                if existing_admin.pharma_id != pharma_id:
+                    existing_admin.pharma_id = pharma_id
                     needs_update = True
                 if existing_admin.role != 'pharma_admin':
                     existing_admin.role = 'pharma_admin'
@@ -74,7 +82,7 @@ def create_pharma_admins():
                 first_name=pharma_admin['first_name'],
                 last_name=pharma_admin['last_name'],
                 role="pharma_admin",
-                company_name=company,
+                pharma_id=pharma_id,
                 approved_status="approved",
                 status=True,
                 session_timeout=120,
@@ -86,7 +94,7 @@ def create_pharma_admins():
             db.commit()
             db.refresh(admin_user)
             
-            logger.info(f"PHARMA ADMIN CREATED: {email} (ID: {admin_user.user_id}) for company: {company}")
+            logger.info(f"PHARMA ADMIN CREATED: {email} (ID: {admin_user.user_id}) for pharma_id: {pharma_id}")
         
         logger.info("=" * 60)
         logger.info(f"PHARMA ADMIN SETUP COMPLETE: {len(pharma_admins)} admins configured")
@@ -102,6 +110,7 @@ def create_pharma_admins():
 def create_pharma_companies():
     """
     Create pharma companies in the pharma table for each pharma admin.
+    Pharma companies are created first, then admin users are created and linked to them.
     """
     logger.info("=" * 60)
     logger.info("CREATING PHARMA COMPANIES...")
@@ -117,7 +126,7 @@ def create_pharma_companies():
         
         for pharma_admin in pharma_admins:
             company_name = pharma_admin['company']
-            admin_email = pharma_admin['email']
+            location = pharma_admin.get('location')  # Get location if provided, None otherwise
             
             logger.info(f"Processing pharma company: {company_name}")
             
@@ -126,17 +135,11 @@ def create_pharma_companies():
             
             if existing_pharma:
                 logger.info(f"Pharma company already exists: {company_name}")
-                continue
-            
-            # Get the pharma admin user for this company
-            pharma_admin_user = db.query(user_model.User).filter(
-                user_model.User.email == admin_email,
-                user_model.User.role == 'pharma_admin',
-                user_model.User.company_name == company_name
-            ).first()
-            
-            if not pharma_admin_user:
-                logger.error(f"Pharma admin user not found for {company_name}")
+                # Update location if provided and different
+                if location and existing_pharma.location != location:
+                    existing_pharma.location = location
+                    db.commit()
+                    logger.info(f"Updated location for {company_name}: {location}")
                 continue
             
             # Create new pharma company
@@ -144,21 +147,22 @@ def create_pharma_companies():
             
             new_pharma = pharma_model.Pharma(
                 pharma_name=company_name,
-                user_id=pharma_admin_user.user_id,  # Link to pharma admin
-                created_by=pharma_admin_user.user_id
+                location=location,
+                created_by="system"
             )
             
             db.add(new_pharma)
             db.commit()
             db.refresh(new_pharma)
             
-            logger.info(f"✅ PHARMA COMPANY CREATED: {company_name} (ID: {new_pharma.id}) linked to admin: {pharma_admin_user.email}")
+            logger.info(f"PHARMA COMPANY CREATED: {company_name} (ID: {new_pharma.id})")
         
         # Show all pharma companies
         all_pharmas = db.query(pharma_model.Pharma).all()
         logger.info(f"All pharma companies in database ({len(all_pharmas)} total):")
         for pharma in all_pharmas:
-            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}, Admin ID: {pharma.user_id}")
+            location_info = f", Location: {pharma.location}" if pharma.location else ""
+            logger.info(f"  - ID: {pharma.id}, Name: {pharma.pharma_name}{location_info}")
         
         logger.info("=" * 60)
         logger.info(f"PHARMA COMPANIES SETUP COMPLETE: {len(all_pharmas)} companies")
@@ -199,7 +203,7 @@ def create_mygrape_admin():
             email=settings.MYGRAPE_ADMIN_EMAIL,
             password_hash=get_password_hash(settings.MYGRAPE_ADMIN_PASSWORD),
             role="mygrape_admin",
-            company_name="MyGrape Platform",
+            pharma_id=None,  # MyGrape admin doesn't belong to any pharma company
             status=True,
             approved_status="approved",
             created_by="system",
@@ -230,11 +234,11 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/verified")
     
-    # Create pharma admins if not exists
-    create_pharma_admins()
-    
     # Create pharma companies if not exists
     create_pharma_companies()
+    
+    # Create pharma admins if not exists
+    create_pharma_admins()
     
     # Create MyGrape platform admin if not exists
     create_mygrape_admin()

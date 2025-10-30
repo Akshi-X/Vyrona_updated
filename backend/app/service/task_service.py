@@ -124,7 +124,7 @@ def create_task(
         # Validate assignee exists and is from same company
         assignee = get_user_by_id(request.assignee_id, db)
         if not assignee or \
-           assignee.company_name != current_user.company_name or \
+           assignee.pharma_id != current_user.pharma_id or \
            assignee.approved_status != 'approved' or \
            not assignee.status:
             raise TaskInvalidAssigneeException(user_id=request.assignee_id)
@@ -291,7 +291,7 @@ def update_task(
         if request.assignee_id:
             assignee = get_user_by_id(request.assignee_id, db)
             if not assignee or \
-               assignee.company_name != current_user.company_name or \
+               assignee.pharma_id != current_user.pharma_id or \
                assignee.approved_status != 'approved' or \
                not assignee.status:
                 raise TaskInvalidAssigneeException(user_id=request.assignee_id)

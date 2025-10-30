@@ -100,9 +100,14 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                     db.close()
                     raise UserNotApprovedException(user_id=user.user_id)
                 
-                # Token valid - inject authenticated user into request
+                # Token valid - inject authenticated user and pharma_id into request
                 request.state.current_user = user
                 request.state.db_session = db
+                
+                # Extract pharma_id from token payload for easy access
+                pharma_id = payload.get("pharma_id")
+                if pharma_id is not None:
+                    request.state.pharma_id = pharma_id
                 
             except AppException:
                 db.close()

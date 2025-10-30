@@ -27,10 +27,12 @@ class PatientService:
         self.db = db
 
 
-    def get_patient_by_id(self, patient_id: str) -> PatientResponse:
-        """Get patient by ID with business logic"""
+    def get_patient_by_id(self, patient_id: str, pharma_id: int) -> PatientResponse:
+        """Get patient by ID with business logic and pharma filtering"""
         try:
-            db_patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+            db_patient = self.db.query(Patient).filter(
+                and_(Patient.id == patient_id, Patient.pharma_id == pharma_id)
+            ).first()
             if not db_patient:
                 raise PatientNotFoundError(patient_id)
             return PatientResponse.model_validate(db_patient)
@@ -39,19 +41,23 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("get_patient_by_id", f"Failed to get patient: {str(e)}")
 
-    def get_all_patients(self) -> List[PatientResponse]:
-        """Get all patients without pagination or search"""
+    def get_all_patients(self, pharma_id: int) -> List[PatientResponse]:
+        """Get all patients for specific pharma without pagination or search"""
         try:
-            patients = self.db.query(Patient).order_by(desc(Patient.created_at)).all()
+            patients = self.db.query(Patient).filter(
+                Patient.pharma_id == pharma_id
+            ).order_by(desc(Patient.created_at)).all()
             return [PatientResponse.model_validate(patient) for patient in patients]
         except Exception as e:
             raise PatientServiceError("get_all_patients", f"Failed to get patients: {str(e)}")
 
-    def update_patient(self, patient_id: str, patient_data: PatientUpdate) -> PatientResponse:
-        """Update patient with business logic validation"""
+    def update_patient(self, patient_id: str, patient_data: PatientUpdate, pharma_id: int) -> PatientResponse:
+        """Update patient with business logic validation and pharma filtering"""
         try:
-            # Check if patient exists
-            db_patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+            # Check if patient exists and belongs to the pharma
+            db_patient = self.db.query(Patient).filter(
+                and_(Patient.id == patient_id, Patient.pharma_id == pharma_id)
+            ).first()
             if not db_patient:
                 raise PatientNotFoundError(patient_id)
             
@@ -70,6 +76,33 @@ class PatientService:
             raise
         except Exception as e:
             raise PatientServiceError("update_patient", f"Failed to update patient: {str(e)}")
+
+    def get_patients_by_provider(self, provider_id: str, pharma_id: int) -> List[PatientResponse]:
+        """Get all patients for a specific provider within pharma"""
+        try:
+            patients = self.db.query(Patient).filter(
+                and_(Patient.provider_id == provider_id, Patient.pharma_id == pharma_id)
+            ).all()
+            return [PatientResponse.model_validate(patient) for patient in patients]
+        except Exception as e:
+            raise PatientServiceError("get_patients_by_provider", f"Failed to get patients by provider: {str(e)}")
+
+    def delete_patient(self, patient_id: str, pharma_id: int) -> None:
+        """Delete patient with pharma filtering"""
+        try:
+            # Check if patient exists and belongs to the pharma
+            db_patient = self.db.query(Patient).filter(
+                and_(Patient.id == patient_id, Patient.pharma_id == pharma_id)
+            ).first()
+            if not db_patient:
+                raise PatientNotFoundError(patient_id)
+
+            self.db.delete(db_patient)
+            self.db.commit()
+        except PatientNotFoundError:
+            raise
+        except Exception as e:
+            raise PatientServiceError("delete_patient", f"Failed to delete patient: {str(e)}")
 
     def create_multiple_patients(self, patients_data: List[PatientCreate]) -> List[Patient]:
         """Create multiple patients in a single transaction"""
