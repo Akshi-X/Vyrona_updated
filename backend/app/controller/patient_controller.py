@@ -12,7 +12,8 @@ from app.schemas.patient_schema import (
     PatientCreateResponse,
     PharmaStatisticsResponse,
     PatientSummaryResponse,
-    PatientDetailedResponse
+    PatientDetailedResponse,
+    PatientStageResponse
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -111,3 +112,14 @@ def delete_patient(
     patient_service = PatientService(db)
     patient_service.delete_patient(patient_id)
     return {"message": "Patient deleted successfully"}
+
+
+@router.get("/{patient_id}/stage", response_model=PatientStageResponse)
+def get_patient_stage(
+    patient_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """Get the current stage for a patient from process_phase table"""
+    patient_service = PatientService(db)
+    return patient_service.get_patient_current_stage(patient_id=patient_id, pharma_id=pharma_id)

@@ -110,6 +110,10 @@ class ErrorMessages:
     TOO_MANY_REQUESTS = "Too many requests. Please try again later"
     AUTHENTICATION_VALIDATION_FAILED = "Authentication validation failed"
     AUTHENTICATION_ERROR = "Authentication error"
+
+    # Patient Stage
+    PATIENT_STAGE_NOT_FOUND = "No stage information found for this patient"
+    PATIENT_STAGE_LOOKUP_FAILED = "Failed to retrieve patient stage"
     
 
     # Task Management
