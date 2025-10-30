@@ -5,24 +5,24 @@ export default function AuditTrailTable() {
     { date: 'April 20', user: 'j.doe', doc: 'Agency' },
   ];
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-      <h3 className="font-semibold text-black text-sm mb-2">Audit Trail Summary</h3>
-      <div className="overflow-x-auto">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[270px]">
+      <h3 className="font-bold text-black text-[16px] mb-2">Audit Trail Summary</h3>
+      <div className="overflow-x-auto h-[193px]">
         <table className="w-full text-xs">
-          <thead className="bg-purple-50 text-purple-700">
+          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left">Data</th>
-              <th className="px-3 py-2 text-left">User</th>
-              <th className="px-3 py-2 text-left">Doc</th>
+              <th className="px-3 py-5 text-left">Data</th>
+              <th className="px-3 py-5 text-left">User</th>
+              <th className="px-3 py-5 text-left">Doc</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {rows.length ? (
               rows.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-3 py-2">{r.date}</td>
-                  <td className="px-3 py-2">{r.user}</td>
-                  <td className="px-3 py-2">{r.doc}</td>
+                <tr key={i} className="hover:bg-gray-50 text-[14px]">
+                  <td className="px-3 py-4">{r.date}</td>
+                  <td className="px-3 py-4">{r.user}</td>
+                  <td className="px-3 py-4">{r.doc}</td>
                 </tr>
               ))
             ) : (

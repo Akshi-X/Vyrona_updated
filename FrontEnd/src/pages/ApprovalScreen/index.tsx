@@ -15,11 +15,15 @@ const ApprovalScreen: React.FC = () => {
   const cookieToken = authUtils.getToken();
 
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | null>(null);
+  const [lastAction, setLastAction] = useState<"approve" | "reject" | null>(null);
   const [fetching, setFetching] = useState(true);
   const [completed, setCompleted] = useState(false);
   const [userInfo, setUserInfo] = useState<UserProfileDto | null>(null);
   const [userLoading, setUserLoading] = useState(true);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
+  const [linkUsed, setLinkUsed] = useState(false);
 
   const apiService = new BaseApiService();
   const location = useLocation();
@@ -40,6 +44,12 @@ const ApprovalScreen: React.FC = () => {
           return;
         }
 
+        // If this approval link was used before in this browser, mark it
+        const storageKey = `approval_used_${registrationId}`;
+        if (localStorage.getItem(storageKey) === '1') {
+          setLinkUsed(true);
+        }
+
         // Fetch user details from API
         const userData = await userService.getUserById(registrationId);
         setUserInfo(userData);
@@ -56,25 +66,54 @@ const ApprovalScreen: React.FC = () => {
   }, [fetching, registrationId]);
 
 
-  // Approve / Reject Handler
+  // Show confirmation modal
+  const handleButtonClick = (action: "approve" | "reject") => {
+    setPendingAction(action);
+    setShowConfirmModal(true);
+  };
+
+  // Close confirmation modal
+  const handleCancel = () => {
+    setShowConfirmModal(false);
+    setPendingAction(null);
+  };
+
+  // Approve / Reject Handler - executed after confirmation
   const handleAction = async (action: "approve" | "reject") => {
     const tokenToUse = authToken || cookieToken;
     if (!registrationId || !tokenToUse) {
       setStatus("Authentication required. Please login first.");
+      setShowConfirmModal(false);
       return;
     }
-    setLoading(true);
+    setShowConfirmModal(false);
+
+    // Mark this approval link as used in this browser immediately
+    try {
+      const storageKey = `approval_used_${registrationId}`;
+      localStorage.setItem(storageKey, '1');
+      setLinkUsed(true);
+    } catch {}
+
+    setLoadingAction(action);
 
     try {
       const endpoint =
         action === "approve" ? "/api/user/approve" : "/api/user/reject";
 
-      const response = await apiService.post<{ detail?: string; message?: string }>(
+      await apiService.post<{ detail?: string; message?: string }>(
         endpoint,
         { registration_id: registrationId }
       );
 
-      setStatus(response.detail || response.message || "Action completed successfully");
+      // Format status message based on action
+      const userEmail = userInfo?.email || "user";
+      const statusMessage = action === "approve"
+        ? `User registration request approved for ${userEmail}`
+        : `User registration request rejected for ${userEmail}`;
+
+      setStatus(statusMessage);
+      setLastAction(action);
       setCompleted(true);
       // After successful approval or rejection, navigate to dashboard
       setTimeout(() => {
@@ -90,7 +129,7 @@ const ApprovalScreen: React.FC = () => {
         setStatus(err.message || "An error occurred");
       }
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
@@ -118,8 +157,55 @@ const ApprovalScreen: React.FC = () => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  // If this approval link was used before (in this browser), block revisiting
+  if (linkUsed && !completed) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
-    <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
+    <>
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-gray-700 mb-4">
+              Confirm {pendingAction === "approve" ? "Approval" : "Rejection"}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {pendingAction === "approve" ? "approve" : "reject"} the registration request for{" "}
+              <span className="font-medium text-gray-800">
+                {userInfo?.first_name} {userInfo?.last_name}
+              </span>
+              {userInfo?.email && (
+                <span className="text-gray-600"> ({userInfo.email})</span>
+              )}
+              ?
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                className="px-6 py-2 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition hover:bg-[#E8D4F0]"
+                onClick={handleCancel}
+                disabled={loadingAction !== null}
+              >
+                Cancel
+              </button>
+              <button
+                className={`px-6 py-2 rounded-md font-medium transition disabled:opacity-50 ${
+                  pendingAction === "approve"
+                    ? "bg-[#8b2a96] text-white hover:bg-[#7a247e]"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                }`}
+                onClick={() => pendingAction && handleAction(pendingAction)}
+                disabled={loadingAction !== null}
+              >
+                Confirm {pendingAction === "approve" ? "Approval" : "Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
 {/* Left Section */}
 <aside
                 className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden 
@@ -206,34 +292,52 @@ const ApprovalScreen: React.FC = () => {
             </div>
           )}
 
-          {/* Action Buttons */}
+          {/* Action Buttons or Success Card */}
           <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
             {!completed && (
               <div className="flex gap-4 justify-center">
                 <button
                   className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
-                  onClick={() => handleAction("approve")}
-                  disabled={loading}
+                  onClick={() => handleButtonClick("approve")}
+                  disabled={loadingAction !== null}
                 >
-                  {loading ? "Processing..." : "Approve"}
+                  Approve
                 </button>
                 <button
                   className="w-full py-3 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition disabled:opacity-50"
-                  onClick={() => handleAction("reject")}
-                  disabled={loading}
+                  onClick={() => handleButtonClick("reject")}
+                  disabled={loadingAction !== null}
                 >
-                  {loading ? "Processing..." : "Reject"}
+                  Reject
                 </button>
               </div>
             )}
-
-            {status && (
-              <p className="mt-4 text-center text-gray-800 font-medium">{status}</p>
+            {completed && (
+              <div className="flex flex-col items-center">
+                <div className="flex justify-center mb-4">
+                  <div className={`w-8 h-8 ${lastAction === 'reject' ? 'bg-red-500' : 'bg-green-500'} rounded-lg flex items-center justify-center`}>
+                    {lastAction === 'reject' ? (
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    ) : (
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                {status && (
+                  <p className="text-center text-gray-800 font-medium">{status}</p>
+                )}
+              </div>
             )}
+
           </div>
         </div>
       </main>
     </div>
+    </>
   );
 };
 

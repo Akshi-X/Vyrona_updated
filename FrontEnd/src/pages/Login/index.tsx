@@ -210,7 +210,7 @@ const Login: React.FC = () => {
                                 <span className="text-gray-700 font-medium">Remember me</span>
                             </label>
                             <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
-                                Forgot password ?
+                                Forgot password?
                             </Link>
                         </div>
 
