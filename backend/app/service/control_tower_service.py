@@ -15,6 +15,7 @@ from ..models.patient_model import Patient
 from ..models.pharma_model import Pharma
 from ..models.provider_model import Provider
 from ..models.carrier_model import Carrier
+from ..models.shipment_leg_model import ShipmentLeg
 from ..constants.enums import PatientStage, RouteStatus
 
 logger = logging.getLogger(__name__)
@@ -233,8 +234,9 @@ class ControlTowerService:
                 # Machine-friendly status should match DB enum values exactly
                 route_status = shipment.routes_status.value if shipment.routes_status else "unknown"
                 
-                # Format route as "Source → Destination"
-                route = f"{shipment.source_location} → {shipment.destination_location}"
+                # Keep source and destination separately for clarity
+                source_location = shipment.source_location
+                destination_location = shipment.destination_location
                 
                 # Start date from departure_time (fallback to updated_at date when missing)
                 start_date = None
@@ -249,13 +251,26 @@ class ControlTowerService:
                 # Get carrier name (from Carrier table, or Provider name, or mode_of_transport as fallback)
                 carrier = carrier_name if carrier_name else (provider_name if provider_name else shipment.mode_of_transport)
                 
+                # Collect unique carriers from shipment legs
+                leg_carrier_rows = self.db.query(Carrier.name).join(
+                    ShipmentLeg, ShipmentLeg.carrier_id == Carrier.id
+                ).filter(
+                    ShipmentLeg.shipment_id == shipment.id,
+                    Carrier.name.isnot(None)
+                ).distinct().all()
+                carriers = [row[0] for row in leg_carrier_rows]
+                # Fallback to shipment-level carrier if no leg carriers found
+                if not carriers and carrier:
+                    carriers = [carrier]
+                
                 route_data = {
                     "patient_id": shipment.patient_id,
-                    "route": route,
+                    "source": source_location,
+                    "destination": destination_location,
                     "route_status": route_status,
                     "start_date": start_date,
                     "transit_days": transit_days,
-                    "carrier": carrier,
+                    "carriers": carriers,
                     "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None
                 }
                 
