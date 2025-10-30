@@ -2,8 +2,8 @@ import React from 'react';
 
 export default function NonComplianceCard() {
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-      <h3 className="font-semibold text-black text-sm mb-2">Non-Compliance</h3>
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[270px] w-[200px]">
+      <h3 className="font-bold text-black text-[14px] mb-3">Non-Compliance</h3>
       <div className="flex items-center gap-4">
         <div className="relative">
           <svg viewBox="0 0 120 120" className="w-28 h-28">

@@ -9,18 +9,18 @@ export default function HistoricLaneRiskAssessment() {
   }));
 
   return (
-    <div className="bg-white rounded-lg p-4">
-      <h3 className="font-semibold text-black text-sm mb-2">Historic Lane Risk Assessment</h3>
+    <div className="bg-white rounded-lg">
+      <h3 className="font-bold text-black text-[16px] mb-3">Historic Lane Risk Assessment</h3>
       <div className="overflow-x-auto rounded-lg ">
-        <table className="w-full text-xs">
-          <thead className="bg-[#F6ECFF] text-[#6b1176] text-[12px]">
+        <table className="w-full text-xs border border-[#E7E1E1] sticky top-0 h-[320px]">
+          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px]">
             <tr>
-              <th className="px-4 py-5 text-left">Route</th>
-              <th className="px-4 py-5 text-left">Quality Deviations</th>
-              <th className="px-4 py-5 text-left">Returns & Regulatory</th>
-              <th className="px-4 py-5 text-left">Loss/Physical Damage</th>
-              <th className="px-4 py-5 text-left">3PL Reliability</th>
-              <th className="px-4 py-5 text-left">Weather</th>
+              <th className="px-4 py-5 text-left font-[600]">Route</th>
+              <th className="px-4 py-5 text-left font-[600]">Quality Deviations</th>
+              <th className="px-4 py-5 text-left font-[600]">Returns & Regulatory</th>
+              <th className="px-4 py-5 text-left font-[600]">Loss/Physical Damage</th>
+              <th className="px-4 py-5 text-left font-[600]">3PL Reliability</th>
+              <th className="px-4 py-5 text-left font-[600]">Weather</th>
             </tr>
           </thead>
           <tbody>
