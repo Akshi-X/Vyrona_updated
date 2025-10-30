@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import MyGrapeLogo from "../../assets/logo.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
@@ -18,11 +18,23 @@ const VerifyOtp: React.FC = () => {
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
     const [timer, setTimer] = useState<number | null>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Helper function to clear the timer interval
+    const clearTimer = () => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    };
 
     // Removed API_BASE_URL - now using authService
 
     // Countdown for OTP Expiry (if backend sends expiry in ISO)
     useEffect(() => {
+        // Clear any existing interval
+        clearTimer();
+
         if (otpExpiry) {
             const expiry = new Date(otpExpiry).getTime();
             const now = new Date().getTime();
@@ -33,22 +45,30 @@ const VerifyOtp: React.FC = () => {
                 const currentTime = new Date().getTime();
                 const remaining = Math.max(0, Math.floor((expiry - currentTime) / 1000));
                 setTimer(remaining);
-                if (remaining <= 0) clearInterval(interval);
+                if (remaining <= 0) {
+                    clearTimer();
+                }
             }, 1000);
-            return () => clearInterval(interval);
+            intervalRef.current = interval;
+            return () => {
+                clearTimer();
+            };
         } else {
             // If no expiry provided, set a default timer (e.g., 5 minutes)
             setTimer(300); // 5 minutes default
             const interval = setInterval(() => {
                 setTimer(prev => {
                     if (prev === null || prev <= 1) {
-                        clearInterval(interval);
+                        clearTimer();
                         return 0;
                     }
                     return prev - 1;
                 });
             }, 1000);
-            return () => clearInterval(interval);
+            intervalRef.current = interval;
+            return () => {
+                clearTimer();
+            };
         }
     }, [otpExpiry]);
 
@@ -71,6 +91,8 @@ const VerifyOtp: React.FC = () => {
 
             if (response.status === "Logged In") {
                 setSuccess("OTP verified successfully!");
+                // Stop the timer when verification is successful
+                clearTimer();
                 // Save auth token using context
                 if (response.auth_token) {
                     // Set token with proper expiration (1 hour for non-remember me)

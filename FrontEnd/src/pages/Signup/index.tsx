@@ -363,8 +363,8 @@ const Signup: React.FC = () => {
                                             className={`text-[10px] mt-1 ${password && !validatePassword(password) ? "text-red-500" : "text-[#9a9a9a]"
                                                 }`}
                                         >
-                                            Use at least 8 characters, including a number, an
-                                            <br /> uppercase letter, and a special symbol
+                                            Use at least 8 characters, including uppercase 
+                                            <br />and lowercase letters, a number, and a special character.
                                         </p>
                                     </div>
 
