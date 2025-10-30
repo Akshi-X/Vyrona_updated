@@ -268,14 +268,14 @@ export default function TrackPage() {
           </div>
 
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
             <ComplianceCard />
             <NonComplianceCard />
             <TransportTimeComparison />
           </div>
 
           {/* Audit Trail / Frequently Missed Docs / Risk */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
             <AuditTrailTable />
             <FrequentlyMissedDocs />
             <RiskPanel />
