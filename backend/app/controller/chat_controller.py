@@ -11,7 +11,7 @@ from app.schemas.chat_schema import (
 from app.service.chat_service import (
     create_chat_message, get_patient_messages, get_unread_messages
 )
-from app.dependencies.auth_dependencies import get_current_user
+from app.dependencies.auth_dependencies import get_current_user, get_pharma_id_from_request
 from app.models import user_model
 from app.exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
@@ -44,7 +44,14 @@ def send_chat_message(
 ):
     """Send a chat message for a specific patient"""
     try:
-        result = create_chat_message(request, current_user.user_id, db)
+        sender_name = f"{current_user.first_name} {current_user.last_name}"
+        result = create_chat_message(
+            request,
+            current_user.user_id,
+            current_user.pharma_id,
+            sender_name,
+            db
+        )
         return result
     except ChatMessageCreateFailedException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
@@ -74,11 +81,12 @@ def send_chat_message(
 def get_patient_chat_messages(
     patient_id: str = Path(..., description="Patient ID"),
     db: Session = Depends(database.get_db),
-    current_user: user_model.User = Depends(get_current_user)
+    current_user: user_model.User = Depends(get_current_user),
+    pharma_id: int = Depends(get_pharma_id_from_request)
 ):
     """Get all messages for a specific patient and mark them as read"""
     try:
-        result = get_patient_messages(patient_id, current_user.user_id, db)
+        result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
         return result
     except ChatPatientNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
@@ -103,11 +111,12 @@ def get_patient_chat_messages(
     """)
 def get_user_unread_messages(
     db: Session = Depends(database.get_db),
-    current_user: user_model.User = Depends(get_current_user)
+    current_user: user_model.User = Depends(get_current_user),
+    pharma_id: int = Depends(get_pharma_id_from_request)
 ):
     """Get all unread messages for the current user"""
     try:
-        result = get_unread_messages(current_user.user_id, db)
+        result = get_unread_messages(current_user.user_id, pharma_id, db)
         return result
     except ChatUserNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
