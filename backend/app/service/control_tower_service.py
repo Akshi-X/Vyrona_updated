@@ -27,19 +27,23 @@ class ControlTowerService:
     def __init__(self, db: Session):
         self.db = db
     
-    def update_patient_stage_on_shipment_failure(self, shipment: Shipment) -> None:
+    
+
+    def update_patient_stage_on_shipment_leg_failure(self, shipment_leg_id: int) -> None:
         """
-        Update PatientStage.is_success to False when shipment routes_status is FAILED.
-        This should be called whenever a shipment's routes_status changes to FAILED.
-        
-        Args:
-            shipment: The shipment object with routes_status = FAILED
+        When a shipment leg fails, mark the active TRANSPORTATION stage as unsuccessful for the patient.
         """
         try:
-            if shipment.routes_status != RouteStatus.FAILED:
+            leg = self.db.query(ShipmentLeg).filter(ShipmentLeg.id == shipment_leg_id).first()
+            if not leg:
                 return
-            
-            # Find the active TRANSPORTATION stage for this patient
+            shipment = self.db.query(Shipment).filter(Shipment.id == leg.shipment_id).first()
+            if not shipment:
+                return
+
+            if leg.leg_status != RouteStatus.FAILED:
+                return
+
             active_stage = self.db.query(PatientStageModel).filter(
                 and_(
                     PatientStageModel.patient_id == shipment.patient_id,
@@ -47,22 +51,17 @@ class ControlTowerService:
                     PatientStageModel.is_active == True
                 )
             ).first()
-            
+
             if active_stage:
-                # Mark the stage as failed (not successful)
                 active_stage.is_success = False
-                active_stage.is_active = False  # Mark as inactive
+                active_stage.is_active = False
                 active_stage.end_time = datetime.now(timezone.utc)
                 active_stage.updated_at = datetime.now(timezone.utc)
-                
                 self.db.commit()
-                logger.info(f"Updated PatientStage.is_success=False for patient {shipment.patient_id} due to shipment failure")
-            else:
-                logger.warning(f"No active TRANSPORTATION stage found for patient {shipment.patient_id} when shipment failed")
-                
+                logger.info(f"Marked patient {shipment.patient_id} stage unsuccessful due to leg {shipment_leg_id} failure")
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Error updating PatientStage on shipment failure: {str(e)}")
+            logger.error(f"Error updating patient stage on leg failure: {str(e)}")
             raise
     
     def get_real_time_metrics(self, pharma_id: Optional[int] = None) -> Dict[str, Any]:
