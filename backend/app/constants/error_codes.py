@@ -73,6 +73,8 @@ ERROR_CODES = {
     "INVALID_ROLE": "ERR_2005",
     "REGISTRATION_DB_ERROR": "ERR_2006",
     "REGISTRATION_EMAIL_FAILED": "ERR_2007",
+    "COMPANY_NOT_FOUND": "ERR_2008",
+    "NO_PHARMA_ADMIN": "ERR_2009",
     
     # ============================================
     # USER MANAGEMENT (3xxx)

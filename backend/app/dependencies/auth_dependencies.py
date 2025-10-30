@@ -59,33 +59,71 @@ def get_current_user(request: Request) -> User:
     return request.state.current_user
 
 
-def get_current_user_pharma_id(request: Request, db: Session = Depends(get_db)) -> int:
+def get_current_user_pharma_id(request: Request) -> int:
     """
-    Get pharma_id for the current authenticated user.
+    Get pharma_id for the current authenticated user from JWT token.
     
-    This automatically resolves the pharma_id from the user's company_name.
-    Use this in endpoints that need pharma_id but don't want to require it as a parameter.
+    This extracts pharma_id directly from the token payload, eliminating
+    the need for a database query. This is safe because pharma_id is
+    immutable for each user in our architecture.
     
     Usage:
         @router.get("/ongoing")
         def get_ongoing(pharma_id: int = Depends(get_current_user_pharma_id)):
             return get_patients_summary(pharma_id)
     """
-    from ..utils.utils import get_pharma_id_by_company_name
-    from ..exceptions import UserNotFoundException
+    from ..auth.auth import verify_token
+    from ..exceptions import InvalidTokenException, UserNotFoundException
     
-    # Get current user
-    current_user = get_current_user(request)
+    # First try to get from request state (set by middleware)
+    if hasattr(request.state, "pharma_id") and request.state.pharma_id is not None:
+        return request.state.pharma_id
     
-    # Get pharma_id from user's company_name
-    pharma_id = get_pharma_id_by_company_name(current_user.company_name, db)
+    # Fallback: Extract token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise InvalidTokenException()
+    
+    # Parse Authorization header (format: "Bearer <token>")
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise InvalidTokenException()
+    
+    token = parts[1]
+    
+    # Verify token and get payload
+    payload = verify_token(token)
+    
+    # Extract pharma_id from token payload
+    pharma_id = payload.get("pharma_id")
     
     if pharma_id is None:
         raise UserNotFoundException(
-            message=f"No pharma company found for user's company: {current_user.company_name}"
+            user_id="unknown"
         )
     
     return pharma_id
+
+
+def get_pharma_id_from_request(request: Request) -> int:
+    """
+    Get pharma_id from request state (set by middleware).
+    
+    This is a lightweight alternative to get_current_user_pharma_id
+    when you know the middleware has already processed the token.
+    
+    Usage:
+        @router.get("/patients")
+        def get_patients(request: Request):
+            pharma_id = get_pharma_id_from_request(request)
+            return get_patients_by_pharma(pharma_id)
+    """
+    if not hasattr(request.state, "pharma_id") or request.state.pharma_id is None:
+        raise UserNotFoundException(
+            user_id="unknown"
+        )
+    
+    return request.state.pharma_id
 
 
 def validate_login_request(email: str, password: str, db: Session) -> User:
