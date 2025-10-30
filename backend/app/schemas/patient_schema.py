@@ -109,3 +109,12 @@ class PatientDetailedResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# --------------------------------------------
+# Single-patient stage lookup response
+# --------------------------------------------
+class PatientStageResponse(BaseModel):
+    """Schema for current stage of a patient"""
+    patient_id: str
+    stage: Optional[PatientStage] = None

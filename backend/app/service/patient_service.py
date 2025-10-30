@@ -11,7 +11,8 @@ from app.schemas.patient_schema import (
     PatientCreateResponse,
     PharmaStatisticsResponse,
     PatientSummaryResponse,
-    PatientDetailedResponse
+    PatientDetailedResponse,
+    PatientStageResponse
 )
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
@@ -370,3 +371,41 @@ class PatientService:
             
         except Exception as e:
             raise PatientServiceError("get_patients_detailed", f"Failed to get patients detailed: {str(e)}")
+
+    def get_patient_current_stage(self, patient_id: str, pharma_id: int) -> PatientStageResponse:
+        """Return the current stage for a patient from process_phase table.
+
+        Verifies the patient belongs to the provided pharma_id, then fetches
+        the active stage. If no active stage exists, returns the latest stage
+        by start_time. If no stages exist, stage is None.
+        """
+        try:
+            # Ensure patient exists and belongs to pharma
+            patient = self.db.query(Patient).filter(
+                and_(Patient.id == patient_id, Patient.pharma_id == pharma_id)
+            ).first()
+            if not patient:
+                raise PatientNotFoundError(patient_id)
+
+            # Prefer active stage; otherwise latest stage by start_time
+            active_stage = self.db.query(PatientStage).filter(
+                and_(
+                    PatientStage.patient_id == patient_id,
+                    PatientStage.is_active == True
+                )
+            ).order_by(desc(PatientStage.start_time)).first()
+
+            stage_row = active_stage
+            if not stage_row:
+                stage_row = self.db.query(PatientStage).filter(
+                    PatientStage.patient_id == patient_id
+                ).order_by(desc(PatientStage.start_time)).first()
+
+            return PatientStageResponse(
+                patient_id=patient_id,
+                stage=stage_row.stage if stage_row else None
+            )
+        except PatientNotFoundError:
+            raise
+        except Exception as e:
+            raise PatientServiceError("get_patient_current_stage", f"Failed to get patient stage: {str(e)}")
