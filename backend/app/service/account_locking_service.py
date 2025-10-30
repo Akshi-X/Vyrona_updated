@@ -27,10 +27,12 @@ def check_account_lock_status(user: User, db: Session) -> None:
     
     current_time = datetime.now(timezone.utc)
     
-    # Make lock_expiry timezone-aware if it's naive
+    # Normalize lock_expiry timezone
     lock_expiry = user.lock_expiry
     if lock_expiry and lock_expiry.tzinfo is None:
-        lock_expiry = lock_expiry.replace(tzinfo=timezone.utc)
+        # Interpret legacy naive timestamps as local time, then convert to UTC
+        local_tz = datetime.now().astimezone().tzinfo
+        lock_expiry = lock_expiry.replace(tzinfo=local_tz).astimezone(timezone.utc)
     
     # Check if lock has expired
     if lock_expiry and current_time >= lock_expiry:
@@ -139,9 +141,10 @@ def is_account_locked(user: User) -> bool:
     if user.lock_expiry:
         current_time = datetime.now(timezone.utc)
         lock_expiry = user.lock_expiry
-        # Make timezone-aware if naive
+        # Normalize timezone if naive (assume local, convert to UTC)
         if lock_expiry.tzinfo is None:
-            lock_expiry = lock_expiry.replace(tzinfo=timezone.utc)
+            local_tz = datetime.now().astimezone().tzinfo
+            lock_expiry = lock_expiry.replace(tzinfo=local_tz).astimezone(timezone.utc)
         return current_time < lock_expiry
     
     return True
