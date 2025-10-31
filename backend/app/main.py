@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller,control_tower_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -157,7 +157,7 @@ app.include_router(feedback_controller.router, prefix=API_PREFIX)
 app.include_router(task_controller.router, prefix=API_PREFIX)
 app.include_router(dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(chat_controller.router, prefix=API_PREFIX)
-app.include_router(control_tower_controller.router, prefix=API_PREFIX)
+app.include_router(shipment_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint

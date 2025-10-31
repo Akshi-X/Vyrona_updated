@@ -31,10 +31,7 @@ class Patient(Base):
     # References (Foreign Keys)
     provider_id = Column(String, ForeignKey("provider.id"), nullable=True)
     pharma_id = Column(Integer, ForeignKey("pharma.id"), nullable=True)
-    
-    # Stage and Status Information (database columns exist but not in original model)
-    stage = Column(String, nullable=True)
-    treatment_status = Column(String, nullable=True)
+
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
