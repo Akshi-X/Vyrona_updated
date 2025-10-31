@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from datetime import datetime
 
 from ..exceptions.custom_exceptions import AppException
+from ..exceptions.patient_exceptions import PatientException
 from ..constants.error_codes import ERROR_CODES
 from ..constants.status_constants import STATUS_FAILED
 from ..constants.messages import ErrorMessages
@@ -46,12 +47,34 @@ async def exception_handler_middleware(request: Request, call_next):
                 "method": request.method
             }
         )
-        
         return JSONResponse(
             status_code=exc.status_code,
             content=exc.to_dict()
         )
-        
+
+    except PatientException as exc:
+        # Handle patient-specific exceptions
+        logger.error(
+            f"PatientException: {exc.error_code} - {exc.message}",
+            extra={
+                "error_code": exc.error_code,
+                "status_code": exc.status_code,
+                "details": exc.details,
+                "path": request.url.path,
+                "method": request.method
+            }
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "status": STATUS_FAILED,
+                "timestamp": datetime.utcnow().isoformat(),
+                **exc.details
+            }
+        )
+
     except ValidationError as exc:
         # Handle Pydantic validation errors
         logger.warning(
@@ -147,10 +170,37 @@ def setup_exception_handlers(app):
                 "method": request.method
             }
         )
-        
         return JSONResponse(
             status_code=exc.status_code,
             content=exc.to_dict(),
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+
+    @app.exception_handler(PatientException)
+    async def patient_exception_handler(request: Request, exc: PatientException):
+        """Handle patient domain exceptions"""
+        logger.error(
+            f"PatientException: {exc.error_code} - {exc.message}",
+            extra={
+                "error_code": exc.error_code,
+                "path": request.url.path,
+                "method": request.method
+            }
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "status": STATUS_FAILED,
+                "timestamp": datetime.utcnow().isoformat(),
+                **exc.details
+            },
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Credentials": "true",

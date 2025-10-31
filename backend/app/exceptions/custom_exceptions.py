@@ -1169,7 +1169,9 @@ class TaskManagerOnlyException(TaskException):
 
 class ChatException(AppException):
     """Base exception for chat-related errors"""
-    pass
+    def __init__(self, message: str, error_code: str, status_code: int = 400, **kwargs):
+        # Forward extra keyword args as structured details
+        super().__init__(message, error_code, status_code, kwargs)
 
 
 class ChatMessageCreateFailedException(ChatException):
