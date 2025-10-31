@@ -67,7 +67,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
                   <p className="text-xs text-gray-500">{chat.patientId}</p>
                 </div>
               </div>
-              <p className="text-sm text-purple-800 flex-1 text-left chat-msg-2line" title={chat.message}>
+              <p className="text-sm text-black flex-1 text-left chat-msg-2line ml-4" title={chat.message}>
                 {chat.message}
               </p>
               <span className="text-xs text-black flex-shrink-0">
