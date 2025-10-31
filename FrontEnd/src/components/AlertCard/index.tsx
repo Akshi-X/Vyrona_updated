@@ -34,14 +34,14 @@ const AlertCard: React.FC<AlertCardProps> = ({
       description={description}
       icon={icon}
     >
-      <div className="overflow-x-auto">
+      <div className="w-full">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12 h-[300px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
             <span className="ml-3 text-gray-600">{loadingText}</span>
           </div>
         ) : dataLength === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 h-[300px] flex flex-col items-center justify-center">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -50,8 +50,18 @@ const AlertCard: React.FC<AlertCardProps> = ({
             <p className="text-gray-500 text-lg">{emptyText}</p>
           </div>
         ) : (
-          <div className="w-full">
-            {children}
+          <div className="w-full h-[300px] overflow-x-hidden relative">
+            <div className="overflow-y-auto h-full">
+              <style>{`
+                .alert-card-table thead {
+                  position: sticky;
+                  top: 0;
+                  z-index: 10;
+                  background-color: rgb(250 245 255);
+                }
+              `}</style>
+              {children}
+            </div>
           </div>
         )}
       </div>
