@@ -15,7 +15,6 @@ class Shipment(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Shipment Information
-    mode_of_transport = Column(String, nullable=False)
     source_location = Column(String, nullable=False)
     destination_location = Column(String, nullable=False)
     
@@ -23,6 +22,7 @@ class Shipment(Base):
     departure_time = Column(DateTime, nullable=True)
     arrival_time = Column(DateTime, nullable=True)
     handover_time = Column(DateTime, nullable=True)
+    scheduled_time = Column(DateTime, nullable=True)
     
     # Quality and Status (Aggregated from legs)
     overall_quality_loss = Column(Float, nullable=True)  # Aggregated from all legs
@@ -34,18 +34,18 @@ class Shipment(Base):
     transportation_success = Column(Boolean, nullable=True)  # True/False/None (pending)
     
     # Loss/Physical Damage Tracking (Shipment Level)
-    physical_damage_reported = Column(Boolean, default=False, nullable=False)
-    damage_incidents_count = Column(Integer, default=0, nullable=False)  # Total damage incidents
-    lost_shipment = Column(Boolean, default=False, nullable=False)
-    theft_incident = Column(Boolean, default=False, nullable=False)
+    # physical_damage_reported = Column(Boolean, default=False, nullable=False)
+    # damage_incidents_count = Column(Integer, default=0, nullable=False)  # Total damage incidents
+    # lost_shipment = Column(Boolean, default=False, nullable=False)
+    # theft_incident = Column(Boolean, default=False, nullable=False)
     
-    # Lane Complexity Tracking
-    total_carrier_handovers = Column(Integer, nullable=True)  # Number of legs/handovers
-    complexity_score = Column(Float, nullable=True)  # Calculated complexity score
+    # # Lane Complexity Tracking
+    # total_carrier_handovers = Column(Integer, nullable=True)  # Number of legs/handovers
+    # complexity_score = Column(Float, nullable=True)  # Calculated complexity score
     
-    # Regulatory Clearance Status
-    regulatory_clearance_required = Column(Boolean, default=False, nullable=False)
-    regulatory_clearance_status = Column(String, nullable=True)  # pending, approved, rejected
+    # # Regulatory Clearance Status
+    # regulatory_clearance_required = Column(Boolean, default=False, nullable=False)
+    # regulatory_clearance_status = Column(String, nullable=True)  # pending, approved, rejected
     
     # Foreign Keys
     patient_id = Column(String, ForeignKey("patient.id", ondelete="CASCADE"), nullable=False)

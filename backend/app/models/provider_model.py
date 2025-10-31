@@ -26,17 +26,4 @@ class Provider(Base):
     # Relationships
     patients = relationship("Patient", back_populates="provider")
     pharma = relationship("Pharma", back_populates="providers")
-    
-    # Many-to-many with carriers (via ProviderCarrier junction table)
-    carrier_relationships = relationship(
-        "ProviderCarrier",
-        back_populates="provider",
-        cascade="all, delete-orphan"
-    )
-    # Convenience property to get carriers
-    carriers = relationship(
-        "Carrier",
-        secondary="provider_carrier",
-        back_populates="providers_convenience",
-        viewonly=True
-    )
+

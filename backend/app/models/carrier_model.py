@@ -27,7 +27,6 @@ class Carrier(Base):
     carrier_type = Column(String, nullable=True)  # "Air", "Ground", "Ocean", "Rail", "Mixed"
     # Global flag: Controls if this carrier is available system-wide.
     # When False: NO providers can use this carrier (e.g., carrier went out of business, lost certification, temporarily suspended).
-    # When True: Carrier is available, but individual provider relationships are controlled by ProviderCarrier.is_active
     is_active = Column(Boolean, default=True, nullable=False, comment="Global flag: Controls carrier availability system-wide. False = carrier unavailable for all providers")
     
     # Audit Trail
@@ -37,18 +36,5 @@ class Carrier(Base):
     updated_by = Column(String, nullable=True)
 
     # Relationships
-    # Many-to-many with providers (via ProviderCarrier junction table)
-    provider_relationships = relationship(
-        "ProviderCarrier",
-        back_populates="carrier",
-        cascade="all, delete-orphan"
-    )
-    # Convenience property to get providers
-    providers_convenience = relationship(
-        "Provider",
-        secondary="provider_carrier",
-        back_populates="carriers",
-        viewonly=True
-    )
     # One-to-many with shipments
     shipments = relationship("Shipment", back_populates="carrier")

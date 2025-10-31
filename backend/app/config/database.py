@@ -48,7 +48,6 @@ def init_db():
         pharma_model,
         provider_model,
         carrier_model,
-        provider_carrier_model,
         task_model,
         chat_model,
         chat_read_status,
