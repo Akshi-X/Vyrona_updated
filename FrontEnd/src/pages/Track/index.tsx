@@ -242,29 +242,14 @@ export default function TrackPage() {
 
           {/* Quality Tracking + Track and Trace */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-              <h3 className="font-semibold text-black text-sm mb-2">Quality Tracking</h3>
               <QualityTrackingChart />
-            </div>
-            <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-              <h3 className="font-semibold text-black text-sm mb-2">Track and Trace <span className="text-green-600 ml-2 text-xs">On time</span></h3>
               <TrackAndTraceMap />
-            </div>
           </div>
 
           {/* Quality Parameter + 3PL */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-black text-sm">Quality Parameter</h3>
-                <span className="text-[10px] bg-yellow-50 text-yellow-700 px-2 py-1 rounded">Quality Loss: 11.5%</span>
-              </div>
               <QualityParametersTable />
-            </div>
-            <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-              <h3 className="font-semibold text-black text-sm mb-2">3PL</h3>
               <ThreePLTable />
-            </div>
           </div>
 
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
