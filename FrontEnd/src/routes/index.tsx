@@ -9,6 +9,7 @@ import NotFound from '../pages/NotFound'
 import VerifyOtp from '../pages/Verify'
 import Dashboard from '../pages/Dashboard'
 import Database from '../pages/Database'
+import ControlTower from '../pages/ControlTower/index'
 import ApprovalScreen from '../pages/ApprovalScreen'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPassword /> },
   { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Dashboard /></RoleBasedRoute> },
   { path: '/database', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Database /></RoleBasedRoute> },
+  { path: '/control-tower', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><ControlTower /></RoleBasedRoute> },
   { path: '/track/:patientId', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><TrackPage /></RoleBasedRoute> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
