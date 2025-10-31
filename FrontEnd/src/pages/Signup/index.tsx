@@ -47,10 +47,13 @@ const Signup: React.FC = () => {
     }, []);
 
     const validateEmail = (value: string) =>
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
+        /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(value);
+        
     const validatePassword = (value: string) =>
         /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(value);
+
+    const validateName = (value: string) =>
+        /^[A-Za-z .]+$/.test(value);
 
     const roleOptions = [
         { value: "Manager", label: "Manager" },
@@ -83,13 +86,22 @@ const Signup: React.FC = () => {
         if (!firstName) {
             setFirstNameError("First Name is required");
             valid = false;
+        } else if (!validateName(firstName)) {
+            setFirstNameError("Only letters, spaces, and . are allowed");
+            valid = false;
         }
         if (!lastName) {
             setLastNameError("Last Name is required");
             valid = false;
+        } else if (!validateName(lastName)) {
+            setLastNameError("Only letters, spaces, and . are allowed");
+            valid = false;
         }
         if (!email) {
             setEmailError("Email is required");
+            valid = false;
+        } else if (/[A-Z]/.test(email)) {
+            setEmailError("Use lowercase letters only");
             valid = false;
         } else if (!validateEmail(email)) {
             setEmailError("Please enter a valid email address");
@@ -217,8 +229,12 @@ const Signup: React.FC = () => {
                                             type="text"
                                             value={firstName}
                                             onChange={(e) => {
-                                                setFirstName(e.target.value);
+                                                const value = e.target.value;
+                                                setFirstName(value);
                                                 if (firstNameError) setFirstNameError("");
+                                                if (value && !validateName(value)) {
+                                                    setFirstNameError("Only letters, spaces, and . are allowed");
+                                                }
                                             }}
                                             placeholder="First Name"
                                             className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${firstNameError ? "border-red-500" : "border-gray-300"
@@ -234,8 +250,12 @@ const Signup: React.FC = () => {
                                             type="text"
                                             value={lastName}
                                             onChange={(e) => {
-                                                setLastName(e.target.value);
+                                                const value = e.target.value;
+                                                setLastName(value);
                                                 if (lastNameError) setLastNameError("");
+                                                if (value && !validateName(value)) {
+                                                    setLastNameError("Only letters, spaces, and . are allowed");
+                                                }
                                             }}
                                             placeholder="Last Name"
                                             className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${lastNameError ? "border-red-500" : "border-gray-300"
@@ -256,7 +276,9 @@ const Signup: React.FC = () => {
                                             const value = e.target.value;
                                             setEmail(value);
                                             if (emailError) setEmailError("");
-                                            if (value && !validateEmail(value)) {
+                                            if (value && /[A-Z]/.test(value)) {
+                                                setEmailError("Use lowercase letters only");
+                                            } else if (value && !validateEmail(value)) {
                                                 setEmailError("Invalid email format");
                                             }
                                         }}

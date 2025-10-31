@@ -15,6 +15,7 @@ import { performanceService, type PerformanceMetrics } from '../../services/perf
 import { riskService, type RiskMetrics } from '../../services/riskService';
 import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
+import { userService } from '../../services/userService';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -61,6 +62,9 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTrackShipment, setShowTrackShipment] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
+
+  // User initials for avatar
+  const [userInitials, setUserInitials] = useState<string>('');
 
 
 
@@ -136,6 +140,24 @@ export default function Dashboard({ }: DashboardProps) {
   useEffect(() => {
     if (isAuthenticated) {
       fetchStakeholderChats();
+    }
+  }, [isAuthenticated]);
+
+  // Fetch user profile to compute initials
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const first = profile.first_name?.trim?.() || '';
+        const last = profile.last_name?.trim?.() || '';
+        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+        setUserInitials(initials);
+      } catch {
+        setUserInitials('U');
+      }
+    };
+    if (isAuthenticated) {
+      fetchUserProfile();
     }
   }, [isAuthenticated]);
 
@@ -269,7 +291,7 @@ export default function Dashboard({ }: DashboardProps) {
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
             >
-              <span className="text-white text-xs font-semibold">MV</span>
+              <span className="text-white text-xs font-semibold">{userInitials}</span>
             </div>
           )}
         />
