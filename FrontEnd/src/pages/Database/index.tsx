@@ -3,15 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '../../components/Sidebar';
 import { DatabaseTable } from '../../components/DatabaseTable';
 import Header from '../../components/Header';
+import { useEffect, useState } from 'react';
+import { userService } from '../../services/userService';
 
 export default function Database() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const [userInitials, setUserInitials] = useState<string>('');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const first = profile.first_name?.trim?.() || '';
+        const last = profile.last_name?.trim?.() || '';
+        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+        setUserInitials(initials);
+      } catch {
+        setUserInitials('U');
+      }
+    };
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -39,7 +59,7 @@ export default function Database() {
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
             >
-              <span className="text-white text-xs font-semibold">MV</span>
+              <span className="text-white text-xs font-semibold">{userInitials}</span>
             </div>
           )}
         />
