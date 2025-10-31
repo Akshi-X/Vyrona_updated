@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 
 from app.config.database import engine, Base, SessionLocal
 from app.models import user_model, otp_model, patient_model, pharma_model, provider_model
-from app.models.patient_stage_model import PatientStage as PatientStageModel
-from app.constants.enums import PatientStage as PatientStageEnum
 from app.models.user_model import User
 from app.auth.auth import get_password_hash
 from app.config.config import settings
@@ -245,75 +243,5 @@ def init_db():
     # Create MyGrape platform admin if not exists
     create_mygrape_admin()
     
-    # Backfill process_phase table from existing patients (idempotent)
-    _backfill_process_phase_from_patients()
-    
     logger.info("Database initialization complete")
     logger.info("=" * 60)
-
-
-def _backfill_process_phase_from_patients():
-    """
-    Create an initial active process_phase row per patient if none exists.
-    - stage: taken from patient.stage if it matches known stages, else defaults to Scheduled
-    - is_active: True by default for ongoing, False if patient.treatment_status indicates completion/failure
-    - is_success: True for after_care, False for failure, None otherwise
-    This function is idempotent: patients with any existing stage_history are skipped.
-    """
-    db = SessionLocal()
-    created_count = 0
-    try:
-        patients = db.query(patient_model.Patient).all()
-        stage_values = set(PatientStageEnum.list())
-
-        for p in patients:
-            # Skip if any stage history exists
-            existing = (
-                db.query(PatientStageModel)
-                .filter(PatientStageModel.patient_id == p.id)
-                .first()
-            )
-            if existing:
-                continue
-
-            # Determine stage
-            stage_value = p.stage if p.stage in stage_values else PatientStageEnum.SCHEDULED.value
-
-            # Determine is_success from legacy treatment_status
-            is_success = None
-            is_active = True
-            if p.treatment_status is not None:
-                ts = str(p.treatment_status).lower()
-                if ts == "failure":
-                    is_success = False
-                    is_active = False
-                elif ts == "after_care":
-                    is_success = True
-                    is_active = False
-                else:
-                    # ongoing or unknown -> keep active
-                    is_success = None
-                    is_active = True
-
-            new_stage = PatientStageModel(
-                patient_id=p.id,
-                stage=stage_value,
-                is_active=is_active,
-                is_success=is_success,
-                created_by="system",
-                updated_by="system",
-            )
-            db.add(new_stage)
-            created_count += 1
-
-        if created_count:
-            db.commit()
-            logger.info(f"Backfill: created {created_count} process_phase row(s)")
-        else:
-            logger.info("Backfill: no process_phase rows needed (already populated)")
-    except Exception as e:
-        db.rollback()
-        logger.error(f"ERROR backfilling process_phase: {str(e)}", exc_info=True)
-    finally:
-        db.close()
-
