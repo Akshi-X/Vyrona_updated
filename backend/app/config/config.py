@@ -48,13 +48,11 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     RELOAD: bool = True
-    # URLs - MUST be provided in .env file
-    FRONTEND_URL: str
-    BACKEND_URL: str
-    # CORS - MUST be provided in .env file
-    # Can be comma-separated list: "http://localhost:5173,http://localhost:3000"
-    # Or "*" for all origins (not recommended for production)
-    ALLOWED_ORIGINS: str
+    # URLs
+    FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_URL: str = "http://localhost:8000"
+    # CORS
+    ALLOWED_ORIGINS: str = "*"
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================
@@ -118,4 +116,3 @@ def get_settings() -> Settings:
  
 # Global settings instance
 settings = get_settings()
- 

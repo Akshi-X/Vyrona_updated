@@ -356,7 +356,11 @@ export default function Dashboard({ }: DashboardProps) {
                           Cold Chain Packaging Failure
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : logisticsMetrics?.cold_chain_packaging_failure_percentage?.toFixed(1) + '%' || '0%'}
+                          {loading
+                            ? '...'
+                            : logisticsMetrics?.cold_chain_packaging_failure_percentage != null
+                              ? `${logisticsMetrics.cold_chain_packaging_failure_percentage.toFixed(1)}%`
+                              : '0%'}
                         </div>
                       </div>
                     </div>
@@ -375,7 +379,11 @@ export default function Dashboard({ }: DashboardProps) {
                           Avg Quality Lost/Patient
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : logisticsMetrics?.avg_quality_lost_per_patient_percentage + '%' || '0%'}
+                          {loading
+                            ? '...'
+                            : logisticsMetrics?.avg_quality_lost_per_patient_percentage != null
+                              ? `${logisticsMetrics.avg_quality_lost_per_patient_percentage}%`
+                              : '0%'}
                         </div>
                       </div>
                     </div>
@@ -405,7 +413,11 @@ export default function Dashboard({ }: DashboardProps) {
                           On Time:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : performanceMetrics?.on_time_percentage + '%' || '0%'}
+                          {loading
+                            ? '...'
+                            : performanceMetrics?.on_time_percentage != null
+                              ? `${performanceMetrics.on_time_percentage}%`
+                              : '0%'}
                         </div>
                       </div>
                     </div>
@@ -424,7 +436,11 @@ export default function Dashboard({ }: DashboardProps) {
                           Avg Lead time:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : performanceMetrics?.avg_lead_time_days + 'd' || '0d'}
+                          {loading
+                            ? '...'
+                            : performanceMetrics?.avg_lead_time_days != null
+                              ? `${performanceMetrics.avg_lead_time_days}d`
+                              : '0d'}
                         </div>
                       </div>
                     </div>
@@ -443,7 +459,11 @@ export default function Dashboard({ }: DashboardProps) {
                           Failure Cost:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : '$' + performanceMetrics?.failure_cost_million + 'M' || '$0M'}
+                          {loading
+                            ? '...'
+                            : performanceMetrics?.failure_cost_million != null
+                              ? `$${performanceMetrics.failure_cost_million}M`
+                              : '$0M'}
                         </div>
                       </div>
                     </div>
