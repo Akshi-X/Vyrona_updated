@@ -43,9 +43,9 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
       <table className="w-full divide-y divide-gray-200">
         <thead className="bg-purple-50">
           <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Patient ID</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Type</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Severity</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Patient ID</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Message</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Timestamp</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Status</th>
@@ -54,6 +54,9 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {alerts.map((alert) => (
             <tr key={alert.id} className="hover:bg-gray-50">
+              <td className="px-4 py-4 text-sm text-gray-900 font-mono truncate">
+                {alert.patientId}
+              </td>
               <td className="px-4 py-4 text-sm font-medium text-gray-900 truncate">
                 {alert.type}
               </td>
@@ -66,9 +69,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 }`}>
                   {alert.severity}
                 </span>
-              </td>
-              <td className="px-4 py-4 text-sm text-gray-900 font-mono truncate">
-                {alert.patientId}
               </td>
               <td className="px-4 py-4 text-sm text-gray-900">
                 <div className="truncate" title={alert.message}>{alert.message}</div>
