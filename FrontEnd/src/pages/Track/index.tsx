@@ -32,6 +32,7 @@ import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
+import { userService } from '../../services/userService';
 
 export default function TrackPage() {
   const { patientId } = useParams();
@@ -46,6 +47,7 @@ export default function TrackPage() {
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [userInitials, setUserInitials] = useState<string>('');
 
   const stakeholderChats = [
     { id: '1', sender: 'Dr. Sarah Johnson', patientId: `Patient ID : ${patientId}`, message: 'Need update on patient transport status', timestamp: '2024-05-28 14:20', isRead: false },
@@ -85,6 +87,21 @@ export default function TrackPage() {
     fetchMyTasks();
   }, []);
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const first = profile.first_name?.trim?.() || '';
+        const last = profile.last_name?.trim?.() || '';
+        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+        setUserInitials(initials);
+      } catch {
+        setUserInitials('U');
+      }
+    };
+    fetchUserProfile();
+  }, []);
+
   const transformedTasks: MyTask[] = myTasks.map(task => ({
     id: task.id.toString(),
     patientId: task.patient_id || 'N/A',
@@ -104,7 +121,7 @@ export default function TrackPage() {
         <header className="h-[63px] bg-black flex items-center justify-end px-6 gap-6 flex-shrink-0">
           {/* Avatar only on the black bar */}
           <div className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-semibold">MV</span>
+            <span className="text-white text-xs font-semibold">{userInitials}</span>
           </div>
         </header>
 
