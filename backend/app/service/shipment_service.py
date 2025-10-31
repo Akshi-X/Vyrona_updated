@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from ..models.shipment_model import Shipment
 from ..models.patient_stage_model import PatientStage as PatientStageModel
@@ -471,5 +471,226 @@ class ShipmentService:
         except Exception as e:
             logger.error(f"Error fetching transport time comparison: {str(e)}")
             raise
+    
+    def get_patient_journey_summary(
+        self, 
+        patient_id: str, 
+        pharma_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Get complete patient journey summary including:
+        - Leg 1: Hospital to Pharma Manufacturing Site
+        - Reengineering/Manufacturing phase
+        - Leg 2: Pharma to Hospital
+        - Current status
+        
+        Args:
+            patient_id: Patient ID
+            pharma_id: Optional pharma ID for filtering
+            
+        Returns:
+            PatientJourneySummaryResponse with complete journey details
+        """
+        try:
+            # Get patient information
+            patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+            if not patient:
+                raise ValueError(f"Patient {patient_id} not found")
+            
+            if pharma_id and patient.pharma_id != pharma_id:
+                raise ValueError(f"Patient {patient_id} does not belong to pharma {pharma_id}")
+            
+            # Get all shipments for this patient
+            # Order by: departure_time (ascending), then created_at (ascending) as fallback
+            shipments_query = self.db.query(Shipment).filter(
+                Shipment.patient_id == patient_id
+            ).order_by(
+                Shipment.departure_time.asc().nulls_last(),
+                Shipment.created_at.asc()
+            )
+            
+            shipments = shipments_query.all()
+            
+            # Identify Leg 1 and Leg 2 based on chronological order
+            # Leg 1: First shipment (hospital to pharma) - typically earlier departure_time
+            # Leg 2: Second shipment (pharma to hospital) - typically later departure_time
+            leg1_shipment = None
+            leg2_shipment = None
+            
+            # First shipment (chronologically) is Leg 1, second is Leg 2
+            for shipment in shipments:
+                if not leg1_shipment:
+                    leg1_shipment = shipment
+                elif not leg2_shipment:
+                    leg2_shipment = shipment
+                    break
+            
+            # Build Leg 1 summary
+            leg1_summary = None
+            if leg1_shipment:
+                leg1_summary = self._build_shipment_summary(leg1_shipment)
+            
+            # Build Leg 2 summary
+            leg2_summary = None
+            if leg2_shipment:
+                leg2_summary = self._build_shipment_summary(leg2_shipment)
+            
+            # Get Reengineering stage
+            reengineering_stage = self._get_reengineering_stage(patient_id)
+            
+            # Get current active stage
+            active_stage = self.db.query(PatientStageModel).filter(
+                PatientStageModel.patient_id == patient_id,
+                PatientStageModel.is_active == True
+            ).first()
+            
+            # Build current status summary
+            leg1_status = "not_started"
+            if leg1_summary:
+                leg1_status = leg1_summary["status"]
+            
+            reengineering_status = "not_started"
+            if reengineering_stage:
+                reengineering_status = reengineering_stage["status"]
+            
+            leg2_status = "not_started"
+            if leg2_summary:
+                leg2_status = leg2_summary["status"]
+            
+            current_status = {
+                "leg1_status": leg1_status,
+                "reengineering_status": reengineering_status,
+                "leg2_status": leg2_status,
+                "overall_stage": active_stage.stage if active_stage else None
+            }
+            
+            return {
+                "patient_id": patient.id,
+                "condition": patient.condition or "",
+                "hospital_name": patient.hospital_name,
+                "leg1": leg1_summary,
+                "reengineering": reengineering_stage,
+                "leg2": leg2_summary,
+                "current_status": current_status
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting patient journey summary: {str(e)}")
+            raise
+    
+    def _build_shipment_summary(self, shipment: Shipment) -> Dict[str, Any]:
+        """Build summary for a shipment with all its legs."""
+        try:
+            # Get all legs for this shipment, ordered by leg_order
+            legs_query = self.db.query(
+                ShipmentLeg,
+                Carrier.name.label('carrier_name'),
+                Provider.name.label('provider_name')
+            ).outerjoin(
+                Carrier, ShipmentLeg.carrier_id == Carrier.id
+            ).outerjoin(
+                Provider, ShipmentLeg.provider_id == Provider.id
+            ).filter(
+                ShipmentLeg.shipment_id == shipment.id
+            ).order_by(ShipmentLeg.leg_order.asc())
+            
+            legs_data = legs_query.all()
+            
+            # Build leg details
+            leg_details = []
+            primary_provider = None
+            
+            for leg, carrier_name, provider_name in legs_data:
+                if not primary_provider:
+                    primary_provider = provider_name or carrier_name
+                
+                leg_details.append({
+                    "leg_order": leg.leg_order,
+                    "mode_of_transport": leg.mode_of_transport,
+                    "from_location": leg.from_location,
+                    "to_location": leg.to_location,
+                    "carrier_name": carrier_name,
+                    "provider_name": provider_name,
+                    "departure_time": leg.departure_time.isoformat() if leg.departure_time else None,
+                    "arrival_time": leg.arrival_time.isoformat() if leg.arrival_time else None,
+                    "scheduled_time": leg.scheduled_time.isoformat() if leg.scheduled_time else None,
+                    "handover_time": leg.handover_time.isoformat() if leg.handover_time else None,
+                    "leg_status": leg.leg_status.value if leg.leg_status else "unknown",
+                    "leg_quality_loss": leg.leg_quality_loss,
+                    "ln2_refill": leg.ln2_refill,
+                    "warehouse": leg.warehouse,
+                    "doc_count_actual": leg.doc_count_actual,
+                    "doc_count_needed": leg.doc_count_needed
+                })
+            
+            # Determine shipment status
+            if shipment.arrival_time:
+                status = "completed"
+            elif shipment.departure_time:
+                # Check if any legs are still in progress
+                in_progress = any(leg.arrival_time is None and leg.departure_time is not None 
+                                for leg, _, _ in legs_data)
+                status = "in_progress" if in_progress else "completed"
+            else:
+                status = "upcoming"
+            
+            # Get arrival date
+            arrival_date = None
+            if shipment.arrival_time:
+                arrival_date = shipment.arrival_time.isoformat()
+            elif shipment.handover_time:
+                arrival_date = shipment.handover_time.isoformat()
+            
+            # Get planned date
+            planned_date = None
+            if shipment.scheduled_time:
+                planned_date = shipment.scheduled_time.isoformat()
+            elif shipment.departure_time and shipment.scheduled_time is None:
+                # If no scheduled_time, use departure_time as planned
+                planned_date = shipment.departure_time.isoformat()
+            
+            return {
+                "status": status,
+                "provider_name": primary_provider,
+                "legs": leg_details,
+                "arrival_date": arrival_date,
+                "planned_date": planned_date
+            }
+            
+        except Exception as e:
+            logger.error(f"Error building shipment summary: {str(e)}")
+            raise
+    
+    def _get_reengineering_stage(self, patient_id: str) -> Optional[Dict[str, Any]]:
+        """Get reengineering stage information for a patient."""
+        try:
+            reengineering_stage = self.db.query(PatientStageModel).filter(
+                PatientStageModel.patient_id == patient_id,
+                PatientStageModel.stage == PatientStage.REENGINEERING
+            ).order_by(PatientStageModel.start_time.desc()).first()
+            
+            if not reengineering_stage:
+                return None
+            
+            # Determine status
+            if reengineering_stage.end_time:
+                status = "completed"
+            elif reengineering_stage.is_active:
+                status = "ongoing"
+            else:
+                status = "upcoming"
+            
+            return {
+                "status": status,
+                "start_date": reengineering_stage.start_time.isoformat() if reengineering_stage.start_time else None,
+                "end_date": reengineering_stage.end_time.isoformat() if reengineering_stage.end_time else None,
+                "scheduled_start": reengineering_stage.start_time.isoformat() if reengineering_stage.start_time else None,
+                "scheduled_end": None,  # Can be enhanced if scheduled_end is stored separately
+                "description": None  # Can be enhanced if description is stored
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting reengineering stage: {str(e)}")
+            return None
 
 

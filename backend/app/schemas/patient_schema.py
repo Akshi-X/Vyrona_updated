@@ -109,3 +109,82 @@ class PatientDetailedResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================
+# PATIENT JOURNEY SUMMARY SCHEMAS
+# ============================================
+
+class ShipmentLegDetail(BaseModel):
+    """Schema for individual shipment leg details"""
+    leg_order: int = Field(..., description="Order of the leg in the shipment")
+    mode_of_transport: str = Field(..., description="Mode of transport (Road, Air, etc.)")
+    from_location: str = Field(..., description="Source location")
+    to_location: str = Field(..., description="Destination location")
+    carrier_name: Optional[str] = Field(None, description="Carrier name")
+    provider_name: Optional[str] = Field(None, description="Provider name")
+    departure_time: Optional[datetime] = Field(None, description="Departure time")
+    arrival_time: Optional[datetime] = Field(None, description="Arrival time")
+    scheduled_time: Optional[datetime] = Field(None, description="Scheduled completion time")
+    handover_time: Optional[datetime] = Field(None, description="Handover time")
+    leg_status: str = Field(..., description="Leg status (safe, delayed, high_risk, failed)")
+    leg_quality_loss: Optional[float] = Field(None, description="Quality loss for this leg")
+    ln2_refill: Optional[str] = Field(None, description="LN2 refill status")
+    warehouse: Optional[str] = Field(None, description="Warehouse information")
+    doc_count_actual: Optional[int] = Field(None, description="Actual document count")
+    doc_count_needed: Optional[int] = Field(None, description="Required document count")
+    
+    class Config:
+        from_attributes = True
+
+
+class ShipmentLegSummary(BaseModel):
+    """Schema for shipment leg summary with status"""
+    status: str = Field(..., description="Overall status: completed, in_progress, upcoming")
+    provider_name: Optional[str] = Field(None, description="Primary provider name for this shipment")
+    legs: List[ShipmentLegDetail] = Field(default_factory=list, description="List of shipment legs")
+    arrival_date: Optional[str] = Field(None, description="Arrival date at destination (ISO format)")
+    planned_date: Optional[str] = Field(None, description="Planned/scheduled date (ISO format)")
+    
+    class Config:
+        from_attributes = True
+
+
+class ReengineeringStage(BaseModel):
+    """Schema for reengineering/manufacturing phase"""
+    status: str = Field(..., description="Status: completed, ongoing, upcoming")
+    start_date: Optional[str] = Field(None, description="Start date (ISO format)")
+    end_date: Optional[str] = Field(None, description="End date (ISO format)")
+    scheduled_start: Optional[str] = Field(None, description="Scheduled start date (ISO format)")
+    scheduled_end: Optional[str] = Field(None, description="Scheduled end date (ISO format)")
+    description: Optional[str] = Field(None, description="Description or notes")
+    
+    class Config:
+        from_attributes = True
+
+
+class CurrentStatusSummary(BaseModel):
+    """Schema for current overall status"""
+    leg1_status: str = Field(..., description="Leg 1 status")
+    reengineering_status: str = Field(..., description="Reengineering status")
+    leg2_status: str = Field(..., description="Leg 2 status")
+    overall_stage: Optional[PatientStage] = Field(None, description="Current patient stage")
+    
+    class Config:
+        from_attributes = True
+
+
+class PatientJourneySummaryResponse(BaseModel):
+    """Schema for complete patient journey summary"""
+    patient_id: str = Field(..., description="Patient ID")
+    condition: str = Field(..., description="Patient condition")
+    hospital_name: Optional[str] = Field(None, description="Hospital name")
+    
+    leg1: Optional[ShipmentLegSummary] = Field(None, description="Leg 1: Hospital to Pharma")
+    reengineering: Optional[ReengineeringStage] = Field(None, description="Reengineering/Manufacturing phase")
+    leg2: Optional[ShipmentLegSummary] = Field(None, description="Leg 2: Pharma to Hospital")
+    
+    current_status: CurrentStatusSummary = Field(..., description="Current overall status summary")
+    
+    class Config:
+        from_attributes = True

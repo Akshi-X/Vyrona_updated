@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.shipment_service import ShipmentService
+from app.schemas.patient_schema import PatientJourneySummaryResponse
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -86,4 +87,38 @@ def get_transport_time_comparison(
         return service.get_transport_time_comparison(patient_id=patient_id, pharma_id=pharma_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting transport time comparison: {str(e)}")
+
+
+@router.get("/patient/{patient_id}/summary", response_model=PatientJourneySummaryResponse)
+def get_patient_journey_summary(
+    patient_id: str,
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get complete patient journey summary including:
+    - Patient information (ID, condition, hospital)
+    - Leg 1: Hospital to Pharma Manufacturing Site (with all shipment legs)
+    - Reengineering/Manufacturing phase
+    - Leg 2: Pharma to Hospital (with all shipment legs)
+    - Current overall status
+    
+    This endpoint provides a comprehensive view of the patient's treatment journey
+    from hospital collection through reengineering to final delivery back to hospital.
+    
+    Response includes:
+    - Patient basic info
+    - Leg 1 details (all legs with carrier, provider, timings, status)
+    - Reengineering stage (start/end dates, status)
+    - Leg 2 details (all legs with carrier, provider, timings, status)
+    - Current status summary for all phases
+    """
+    try:
+        service = ShipmentService(db)
+        summary = service.get_patient_journey_summary(patient_id=patient_id, pharma_id=pharma_id)
+        return PatientJourneySummaryResponse(**summary)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
 
