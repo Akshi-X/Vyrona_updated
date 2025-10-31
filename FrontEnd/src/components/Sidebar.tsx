@@ -3,9 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import MyGrapeLogo from "../assets/logo.svg";
 
 // Dashboard Icons
-import DashboardIcon from "../assets/DashBoardIcons/DashBoard.svg";
-import DatabaseIcon from "../assets/DashBoardIcons/DataBase.svg";
-import ControlTowerIcon from "../assets/DashBoardIcons/Control_Towers.svg";
+import DashboardIconWhite from "../assets/DashBoardIcons/DashBoardWhite.svg";
+import DashboardIconDark from "../assets/DashBoardIcons/DashBoardDark.svg";
+import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
+import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
+import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
+import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 interface SidebarProps {
@@ -24,9 +27,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
   }, []);
 
   const navigationItems = [
-    { icon: DashboardIcon, label: "Dashboard", path: "/dashboard" },
-    { icon: DatabaseIcon, label: "Database", path: "/database" },
-    { icon: ControlTowerIcon, label: "Control Tower", path: "/control-tower" },
+    { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
+    { icon: DatabaseIconWhite, label: "Database", path: "/database" },
+    { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
     // { icon: SupportIcon, label: "Support", path: "/support" },
   ];
 
@@ -53,6 +56,18 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
       <nav className="flex flex-col gap-[18px] mt-8 px-6 flex-shrink-0">
         {navigationItems.map((item, index) => {
           const isActive = location.pathname === item.path;
+          const iconSrc = (() => {
+            if (item.label === "Dashboard") {
+              return isActive ? DashboardIconDark : DashboardIconWhite;
+            }
+            if (item.label === "Database") {
+              return isActive ? DatabaseIconDark : DatabaseIconWhite;
+            }
+            if (item.label === "Control Tower") {
+              return isActive ? ControlTowerIconDark : ControlTowerIconWhite;
+            }
+            return item.icon;
+          })();
           return (
             <button
               key={index}
@@ -61,7 +76,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
               }`}
             >
-              <img className="w-5 h-5" alt={`${item.label} icon`} src={item.icon} />
+              <img className="w-5 h-5" alt={`${item.label} icon`} src={iconSrc} />
               <span
                 className={`font-semibold text-sm ${
                   isActive ? "text-[#6b1176]" : "text-white"
