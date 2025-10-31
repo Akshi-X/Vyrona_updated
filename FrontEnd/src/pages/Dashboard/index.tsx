@@ -316,7 +316,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Patient Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -325,7 +325,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={getIcon('Patient_Count')}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Patient Count:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -335,7 +335,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Treatment Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -344,7 +344,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={getIcon('Treatments_Count')}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Treatments Count:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -365,7 +365,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Cold Chain Packaging Failure */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 mr-4 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -374,7 +374,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={getIcon('Logistics_Chain')}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[10px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Cold Chain Packaging Failure
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -388,7 +388,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Quality Lost per Patient */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -397,7 +397,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={getIcon('Logistics_Quality')}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[10px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Avg Quality Lost/Patient
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -418,7 +418,7 @@ export default function Dashboard({ }: DashboardProps) {
                 <h2 className="font-semibold text-black text-base mb-4">
                   Performance
                 </h2>
-                <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] mr-6">
+                <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                   <div className="grid grid-cols-3 gap-12 relative">
 
                     {/* On Time Percentage */}
@@ -431,7 +431,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={OnTimeIcon}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           On Time:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -454,7 +454,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={AvgLeadTimeIcon}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Avg Lead time:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -477,7 +477,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={FailureCostIcon}
                           />
                         </div>
-                        <div className="font-normal text-[#868686] text-[12px] mt-2">
+                        <div className="font-normal text-[#656565] text-[11px] mt-2">
                           Failure Cost:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
@@ -588,7 +588,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}
-                      className={`flex-1 bg-white border h-[125px] border-[#E7E1E1] rounded-lg ${(card.alt === 'My Tasks' || card.alt === 'Tracking Shipment') ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                      className={`flex-1 bg-white border h-[125px] border-[#E7E1E1] rounded-lg ${(card.label === 'Track Shipment' || card.label === 'Aftercare' || card.label === 'Failures') ? 'cursor-pointer transition-all  drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)]' : ''}`}
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
@@ -599,12 +599,14 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     >
                       <div className="flex flex-col items-center justify-center pt-7 pb-6 px-4">
-                        <img
-                          className="w-[34px] h-[34px] mb-3 "
-                          alt={card.alt}
-                          src={card.icon}
-                        />
-                        <div className="h-4 flex items-center justify-center font-semibold text-black text-xs">
+                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center mb-3">
+                          <img
+                            className="w-[18px] h-[18px]"
+                            alt={card.alt}
+                            src={card.icon}
+                          />
+                        </div>
+                        <div className="h-4 flex items-center justify-center font-semibold text-black text-xs font-[12px]">
                           {card.label}
                         </div>
                       </div>
@@ -628,6 +630,17 @@ export default function Dashboard({ }: DashboardProps) {
                       percentage={loading ? 0 : riskMetrics?.deviation_percentage || 0}
                       color="#ff6b35"
                       size="md"
+                      gradient={{
+                        id: 'riskGradient',
+                        x1: '0%',
+                        y1: '0%',
+                        x2: '100%',
+                        y2: '0%',
+                        stops: [
+                          { offset: '0%', color: 'rgba(244, 149, 0, 1)' },
+                          { offset: '100%', color: 'rgba(234, 88, 12, 1)' }
+                        ]
+                      }}
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px] whitespace-nowrap">
@@ -668,6 +681,17 @@ export default function Dashboard({ }: DashboardProps) {
                       percentage={loading ? 0 : complianceMetrics?.audit_coverage_percentage || 0}
                       color="#1083c5"
                       size="md"
+                      gradient={{
+                        id: 'complianceGradient',
+                        x1: '0%',
+                        y1: '0%',
+                        x2: '100%',
+                        y2: '0%',
+                        stops: [
+                          { offset: '0%', color: 'rgba(0, 120, 183, 1)' },
+                          { offset: '100%', color: 'rgba(0, 152, 240, 1)' }
+                        ]
+                      }}
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px]">

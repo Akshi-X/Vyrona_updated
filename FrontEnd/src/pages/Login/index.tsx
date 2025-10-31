@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
+import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
 
 const Login: React.FC = () => {
@@ -187,7 +188,7 @@ const Login: React.FC = () => {
                                     className="absolute inset-y-0 right-3 flex items-center text-gray-500"
                                 >
                                     <img
-                                        src={EyeOffIcon}
+                                        src={showPassword ? EyeOpenIcon : EyeOffIcon}
                                         alt="toggle password visibility"
                                         className="w-5 h-5"
                                     />

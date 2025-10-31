@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
+import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
 
 const Signup: React.FC = () => {
@@ -376,7 +377,7 @@ const Signup: React.FC = () => {
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3 "
                                         >
-                                            <img src={EyeOffIcon} className="w-5 h-5 my-2.5" />
+                                            <img src={showPassword ? EyeOpenIcon : EyeOffIcon} className="w-5 h-5 my-2.5" />
                                         </button>
                                         {passwordError && (
                                             <p className="text-xs text-red-500 mt-1">{passwordError}</p>

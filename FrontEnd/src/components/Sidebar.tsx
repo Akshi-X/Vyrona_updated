@@ -7,7 +7,8 @@ import DashboardIconWhite from "../assets/DashBoardIcons/DashBoardWhite.svg";
 import DashboardIconDark from "../assets/DashBoardIcons/DashBoardDark.svg";
 import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
 import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
-import ControlTowerIcon from "../assets/DashBoardIcons/Control_Towers.svg";
+import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
+import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 interface SidebarProps {
@@ -28,7 +29,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
   const navigationItems = [
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
-    { icon: ControlTowerIcon, label: "Control Tower", path: "/control-tower" },
+    { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
     // { icon: SupportIcon, label: "Support", path: "/support" },
   ];
 
@@ -61,6 +62,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             }
             if (item.label === "Database") {
               return isActive ? DatabaseIconDark : DatabaseIconWhite;
+            }
+            if (item.label === "Control Tower") {
+              return isActive ? ControlTowerIconDark : ControlTowerIconWhite;
             }
             return item.icon;
           })();
