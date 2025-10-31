@@ -33,7 +33,7 @@ class User(Base):
     
     # Security - Account Locking (Brute Force Protection)
     is_locked = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Is account locked
-    lock_expiry = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # When lock expires (30 min)
+    lock_expiry = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True), nullable=True)  # When lock expires (30 min)
     login_attempts = sqlalchemy.Column(sqlalchemy.Integer, default=0)  # Failed login counter
     
     # Password Security
