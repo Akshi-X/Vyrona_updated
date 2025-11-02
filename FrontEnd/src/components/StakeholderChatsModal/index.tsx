@@ -40,30 +40,40 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
       dataLength={chats.length}
     >
       <div className="space-y-3">
+        <style>{`
+          .chat-msg-2line {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-word;
+          }
+        `}</style>
         {chats.map((chat) => (
           <div 
             key={chat.id} 
             className="p-3 rounded-lg border bg-purple-50 border-purple-200 hover:bg-purple-100 transition-colors"
           >
-            <div className="flex items-start justify-between mb-1">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center space-x-2 flex-shrink-0">
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold bg-purple-600">
                   {chat.sender.charAt(0)}
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-purple-900">
+                  <h4 className="text-sm font-medium text-black">
                     {chat.sender}
                   </h4>
                   <p className="text-xs text-gray-500">{chat.patientId}</p>
                 </div>
               </div>
-              <span className="text-xs text-purple-600">
+              <p className="text-sm text-black flex-1 text-left chat-msg-2line ml-4" title={chat.message}>
+                {chat.message}
+              </p>
+              <span className="text-xs text-black flex-shrink-0">
                 {chat.timestamp}
               </span>
             </div>
-            <p className="text-sm text-purple-800">
-              {chat.message}
-            </p>
           </div>
         ))}
       </div>
