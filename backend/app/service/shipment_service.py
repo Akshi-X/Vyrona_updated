@@ -367,6 +367,18 @@ class ShipmentService:
         - warehouse: ShipmentLeg.warehouse
         """
         try:
+            from ..exceptions.patient_exceptions import PatientNotFoundException
+            
+            # Validate patient exists if patient_id is provided
+            if patient_id:
+                patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+                if not patient:
+                    raise PatientNotFoundException(patient_id=patient_id)
+                
+                # Validate patient belongs to pharma if pharma_id is provided
+                if pharma_id and patient.pharma_id != pharma_id:
+                    raise PatientNotFoundException(patient_id=patient_id)
+            
             query = self.db.query(
                 ShipmentLeg,
                 Shipment.handover_time,
@@ -428,6 +440,17 @@ class ShipmentService:
             - actual_time: Actual transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to handover_time or arrival_time
         """
         try:
+            from ..exceptions.patient_exceptions import PatientNotFoundException
+            
+            # Validate patient exists
+            patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+            if not patient:
+                raise PatientNotFoundException(patient_id=patient_id)
+            
+            # Validate patient belongs to pharma if pharma_id is provided
+            if pharma_id and patient.pharma_id != pharma_id:
+                raise PatientNotFoundException(patient_id=patient_id)
+            
             query = self.db.query(
                 ShipmentLeg,
                 Shipment.patient_id,
@@ -492,13 +515,15 @@ class ShipmentService:
             PatientJourneySummaryResponse with complete journey details
         """
         try:
+            from ..exceptions.patient_exceptions import PatientNotFoundException
+            
             # Get patient information
             patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
             if not patient:
-                raise ValueError(f"Patient {patient_id} not found")
+                raise PatientNotFoundException(patient_id=patient_id)
             
             if pharma_id and patient.pharma_id != pharma_id:
-                raise ValueError(f"Patient {patient_id} does not belong to pharma {pharma_id}")
+                raise PatientNotFoundException(patient_id=patient_id)
             
             # Get all shipments for this patient
             # Order by: departure_time (ascending), then created_at (ascending) as fallback

@@ -17,8 +17,12 @@ def get_three_pl_players(
     db: Session = Depends(get_db)
 ):
     try:
+        from app.exceptions.patient_exceptions import PatientNotFoundException
+        
         service = ShipmentService(db)
         return service.get_3pl_player_details(pharma_id=pharma_id, patient_id=patient_id)
+    except PatientNotFoundException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting 3PL player details: {str(e)}")
 
@@ -83,8 +87,12 @@ def get_transport_time_comparison(
         ]
     """
     try:
+        from app.exceptions.patient_exceptions import PatientNotFoundException
+        
         service = ShipmentService(db)
         return service.get_transport_time_comparison(patient_id=patient_id, pharma_id=pharma_id)
+    except PatientNotFoundException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting transport time comparison: {str(e)}")
 
@@ -114,11 +122,13 @@ def get_patient_journey_summary(
     - Current status summary for all phases
     """
     try:
+        from app.exceptions.patient_exceptions import PatientNotFoundException
+        
         service = ShipmentService(db)
         summary = service.get_patient_journey_summary(patient_id=patient_id, pharma_id=pharma_id)
         return PatientJourneySummaryResponse(**summary)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except PatientNotFoundException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
 
