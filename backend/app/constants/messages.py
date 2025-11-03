@@ -113,6 +113,7 @@ class ErrorMessages:
     
     # Patient
     PATIENT_NOT_FOUND = "Patient not found"
+    SHIPMENT_NOT_STARTED = "Patient is in transportation stage but shipment has not started"
     
 
     # Task Management
