@@ -6,6 +6,7 @@ from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.shipment_service import ShipmentService
 from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTowerMapResponse
+from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException 
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -17,11 +18,10 @@ def get_three_pl_players(
     db: Session = Depends(get_db)
 ):
     try:
-        from app.exceptions.patient_exceptions import PatientNotFoundException
-        
+      
         service = ShipmentService(db)
         return service.get_3pl_player_details(pharma_id=pharma_id, patient_id=patient_id)
-    except PatientNotFoundException:
+    except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting 3PL player details: {str(e)}")
@@ -86,12 +86,10 @@ def get_transport_time_comparison(
             ...
         ]
     """
-    try:
-        from app.exceptions.patient_exceptions import PatientNotFoundException
-        
+    try:   
         service = ShipmentService(db)
         return service.get_transport_time_comparison(patient_id=patient_id, pharma_id=pharma_id)
-    except PatientNotFoundException:
+    except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting transport time comparison: {str(e)}")
@@ -121,13 +119,11 @@ def get_patient_journey_summary(
     - Leg 2 details (all legs with carrier, provider, timings, status)
     - Current status summary for all phases
     """
-    try:
-        from app.exceptions.patient_exceptions import PatientNotFoundException
-        
+    try:   
         service = ShipmentService(db)
         summary = service.get_patient_journey_summary(patient_id=patient_id, pharma_id=pharma_id)
         return PatientJourneySummaryResponse(**summary)
-    except PatientNotFoundException:
+    except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")

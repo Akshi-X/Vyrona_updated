@@ -95,6 +95,21 @@ class PatientPharmaNotFoundException(PatientException):
         )
 
 
+class ShipmentNotStartedException(PatientException):
+    """Exception raised when patient is in transportation stage but shipment has not started"""
+    
+    def __init__(self, patient_id: str):
+        message = f"{ErrorMessages.SHIPMENT_NOT_STARTED} for patient ID '{patient_id}'"
+        details = {"patient_id": patient_id}
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES.get("SHIPMENT_NOT_STARTED", "ERR_9001"),
+            status_code=400,
+            details=details
+        )
+
+
 # ============================================
 # PATIENT VALIDATION EXCEPTIONS
 # ============================================

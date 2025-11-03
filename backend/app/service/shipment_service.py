@@ -17,6 +17,7 @@ from ..models.provider_model import Provider
 from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
 from ..constants.enums import PatientStage, RouteStatus
+from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,48 @@ class ShipmentService:
                 PatientStageModel.is_active == True
             )
         ).first()
+    
+    def _validate_patient_for_shipment_operations(
+        self, 
+        patient_id: str, 
+        pharma_id: Optional[int] = None,
+        require_shipment: bool = True
+    ) -> Patient:
+        """
+        Validate patient for shipment-related operations.
+        
+        Args:
+            patient_id: Patient ID to validate
+            pharma_id: Optional pharma ID to validate patient belongs to
+            require_shipment: If True, check that patient in TRANSPORTATION stage has shipments
+            
+        Returns:
+            Patient object if validation passes
+            
+        Raises:
+            PatientNotFoundException: If patient doesn't exist or doesn't belong to pharma
+            ShipmentNotStartedException: If patient is in TRANSPORTATION stage but has no shipments
+        """
+        # Validate patient exists
+        patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            raise PatientNotFoundException(patient_id=patient_id)
+        
+        # Validate patient belongs to pharma if pharma_id is provided
+        if pharma_id and patient.pharma_id != pharma_id:
+            raise PatientNotFoundException(patient_id=patient_id)
+        
+        # Check if patient is in TRANSPORTATION stage but has no shipments
+        if require_shipment:
+            active_transportation_stage = self._get_active_transportation_stage(patient_id)
+            if active_transportation_stage:
+                shipment_count = self.db.query(Shipment).filter(
+                    Shipment.patient_id == patient_id
+                ).count()
+                if shipment_count == 0:
+                    raise ShipmentNotStartedException(patient_id=patient_id)
+        
+        return patient
     
     def _calculate_transit_days(self, departure_time: Optional[datetime]) -> Optional[float]:
         """Calculate transit days from departure time to now."""
@@ -367,17 +410,9 @@ class ShipmentService:
         - warehouse: ShipmentLeg.warehouse
         """
         try:
-            from ..exceptions.patient_exceptions import PatientNotFoundException
-            
-            # Validate patient exists if patient_id is provided
+            # Validate patient if patient_id is provided
             if patient_id:
-                patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-                if not patient:
-                    raise PatientNotFoundException(patient_id=patient_id)
-                
-                # Validate patient belongs to pharma if pharma_id is provided
-                if pharma_id and patient.pharma_id != pharma_id:
-                    raise PatientNotFoundException(patient_id=patient_id)
+                self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
             
             query = self.db.query(
                 ShipmentLeg,
@@ -440,16 +475,8 @@ class ShipmentService:
             - actual_time: Actual transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to handover_time or arrival_time
         """
         try:
-            from ..exceptions.patient_exceptions import PatientNotFoundException
-            
-            # Validate patient exists
-            patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-            if not patient:
-                raise PatientNotFoundException(patient_id=patient_id)
-            
-            # Validate patient belongs to pharma if pharma_id is provided
-            if pharma_id and patient.pharma_id != pharma_id:
-                raise PatientNotFoundException(patient_id=patient_id)
+            # Validate patient and shipment status
+            self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
             
             query = self.db.query(
                 ShipmentLeg,
@@ -466,7 +493,7 @@ class ShipmentService:
             
             # Order by leg_order to maintain sequence
             rows = query.order_by(ShipmentLeg.leg_order.asc()).all()
-            
+
             results: List[Dict[str, Any]] = []
             
             for leg, patient_id_val, _ in rows:
@@ -515,15 +542,8 @@ class ShipmentService:
             PatientJourneySummaryResponse with complete journey details
         """
         try:
-            from ..exceptions.patient_exceptions import PatientNotFoundException
-            
-            # Get patient information
-            patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-            if not patient:
-                raise PatientNotFoundException(patient_id=patient_id)
-            
-            if pharma_id and patient.pharma_id != pharma_id:
-                raise PatientNotFoundException(patient_id=patient_id)
+            # Validate patient and shipment status
+            self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
             
             # Get all shipments for this patient
             # Order by: departure_time (ascending), then created_at (ascending) as fallback
