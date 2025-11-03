@@ -7,6 +7,7 @@ export interface Patient {
   location: string;
   provider_name: string;
   stage: string;
+  treatment_status?: string;
   docs_report: string;
 }
 
@@ -15,6 +16,7 @@ export interface OngoingTreatment {
   condition: string;
   hospital: string;
   stage: string | null;
+  treatment_status: string;
   provider_name: string;
   location: string;
 }
