@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+/* Hide Microsoft Edge's default password reveal and clear icons
+   so only our custom eye icon is shown */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
