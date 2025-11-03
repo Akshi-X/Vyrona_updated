@@ -678,7 +678,7 @@ const Support: React.FC = () => {
                     <div className="pt-4">
                       {/* Add comment */}
                       <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-800 text-xs font-semibold">{(fullName||'U').slice(0,1)}</div>
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-800 text-xs font-semibold">{(currentUserName || fullName || 'U').trim().slice(0,1).toUpperCase()}</div>
                         <div className="flex-1">
                           <textarea
                             rows={3}

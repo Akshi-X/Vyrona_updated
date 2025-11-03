@@ -34,7 +34,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState<number | null>(null);
-  const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState(true);
+  const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('email_notify_pref');
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch {
+      return true;
+    }
+  });
 
   // Function to set session timeout
   const setSessionTimeoutHandler = (rememberMe: boolean = false) => {
@@ -67,6 +74,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     setIsLoading(false);
   }, []);
+
+  // Persist email notification preference
+  useEffect(() => {
+    try {
+      localStorage.setItem('email_notify_pref', JSON.stringify(isEmailNotificationsEnabled));
+    } catch {}
+  }, [isEmailNotificationsEnabled]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
