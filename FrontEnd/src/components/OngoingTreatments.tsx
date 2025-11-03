@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { patientService, type OngoingTreatment } from '../services/patientService';
-import { ALL_STAGES, getStageColor } from '../constants/stages';
+import { ALL_STAGES, TREATMENT_STATUS_OPTIONS, getTreatmentStatusColor } from '../constants/stages';
+
+// Color helper imported from constants
 
 interface OngoingTreatmentsProps {
   // No props needed since we don't send pharma_id
@@ -35,7 +37,8 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // All possible stage values
+  // Status filter options for treatment_status (shared)
+  const statusOptions = TREATMENT_STATUS_OPTIONS as readonly string[];
   const allStages = ALL_STAGES;
 
   const handleSort = (field: SortField) => {
@@ -48,10 +51,24 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   };
 
   const getSortedTreatments = () => {
-    // First, filter by stage if needed
+    // First, filter by treatment status or stage if needed
     let filtered = treatments;
     if (stageFilter !== 'all') {
-      filtered = treatments.filter(t => t.stage === stageFilter);
+      const normalizedFilter = stageFilter.toLowerCase();
+      const isStatus = statusOptions.includes(normalizedFilter);
+      if (isStatus) {
+        filtered = treatments.filter(t => {
+          const status = (t.treatment_status || '').toLowerCase();
+          // treat "after_care" and "aftercare" as the same
+          if (normalizedFilter === 'after_care') {
+            return status === 'after_care' || status === 'aftercare';
+          }
+          return status === normalizedFilter;
+        });
+      } else {
+        // Stage filter - compare by string value
+        filtered = treatments.filter(t => (t.stage || '').toLowerCase() === normalizedFilter);
+      }
     }
 
     // Then sort if sort field is selected
@@ -183,7 +200,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                           className={`text-xs p-1.5 text-[#6b1176] hover:bg-gray-50 transition-all duration-200 ${
                             stageFilter !== 'all' ? 'text-[#6b1176]' : ''
                           }`}
-                          title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
+                          title={stageFilter === 'all' ? 'All All Stages' : `Filtered: ${stageFilter}`}
                         >
                           <svg 
                             className="w-4 h-4"
@@ -196,25 +213,35 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                         </button>
                         
                         {isDropdownOpen && (
-                          <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[150px] overflow-hidden">
-                            {['all', ...allStages].map((stage) => (
-                              <button
-                                key={stage}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStageFilter(stage);
-                                  setIsDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                  stageFilter === stage
-                                    ? 'bg-[#6b1176] text-white'
-                                    : 'text-[#6b1176] hover:bg-gray-100'
-                                }`}
-                              >
-                                {stage === 'all' ? 'All Stages' : stage}
-                              </button>
-                            ))}
+                          <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden">
+                            {['all', ...allStages, ...statusOptions].map((item) => {
+                              const isAll = item === 'all';
+                              const isStatus = typeof item === 'string' && statusOptions.includes((item as string).toLowerCase());
+                              const key = isAll ? 'all' : (item as string);
+                              const value = isAll ? 'all' : (isStatus ? (item as string).toLowerCase() : (item as string));
+                              const label = isAll
+                                ? 'All Stages'
+                                : isStatus
+                                  ? ((item as string) === 'after_care' ? 'AfterCare' : (item as string).charAt(0).toUpperCase() + (item as string).slice(1))
+                                  : (item as string);
+
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStageFilter(value);
+                                    setIsDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                    stageFilter === value ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -289,7 +316,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                     {treatment.hospital}
                   </td>
                   <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(treatment.stage)}`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTreatmentStatusColor(treatment.treatment_status, treatment.stage)}`}>
                       {treatment.stage || 'N/A'}
                     </span>
                   </td>
