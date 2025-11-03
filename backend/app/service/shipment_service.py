@@ -692,5 +692,76 @@ class ShipmentService:
         except Exception as e:
             logger.error(f"Error getting reengineering stage: {str(e)}")
             return None
+    
+    def get_control_tower_map_data(
+        self,
+        pharma_id: Optional[int] = None,
+        route_status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get control tower map data with source and destination locations including coordinates.
+        Returns only shipment-level data (no leg details).
+        
+        Args:
+            pharma_id: Optional pharma ID to filter routes
+            route_status: Optional route status filter (safe, delayed, high_risk). If None, returns all statuses.
+            
+        Returns:
+            Dictionary containing:
+            - routes: List of route dictionaries with source/destination and coordinates
+            - total_routes: Total count of routes
+        """
+        try:
+            # Query shipments with joins to check active stage
+            query = self.db.query(Shipment).outerjoin(
+                PatientStageModel,
+                and_(
+                    PatientStageModel.patient_id == Shipment.patient_id,
+                    PatientStageModel.stage == PatientStage.TRANSPORTATION,
+                    PatientStageModel.is_active == True
+                )
+            )
+            
+            if pharma_id:
+                query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Filter by route status if provided
+            if route_status:
+                parsed_status = self._parse_route_status_filter(route_status)
+                if parsed_status:
+                    query = query.filter(Shipment.routes_status == parsed_status)
+            
+            # Filter only active routes (where PatientStage exists)
+            query = query.filter(PatientStageModel.id.isnot(None))
+            
+            results = query.all()
+            
+            routes = []
+            
+            for shipment in results:
+                route_data = {
+                    "shipment_id": shipment.id,
+                    "patient_id": shipment.patient_id,
+                    "source_location": shipment.source_location,
+                    "destination_location": shipment.destination_location,
+                    "source_latitude": shipment.source_latitude,
+                    "source_longitude": shipment.source_longitude,
+                    "destination_latitude": shipment.destination_latitude,
+                    "destination_longitude": shipment.destination_longitude
+                }
+                
+                routes.append(route_data)
+            
+            # Sort by shipment ID
+            routes.sort(key=lambda x: x['shipment_id'], reverse=True)
+            
+            return {
+                "routes": routes,
+                "total_routes": len(routes)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting control tower map data: {str(e)}")
+            raise
 
 

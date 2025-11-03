@@ -188,3 +188,31 @@ class PatientJourneySummaryResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================
+# CONTROL TOWER MAP SCHEMAS
+# ============================================
+
+class ControlTowerMapRoute(BaseModel):
+    """Schema for a shipment route on the control tower map"""
+    shipment_id: int = Field(..., description="Shipment ID")
+    patient_id: str = Field(..., description="Patient ID")
+    source_location: str = Field(..., description="Source location name")
+    destination_location: str = Field(..., description="Destination location name")
+    source_latitude: Optional[float] = Field(None, description="Latitude of source location")
+    source_longitude: Optional[float] = Field(None, description="Longitude of source location")
+    destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
+    destination_longitude: Optional[float] = Field(None, description="Longitude of destination location")
+    
+    class Config:
+        from_attributes = True
+
+
+class ControlTowerMapResponse(BaseModel):
+    """Schema for control tower map API response"""
+    routes: List[ControlTowerMapRoute] = Field(..., description="List of routes for map display")
+    total_routes: int = Field(..., description="Total number of routes")
+    
+    class Config:
+        from_attributes = True
