@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.shipment_service import ShipmentService
-from app.schemas.patient_schema import PatientJourneySummaryResponse
+from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTowerMapResponse
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -121,4 +121,48 @@ def get_patient_journey_summary(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
+
+
+@router.get("/control-tower-map", response_model=ControlTowerMapResponse)
+def get_control_tower_map(
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get control tower map data with source and destination locations including latitude and longitude coordinates.
+    
+    This endpoint returns only shipment-level data (source and destination with coordinates).
+    It does not include individual leg details.
+    
+    Optional filters:
+    - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
+    
+    Response:
+        {
+            "routes": [
+                {
+                    "shipment_id": 1,
+                    "patient_id": "PT...",
+                    "source_location": "Location A",
+                    "destination_location": "Location B",
+                    "source_latitude": 40.7128,
+                    "source_longitude": -74.0060,
+                    "destination_latitude": 34.0522,
+                    "destination_longitude": -118.2437
+                },
+                ...
+            ],
+            "total_routes": 10
+        }
+    """
+    try:
+        service = ShipmentService(db)
+        map_data = service.get_control_tower_map_data(
+            pharma_id=pharma_id,
+            route_status=route_status
+        )
+        return ControlTowerMapResponse(**map_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting control tower map data: {str(e)}")
 
