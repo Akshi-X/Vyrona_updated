@@ -245,4 +245,3 @@ def init_db():
     
     logger.info("Database initialization complete")
     logger.info("=" * 60)
-

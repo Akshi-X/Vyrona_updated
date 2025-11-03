@@ -163,3 +163,14 @@ class TaskStatus(str, Enum):
     def list(cls):
         return [status.value for status in cls]
 
+
+class RouteStatus(str, Enum):
+    """Enum for route status in control tower"""
+    SAFE = "safe"           # Good quality (0-5% loss)
+    DELAYED = "delayed"     # Moderate quality (5-15% loss)
+    HIGH_RISK = "high_risk" # High risk (15%+ loss)
+    FAILED = "failed"       # Failed shipment
+    
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]

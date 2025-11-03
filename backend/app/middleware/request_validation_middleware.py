@@ -483,7 +483,27 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 department = FeedbackDepartment(data["department"])
                 feedback_type = FeedbackType(data["feedback_type"])
                 priority = FeedbackPriority(data["priority"])
-                affected_modules = AffectedModule(data["affected_modules"])
+                
+                # Handle affected_modules as list (multiple selection)
+                affected_modules_data = data["affected_modules"]
+                if isinstance(affected_modules_data, list):
+                    if len(affected_modules_data) == 0:
+                        return JSONResponse(
+                            status_code=400,
+                            content={
+                                "error_code": ERROR_CODES["FEEDBACK_INVALID_ENUM_VALUE"],
+                                "message": "At least one affected module must be selected",
+                                "status": STATUS_FAILED,
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                        )
+                    # Validate each module in the list
+                    affected_modules = [AffectedModule(module) for module in affected_modules_data]
+                elif isinstance(affected_modules_data, str):
+                    # Backward compatibility: handle single string value
+                    affected_modules = [AffectedModule(affected_modules_data)]
+                else:
+                    raise ValueError("affected_modules must be a list or string")
             except ValueError as e:
                 # Provide detailed error message with valid values
                 return JSONResponse(
