@@ -40,7 +40,7 @@ class Feedback(Base):
         nullable=False
     )
     affected_modules = sqlalchemy.Column(
-        sqlalchemy.String(50), 
+        sqlalchemy.String(500),  # Increased size to accommodate multiple comma-separated modules
         nullable=False
     )
     
