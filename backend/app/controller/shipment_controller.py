@@ -32,6 +32,7 @@ def get_active_routes(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
     carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
+    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
     db: Session = Depends(get_db)
 ):
     """
@@ -40,8 +41,9 @@ def get_active_routes(
     Optional filters:
     - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
     - carriers: Filter by carrier names (can specify multiple). If not provided, returns all carriers.
+    - regions: Filter by regions - matches if either source OR destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'
     
-    Response:
+    Response (when data is available):
         {
           "routes": [
              { "route": "A → B", "status": "Safe", "date": "YYYY-MM-DD", "company": "...", "transit_days": 3, "carrier": "...", "updated_at": "..." },
@@ -56,11 +58,39 @@ def get_active_routes(
              "last_updated": "..."
           }
         }
+    
+    Response (when filters are applied but no data matches):
+        {
+          "routes": [],
+          "metrics": {},
+          "message": "Active routes not available"
+        }
     """
     try:
         service = ShipmentService(db)
-        routes = service.get_active_routes(pharma_id, route_status=route_status, carriers=carriers)
-        metrics = service.get_real_time_metrics(pharma_id)
+        
+        # Check if any filters are applied
+        has_filters = any([route_status, carriers, regions])
+        
+        routes = service.get_active_routes(
+            pharma_id, 
+            route_status=route_status, 
+            carriers=carriers,
+            regions=regions
+        )
+        
+        # If filters are applied and no routes found, return message
+        if has_filters and not routes:
+            return {
+                "routes": [],
+                "metrics": {},
+                "message": "Active routes not available"
+            }
+        
+        metrics = service.get_real_time_metrics(
+            pharma_id,
+            regions=regions
+        )
         return {"routes": routes, "metrics": metrics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting active routes: {str(e)}")
@@ -127,6 +157,61 @@ def get_patient_journey_summary(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
+
+
+@router.get("/carriers", response_model=List[str])
+def get_all_carriers(
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    active_only: bool = Query(True, description="Return only active carriers. Set to false to get all carriers."),
+    db: Session = Depends(get_db)
+):
+    """
+    Get carrier names used in shipments for the current user's pharma_id.
+    
+    Only returns carriers that are actually used in shipments (either at shipment level or leg level)
+    for the specified pharma.
+    
+    Returns:
+        List of carrier names (sorted alphabetically):
+        [
+            "DHL Express Healthcare",
+            "FedEx Medical Express",
+            "UPS Healthcare Logistics",
+            ...
+        ]
+    """
+    try:
+        service = ShipmentService(db)
+        return service.get_all_carriers(pharma_id=pharma_id, active_only=active_only)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting carriers: {str(e)}")
+
+
+@router.get("/regions", response_model=List[str])
+def get_available_regions(
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all unique regions available for shipments based on the current user's pharma_id.
+    
+    Regions are derived from source and destination countries in shipments using country_converter.
+    Only returns regions that appear in actual shipments for the specified pharma.
+    
+    Returns:
+        List of unique region names (sorted alphabetically):
+        [
+            "Asia",
+            "Europe",
+            "North America",
+            ...
+        ]
+    """
+    try:
+        service = ShipmentService(db)
+        return service.get_available_regions(pharma_id=pharma_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting available regions: {str(e)}")
 
 
 @router.get("/control-tower-map", response_model=ControlTowerMapResponse)
