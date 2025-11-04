@@ -21,7 +21,7 @@ router = APIRouter(tags=["Tasks"])
 
 
 # ---------------------------
-# 1. Create Task (Manager Only)
+# 1. Create Task (Manager or Pharma Admin)
 # ---------------------------
 @router.post("/tasks", response_model=CreateTaskResponse)
 def create_task(
@@ -30,9 +30,9 @@ def create_task(
     db: Session = Depends(database.get_db)
 ):
     """
-    Create a new task. Only managers can create tasks.
+    Create a new task. Managers and pharma_admins can create tasks.
     
-    Protected endpoint. Manager role required.
+    Protected endpoint. Manager or Pharma Admin role required.
     
     Request Body:
     - task_name: Name of the task (required)
@@ -63,14 +63,13 @@ def get_all_tasks(
     db: Session = Depends(database.get_db)
 ):
     """
-    Get all tasks for current user.
+    Get tasks for current user as two arrays.
     
     Protected endpoint. Any authenticated user can view their tasks.
     
-    Returns:
-    - Managers: Tasks they created OR tasks assigned to them
-    - Users: Only tasks assigned to them
-    - Each task includes permission flags for frontend
+    Returns two arrays:
+    - created_tasks: tasks created by the user (editable via PUT)
+    - assigned_tasks: tasks assigned to the user (status editable via PATCH)
     """
     # Call service (business logic in service layer)
     result = task_service.get_all_tasks(
@@ -111,7 +110,7 @@ def get_task(
 
 
 # ---------------------------
-# 4. Update Task (Full Update - Manager Only)
+# 4. Update Task (Full Update - Manager/Pharma Admin)
 # ---------------------------
 @router.put("/tasks/{task_id}", response_model=UpdateTaskResponse)
 def update_task(
@@ -121,7 +120,7 @@ def update_task(
     db: Session = Depends(database.get_db)
 ):
     """
-    Update a task (full update). Only the manager who created the task can do this.
+    Update a task (full update). Only the manager or pharma_admin who created the task can do this.
     
     Protected endpoint. Only creator can edit.
     
@@ -183,7 +182,7 @@ def update_task_status(
 
 
 # ---------------------------
-# 6. Delete Task (Manager Only)
+# 6. Delete Task (Manager/Pharma Admin)
 # ---------------------------
 @router.delete("/tasks/{task_id}", response_model=DeleteTaskResponse)
 def delete_task(
@@ -192,7 +191,7 @@ def delete_task(
     db: Session = Depends(database.get_db)
 ):
     """
-    Delete a task. Only the manager who created the task can do this.
+    Delete a task. Only the manager or pharma_admin who created the task can do this.
     
     Protected endpoint. Only creator can delete.
     
