@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from ..constants.status_constants import STATUS_FAILED
 from ..constants.messages import ErrorMessages
 from ..constants.error_codes import ERROR_CODES
+from ..constants.app_constants import COMMON_API_HEADERS
 from ..config.database import SessionLocal
 from ..exceptions.patient_exceptions import (
     PatientValidationException,
@@ -115,7 +116,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "message": e.message,
                     "details": e.details,
                     "timestamp": e.timestamp
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         except json.JSONDecodeError:
             return JSONResponse(
@@ -125,7 +127,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "error_code": ERROR_CODES.get("VALIDATION_INVALID_FORMAT", "ERR_6002"),
                     "message": "Invalid JSON format",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         except Exception as e:
             return JSONResponse(
@@ -135,7 +138,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "error_code": ERROR_CODES.get("SERVER_ERROR", "ERR_9001"),
                     "message": f"Validation error: {str(e)}",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
     
     async def _validate_patient_update(self, request: Request):
@@ -200,7 +204,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "message": e.message,
                     "details": e.details,
                     "timestamp": e.timestamp
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         except json.JSONDecodeError:
             return JSONResponse(
@@ -210,7 +215,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "error_code": ERROR_CODES.get("VALIDATION_INVALID_FORMAT", "ERR_6002"),
                     "message": "Invalid JSON format",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         except Exception as e:
             return JSONResponse(
@@ -220,7 +226,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "error_code": ERROR_CODES.get("SERVER_ERROR", "ERR_9001"),
                     "message": f"Validation error: {str(e)}",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
     
     async def _validate_patient_search(self, request: Request):
@@ -257,7 +264,8 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "message": e.message,
                     "details": e.details,
                     "timestamp": e.timestamp
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         except Exception as e:
             return JSONResponse(
@@ -267,5 +275,6 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
                     "error_code": ERROR_CODES.get("SERVER_ERROR", "ERR_9001"),
                     "message": f"Validation error: {str(e)}",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
