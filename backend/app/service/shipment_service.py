@@ -18,7 +18,9 @@ from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
 from ..models.shipment_leg_document_model import ShipmentLegDocument
 from ..constants.enums import PatientStage, RouteStatus
+from ..constants.messages import ErrorMessages
 from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
+from ..utils.utils import get_countries_by_regions, country_to_region
 
 logger = logging.getLogger(__name__)
 
@@ -113,30 +115,68 @@ class ShipmentService:
             return RouteStatus.HIGH_RISK
         return None
     
-    def _get_shipment_carriers(self, shipment_id: int, fallback_carrier: Optional[str] = None) -> List[str]:
-        """Get list of carrier names for a shipment from its legs, with fallback."""
-        leg_carrier_rows = self.db.query(Carrier.name).join(
+    def _get_shipment_carrier(self, shipment_id: int, fallback_carrier: Optional[str] = None) -> Optional[str]:
+        """Get the primary carrier name from the first leg (leg_order = 1) of a shipment, with fallback."""
+        # Get the carrier from the first leg (lowest leg_order)
+        first_leg_carrier = self.db.query(Carrier.name).join(
             ShipmentLeg, ShipmentLeg.carrier_id == Carrier.id
         ).filter(
             ShipmentLeg.shipment_id == shipment_id,
             Carrier.name.isnot(None)
-        ).distinct().all()
+        ).order_by(ShipmentLeg.leg_order.asc()).first()
         
-        carriers = [row[0] for row in leg_carrier_rows]
-        if not carriers and fallback_carrier:
-            carriers = [fallback_carrier]
-        return carriers
+        if first_leg_carrier and first_leg_carrier[0]:
+            return first_leg_carrier[0]
+        
+        # Fallback to provided carrier if no carrier found in legs
+        return fallback_carrier
     
-    def _carriers_match_filter(self, route_carriers: List[str], filter_carriers: List[str]) -> bool:
-        """Check if any route carriers match the filter carriers (partial match, case-insensitive)."""
-        route_carriers_lower = [c.lower() if c else "" for c in route_carriers]
+    def _carrier_matches_filter(self, route_carrier: Optional[str], filter_carriers: List[str]) -> bool:
+        """Check if the route carrier matches any of the filter carriers (partial match, case-insensitive)."""
+        if not route_carrier:
+            return False
+        
+        route_carrier_lower = route_carrier.lower()
         filter_carriers_lower = [c.lower() for c in filter_carriers]
         
         for filter_carrier in filter_carriers_lower:
-            for route_carrier in route_carriers_lower:
-                if filter_carrier in route_carrier or route_carrier in filter_carrier:
-                    return True
+            if filter_carrier in route_carrier_lower or route_carrier_lower in filter_carrier:
+                return True
         return False
+    
+    def _apply_region_filter(self, query, regions: Optional[List[str]] = None):
+        """
+        Apply region-based filtering to a shipment query.
+        Matches if either source OR destination is in the specified regions.
+        
+        Args:
+            query: SQLAlchemy query object
+            regions: Filter by regions - matches if either source OR destination is in the specified regions
+            
+        Returns:
+            Filtered query object
+        """
+        if not regions:
+            return query
+        
+        # Get country codes for the specified regions
+        region_countries = get_countries_by_regions(regions)
+        
+        # If regions were provided but no countries match (invalid region), return empty result
+        if not region_countries:
+            # Apply a filter that will never match (no results)
+            query = query.filter(Shipment.id == -1)
+            return query
+        
+        # Match if source OR destination is in the regions
+        query = query.filter(
+            or_(
+                Shipment.source_country.in_(region_countries),
+                Shipment.destination_country.in_(region_countries)
+            )
+        )
+        
+        return query
     
     def _format_duration(self, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> Optional[str]:
         """Format duration between two datetimes as 'Xh Ym' string."""
@@ -205,7 +245,11 @@ class ShipmentService:
             logger.error(f"Error updating patient stage on leg failure: {str(e)}")
             raise
     
-    def get_real_time_metrics(self, pharma_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_real_time_metrics(
+        self, 
+        pharma_id: Optional[int] = None,
+        regions: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """
         Get real-time metrics for shipment tracking dashboard.
         Calculates: Active Routes, Avg Transit, Safe Routes, Delayed Routes, Risky Routes
@@ -235,6 +279,9 @@ class ShipmentService:
             
             if pharma_id:
                 query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Apply region-based filtering
+            query = self._apply_region_filter(query, regions=regions)
             
             results = query.all()
             
@@ -284,14 +331,15 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating real-time metrics: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_METRICS_ERROR}: {str(e)}")
             raise
     
     def get_active_routes(
         self, 
         pharma_id: Optional[int] = None,
         route_status: Optional[str] = None,
-        carriers: Optional[List[str]] = None
+        carriers: Optional[List[str]] = None,
+        regions: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         Get detailed list of active routes (shipments in TRANSPORTATION stage).
@@ -344,6 +392,9 @@ class ShipmentService:
                 if parsed_status:
                     query = query.filter(Shipment.routes_status == parsed_status)
             
+            # Apply region-based filtering
+            query = self._apply_region_filter(query, regions=regions)
+            
             # Filter only active routes (where PatientStage exists)
             query = query.filter(PatientStageModel.id.isnot(None))
             
@@ -366,11 +417,11 @@ class ShipmentService:
                 # Get carrier name (from Carrier table, or Provider name)
                 fallback_carrier = carrier_name if carrier_name else provider_name
                 
-                # Collect unique carriers from shipment legs
-                route_carriers = self._get_shipment_carriers(shipment.id, fallback_carrier)
+                # Get primary carrier from first leg
+                route_carrier = self._get_shipment_carrier(shipment.id, fallback_carrier)
                 
                 # Filter by carriers if provided
-                if carriers and not self._carriers_match_filter(route_carriers, carriers):
+                if carriers and not self._carrier_matches_filter(route_carrier, carriers):
                     continue
                 
                 route_data = {
@@ -380,7 +431,7 @@ class ShipmentService:
                     "route_status": route_status,
                     "start_date": start_date,
                     "transit_days": transit_days,
-                    "carriers": route_carriers,
+                    "carrier": route_carrier,
                     "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None
                 }
                 
@@ -392,7 +443,7 @@ class ShipmentService:
             return active_routes
             
         except Exception as e:
-            logger.error(f"Error getting active routes: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_ACTIVE_ROUTES_ERROR}: {str(e)}")
             raise
 
     def get_3pl_player_details(self, pharma_id: Optional[int] = None, patient_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -457,7 +508,7 @@ class ShipmentService:
 
             return results
         except Exception as e:
-            logger.error(f"Error fetching 3PL player details: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_3PL_PLAYER_DETAILS_ERROR}: {str(e)}")
             raise
 
     def get_transport_time_comparison(self, patient_id: str, pharma_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -520,7 +571,7 @@ class ShipmentService:
             return results
             
         except Exception as e:
-            logger.error(f"Error fetching transport time comparison: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_TRANSPORT_TIME_COMPARISON_ERROR}: {str(e)}")
             raise
     
     def get_patient_journey_summary(
@@ -544,7 +595,7 @@ class ShipmentService:
         """
         try:
             # Validate patient and shipment status
-            self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
+            patient = self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
             
             # Get all shipments for this patient
             # Order by: departure_time (ascending), then created_at (ascending) as fallback
@@ -621,7 +672,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting patient journey summary: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_PATIENT_JOURNEY_SUMMARY_ERROR}: {str(e)}")
             raise
     
     def _build_shipment_summary(self, shipment: Shipment) -> Dict[str, Any]:
@@ -704,7 +755,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error building shipment summary: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_SUMMARY_BUILD_ERROR}: {str(e)}")
             raise
     
     def _get_reengineering_stage(self, patient_id: str) -> Optional[Dict[str, Any]]:
@@ -736,7 +787,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting reengineering stage: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_REENGINEERING_STAGE_ERROR}: {str(e)}")
             return None
     
     def get_control_tower_map_data(
@@ -790,6 +841,8 @@ class ShipmentService:
                     "patient_id": shipment.patient_id,
                     "source_location": shipment.source_location,
                     "destination_location": shipment.destination_location,
+                    "source_country": shipment.source_country,
+                    "destination_country": shipment.destination_country,
                     "source_latitude": shipment.source_latitude,
                     "source_longitude": shipment.source_longitude,
                     "destination_latitude": shipment.destination_latitude,
@@ -807,7 +860,116 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting control tower map data: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_CONTROL_TOWER_MAP_ERROR}: {str(e)}")
+            raise
+    
+    def get_all_carriers(self, pharma_id: Optional[int] = None, active_only: bool = True) -> List[str]:
+        """
+        Get carrier names used in shipments for the specified pharma.
+        
+        Args:
+            pharma_id: Optional pharma ID to filter carriers by shipments. If None, returns all carriers.
+            active_only: If True, return only active carriers. If False, return all carriers.
+            
+        Returns:
+            List of carrier names (sorted alphabetically) that appear in shipments for the pharma
+        """
+        try:
+            carrier_names = set()
+            
+            if pharma_id:
+                # Get carriers from shipment level (Shipment.carrier_id)
+                shipment_carriers = self.db.query(Carrier.name).join(
+                    Shipment, Shipment.carrier_id == Carrier.id
+                ).filter(
+                    Shipment.pharma_id == pharma_id,
+                    Carrier.name.isnot(None)
+                )
+                
+                if active_only:
+                    shipment_carriers = shipment_carriers.filter(Carrier.is_active == True)
+                
+                for carrier in shipment_carriers.all():
+                    if carrier[0]:
+                        carrier_names.add(carrier[0])
+                
+                # Get carriers from shipment leg level (ShipmentLeg.carrier_id)
+                leg_carriers = self.db.query(Carrier.name).join(
+                    ShipmentLeg, ShipmentLeg.carrier_id == Carrier.id
+                ).join(
+                    Shipment, ShipmentLeg.shipment_id == Shipment.id
+                ).filter(
+                    Shipment.pharma_id == pharma_id,
+                    Carrier.name.isnot(None)
+                )
+                
+                if active_only:
+                    leg_carriers = leg_carriers.filter(Carrier.is_active == True)
+                
+                for carrier in leg_carriers.all():
+                    if carrier[0]:
+                        carrier_names.add(carrier[0])
+            else:
+                # If no pharma_id, return all carriers
+                query = self.db.query(Carrier.name)
+                
+                if active_only:
+                    query = query.filter(Carrier.is_active == True)
+                
+                carriers = query.all()
+                carrier_names = {carrier[0] for carrier in carriers if carrier[0]}
+            
+            return sorted(list(carrier_names))
+            
+        except Exception as e:
+            logger.error(f"{ErrorMessages.SHIPMENT_CARRIERS_ERROR}: {str(e)}")
+            raise
+    
+    def get_available_regions(self, pharma_id: Optional[int] = None) -> List[str]:
+        """
+        Get all unique regions available for shipments based on source and destination countries.
+        
+        Args:
+            pharma_id: Optional pharma ID to filter shipments. If None, returns regions for all shipments.
+            
+        Returns:
+            List of unique region names (sorted alphabetically) that appear in shipments
+        """
+        try:
+            # Query shipments to get unique source and destination countries
+            query = self.db.query(
+                Shipment.source_country,
+                Shipment.destination_country
+            ).filter(
+                Shipment.source_country.isnot(None),
+                Shipment.destination_country.isnot(None)
+            )
+            
+            if pharma_id:
+                query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            results = query.distinct().all()
+            
+            # Collect all unique countries
+            countries = set()
+            for source_country, dest_country in results:
+                if source_country:
+                    countries.add(source_country)
+                if dest_country:
+                    countries.add(dest_country)
+            
+            # Convert countries to regions
+            regions = set()
+            for country_code in countries:
+                region = country_to_region(country_code)
+                if region:
+                    regions.add(region)
+            
+            # Return sorted list of unique regions
+            return sorted(list(regions))
+            
+        except Exception as e:
+            logger.error(f"{ErrorMessages.SHIPMENT_REGIONS_ERROR}: {str(e)}")
             raise
     
     def get_document_checklist(self, patient_id: str, pharma_id: Optional[int] = None) -> Dict[str, Any]:

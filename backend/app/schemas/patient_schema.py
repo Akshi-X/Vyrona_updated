@@ -213,9 +213,17 @@ class ControlTowerMapResponse(BaseModel):
     """Schema for control tower map API response"""
     routes: List[ControlTowerMapRoute] = Field(..., description="List of routes for map display")
     total_routes: int = Field(..., description="Total number of routes")
-    
+
     class Config:
         from_attributes = True
+
+# --------------------------------------------
+# Single-patient stage lookup response
+# --------------------------------------------
+class PatientStageResponse(BaseModel):
+    """Schema for current stage of a patient"""
+    patient_id: str
+    stage: Optional[PatientStage] = None
 
 
 # ============================================
@@ -228,7 +236,7 @@ class DocumentChecklistItem(BaseModel):
     actual: Optional[int] = Field(None, description="Actual document count (doc_count_actual)")
     needed: Optional[int] = Field(None, description="Required document count (doc_count_needed)")
     missed: Optional[int] = Field(None, description="Missed document count (needed - actual, minimum 0)")
-    
+
     class Config:
         from_attributes = True
 
@@ -239,6 +247,6 @@ class DocumentChecklistResponse(BaseModel):
     total_items: int = Field(..., description="Total number of items")
     missing_documents: List[str] = Field(default_factory=list, description="Overall list of missing document names across all shipment legs")
     non_compliance_percentage: float = Field(..., description="Non-compliance percentage calculated as ((total_needed - total_actual) / total_needed) * 100")
-    
+
     class Config:
         from_attributes = True
