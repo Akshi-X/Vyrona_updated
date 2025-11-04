@@ -234,8 +234,9 @@ class PatientService:
         except Exception as e:
             raise PatientServiceError("create_patients", f"Failed to create patients: {str(e)}")
 
-    def get_patients_summary(self, pharma_id: int) -> List[PatientSummaryResponse]:
-        """Get patient summary data with joined provider and pharma information - includes all patients plus failure and aftercare data from last 2 weeks"""
+    def get_patients_summary(self, pharma_id: int, stage: Optional[str] = None, status: Optional[str] = None) -> List[PatientSummaryResponse]:
+        """Get patient summary data with joined provider and pharma information - includes all patients plus failure and aftercare data from last 2 weeks.
+        Optionally filters by current stage or computed treatment status (ongoing/after_care/failure)."""
         try:
             # Import here to avoid circular imports
             from app.models.pharma_model import Pharma
@@ -298,7 +299,7 @@ class PatientService:
                     elif result.treatment_status == True:
                         treatment_status = "after_care"
                 
-                summary_data.append(PatientSummaryResponse(
+                summary_item = PatientSummaryResponse(
                     patient_id=result.patient_id,
                     condition=result.condition,
                     hospital=result.hospital,
@@ -306,7 +307,23 @@ class PatientService:
                     treatment_status=treatment_status,
                     provider_name=result.provider_name,
                     location=result.pharma_location
-                ))
+                )
+
+                # Apply in-memory filters if provided
+                if stage is not None:
+                    if (summary_item.stage or "").lower() != stage.lower():
+                        continue
+                if status is not None:
+                    normalized_status = status.lower()
+                    item_status = (summary_item.treatment_status or "").lower()
+                    # treat after_care and aftercare equivalently
+                    if normalized_status == "after_care":
+                        if item_status not in ["after_care", "aftercare"]:
+                            continue
+                    elif item_status != normalized_status:
+                        continue
+
+                summary_data.append(summary_item)
             
             return summary_data
             

@@ -88,13 +88,6 @@ const ApprovalScreen: React.FC = () => {
     }
     setShowConfirmModal(false);
 
-    // Mark this approval link as used in this browser immediately
-    try {
-      const storageKey = `approval_used_${registrationId}`;
-      localStorage.setItem(storageKey, '1');
-      setLinkUsed(true);
-    } catch {}
-
     setLoadingAction(action);
 
     try {
@@ -115,6 +108,13 @@ const ApprovalScreen: React.FC = () => {
       setStatus(statusMessage);
       setLastAction(action);
       setCompleted(true);
+
+      // Mark this approval link as used in this browser AFTER successful completion
+      try {
+        const storageKey = `approval_used_${registrationId}`;
+        localStorage.setItem(storageKey, '1');
+        setLinkUsed(true);
+      } catch {}
       // After successful approval or rejection, navigate to dashboard
       setTimeout(() => {
         window.location.href = "/dashboard";
@@ -228,7 +228,7 @@ const ApprovalScreen: React.FC = () => {
                         Driving Health Forward <br />
                         One Smart Solution At a Time
                     </h2>
-                    <p className="mt-4 text-sm opacity-80">
+                    <p className="mt-4 opacity-80 font-[12px]">
                         Because every patient is someone’s everything.
                     </p>
                 </div>

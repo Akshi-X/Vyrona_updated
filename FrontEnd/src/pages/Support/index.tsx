@@ -415,8 +415,8 @@ const Support: React.FC = () => {
           <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-5 sm:px-6 pt-5 sm:pt-6">
-                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Grape Support & Feedback</h1>
-                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using Grape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
+                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">myGrape Support & Feedback</h1>
+                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using myGrape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
               </div>
 
               <form onSubmit={onSubmit} className="px-5 sm:px-6 pb-6">
@@ -609,7 +609,8 @@ const Support: React.FC = () => {
                               disabled={readonly} 
                               checked={selectedModuleIndices.includes(index)}
                               onChange={(e) => handleModuleChange(index, e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-gray-300 text-purple-700 focus:ring-purple-200" 
+                              className="h-3.5 w-3.5 rounded border-gray-300 focus:outline-none focus:ring-0"
+                              style={{ accentColor: COLORS.primary.purple }}
                             />
                             <span className="text-[12px] text-gray-800">{label}</span>
                           </label>
@@ -677,7 +678,7 @@ const Support: React.FC = () => {
                     <div className="pt-4">
                       {/* Add comment */}
                       <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-800 text-xs font-semibold">{(fullName||'U').slice(0,1)}</div>
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-800 text-xs font-semibold">{(currentUserName || fullName || 'U').trim().slice(0,1).toUpperCase()}</div>
                         <div className="flex-1">
                           <textarea
                             rows={3}
