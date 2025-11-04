@@ -40,12 +40,10 @@ function parseDurationToHours(input: string): number {
 }
 
 function niceMax(maxValue: number): number {
-  // Round up to a pleasant tick (nearest 5/10/20 etc.)
+  // Round up to the next multiple of the current magnitude (e.g., 24 -> 30, 67 -> 70)
   if (maxValue <= 10) return 10;
   const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
-  const normalized = maxValue / magnitude;
-  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return nice * magnitude;
+  return Math.ceil(maxValue / magnitude) * magnitude;
 }
 
 export default function TransportTimeComparison() {
@@ -94,7 +92,7 @@ export default function TransportTimeComparison() {
           backgroundColor: '#5B0D8E',
           borderRadius: 6,
           borderSkipped: 'bottom' as any,
-          barThickness: 22,
+          barThickness: 32,
           categoryPercentage: 0.6 as any,
           barPercentage: 0.7 as any,
         },
@@ -104,7 +102,7 @@ export default function TransportTimeComparison() {
           backgroundColor: '#A340F9',
           borderRadius: 6,
           borderSkipped: 'bottom' as any,
-          barThickness: 22,
+          barThickness: 32,
           categoryPercentage: 0.6 as any,
           barPercentage: 0.7 as any,
         },
@@ -122,6 +120,14 @@ export default function TransportTimeComparison() {
         legend: { display: false },
         tooltip: {
           callbacks: {
+            title: (items: any[]) => {
+              if (!items?.length) return '';
+              const idx = items[0].dataIndex;
+              const route = data[idx];
+              return route
+                ? `${route.source_location} -> ${route.destination_location}`
+                : '';
+            },
             label: (ctx: any) => `${ctx.dataset.label}: ${ctx.parsed.y}h`,
           },
         },
@@ -151,7 +157,7 @@ export default function TransportTimeComparison() {
         },
       },
     }),
-    [maxY, stepY]
+    [maxY, stepY, data]
   );
 
   return (
