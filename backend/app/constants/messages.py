@@ -119,6 +119,17 @@ class ErrorMessages:
     PATIENT_NOT_FOUND = "Patient not found"
     SHIPMENT_NOT_STARTED = "Patient is in transportation stage but shipment has not started"
     
+    # Shipment
+    SHIPMENT_3PL_PLAYER_DETAILS_ERROR = "Error getting 3PL player details"
+    SHIPMENT_ACTIVE_ROUTES_ERROR = "Error getting active routes"
+    SHIPMENT_TRANSPORT_TIME_COMPARISON_ERROR = "Error getting transport time comparison"
+    SHIPMENT_PATIENT_JOURNEY_SUMMARY_ERROR = "Error getting patient journey summary"
+    SHIPMENT_CARRIERS_ERROR = "Error getting carriers"
+    SHIPMENT_REGIONS_ERROR = "Error getting available regions"
+    SHIPMENT_CONTROL_TOWER_MAP_ERROR = "Error getting control tower map data"
+    SHIPMENT_METRICS_ERROR = "Error calculating real-time metrics"
+    SHIPMENT_SUMMARY_BUILD_ERROR = "Error building shipment summary"
+    SHIPMENT_REENGINEERING_STAGE_ERROR = "Error getting reengineering stage"
 
     # Task Management
     TASK_CREATE_FAILED = "Failed to create task"
@@ -176,4 +187,7 @@ class SuccessMessages:
 class InfoMessages:
     PENDING_APPROVAL = "Your registration is pending admin approval"
     CHECK_EMAIL = "Please check your email"
+    
+    # Shipment
+    SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE = "Active routes not available"
 
