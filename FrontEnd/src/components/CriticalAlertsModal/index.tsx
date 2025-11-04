@@ -40,7 +40,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
       emptyText="No critical alerts found"
       dataLength={alerts.length}
     >
-      <table className="w-full divide-y divide-gray-200">
+      <table className="alert-card-table w-full divide-y divide-gray-200">
         <thead className="bg-purple-50">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Patient ID</th>

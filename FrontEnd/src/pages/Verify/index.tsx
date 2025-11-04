@@ -148,7 +148,7 @@ const VerifyOtp: React.FC = () => {
                         Driving Health Forward <br />
                         One Smart Solution At a Time
                     </h2>
-                    <p className="mt-4 text-sm opacity-80">
+                    <p className="mt-4 opacity-80 font-[12px]">
                         Because every patient is someone’s everything.
                     </p>
                 </div>
