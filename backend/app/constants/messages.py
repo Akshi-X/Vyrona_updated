@@ -111,6 +111,10 @@ class ErrorMessages:
     AUTHENTICATION_VALIDATION_FAILED = "Authentication validation failed"
     AUTHENTICATION_ERROR = "Authentication error"
     
+    # Patient
+    PATIENT_NOT_FOUND = "Patient not found"
+    SHIPMENT_NOT_STARTED = "Patient is in transportation stage but shipment has not started"
+    
 
     # Task Management
     TASK_CREATE_FAILED = "Failed to create task"

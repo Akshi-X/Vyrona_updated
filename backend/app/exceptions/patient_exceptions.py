@@ -14,9 +14,10 @@ from datetime import datetime
 
 from ..constants.error_codes import ERROR_CODES
 from ..constants.messages import ErrorMessages
+from ..exceptions.custom_exceptions import AppException
 
 
-class PatientException(Exception):
+class PatientException(AppException):
     """Base exception for all patient-related errors"""
     
     def __init__(
@@ -26,12 +27,7 @@ class PatientException(Exception):
         status_code: int = 500,
         details: Optional[Dict[str, Any]] = None
     ):
-        self.message = message
-        self.error_code = error_code
-        self.status_code = status_code
-        self.details = details or {}
-        self.timestamp = datetime.now().isoformat()
-        super().__init__(self.message)
+        super().__init__(message, error_code, status_code, details)
 
 
 # ============================================
@@ -43,10 +39,10 @@ class PatientNotFoundException(PatientException):
     
     def __init__(self, patient_id: Optional[str] = None, reason: Optional[str] = None):
         if patient_id:
-            message = f"Patient with ID '{patient_id}' not found"
+            message = f"{ErrorMessages.PATIENT_NOT_FOUND} with ID '{patient_id}'"
             details = {"patient_id": patient_id}
         else:
-            message = "Patient not found"
+            message = ErrorMessages.PATIENT_NOT_FOUND
             details = {}
         
         if reason:
@@ -95,6 +91,21 @@ class PatientPharmaNotFoundException(PatientException):
             message=message,
             error_code=ERROR_CODES.get("PHARMA_NOT_FOUND", "ERR_9001"),
             status_code=404,
+            details=details
+        )
+
+
+class ShipmentNotStartedException(PatientException):
+    """Exception raised when patient is in transportation stage but shipment has not started"""
+    
+    def __init__(self, patient_id: str):
+        message = f"{ErrorMessages.SHIPMENT_NOT_STARTED} for patient ID '{patient_id}'"
+        details = {"patient_id": patient_id}
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES.get("SHIPMENT_NOT_STARTED", "ERR_9001"),
+            status_code=400,
             details=details
         )
 

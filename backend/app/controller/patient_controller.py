@@ -12,7 +12,8 @@ from app.schemas.patient_schema import (
     PatientCreateResponse,
     PharmaStatisticsResponse,
     PatientSummaryResponse,
-    PatientDetailedResponse
+    PatientDetailedResponse,
+
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -30,11 +31,14 @@ def create_patients(
 
 
 @router.get("/", response_model=List[PatientResponse])
-def get_all_patients(db: Session = Depends(get_db)):
+def get_all_patients(
+    pharma_id: int = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
     """Get all patients"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_all_patients()
+    return patient_service.get_all_patients(pharma_id=pharma_id)
 
 
 @router.get("/ongoing", response_model=List[PatientSummaryResponse])
@@ -70,44 +74,48 @@ def get_user_pharma_statistics(
 @router.get("/provider/{provider_id}", response_model=List[PatientResponse])
 def get_patients_by_provider(
     provider_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
     """Get all patients for a specific provider"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_patients_by_provider(provider_id)
+    return patient_service.get_patients_by_provider(provider_id, pharma_id)
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient_by_id(
     patient_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
     """Get patient by ID"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_patient_by_id(patient_id)
+    return patient_service.get_patient_by_id(patient_id, pharma_id)
 
 
 @router.put("/{patient_id}", response_model=PatientResponse)
 def update_patient(
     patient_id: str,
     patient_data: PatientUpdate,
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
     """Update patient information"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.update_patient(patient_id, patient_data)
+    return patient_service.update_patient(patient_id, patient_data, pharma_id)
 
 
 @router.delete("/{patient_id}", response_model=dict)
 def delete_patient(
     patient_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
     """Delete patient"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    patient_service.delete_patient(patient_id)
+    patient_service.delete_patient(patient_id, pharma_id)
     return {"message": "Patient deleted successfully"}
