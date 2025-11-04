@@ -217,31 +217,42 @@ const ControlTower = () => {
                   {!loadingRoutes && routesError && (
                     <div className="p-4 text-xs text-red-600">{routesError}</div>
                   )}
-                  {!loadingRoutes && !routesError && augmentedRoutes.map((route) => {
-                    const statusColor = route.status === 'Safe' ? 'text-[#00B050]' : route.status === 'Risk' ? 'text-[#FF0000]' : 'text-[#FFA500]';
-                    return (
-                      <div key={route.id} className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 items-center px-4 py-3 hover:bg-gray-50">
-                        <div className="min-w-0">
-                          <button className="text-[#6b1176] text-xs font-bold hover:underline">{route.patientId}</button>
-                          <div className="text-sm text-gray-900 leading-snug">
-                            {(route.origin && route.destination) ? (
-                              <>
-                                <div className="truncate">{route.origin}</div>
-                                <div className="truncate">→ {route.destination}</div>
-                              </>
-                            ) : (
-                              <div className="truncate">{route.routeText}</div>
+                  {!loadingRoutes && !routesError && (augmentedRoutes && augmentedRoutes.length > 0 ? (
+                    (augmentedRoutes || []).map((route) => {
+                      const statusText = route?.status || 'N/A';
+                      const statusColor = statusText === 'Safe'
+                        ? 'text-[#00B050]'
+                        : statusText === 'Risk'
+                          ? 'text-[#FF0000]'
+                          : statusText === 'Delayed'
+                            ? 'text-[#FFA500]'
+                            : 'text-gray-500';
+                      return (
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 items-center px-4 py-3 hover:bg-gray-50">
+                          <div className="min-w-0">
+                            <button className="text-[#6b1176] text-xs font-bold hover:underline">{route?.patientId || 'N/A'}</button>
+                            <div className="text-sm text-gray-900 leading-snug">
+                              {(route?.origin && route?.destination) ? (
+                                <>
+                                  <div className="truncate">{route?.origin || '-'}</div>
+                                  <div className="truncate">→ {route?.destination || '-'}</div>
+                                </>
+                              ) : (
+                                <div className="truncate">{route?.routeText || '-'}</div>
+                              )}
+                            </div>
+                            {route?.supplyChain && (
+                              <div className="text-[11px] text-gray-400 truncate">{route?.supplyChain}</div>
                             )}
                           </div>
-                          {route.supplyChain && (
-                            <div className="text-[11px] text-gray-400 truncate">{route.supplyChain}</div>
-                          )}
+                          <div className={`text-left text-xs font-medium justify-self-start ${statusColor}`}>{statusText}</div>
+                          <div className="text-left text-xs font-bold text-gray-600 justify-self-start">{route?.date || '-'}</div>
                         </div>
-                        <div className={`text-left text-xs font-medium justify-self-start ${statusColor}`}>{route.status}</div>
-                        <div className="text-left text-xs font-bold text-gray-600 justify-self-start">{route.date}</div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-xs text-gray-500">No active routes found.</div>
+                  ))}
                 </div>
               </div>
             </div>
