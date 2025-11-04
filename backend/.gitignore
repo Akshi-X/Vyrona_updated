@@ -56,9 +56,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Alembic - Only ignore compiled Python files, NOT migration scripts
-migration/versions/__pycache__/
-migration/versions/*.pyc
+# Alembic
+alembic/versions/*.pyc
 
 # Pharma Admins
 pharma_admins.json
