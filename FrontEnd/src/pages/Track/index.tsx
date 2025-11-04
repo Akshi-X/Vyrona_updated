@@ -14,14 +14,19 @@ import FrequentlyMissedDocs from './sections/FrequentlyMissedDocs.tsx';
 import RiskPanel from './sections/RiskPanel.tsx';
 import HistoricLaneRiskAssessment from './sections/HistoricLaneRiskAssessment.tsx';
 import PatientSummaryIcon from '../../assets/TrackAndTraceIcons/PatientSummary.svg';
-import ApheresisIcon from '../../assets/TrackAndTraceIcons/Apheresis.svg';
+import DarkApheresisIcon from '../../assets/TrackAndTraceIcons/DarkApheresis.svg';
+import LightApheresisIcon from '../../assets/TrackAndTraceIcons/LightApheresis.svg';
 import DarkCryopreservationIcon from '../../assets/TrackAndTraceIcons/DarkCryopreservation.svg';
 import DarkTransportationIcon from '../../assets/TrackAndTraceIcons/DarkTransportation.svg';
 import PreReIcon from '../../assets/TrackAndTraceIcons/Pre-Reengineering.svg';
+import LightPreReIcon from '../../assets/TrackAndTraceIcons/LightPre-Reengineering.svg';
 import PostReIcon from '../../assets/TrackAndTraceIcons/Post-Reengineering.svg';
+import DarkPostReIcon from '../../assets/TrackAndTraceIcons/DarkPost-Reengineering.svg';
 import LightCryopreservationIcon from '../../assets/TrackAndTraceIcons/LightCryopreservation.svg';
 import LightTransportationIcon from '../../assets/TrackAndTraceIcons/LightTransportation.svg';
 import ReinfusionIcon from '../../assets/TrackAndTraceIcons/Reinfusion.svg';
+import DarkReinfusionIcon from '../../assets/TrackAndTraceIcons/DarkReinfusion.svg';
+import { patientService, type PatientResponse } from '../../services/patientService';
 
 // Header icons & modals (reuse from Dashboard)
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
@@ -48,6 +53,9 @@ export default function TrackPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [userInitials, setUserInitials] = useState<string>('');
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [patientData, setPatientData] = useState<PatientResponse | null>(null);
+  const [loadingPatient, setLoadingPatient] = useState(false);
 
   const stakeholderChats = [
     { id: '1', sender: 'Dr. Sarah Johnson', patientId: `Patient ID : ${patientId}`, message: 'Need update on patient transport status', timestamp: '2024-05-28 14:20', isRead: false },
@@ -113,6 +121,39 @@ export default function TrackPage() {
     status: task.status
   }));
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadStage = async () => {
+      if (!patientId) return;
+      try {
+        const data = await patientService.getPatientStage(patientId);
+        if (isMounted) setCurrentStage(data?.stage ?? null);
+      } catch {
+        if (isMounted) setCurrentStage(null);
+      }
+    };
+    loadStage();
+    return () => { isMounted = false; };
+  }, [patientId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPatient = async () => {
+      if (!patientId) return;
+      setLoadingPatient(true);
+      try {
+        const data = await patientService.getPatientById(patientId);
+        if (isMounted) setPatientData(data);
+      } catch {
+        if (isMounted) setPatientData(null);
+      } finally {
+        if (isMounted) setLoadingPatient(false);
+      }
+    };
+    loadPatient();
+    return () => { isMounted = false; };
+  }, [patientId]);
+
   return (
     <div className="bg-[#fcfaff] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
@@ -128,7 +169,9 @@ export default function TrackPage() {
         {/* Subheader with patient summary and icons */}
         <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">
           <div className="flex items-center text-black text-sm font-semibold">
-            <span>Patient ID: {patientId} - Condition Unknown</span>
+            <span>
+              Patient ID: {patientId} - {loadingPatient ? 'Loading...' : (patientData?.condition || 'Condition Unknown')}
+            </span>
           </div>
           <div className="flex items-center gap-6">
             {/* Critical Alerts */}
@@ -185,75 +228,65 @@ export default function TrackPage() {
         </div>
 
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
-          {/* Top progress rail with icons */}
+          {/* Top progress rail with icons (dynamic) */}
           <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
-            <div className="flex items-center justify-between">
-              {/* Left segment with dark icons and solid connector */}
-              <div className="flex items-center gap-0 flex-1">
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={ApheresisIcon} alt="Apheresis" className="w-4 h-4" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Apheresis</div>
-                </div>
-                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={DarkCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Cryopreservation</div>
-                </div>
-                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={DarkTransportationIcon} alt="Transportation" className="w-4 h-4" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Transportation</div>
-                </div>
-                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={PreReIcon} alt="Pre-Reengineering" className="w-4 h-4" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Pre-Reengineering</div>
-                </div>
-                {/* dotted connector to light phase */}
-                <div className="flex-1">
-                  <div className="w-full h-[2px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
-                </div>
-              </div>
+            {(() => {
+              const steps = [
+                { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
+                { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+                { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+                { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
+                { key: 'Post-Reengineering', dark: DarkPostReIcon, light: PostReIcon },
+                { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+                { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+                { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
+              ];
 
-              {/* Right segment with light icons */}
-              <div className="flex items-center gap-0 flex-1">
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={PostReIcon} alt="Post-Reengineering" className="w-4 h-4 opacity-80" />
+              const currentIndex = Math.max(
+                0,
+                steps.findIndex(s => s.key === (currentStage ?? ''))
+              );
+
+              return (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-0 w-full">
+                    {steps.map((s, idx) => {
+                      const isCompleted = idx < currentIndex;
+                      const isCurrentOrUpcoming = idx >= currentIndex;
+                      const circleBg = isCompleted ? '#8d2b8f' : '#f6e9f8';
+                      const labelColor = isCompleted ? 'text-gray-700' : 'text-gray-500';
+                      const icon = isCompleted ? s.dark : s.light;
+                      const connector = (() => {
+                        if (idx === steps.length - 1) return null;
+                        if (idx < currentIndex - 1) return <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />;
+                        if (idx === currentIndex - 1) return (
+                          <div className="flex-1">
+                            <div className="w-full h-[2px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
+                          </div>
+                        );
+                        return <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />;
+                      })();
+
+                      const containerClass = idx === steps.length - 1
+                        ? 'flex items-center gap-0'
+                        : 'flex items-center gap-0 flex-1';
+
+                      return (
+                        <div className={containerClass} key={`${s.key}-${idx}`}>
+                          <div className="relative flex flex-col items-center w-9 shrink-0">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
+                              <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
+                            </div>
+                            <div className={`absolute top-full mt-2 text-[10px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                          </div>
+                          {connector}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Post-Reengineering</div>
                 </div>
-                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={LightCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Cryopreservation</div>
-                </div>
-                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={LightTransportationIcon} alt="Transportation" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Transportation</div>
-                </div>
-                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1 -ml-3 -mr-3" />
-                <div className="relative flex flex-col items-center w-9 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={ReinfusionIcon} alt="Reinfusion" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Reinfusion</div>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           {/* Quality Tracking + Track and Trace */}

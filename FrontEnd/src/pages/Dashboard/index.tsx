@@ -7,6 +7,7 @@ import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import { patientService } from '../../services/patientService';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
@@ -61,6 +62,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTrackShipment, setShowTrackShipment] = useState(false);
+  const [trackError, setTrackError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
 
   // User initials for avatar
@@ -763,8 +765,22 @@ export default function Dashboard({ }: DashboardProps) {
       {/* Track Shipment Modal */}
       <TrackShipmentModal
         isOpen={showTrackShipment}
-        onClose={() => setShowTrackShipment(false)}
-        onTrack={(pid) => navigate(`/track/${encodeURIComponent(pid)}`)}
+        onClose={() => {
+          setTrackError(undefined);
+          setShowTrackShipment(false);
+        }}
+        error={trackError}
+        onTrack={async (pid) => {
+          try {
+            setTrackError(undefined);
+            await patientService.getPatientById(pid);
+            setShowTrackShipment(false);
+            navigate(`/track/${encodeURIComponent(pid)}`);
+          } catch (e: any) {
+            const msg = (e?.message as string) || 'Failed to fetch patient';
+            setTrackError(msg);
+          }
+        }}
       />
     </div>
   );
