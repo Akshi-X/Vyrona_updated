@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, field_serializer, model_serializer
 
 from app.constants.enums import TaskPriority, TaskStatus
 
@@ -124,14 +124,39 @@ class TaskResponse(BaseModel):
     updated_at: datetime
     permissions: Optional[TaskPermissions] = None
     
+    @field_serializer('due_date')
+    def serialize_due_date(self, due_date: Optional[datetime]) -> Optional[str]:
+        """Format due_date as YYYY-M-D (e.g., 2025-10-3)"""
+        if due_date is None:
+            return None
+        # Format as YYYY-M-D without leading zeros
+        return f"{due_date.year}-{due_date.month}-{due_date.day}"
+    
     class Config:
         from_attributes = True
 
 
 class TaskListResponse(BaseModel):
-    """Response schema for listing tasks"""
-    total_tasks: int
-    tasks: List[TaskResponse]
+    """Response schema for listing tasks split by role context"""
+    total_created: int
+    total_assigned: int
+    created_tasks: List[TaskResponse]
+    assigned_tasks: List[TaskResponse]
+    
+    @model_serializer
+    def serialize_model(self) -> Dict[str, Any]:
+        """Serialize model, excluding empty list fields"""
+        result = {
+            "total_created": self.total_created,
+            "total_assigned": self.total_assigned,
+        }
+        # Only include created_tasks if not empty
+        if self.created_tasks:
+            result["created_tasks"] = self.created_tasks
+        # Only include assigned_tasks if not empty
+        if self.assigned_tasks:
+            result["assigned_tasks"] = self.assigned_tasks
+        return result
 
 
 class CreateTaskResponse(BaseModel):

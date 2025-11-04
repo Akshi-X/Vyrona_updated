@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -100,25 +100,25 @@ def create_task(
     db: Session
 ) -> CreateTaskResponse:
     """
-    Create a new task. Only managers can create tasks.
+    Create a new task. Managers and pharma_admins can create tasks.
     
     Args:
         request: CreateTaskRequest with task details
-        current_user: Current authenticated user (must be manager)
+        current_user: Current authenticated user (must be manager or pharma_admin)
         db: Database session
         
     Returns:
         CreateTaskResponse with created task details
         
     Raises:
-        TaskManagerOnlyException: If user is not a manager
+        TaskManagerOnlyException: If user is not a manager or pharma_admin
         TaskInvalidAssigneeException: If assignee not found or invalid
         TaskInvalidPatientException: If patient not found (when patient_id provided)
         TaskCreateFailedException: If task creation fails
     """
     try:
-        # Check if user is manager
-        if current_user.role != "manager":
+        # Check if user has permission to create tasks (manager or pharma_admin)
+        if current_user.role not in ("manager", "pharma_admin"):
             raise TaskManagerOnlyException(user_role=current_user.role)
         
         # Validate assignee exists and is from same company
@@ -175,9 +175,9 @@ def create_task(
 
 def get_all_tasks(current_user: User, db: Session) -> TaskListResponse:
     """
-    Get all tasks for current user based on their role:
-    - Manager: Tasks they created OR tasks assigned to them
-    - User: Only tasks assigned to them
+    Get tasks for current user split into two lists:
+    - created_tasks: Tasks created by the user (editable via PUT)
+    - assigned_tasks: Tasks assigned to the user (status editable via PATCH)
     
     Multi-tenant filtering: Users can only see tasks from their own company.
     
@@ -189,26 +189,28 @@ def get_all_tasks(current_user: User, db: Session) -> TaskListResponse:
         TaskListResponse with filtered tasks
     """
     try:
-        if current_user.role == "manager":
-            # Managers see tasks they created OR tasks assigned to them
-            tasks = db.query(Tasks).filter(
-                or_(
-                    Tasks.created_by_id == current_user.user_id,
-                    Tasks.assignee_id == current_user.user_id
-                )
-            ).order_by(Tasks.created_at.desc()).all()
-        else:
-            # Regular users only see tasks assigned to them
-            tasks = db.query(Tasks).filter(
-                Tasks.assignee_id == current_user.user_id
-            ).order_by(Tasks.created_at.desc()).all()
-        
-        # Build response with permissions
-        task_responses = [_build_task_response(task, current_user) for task in tasks]
-        
+        # Always compute split lists for all roles
+        created = db.query(Tasks).filter(
+            Tasks.created_by_id == current_user.user_id
+        ).order_by(Tasks.created_at.desc()).all()
+
+        # Get assigned tasks, but exclude tasks where user is both creator and assignee
+        # (those should only appear in created_tasks)
+        assigned = db.query(Tasks).filter(
+            and_(
+                Tasks.assignee_id == current_user.user_id,
+                Tasks.created_by_id != current_user.user_id
+            )
+        ).order_by(Tasks.created_at.desc()).all()
+
+        created_responses = [_build_task_response(task, current_user) for task in created]
+        assigned_responses = [_build_task_response(task, current_user) for task in assigned]
+
         return TaskListResponse(
-            total_tasks=len(task_responses),
-            tasks=task_responses
+            total_created=len(created_responses),
+            total_assigned=len(assigned_responses),
+            created_tasks=created_responses,
+            assigned_tasks=assigned_responses
         )
         
     except Exception as e:
@@ -258,7 +260,7 @@ def update_task(
     db: Session
 ) -> UpdateTaskResponse:
     """
-    Update a task (full update). Only the manager who created the task can do this.
+    Update a task (full update). Only the manager or pharma_admin who created the task can do this.
     
     Args:
         task_id: Task ID to update
@@ -399,7 +401,7 @@ def update_task_status(
 
 def delete_task(task_id: int, current_user: User, db: Session) -> DeleteTaskResponse:
     """
-    Delete a task. Only the manager who created the task can do this.
+    Delete a task. Only the manager or pharma_admin who created the task can do this.
     
     Args:
         task_id: Task ID to delete
@@ -440,4 +442,3 @@ def delete_task(task_id: int, current_user: User, db: Session) -> DeleteTaskResp
     except Exception as e:
         db.rollback()
         raise TaskDeleteFailedException(task_id=task_id, reason=str(e))
-

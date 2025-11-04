@@ -168,3 +168,14 @@ FEEDBACK_DEFAULT_SORT_ORDER = "desc"
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\+?1?\d{9,15}$'
 
+# ============================================
+# COMMON API RESPONSE HEADERS
+# ============================================
+# Common headers used across all API responses for CORS and security
+COMMON_API_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "*",
+    "Access-Control-Allow-Headers": "*",
+}
+
