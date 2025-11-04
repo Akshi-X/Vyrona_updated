@@ -16,6 +16,7 @@ from ..config.database import SessionLocal
 from ..config.permissions import EndpointPermissions
 from ..models.user_model import User
 from ..constants.error_codes import ERROR_CODES
+from ..constants.app_constants import COMMON_API_HEADERS
 from ..exceptions import (
     InvalidTokenException,
     TokenExpiredException,
@@ -129,7 +130,8 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             # Catch custom exceptions and return JSON response
             return JSONResponse(
                 status_code=e.status_code,
-                content=e.to_dict()
+                content=e.to_dict(),
+                headers=COMMON_API_HEADERS
             )
         except Exception as e:
             # Unexpected error
@@ -140,7 +142,8 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                     "message": str(e),
                     "status": "failed",
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
     
     def _is_public_endpoint(self, method: str, path: str) -> bool:

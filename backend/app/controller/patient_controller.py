@@ -13,7 +13,7 @@ from app.schemas.patient_schema import (
     PharmaStatisticsResponse,
     PatientSummaryResponse,
     PatientDetailedResponse,
-
+    PatientStageResponse
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -22,9 +22,18 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 @router.post("/", response_model=PatientCreateResponse, status_code=201)
 def create_patients(
     request_data: PatientCreateRequest,
+    pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Create single or multiple patients"""
+    """Create single or multiple patients for authenticated user's pharma"""
+    # Override pharma_id from token for security (prevent users from creating patients for other pharma)
+    patients_data = request_data.root
+    if isinstance(patients_data, list):
+        for patient in patients_data:
+            patient.pharma_id = pharma_id
+    else:
+        patients_data.pharma_id = pharma_id
+    
     # Call service (all business logic there)
     patient_service = PatientService(db)
     return patient_service.create_patients(request_data)
@@ -35,7 +44,7 @@ def get_all_patients(
     pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Get all patients"""
+    """Get all patients for authenticated user's pharma"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
     return patient_service.get_all_patients(pharma_id=pharma_id)
@@ -77,10 +86,10 @@ def get_patients_by_provider(
     pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Get all patients for a specific provider"""
+    """Get all patients for a specific provider within authenticated user's pharma"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_patients_by_provider(provider_id, pharma_id)
+    return patient_service.get_patients_by_provider(provider_id, pharma_id=pharma_id)
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
@@ -89,10 +98,10 @@ def get_patient_by_id(
     pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Get patient by ID"""
+    """Get patient by ID for authenticated user's pharma"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.get_patient_by_id(patient_id, pharma_id)
+    return patient_service.get_patient_by_id(patient_id, pharma_id=pharma_id)
 
 
 @router.put("/{patient_id}", response_model=PatientResponse)
@@ -102,10 +111,10 @@ def update_patient(
     pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Update patient information"""
+    """Update patient information for authenticated user's pharma"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    return patient_service.update_patient(patient_id, patient_data, pharma_id)
+    return patient_service.update_patient(patient_id, patient_data, pharma_id=pharma_id)
 
 
 @router.delete("/{patient_id}", response_model=dict)
@@ -114,8 +123,19 @@ def delete_patient(
     pharma_id: int = Depends(get_current_user_pharma_id),
     db: Session = Depends(get_db)
 ):
-    """Delete patient"""
+    """Delete patient for authenticated user's pharma"""
     # Call service (all business logic there)
     patient_service = PatientService(db)
-    patient_service.delete_patient(patient_id, pharma_id)
+    patient_service.delete_patient(patient_id, pharma_id=pharma_id)
     return {"message": "Patient deleted successfully"}
+
+
+@router.get("/{patient_id}/stage", response_model=PatientStageResponse)
+def get_patient_stage(
+    patient_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """Get the current stage for a patient from process_phase table"""
+    patient_service = PatientService(db)
+    return patient_service.get_patient_current_stage(patient_id=patient_id, pharma_id=pharma_id)
