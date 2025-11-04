@@ -69,12 +69,8 @@ async def exception_handler_middleware(request: Request, call_next):
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat(),
                 **exc.details
-            }
-        )
-
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=exc.to_dict()
+            },
+            headers=COMMON_API_HEADERS
         )
 
     except PatientException as exc:
@@ -97,7 +93,8 @@ async def exception_handler_middleware(request: Request, call_next):
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat(),
                 **exc.details
-            }
+            },
+            headers=COMMON_API_HEADERS
         )
 
     except ValidationError as exc:
@@ -124,7 +121,8 @@ async def exception_handler_middleware(request: Request, call_next):
                     "message": ErrorMessages.OTP_VALIDATION_ERROR,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         else:
             # Generic validation error
@@ -136,7 +134,8 @@ async def exception_handler_middleware(request: Request, call_next):
                     "message": ErrorMessages.INVALID_REQUEST_DATA,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         
     except Exception as exc:
@@ -164,7 +163,8 @@ async def exception_handler_middleware(request: Request, call_next):
                     "message": ErrorMessages.INVALID_REQUEST_DATA,
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
         
         return JSONResponse(
@@ -175,7 +175,8 @@ async def exception_handler_middleware(request: Request, call_next):
                 "status": STATUS_FAILED,
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
-            }
+            },
+            headers=COMMON_API_HEADERS
         )
 
 
@@ -216,12 +217,7 @@ def setup_exception_handlers(app):
                 "timestamp": datetime.utcnow().isoformat(),
                 **exc.details
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
 
         return JSONResponse(
@@ -316,12 +312,7 @@ def setup_exception_handlers(app):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
         else:
             # Generic validation error
@@ -333,12 +324,7 @@ def setup_exception_handlers(app):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
     
     @app.exception_handler(HTTPException)
@@ -356,12 +342,7 @@ def setup_exception_handlers(app):
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat()
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
     
     @app.exception_handler(Exception)
@@ -388,11 +369,6 @@ def setup_exception_handlers(app):
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
 
