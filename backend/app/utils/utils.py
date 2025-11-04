@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List, Set
 from passlib.context import CryptContext
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import bcrypt
+import country_converter as coco
 from ..models.pharma_model import Pharma
 from ..models.user_model import User
 from ..constants.status_constants import STATUS_FAILED
@@ -166,3 +167,72 @@ def get_pharma_id_by_company_name(company_name: str, db: Session) -> Optional[in
     
     pharma = db.query(Pharma).filter(Pharma.pharma_name == company_name).first()
     return pharma.id if pharma else None
+
+
+# ============================================
+# COUNTRY AND REGION UTILITIES
+# ============================================
+
+# Initialize country converter instance (singleton pattern for performance)
+_cc = coco.CountryConverter()
+
+def country_to_region(country_code: Optional[str]) -> Optional[str]:
+    """
+    Convert a country code to its region using country_converter.
+    
+    Args:
+        country_code: Country code (ISO 3166-1 alpha-2, alpha-3, or country name)
+                      Examples: 'US', 'USA', 'United States', 'DE', 'DEU', 'Germany'
+        
+    Returns:
+        Region name (e.g., 'North America', 'Europe', 'Asia') or None if conversion fails
+    """
+    if not country_code:
+        return None
+    
+    try:
+        # Convert country code to region using country_converter
+        # Using 'UNregion' which provides UN geoscheme regions
+        region = _cc.convert(country_code, to='UNregion', not_found=None)
+        return region if region else None
+    except Exception:
+        # If conversion fails, return None
+        return None
+
+
+def get_countries_by_regions(regions: List[str]) -> Set[str]:
+    """
+    Get all country codes that belong to the specified regions.
+    This is optimized for filtering - pre-computes all countries in the regions.
+    
+    Args:
+        regions: List of region names (e.g., ['Europe', 'North America'])
+        
+    Returns:
+        Set of country codes (ISO 3166-1 alpha-2) that belong to the regions
+    """
+    if not regions:
+        return set()
+    
+    countries = set()
+    try:
+        # Get all available countries from country_converter
+        # Using the data attribute which contains a pandas DataFrame
+        if hasattr(_cc, 'data') and hasattr(_cc.data, 'ISO2'):
+            all_countries = _cc.data['ISO2'].dropna().unique().tolist()
+        else:
+            # Fallback: use a predefined list of common countries
+            all_countries = _cc.data_table['ISO2'].dropna().unique().tolist() if hasattr(_cc, 'data_table') else []
+        
+        # Convert to set for faster lookup
+        regions_set = set(regions)
+        
+        for country_code in all_countries:
+            region = country_to_region(country_code)
+            if region and region in regions_set:
+                countries.add(country_code)
+    except Exception:
+        # If conversion fails, return empty set
+        pass
+    
+    return countries
