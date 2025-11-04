@@ -17,6 +17,8 @@ class Shipment(Base):
     # Shipment Information
     source_location = Column(String, nullable=False)
     destination_location = Column(String, nullable=False)
+    source_country = Column(String, nullable=True)  # Country code (ISO 3166-1 alpha-2 or alpha-3)
+    destination_country = Column(String, nullable=True)  # Country code (ISO 3166-1 alpha-2 or alpha-3)
     
     # Coordinates for mapping (latitude, longitude)
     source_latitude = Column(Float, nullable=True)  # Latitude of source location
