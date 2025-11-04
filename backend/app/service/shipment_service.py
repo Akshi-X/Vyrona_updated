@@ -17,6 +17,7 @@ from ..models.provider_model import Provider
 from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
 from ..constants.enums import PatientStage, RouteStatus
+from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,48 @@ class ShipmentService:
                 PatientStageModel.is_active == True
             )
         ).first()
+    
+    def _validate_patient_for_shipment_operations(
+        self, 
+        patient_id: str, 
+        pharma_id: Optional[int] = None,
+        require_shipment: bool = True
+    ) -> Patient:
+        """
+        Validate patient for shipment-related operations.
+        
+        Args:
+            patient_id: Patient ID to validate
+            pharma_id: Optional pharma ID to validate patient belongs to
+            require_shipment: If True, check that patient in TRANSPORTATION stage has shipments
+            
+        Returns:
+            Patient object if validation passes
+            
+        Raises:
+            PatientNotFoundException: If patient doesn't exist or doesn't belong to pharma
+            ShipmentNotStartedException: If patient is in TRANSPORTATION stage but has no shipments
+        """
+        # Validate patient exists
+        patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            raise PatientNotFoundException(patient_id=patient_id)
+        
+        # Validate patient belongs to pharma if pharma_id is provided
+        if pharma_id and patient.pharma_id != pharma_id:
+            raise PatientNotFoundException(patient_id=patient_id)
+        
+        # Check if patient is in TRANSPORTATION stage but has no shipments
+        if require_shipment:
+            active_transportation_stage = self._get_active_transportation_stage(patient_id)
+            if active_transportation_stage:
+                shipment_count = self.db.query(Shipment).filter(
+                    Shipment.patient_id == patient_id
+                ).count()
+                if shipment_count == 0:
+                    raise ShipmentNotStartedException(patient_id=patient_id)
+        
+        return patient
     
     def _calculate_transit_days(self, departure_time: Optional[datetime]) -> Optional[float]:
         """Calculate transit days from departure time to now."""
@@ -367,6 +410,10 @@ class ShipmentService:
         - warehouse: ShipmentLeg.warehouse
         """
         try:
+            # Validate patient if patient_id is provided
+            if patient_id:
+                self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
+            
             query = self.db.query(
                 ShipmentLeg,
                 Shipment.handover_time,
@@ -428,6 +475,9 @@ class ShipmentService:
             - actual_time: Actual transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to handover_time or arrival_time
         """
         try:
+            # Validate patient and shipment status
+            self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
+            
             query = self.db.query(
                 ShipmentLeg,
                 Shipment.patient_id,
@@ -443,7 +493,7 @@ class ShipmentService:
             
             # Order by leg_order to maintain sequence
             rows = query.order_by(ShipmentLeg.leg_order.asc()).all()
-            
+
             results: List[Dict[str, Any]] = []
             
             for leg, patient_id_val, _ in rows:
@@ -492,13 +542,8 @@ class ShipmentService:
             PatientJourneySummaryResponse with complete journey details
         """
         try:
-            # Get patient information
-            patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
-            if not patient:
-                raise ValueError(f"Patient {patient_id} not found")
-            
-            if pharma_id and patient.pharma_id != pharma_id:
-                raise ValueError(f"Patient {patient_id} does not belong to pharma {pharma_id}")
+            # Validate patient and shipment status
+            self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
             
             # Get all shipments for this patient
             # Order by: departure_time (ascending), then created_at (ascending) as fallback
@@ -692,5 +737,76 @@ class ShipmentService:
         except Exception as e:
             logger.error(f"Error getting reengineering stage: {str(e)}")
             return None
+    
+    def get_control_tower_map_data(
+        self,
+        pharma_id: Optional[int] = None,
+        route_status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get control tower map data with source and destination locations including coordinates.
+        Returns only shipment-level data (no leg details).
+        
+        Args:
+            pharma_id: Optional pharma ID to filter routes
+            route_status: Optional route status filter (safe, delayed, high_risk). If None, returns all statuses.
+            
+        Returns:
+            Dictionary containing:
+            - routes: List of route dictionaries with source/destination and coordinates
+            - total_routes: Total count of routes
+        """
+        try:
+            # Query shipments with joins to check active stage
+            query = self.db.query(Shipment).outerjoin(
+                PatientStageModel,
+                and_(
+                    PatientStageModel.patient_id == Shipment.patient_id,
+                    PatientStageModel.stage == PatientStage.TRANSPORTATION,
+                    PatientStageModel.is_active == True
+                )
+            )
+            
+            if pharma_id:
+                query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Filter by route status if provided
+            if route_status:
+                parsed_status = self._parse_route_status_filter(route_status)
+                if parsed_status:
+                    query = query.filter(Shipment.routes_status == parsed_status)
+            
+            # Filter only active routes (where PatientStage exists)
+            query = query.filter(PatientStageModel.id.isnot(None))
+            
+            results = query.all()
+            
+            routes = []
+            
+            for shipment in results:
+                route_data = {
+                    "shipment_id": shipment.id,
+                    "patient_id": shipment.patient_id,
+                    "source_location": shipment.source_location,
+                    "destination_location": shipment.destination_location,
+                    "source_latitude": shipment.source_latitude,
+                    "source_longitude": shipment.source_longitude,
+                    "destination_latitude": shipment.destination_latitude,
+                    "destination_longitude": shipment.destination_longitude
+                }
+                
+                routes.append(route_data)
+            
+            # Sort by shipment ID
+            routes.sort(key=lambda x: x['shipment_id'], reverse=True)
+            
+            return {
+                "routes": routes,
+                "total_routes": len(routes)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting control tower map data: {str(e)}")
+            raise
 
 
