@@ -1,18 +1,9 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import Header from '../../components/Header';
-
-interface Route {
-  id: string;
-  routeName: string;
-  origin: string;
-  destination: string;
-  carrier: string;
-  status: 'Safe' | 'Risk' | 'Delayed';
-  lastUpdated: string;
-}
+import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 
 const ControlTower = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -28,54 +19,41 @@ const ControlTower = () => {
     navigate('/login');
   };
 
-  // Sample routes data
-  const [routes] = useState<Route[]>([
-    {
-      id: '1',
-      routeName: 'Route A1',
-      origin: 'New York Hub',
-      destination: 'Chicago Hub',
-      carrier: 'FedEx',
-      status: 'Safe',
-      lastUpdated: '2 mins ago'
-    },
-    {
-      id: '2',
-      routeName: 'Route B2',
-      origin: 'Los Angeles Hub',
-      destination: 'San Francisco Hub',
-      carrier: 'UPS',
-      status: 'Risk',
-      lastUpdated: '5 mins ago'
-    },
-    {
-      id: '3',
-      routeName: 'Route C3',
-      origin: 'Miami Hub',
-      destination: 'Atlanta Hub',
-      carrier: 'DHL',
-      status: 'Delayed',
-      lastUpdated: '15 mins ago'
-    },
-    {
-      id: '4',
-      routeName: 'Route D4',
-      origin: 'Seattle Hub',
-      destination: 'Portland Hub',
-      carrier: 'FedEx',
-      status: 'Safe',
-      lastUpdated: '1 min ago'
-    },
-    {
-      id: '5',
-      routeName: 'Route E5',
-      origin: 'Boston Hub',
-      destination: 'Philadelphia Hub',
-      carrier: 'UPS',
-      status: 'Safe',
-      lastUpdated: '3 mins ago'
-    },
-  ]);
+  // Active routes via API
+  const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
+  const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [routesError, setRoutesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      setLoadingRoutes(true);
+      setRoutesError(null);
+      try {
+        const data = await shipmentService.getActiveRoutes();
+        setRoutes(data);
+      } catch (e: any) {
+        setRoutesError(e?.message || 'Failed to load active routes');
+        setRoutes([]);
+      } finally {
+        setLoadingRoutes(false);
+      }
+    };
+    if (isAuthenticated) fetchRoutes();
+  }, [isAuthenticated]);
+
+  // Add 5 more rows based on present values (for demo/population)
+  const augmentedRoutes = useMemo(() => {
+    if (!routes || routes.length === 0) return [] as ActiveRouteItem[];
+    const result: ActiveRouteItem[] = [...routes];
+    for (let i = 0; i < 5; i++) {
+      const base = routes[i % routes.length];
+      result.push({
+        ...base,
+        id: `${base.id}-x${i + 1}`,
+      });
+    }
+    return result;
+  }, [routes]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -103,18 +81,7 @@ const ControlTower = () => {
     }
   };
 
-  const getRouteLineColor = (status: string) => {
-    switch (status) {
-      case 'Safe':
-        return '#22c55e'; // green-500
-      case 'Risk':
-        return '#ef4444'; // red-500
-      case 'Delayed':
-        return '#eab308'; // yellow-500
-      default:
-        return '#6b7280'; // gray-500
-    }
-  };
+  // map color helper not needed here
 
   if (!isAuthenticated) {
     return (
@@ -238,60 +205,43 @@ const ControlTower = () => {
               {/* Active Routes List */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[464px] flex-shrink-0 flex flex-col">
                 <h2 className="font-bold text-black text-lg mb-3">Active Routes</h2>
-                <div className="grid grid-cols-[1fr_84px_110px] gap-4 px-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
-                  <div>Route</div>
-                  <div className="text-center">Status</div>
-                  <div className="text-right">Date</div>
+                <div className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 px-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
+                  <div className="text-left">Route</div>
+                  <div className="text-left justify-self-start">Status</div>
+                  <div className="text-left justify-self-start">Date</div>
                 </div>
                 <div className="flex-1 overflow-y-auto mt-1 divide-y divide-gray-100">
-                  {routes.map((route) => {
-                    const parsed = new Date(route.lastUpdated);
-                    const displayDate = isNaN(parsed.getTime()) ? new Date().toLocaleDateString('en-GB') : parsed.toLocaleDateString('en-GB');
+                  {loadingRoutes && (
+                    <div className="p-4 text-xs text-gray-500">Loading routes...</div>
+                  )}
+                  {!loadingRoutes && routesError && (
+                    <div className="p-4 text-xs text-red-600">{routesError}</div>
+                  )}
+                  {!loadingRoutes && !routesError && augmentedRoutes.map((route) => {
                     const statusColor = route.status === 'Safe' ? 'text-[#00B050]' : route.status === 'Risk' ? 'text-[#FF0000]' : 'text-[#FFA500]';
                     return (
-                      <div key={route.id} className="grid grid-cols-[1fr_84px_110px] gap-4 items-center px-4 py-3 hover:bg-gray-50">
+                      <div key={route.id} className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 items-center px-4 py-3 hover:bg-gray-50">
                         <div className="min-w-0">
-                          <button className="text-[#6b1176] text-xs font-bold hover:underline">{route.id}</button>
+                          <button className="text-[#6b1176] text-xs font-bold hover:underline">{route.patientId}</button>
                           <div className="text-sm text-gray-900 leading-snug">
-                            <div className="truncate">{route.origin}</div>
-                            <div className="truncate">→ {route.destination}</div>
+                            {(route.origin && route.destination) ? (
+                              <>
+                                <div className="truncate">{route.origin}</div>
+                                <div className="truncate">→ {route.destination}</div>
+                              </>
+                            ) : (
+                              <div className="truncate">{route.routeText}</div>
+                            )}
                           </div>
-                          <div className="text-[11px] text-gray-400">{route.carrier} Supply Chain</div>
+                          {route.supplyChain && (
+                            <div className="text-[11px] text-gray-400 truncate">{route.supplyChain}</div>
+                          )}
                         </div>
-                        <div className={`text-center text-xs font-medium ${statusColor}`}>{route.status}</div>
-                        <div className="text-right text-xs font-bold text-gray-600">{displayDate}</div>
+                        <div className={`text-left text-xs font-medium justify-self-start ${statusColor}`}>{route.status}</div>
+                        <div className="text-left text-xs font-bold text-gray-600 justify-self-start">{route.date}</div>
                       </div>
                     );
                   })}
-                </div>
-                <div className="hidden">
-                  {routes.map((route) => (
-                    <div key={route.id} className="grid grid-cols-[1fr_auto_auto] gap-4 items-center px-1 py-3 border-b border-gray-50 hover:bg-gray-50">
-                      {/* Route column */}
-                      <div className="min-w-0">
-                        <button className="text-[#6b1176] text-xs font-semibold hover:underline">
-                          {route.id}
-                        </button>
-                        <div className="text-sm text-gray-900 truncate">
-                          {route.origin}   a a→ {route.destination}
-                        </div>
-                        <div className="text-[11px] text-gray-500 truncate">
-                          {route.carrier} Supply Chain
-                        </div>
-                      </div>
-                      {/* Status column */}
-                      <div className="text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-full border ${getStatusColor(route.status)}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${getStatusDotColor(route.status)}`} />
-                          {route.status}
-                        </span>
-                      </div>
-                      {/* Date column */}
-                      <div className="text-right text-xs font-semibold text-gray-600">
-                        {route.lastUpdated}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
