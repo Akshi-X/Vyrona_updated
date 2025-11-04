@@ -26,6 +26,7 @@ from ..dependencies.auth_dependencies import (
 from ..utils.utils import create_error_response
 from ..exceptions.custom_exceptions import AppException
 from ..constants.enums import FeedbackDepartment, FeedbackType, FeedbackPriority, AffectedModule
+from ..constants.app_constants import COMMON_API_HEADERS
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -255,12 +256,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=e.status_code,
                 content=e.to_dict(),
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
         except Exception as e:
             db.close()
@@ -272,12 +268,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
     
     async def _validate_approve_user(self, request: Request):
@@ -297,12 +288,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     },
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                        "Access-Control-Allow-Methods": "*",
-                        "Access-Control-Allow-Headers": "*",
-                    }
+                    headers=COMMON_API_HEADERS
                 )
             
             db = SessionLocal()
@@ -316,12 +302,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=e.status_code,
                     content=e.to_dict(),
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                        "Access-Control-Allow-Methods": "*",
-                        "Access-Control-Allow-Headers": "*",
-                    }
+                    headers=COMMON_API_HEADERS
                 )
         except Exception as e:
             return JSONResponse(
@@ -332,12 +313,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
     
     async def _validate_reject_user(self, request: Request):
@@ -357,12 +333,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     },
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                        "Access-Control-Allow-Methods": "*",
-                        "Access-Control-Allow-Headers": "*",
-                    }
+                    headers=COMMON_API_HEADERS
                 )
             
             db = SessionLocal()
@@ -376,29 +347,19 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=e.status_code,
                     content=e.to_dict(),
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                        "Access-Control-Allow-Methods": "*",
-                        "Access-Control-Allow-Headers": "*",
-                    }
+                    headers=COMMON_API_HEADERS
                 )
         except Exception as e:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error_code": "SERVER_ERROR",
-                    "message": f"Validation error: {str(e)}",
-                    "status": STATUS_FAILED,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
-            )
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error_code": "SERVER_ERROR",
+                        "message": f"Validation error: {str(e)}",
+                        "status": STATUS_FAILED,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers=COMMON_API_HEADERS
+                )
     
     async def _validate_feedback_creation(self, request: Request):
         """Validate feedback creation request."""
@@ -420,7 +381,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
+                        },
+                        headers=COMMON_API_HEADERS
                     )
                 
                 # Parse JSON from form data
@@ -434,7 +396,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
+                        },
+                        headers=COMMON_API_HEADERS
                     )
             else:
                 # Handle JSON requests
@@ -447,7 +410,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             "message": ErrorMessages.FEEDBACK_REQUEST_DATA_REQUIRED,
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
+                        },
+                        headers=COMMON_API_HEADERS
                     )
                 
                 try:
@@ -460,7 +424,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             "message": f"{ErrorMessages.FEEDBACK_INVALID_JSON_FORMAT}: {str(e)}",
                             "status": STATUS_FAILED,
                             "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
+                        },
+                        headers=COMMON_API_HEADERS
                     )
             
             # Validate required fields
@@ -475,7 +440,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": f"{ErrorMessages.FEEDBACK_MISSING_REQUIRED_FIELDS}: {', '.join(missing_fields)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             # Validate enum values
@@ -495,7 +461,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                                 "message": "At least one affected module must be selected",
                                 "status": STATUS_FAILED,
                                 "timestamp": datetime.now(timezone.utc).isoformat()
-                            }
+                            },
+                            headers=COMMON_API_HEADERS
                         )
                     # Validate each module in the list
                     affected_modules = [AffectedModule(module) for module in affected_modules_data]
@@ -513,7 +480,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": f"{ErrorMessages.FEEDBACK_INVALID_ENUM_VALUE}: {str(e)}",
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             # Validate string lengths
@@ -525,7 +493,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             if len(data["description"]) < 10:
@@ -536,7 +505,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_SHORT,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             if len(data["subject"]) > 200:
@@ -547,7 +517,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.FEEDBACK_SUBJECT_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             if len(data["description"]) > 2000:
@@ -558,7 +529,8 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                         "message": ErrorMessages.FEEDBACK_DESCRIPTION_TOO_LONG,
                         "status": STATUS_FAILED,
                         "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
+                    },
+                    headers=COMMON_API_HEADERS
                 )
             
             # Store validated data in request state for controller to use
@@ -582,5 +554,6 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     "message": f"Validation error: {str(e)}",
                     "status": STATUS_FAILED,
                     "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                },
+                headers=COMMON_API_HEADERS
             )
