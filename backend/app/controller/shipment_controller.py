@@ -9,7 +9,10 @@ from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTow
 from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 from app.exceptions.custom_exceptions import AppException
 from app.constants.error_codes import ERROR_CODES
-from app.constants.messages import ErrorMessages 
+from app.constants.messages import ErrorMessages
+from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTowerMapResponse
+from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
+from app.constants.messages import ErrorMessages, InfoMessages
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -27,7 +30,7 @@ def get_three_pl_players(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting 3PL player details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_3PL_PLAYER_DETAILS_ERROR}: {str(e)}")
 
 
 @router.get("/active-routes", response_model=Dict[str, Any])
@@ -35,6 +38,7 @@ def get_active_routes(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
     carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
+    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
     db: Session = Depends(get_db)
 ):
     """
@@ -174,57 +178,4 @@ def get_control_tower_map(
         return ControlTowerMapResponse(**map_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting control tower map data: {str(e)}")
-
-
-@router.get("/document-checklist/{patient_id}", response_model=DocumentChecklistResponse)
-def get_document_checklist(
-    patient_id: str,
-    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
-    db: Session = Depends(get_db)
-):
-    """
-    Get document checklist from shipment legs for a specific patient.
-    
-    This endpoint returns document counts (actual vs needed) for all shipment legs
-    belonging to the specified patient. The patient must belong to the logged-in user's pharma company.
-    
-    The pharma_id is automatically extracted from the authentication token and used to validate
-    that the patient belongs to the user's pharma company.
-    
-    Args:
-        patient_id: Patient ID to get document checklist for
-    
-    Response:
-        {
-            "items": [
-                {
-                    "stage": "Location A - Location B",
-                    "actual": 3,
-                    "needed": 5,
-                    "missed": 2
-                },
-                ...
-            ],
-            "total_items": 2,
-            "missing_documents": ["Bill of Lading", "Customs Declaration", "Insurance Certificate"],
-            "non_compliance_percentage": 25.5
-        }
-    """
-    try:
-        service = ShipmentService(db)
-        checklist_data = service.get_document_checklist(patient_id=patient_id, pharma_id=pharma_id)
-        return DocumentChecklistResponse(**checklist_data)
-    except PatientNotFoundException:
-        raise
-    except AppException:
-        # Re-raise AppException so middleware can handle it properly
-        raise
-    except Exception as e:
-        # For unexpected errors, raise AppException with proper error code
-        raise AppException(
-            message=ErrorMessages.INTERNAL_SERVER_ERROR,
-            error_code=ERROR_CODES.get("SERVER_ERROR", "ERR_9001"),
-            status_code=500,
-            details={"operation": "get_document_checklist", "error": str(e)}
-        )
 
