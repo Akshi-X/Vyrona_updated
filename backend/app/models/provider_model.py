@@ -5,6 +5,13 @@ from app.config.database import Base
 
 
 class Provider(Base):
+    """
+    Logistics Provider (3PL - Third Party Logistics)
+    Examples: XPO Logistics, DHL Supply Chain, UPS Healthcare, Kuehne+Nagel
+    
+    Note: Currently used for patient providers, but can also represent logistics providers.
+    Consider splitting into separate LogisticsProvider table if needed.
+    """
     __tablename__ = "provider"
 
     id = Column(String, primary_key=True, index=True)
@@ -19,3 +26,4 @@ class Provider(Base):
     # Relationships
     patients = relationship("Patient", back_populates="provider")
     pharma = relationship("Pharma", back_populates="providers")
+

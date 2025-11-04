@@ -43,7 +43,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       emptyText="No tasks found"
       dataLength={tasks.length}
     >
-      <table className="w-full divide-y divide-gray-200">
+      <table className="alert-card-table w-full divide-y divide-gray-200">
         <thead className="bg-purple-50">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Patient ID</th>
@@ -58,11 +58,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {tasks.map((task) => (
             <tr key={task.id} className="hover:bg-gray-50">
-              <td className="px-4 py-4 text-sm text-gray-900 font-mono truncate">
+              <td className="px-4 py-4 text-sm text-gray-900 font-mono font-normal truncate">
                 {task.patientId}
               </td>
               <td className="px-4 py-4">
-                <div className="text-sm font-medium text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
+                <div className="text-sm font-normal text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
               </td>
               <td className="px-4 py-4 text-sm text-gray-900">
                 <div className="truncate" title={task.description}>{task.description}</div>

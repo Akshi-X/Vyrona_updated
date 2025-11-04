@@ -18,7 +18,7 @@ class FeedbackCreateRequest(BaseModel):
     subject: str
     description: str
     priority: FeedbackPriority
-    affected_modules: AffectedModule
+    affected_modules: List[AffectedModule]  # Multiple selection allowed
     send_email: bool = True  # Default to True for backward compatibility
     
     @field_validator('subject')
@@ -34,6 +34,13 @@ class FeedbackCreateRequest(BaseModel):
         if not v or len(v.strip()) < 10:
             raise ValueError("Description must be at least 10 characters long")
         return v.strip()
+    
+    @field_validator('affected_modules')
+    @classmethod
+    def validate_affected_modules(cls, v):
+        if not v or len(v) == 0:
+            raise ValueError("At least one affected module must be selected")
+        return v
 
 
 class CommentCreateRequest(BaseModel):
@@ -91,7 +98,7 @@ class FeedbackDetailResponse(BaseModel):
     subject: str
     description: str
     priority: str
-    affected_modules: str
+    affected_modules: List[str]  # List of affected modules
     status: str
     submitted_by: str
     submitted_by_email: str
@@ -140,4 +147,4 @@ class FeedbackFilterRequest(BaseModel):
     to_date: Optional[datetime] = None
     department: Optional[FeedbackDepartment] = None
     priority: Optional[FeedbackPriority] = None
-    affected_modules: Optional[AffectedModule] = None
+    affected_modules: Optional[AffectedModule] = None  # Single module for filtering
