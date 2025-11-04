@@ -18,6 +18,7 @@ from ..exceptions.patient_exceptions import PatientException
 from ..constants.error_codes import ERROR_CODES
 from ..constants.status_constants import STATUS_FAILED
 from ..constants.messages import ErrorMessages
+from ..constants.app_constants import COMMON_API_HEADERS
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -173,12 +174,7 @@ def setup_exception_handlers(app):
         return JSONResponse(
             status_code=exc.status_code,
             content=exc.to_dict(),
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
 
     @app.exception_handler(PatientException)
@@ -201,12 +197,7 @@ def setup_exception_handlers(app):
                 "timestamp": datetime.utcnow().isoformat(),
                 **exc.details
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
     
     @app.exception_handler(RequestValidationError)
@@ -247,12 +238,7 @@ def setup_exception_handlers(app):
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat()
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
     
     @app.exception_handler(ValidationError)
@@ -277,12 +263,7 @@ def setup_exception_handlers(app):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
         else:
             # Generic validation error
@@ -294,12 +275,7 @@ def setup_exception_handlers(app):
                     "status": STATUS_FAILED,
                     "timestamp": datetime.utcnow().isoformat()
                 },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=COMMON_API_HEADERS
             )
     
     @app.exception_handler(HTTPException)
@@ -317,12 +293,7 @@ def setup_exception_handlers(app):
                 "status": STATUS_FAILED,
                 "timestamp": datetime.utcnow().isoformat()
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
     
     @app.exception_handler(Exception)
@@ -349,11 +320,6 @@ def setup_exception_handlers(app):
                 "error_id": error_id,
                 "timestamp": datetime.utcnow().isoformat()
             },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=COMMON_API_HEADERS
         )
 
