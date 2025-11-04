@@ -6,7 +6,8 @@ from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.shipment_service import ShipmentService
 from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTowerMapResponse
-from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException 
+from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
+from app.constants.messages import ErrorMessages, InfoMessages 
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -24,7 +25,7 @@ def get_three_pl_players(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting 3PL player details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_3PL_PLAYER_DETAILS_ERROR}: {str(e)}")
 
 
 @router.get("/active-routes", response_model=Dict[str, Any])
@@ -84,7 +85,7 @@ def get_active_routes(
             return {
                 "routes": [],
                 "metrics": {},
-                "message": "Active routes not available"
+                "message": InfoMessages.SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE
             }
         
         metrics = service.get_real_time_metrics(
@@ -93,7 +94,7 @@ def get_active_routes(
         )
         return {"routes": routes, "metrics": metrics}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting active routes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_ACTIVE_ROUTES_ERROR}: {str(e)}")
 
 
 @router.get("/transport-time-comparison/{patient_id}", response_model=List[Dict[str, Any]])
@@ -122,7 +123,7 @@ def get_transport_time_comparison(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting transport time comparison: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_TRANSPORT_TIME_COMPARISON_ERROR}: {str(e)}")
 
 
 @router.get("/patient/{patient_id}/summary", response_model=PatientJourneySummaryResponse)
@@ -156,7 +157,7 @@ def get_patient_journey_summary(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_PATIENT_JOURNEY_SUMMARY_ERROR}: {str(e)}")
 
 
 @router.get("/carriers", response_model=List[str])
@@ -184,7 +185,7 @@ def get_all_carriers(
         service = ShipmentService(db)
         return service.get_all_carriers(pharma_id=pharma_id, active_only=active_only)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting carriers: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_CARRIERS_ERROR}: {str(e)}")
 
 
 @router.get("/regions", response_model=List[str])
@@ -211,7 +212,7 @@ def get_available_regions(
         service = ShipmentService(db)
         return service.get_available_regions(pharma_id=pharma_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting available regions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_REGIONS_ERROR}: {str(e)}")
 
 
 @router.get("/control-tower-map", response_model=ControlTowerMapResponse)
@@ -255,5 +256,5 @@ def get_control_tower_map(
         )
         return ControlTowerMapResponse(**map_data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting control tower map data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_CONTROL_TOWER_MAP_ERROR}: {str(e)}")
 

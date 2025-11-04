@@ -17,6 +17,7 @@ from ..models.provider_model import Provider
 from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
 from ..constants.enums import PatientStage, RouteStatus
+from ..constants.messages import ErrorMessages
 from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 from ..utils.utils import get_countries_by_regions, country_to_region
 
@@ -329,7 +330,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating real-time metrics: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_METRICS_ERROR}: {str(e)}")
             raise
     
     def get_active_routes(
@@ -441,7 +442,7 @@ class ShipmentService:
             return active_routes
             
         except Exception as e:
-            logger.error(f"Error getting active routes: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_ACTIVE_ROUTES_ERROR}: {str(e)}")
             raise
 
     def get_3pl_player_details(self, pharma_id: Optional[int] = None, patient_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -506,7 +507,7 @@ class ShipmentService:
 
             return results
         except Exception as e:
-            logger.error(f"Error fetching 3PL player details: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_3PL_PLAYER_DETAILS_ERROR}: {str(e)}")
             raise
 
     def get_transport_time_comparison(self, patient_id: str, pharma_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -569,7 +570,7 @@ class ShipmentService:
             return results
             
         except Exception as e:
-            logger.error(f"Error fetching transport time comparison: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_TRANSPORT_TIME_COMPARISON_ERROR}: {str(e)}")
             raise
     
     def get_patient_journey_summary(
@@ -670,7 +671,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting patient journey summary: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_PATIENT_JOURNEY_SUMMARY_ERROR}: {str(e)}")
             raise
     
     def _build_shipment_summary(self, shipment: Shipment) -> Dict[str, Any]:
@@ -753,7 +754,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error building shipment summary: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_SUMMARY_BUILD_ERROR}: {str(e)}")
             raise
     
     def _get_reengineering_stage(self, patient_id: str) -> Optional[Dict[str, Any]]:
@@ -785,7 +786,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting reengineering stage: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_REENGINEERING_STAGE_ERROR}: {str(e)}")
             return None
     
     def get_control_tower_map_data(
@@ -858,7 +859,7 @@ class ShipmentService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting control tower map data: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_CONTROL_TOWER_MAP_ERROR}: {str(e)}")
             raise
     
     def get_all_carriers(self, pharma_id: Optional[int] = None, active_only: bool = True) -> List[str]:
@@ -920,7 +921,7 @@ class ShipmentService:
             return sorted(list(carrier_names))
             
         except Exception as e:
-            logger.error(f"Error getting all carriers: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_CARRIERS_ERROR}: {str(e)}")
             raise
     
     def get_available_regions(self, pharma_id: Optional[int] = None) -> List[str]:
@@ -967,7 +968,7 @@ class ShipmentService:
             return sorted(list(regions))
             
         except Exception as e:
-            logger.error(f"Error getting available regions: {str(e)}")
+            logger.error(f"{ErrorMessages.SHIPMENT_REGIONS_ERROR}: {str(e)}")
             raise
 
 
