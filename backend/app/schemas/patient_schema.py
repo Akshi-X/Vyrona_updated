@@ -200,6 +200,8 @@ class ControlTowerMapRoute(BaseModel):
     patient_id: str = Field(..., description="Patient ID")
     source_location: str = Field(..., description="Source location name")
     destination_location: str = Field(..., description="Destination location name")
+    source_country: Optional[str] = Field(None, description="Source country code (ISO 3166-1 alpha-2)")
+    destination_country: Optional[str] = Field(None, description="Destination country code (ISO 3166-1 alpha-2)")
     source_latitude: Optional[float] = Field(None, description="Latitude of source location")
     source_longitude: Optional[float] = Field(None, description="Longitude of source location")
     destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
