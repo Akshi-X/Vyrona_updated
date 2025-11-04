@@ -114,7 +114,7 @@ export default function TrackPage() {
   }));
 
   return (
-    <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
+    <div className="bg-[#fcfaff] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
@@ -128,7 +128,6 @@ export default function TrackPage() {
         {/* Subheader with patient summary and icons */}
         <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">
           <div className="flex items-center text-black text-sm font-semibold">
-            <Link to="/dashboard" className="mr-3 text-black">←</Link>
             <span>Patient ID: {patientId} - Condition Unknown</span>
           </div>
           <div className="flex items-center gap-6">
@@ -187,71 +186,71 @@ export default function TrackPage() {
 
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           {/* Top progress rail with icons */}
-          <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
+          <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
             <div className="flex items-center justify-between">
               {/* Left segment with dark icons and solid connector */}
               <div className="flex items-center gap-0 flex-1">
-                <div className="flex flex-col items-center">
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
                     <img src={ApheresisIcon} alt="Apheresis" className="w-4 h-4" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Apheresis</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Apheresis</div>
                 </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
                     <img src={DarkCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Cryopreservation</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Cryopreservation</div>
                 </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
                     <img src={DarkTransportationIcon} alt="Transportation" className="w-4 h-4" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Transportation</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Transportation</div>
                 </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
                     <img src={PreReIcon} alt="Pre-Reengineering" className="w-4 h-4" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Pre-Reengineering</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-700 text-center whitespace-nowrap">Pre-Reengineering</div>
                 </div>
                 {/* dotted connector to light phase */}
-                <div className="flex-1 ">
-                  <div className="w-full h-[3px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
+                <div className="flex-1">
+                  <div className="w-full h-[2px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
                 </div>
               </div>
 
               {/* Right segment with light icons */}
               <div className="flex items-center gap-0 flex-1">
-                <div className="flex flex-col items-center">
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
                     <img src={PostReIcon} alt="Post-Reengineering" className="w-4 h-4 opacity-80" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Post-Reengineering</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Post-Reengineering</div>
                 </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1" />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
                     <img src={LightCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4 opacity-80" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Cryopreservation</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Cryopreservation</div>
                 </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
                     <img src={LightTransportationIcon} alt="Transportation" className="w-4 h-4 opacity-80" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Transportation</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Transportation</div>
                 </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1 -ml-3 -mr-3" />
-                <div className="flex flex-col items-center">
+                <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1 -ml-3 -mr-3" />
+                <div className="relative flex flex-col items-center w-9 shrink-0">
                   <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
                     <img src={ReinfusionIcon} alt="Reinfusion" className="w-4 h-4 opacity-80" />
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Reinfusion</div>
+                  <div className="absolute top-full mt-2 text-[10px] text-gray-500 text-center whitespace-nowrap">Reinfusion</div>
                 </div>
               </div>
             </div>
@@ -270,17 +269,23 @@ export default function TrackPage() {
           </div>
 
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
-          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
-            <ComplianceCard />
-            <NonComplianceCard />
-            <TransportTimeComparison />
+          <div className="grid grid-cols-1 md:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
+            <div className="min-w-0 h-full">
+              <ComplianceCard />
+            </div>
+            <div className="h-full">
+              <NonComplianceCard />
+            </div>
+            <div className="min-w-0 h-full">
+              <TransportTimeComparison />
+            </div>
           </div>
 
           {/* Audit Trail / Frequently Missed Docs / Risk */}
-          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
-            <AuditTrailTable />
-            <FrequentlyMissedDocs />
-            <RiskPanel />
+          <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr_5fr] lg:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
+            <div className="min-w-0 h-full"><AuditTrailTable /></div>
+            <div className="h-full"><FrequentlyMissedDocs /></div>
+            <div className="min-w-0 h-full"><RiskPanel /></div>
           </div>
 
           {/* Historic Lane Risk Assessment */}
