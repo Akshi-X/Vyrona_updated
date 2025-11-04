@@ -129,7 +129,8 @@ ERROR_CODES = {
     "PATIENT_DELETE_FAILED": "ERR_5010",
     "PATIENT_SEARCH_FAILED": "ERR_5011",
     "PATIENT_STATISTICS_FAILED": "ERR_5012",
-    
+    "PATIENT_STAGE_LOOKUP_FAILED": "ERR_5013",
+
     # ============================================
     # VALIDATION (6xxx)
     # ============================================
@@ -229,6 +230,7 @@ ERROR_CODES = {
     "PHARMA_NOT_FOUND": "ERR_9009",
     "PATIENT_DOCUMENT_NOT_FOUND": "ERR_9010",
     "SHIPMENT_NOT_STARTED": "ERR_9011",
+    "PATIENT_STAGE_NOT_FOUND": "ERR_9012",
 }
 
 

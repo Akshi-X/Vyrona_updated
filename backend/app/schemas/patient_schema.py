@@ -133,7 +133,7 @@ class ShipmentLegDetail(BaseModel):
     warehouse: Optional[str] = Field(None, description="Warehouse information")
     doc_count_actual: Optional[int] = Field(None, description="Actual document count")
     doc_count_needed: Optional[int] = Field(None, description="Required document count")
-    
+
     class Config:
         from_attributes = True
 
@@ -206,7 +206,7 @@ class ControlTowerMapRoute(BaseModel):
     source_longitude: Optional[float] = Field(None, description="Longitude of source location")
     destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
     destination_longitude: Optional[float] = Field(None, description="Longitude of destination location")
-    
+
     class Config:
         from_attributes = True
 
@@ -215,6 +215,14 @@ class ControlTowerMapResponse(BaseModel):
     """Schema for control tower map API response"""
     routes: List[ControlTowerMapRoute] = Field(..., description="List of routes for map display")
     total_routes: int = Field(..., description="Total number of routes")
-    
+
     class Config:
         from_attributes = True
+
+# --------------------------------------------
+# Single-patient stage lookup response
+# --------------------------------------------
+class PatientStageResponse(BaseModel):
+    """Schema for current stage of a patient"""
+    patient_id: str
+    stage: Optional[PatientStage] = None
