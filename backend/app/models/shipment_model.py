@@ -18,6 +18,12 @@ class Shipment(Base):
     source_location = Column(String, nullable=False)
     destination_location = Column(String, nullable=False)
     
+    # Coordinates for mapping (latitude, longitude)
+    source_latitude = Column(Float, nullable=True)  # Latitude of source location
+    source_longitude = Column(Float, nullable=True)  # Longitude of source location
+    destination_latitude = Column(Float, nullable=True)  # Latitude of destination location
+    destination_longitude = Column(Float, nullable=True)  # Longitude of destination location
+    
     # Timing Information
     departure_time = Column(DateTime, nullable=True)
     arrival_time = Column(DateTime, nullable=True)

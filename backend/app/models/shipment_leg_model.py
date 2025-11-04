@@ -25,6 +25,10 @@ class ShipmentLeg(Base):
     from_location = Column(String, nullable=False)
     to_location = Column(String, nullable=False)
     
+    # Coordinates for mapping (latitude, longitude)
+    latitude = Column(Float, nullable=True)  # Latitude of current location
+    longitude = Column(Float, nullable=True)  # Longitude of current location
+   
     # Timing Information
     departure_time = Column(DateTime, nullable=True)
     arrival_time = Column(DateTime, nullable=True)
