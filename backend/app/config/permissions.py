@@ -62,6 +62,10 @@ PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/user/{user_id}"),     # View user details
     ("POST", "/api/user/approve"),      # Approve user
     ("POST", "/api/user/reject"),       # Reject user
+    # Allow pharma admins to fully manage tasks
+    ("POST", "/api/tasks"),                    # Create task
+    ("PUT", "/api/tasks/{task_id}"),           # Update task (full update)
+    ("DELETE", "/api/tasks/{task_id}"),        # Delete task
 }
 
 # ============================================
@@ -79,7 +83,8 @@ MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
 # MANAGER-ONLY ENDPOINTS
 # ============================================
 MANAGER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
-    # Managers can no longer approve users - only pharma admins can
+    # Note: Task management endpoints are shared with PHARMA_ADMIN_ENDPOINTS
+    # Add manager-only endpoints here when needed
 }
 
 
@@ -105,6 +110,10 @@ AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/feedback/{feedback_id}/comments"),   # Get comments
     ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
     ("GET", "/api/profile"),  # View own profile
+    # Task endpoints - all authenticated users can view and update status
+    ("GET", "/api/tasks"),                        # Get all tasks (filtered by ownership)
+    ("GET", "/api/tasks/{task_id}"),              # Get task by ID (if creator or assignee)
+    ("PATCH", "/api/tasks/{task_id}/status"),     # Update task status (if assignee)
 }
 
 
