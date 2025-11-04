@@ -122,6 +122,9 @@ def create_feedback(
     # Generate ticket ID
     ticket_id = generate_ticket_id(db)
     
+    # Convert list of AffectedModule enums to comma-separated string
+    affected_modules_str = ",".join([module.value for module in request.affected_modules])
+    
     # Create feedback record
     feedback = Feedback(
         ticket_id=ticket_id,
@@ -130,7 +133,7 @@ def create_feedback(
         subject=request.subject,
         description=request.description,
         priority=request.priority,
-        affected_modules=request.affected_modules.value,
+        affected_modules=affected_modules_str,
         status=FeedbackStatus.OPEN,
         submitted_by=submitted_by,
         created_by=submitted_by
@@ -430,6 +433,9 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
     # Get attachments
     attachments = db.query(FeedbackAttachment).filter(FeedbackAttachment.ticket_id == feedback_id).order_by(FeedbackAttachment.uploaded_at).all()
     
+    # Parse comma-separated affected_modules string back to list
+    affected_modules_list = feedback.affected_modules.split(",") if feedback.affected_modules else []
+    
     return FeedbackDetailResponse(
         id=feedback.ticket_id,
         ticket_id=feedback.ticket_id,
@@ -438,7 +444,7 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         subject=feedback.subject,
         description=feedback.description,
         priority=feedback.priority.value,
-        affected_modules=feedback.affected_modules,
+        affected_modules=affected_modules_list,
         status=feedback.status.value,
         submitted_by=f"{user.first_name} {user.last_name}",
         submitted_by_email=user.email,

@@ -1,16 +1,16 @@
-import React from 'react';
+import { CurveBar } from '../../../components/CurveBar';
 
 export default function NonComplianceCard() {
+  const percentage = 12;
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[270px] w-[200px]">
-      <h3 className="font-bold text-black text-[14px] mb-3">Non-Compliance</h3>
-      <div className="flex items-center gap-4">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[200px]">
+      <h3 className="font-bold text-black text-sm mb-2 text-[16px]">Non-Compliance</h3>
+      <div className="flex items-center justify-center mt-[60px]">
         <div className="relative">
-          <svg viewBox="0 0 120 120" className="w-28 h-28">
-            <circle cx="60" cy="60" r="50" fill="#fff" stroke="#eee" strokeWidth="10" />
-            <circle cx="60" cy="60" r="50" fill="transparent" stroke="#9c3aa6" strokeWidth="10" strokeDasharray="314" strokeDashoffset="(1-0.12)*314" />
-            <text x="60" y="66" textAnchor="middle" className="fill-purple-700 text-[20px]">12%</text>
-          </svg>
+          <CurveBar percentage={percentage} color="#F97316" className='w-[30px] h-[30px]'/>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-black font-bold text-[28px] mt-[50px]">{percentage}%</span>
+          </div>
         </div>
       </div>
     </div>
