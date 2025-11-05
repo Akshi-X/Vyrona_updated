@@ -172,8 +172,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
       <div 
         className="h-[385px] overflow-y-auto"
         style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: '#af6eb7 transparent'
+          scrollbarWidth: 'thin'
         }}
       >
         <table className="w-full">
