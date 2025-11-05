@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
@@ -14,14 +14,18 @@ import FrequentlyMissedDocs from './sections/FrequentlyMissedDocs.tsx';
 import RiskPanel from './sections/RiskPanel.tsx';
 import HistoricLaneRiskAssessment from './sections/HistoricLaneRiskAssessment.tsx';
 import PatientSummaryIcon from '../../assets/TrackAndTraceIcons/PatientSummary.svg';
-import ApheresisIcon from '../../assets/TrackAndTraceIcons/Apheresis.svg';
+import DarkApheresisIcon from '../../assets/TrackAndTraceIcons/DarkApheresis.svg';
+import LightApheresisIcon from '../../assets/TrackAndTraceIcons/LightApheresis.svg';
 import DarkCryopreservationIcon from '../../assets/TrackAndTraceIcons/DarkCryopreservation.svg';
 import DarkTransportationIcon from '../../assets/TrackAndTraceIcons/DarkTransportation.svg';
 import PreReIcon from '../../assets/TrackAndTraceIcons/Pre-Reengineering.svg';
+import LightPreReIcon from '../../assets/TrackAndTraceIcons/LightPre-Reengineering.svg';
 import PostReIcon from '../../assets/TrackAndTraceIcons/Post-Reengineering.svg';
 import LightCryopreservationIcon from '../../assets/TrackAndTraceIcons/LightCryopreservation.svg';
 import LightTransportationIcon from '../../assets/TrackAndTraceIcons/LightTransportation.svg';
 import ReinfusionIcon from '../../assets/TrackAndTraceIcons/Reinfusion.svg';
+import DarkReinfusionIcon from '../../assets/TrackAndTraceIcons/DarkReinfusion.svg';
+import { patientService, type PatientResponse } from '../../services/patientService';
 
 // Header icons & modals (reuse from Dashboard)
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
@@ -33,8 +37,19 @@ import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import PatientSummaryAlertModal from '../../components/PatientSummaryAlertModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
+
 import { userService, type UserListItem, type UserProfileDto } from '../../services/userService';
 import { chatService } from '../../services/chatService';
+const steps = [
+  { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
+  { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+  { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+  { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
+  { key: 'Post-Reengineering', dark: PostReIcon, light: PostReIcon },
+  { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+  { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+  { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
+];
 
 export default function TrackPage() {
   const { patientId } = useParams();
@@ -52,6 +67,9 @@ export default function TrackPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [userInitials, setUserInitials] = useState<string>('');
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [patientData, setPatientData] = useState<PatientResponse | null>(null);
+  const [loadingPatient, setLoadingPatient] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const unreadSeparatorRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -87,6 +105,8 @@ export default function TrackPage() {
       setLoadingAlerts(false);
     }
   };
+
+  
 
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
@@ -710,6 +730,11 @@ export default function TrackPage() {
     fetchUserProfile();
   }, []);
 
+  const currentIndex = Math.max(
+    0,
+    steps.findIndex(s => s.key === (currentStage ?? ''))
+  );
+
   const transformedTasks: MyTask[] = myTasks.map(task => ({
     id: task.id.toString(),
     patientId: task.patient_id || 'N/A',
@@ -721,8 +746,35 @@ export default function TrackPage() {
     status: task.status
   }));
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      if (!patientId) return;
+      setLoadingPatient(true);
+      try {
+        const [stageData, patientDataResp] = await Promise.all([
+          patientService.getPatientStage(patientId),
+          patientService.getPatientById(patientId),
+        ]);
+        if (isMounted) {
+          setCurrentStage(stageData?.stage ?? null);
+          setPatientData(patientDataResp);
+        }
+      } catch {
+        if (isMounted) {
+          setCurrentStage(null);
+          setPatientData(null);
+        }
+      } finally {
+        if (isMounted) setLoadingPatient(false);
+      }
+    };
+    loadData();
+    return () => { isMounted = false; };
+  }, [patientId]);
+
   return (
-    <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
+    <div className="bg-[#fcfaff] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
@@ -736,8 +788,9 @@ export default function TrackPage() {
         {/* Subheader with patient summary and icons */}
         <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">
           <div className="flex items-center text-black text-sm font-semibold">
-            <Link to="/dashboard" className="mr-3 text-black">←</Link>
-            <span>Patient ID: {patientId} - Condition Unknown</span>
+            <span>
+              Patient ID: {patientId} - {loadingPatient ? 'Loading...' : (patientData?.condition || 'Condition Unknown')}
+            </span>
           </div>
           <div className="flex items-center gap-6">
             {/* Critical Alerts */}
@@ -804,7 +857,7 @@ export default function TrackPage() {
             <div className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="px-5 pt-5 pb-3 border-b">
-                <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg">
                       <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -861,21 +914,21 @@ export default function TrackPage() {
                                   <div className="bg-gray-100 rounded-lg px-3 py-2 inline-block">
                                     <div className="text-sm whitespace-pre-wrap" style={{ color: '#000000' }}>
                                       {renderMessageWithMentions(m.text)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                  </div>
+                </div>
+                  </div>
+                </div>
                             ) : (
                               <div className="flex justify-end mb-4">
                                 <div className="max-w-[70%]">
                                   <div className="bg-purple-50 rounded-lg px-3 py-2 inline-block">
                                     <div className="text-sm whitespace-pre-wrap" style={{ color: '#000000' }}>
                                       {renderMessageWithMentions(m.text)}
-                                    </div>
-                                  </div>
+                  </div>
+                </div>
                                   <div className="text-[10px] text-gray-500 mt-1 text-right">{m.at}</div>
-                                </div>
-                              </div>
+                </div>
+              </div>
                             )}
                           </div>
                         );
@@ -884,7 +937,7 @@ export default function TrackPage() {
                   ) : (
                     <div className="text-center text-xs text-gray-500 mt-10">
                       {patientId ? 'No messages yet. Start the conversation!' : 'No messages to display'}
-                    </div>
+                  </div>
                   )}
                 </div>
                   {/* Composer */}
@@ -921,92 +974,68 @@ export default function TrackPage() {
                                     {user.first_name} {user.last_name}
                                   </div>
                                   <div className="text-xs text-gray-500">{user.email}</div>
-                                </div>
+                  </div>
                               </button>
                             ))}
-                          </div>
+                </div>
                         )}
-                      </div>
+                  </div>
                       <button disabled={!patientId || !draftMessage.trim()} onClick={handleSendDraft} className={`w-9 h-9 rounded-md flex items-center justify-center ${(!patientId || !draftMessage.trim()) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#8d2b8f]'}`}>
                         <svg className="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14A1 1 0 003 18h14a1 1 0 00.894-1.447l-7-14z"/></svg>
                       </button>
-                    </div>
-                  </div>
+                </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
-          {/* Top progress rail with icons */}
-          <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              {/* Left segment with dark icons and solid connector */}
-              <div className="flex items-center gap-0 flex-1">
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={ApheresisIcon} alt="Apheresis" className="w-4 h-4" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Apheresis</div>
-                </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={DarkCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Cryopreservation</div>
-                </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={DarkTransportationIcon} alt="Transportation" className="w-4 h-4" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Transportation</div>
-                </div>
-                <div className="h-[3px] bg-[#8d2b8f] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#8d2b8f] flex items-center justify-center">
-                    <img src={PreReIcon} alt="Pre-Reengineering" className="w-4 h-4" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-700">Pre-Reengineering</div>
-                </div>
-                {/* dotted connector to light phase */}
-                <div className="flex-1 ">
-                  <div className="w-full h-[3px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
-                </div>
-              </div>
+        
 
-              {/* Right segment with light icons */}
-              <div className="flex items-center gap-0 flex-1">
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={PostReIcon} alt="Post-Reengineering" className="w-4 h-4 opacity-80" />
+        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
+          {/* Top progress rail with icons (dynamic) */}
+          <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
+            {(() => {
+              return (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-0 w-full">
+                    {steps.map((s, idx) => {
+                      const isCompleted = idx < currentIndex;
+                      const isCurrentOrUpcoming = idx >= currentIndex;
+                      const circleBg = isCompleted ? '#8d2b8f' : '#f6e9f8';
+                      const labelColor = isCompleted ? 'text-gray-700' : 'text-gray-500';
+                      const icon = isCompleted ? s.dark : s.light;
+                      const connector = (() => {
+                        if (idx === steps.length - 1) return null;
+                        if (idx < currentIndex - 1) return <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />;
+                        if (idx === currentIndex - 1) return (
+                          <div className="flex-1">
+                            <div className="w-full h-[2px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
+                          </div>
+                        );
+                        return <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />;
+                      })();
+
+                      const containerClass = idx === steps.length - 1
+                        ? 'flex items-center gap-0'
+                        : 'flex items-center gap-0 flex-1';
+
+                      return (
+                        <div className={containerClass} key={`${s.key}-${idx}`}>
+                          <div className="relative flex flex-col items-center w-9 shrink-0">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
+                              <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
+                            </div>
+                            <div className={`absolute top-full mt-2 text-[10px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                          </div>
+                          {connector}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Post-Reengineering</div>
                 </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1" />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={LightCryopreservationIcon} alt="Cryopreservation" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Cryopreservation</div>
-                </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1 " />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={LightTransportationIcon} alt="Transportation" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Transportation</div>
-                </div>
-                <div className="h-[3px] bg-[#f1dff5] rounded-full flex-1 -ml-3 -mr-3" />
-                <div className="flex flex-col items-center">
-                  <div className="w-9 h-9 rounded-full bg-[#f6e9f8] flex items-center justify-center">
-                    <img src={ReinfusionIcon} alt="Reinfusion" className="w-4 h-4 opacity-80" />
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-500">Reinfusion</div>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           {/* Quality Tracking + Track and Trace */}
@@ -1022,17 +1051,23 @@ export default function TrackPage() {
           </div>
 
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
-          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
+            <div className="min-w-0 h-full">
             <ComplianceCard />
+            </div>
+            <div className="h-full">
             <NonComplianceCard />
+            </div>
+            <div className="min-w-0 h-full">
             <TransportTimeComparison />
+            </div>
           </div>
 
           {/* Audit Trail / Frequently Missed Docs / Risk */}
-          <div className="grid grid-cols-[5fr_1fr_6fr] gap-6">
-            <AuditTrailTable />
-            <FrequentlyMissedDocs />
-            <RiskPanel />
+          <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr_5fr] lg:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
+            <div className="min-w-0 h-full"><AuditTrailTable /></div>
+            <div className="h-full"><FrequentlyMissedDocs /></div>
+            <div className="min-w-0 h-full"><RiskPanel /></div>
           </div>
 
           {/* Historic Lane Risk Assessment */}

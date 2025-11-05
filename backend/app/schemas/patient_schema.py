@@ -133,7 +133,7 @@ class ShipmentLegDetail(BaseModel):
     warehouse: Optional[str] = Field(None, description="Warehouse information")
     doc_count_actual: Optional[int] = Field(None, description="Actual document count")
     doc_count_needed: Optional[int] = Field(None, description="Required document count")
-
+    
     class Config:
         from_attributes = True
 
@@ -200,13 +200,11 @@ class ControlTowerMapRoute(BaseModel):
     patient_id: str = Field(..., description="Patient ID")
     source_location: str = Field(..., description="Source location name")
     destination_location: str = Field(..., description="Destination location name")
-    source_country: Optional[str] = Field(None, description="Source country code (ISO 3166-1 alpha-2)")
-    destination_country: Optional[str] = Field(None, description="Destination country code (ISO 3166-1 alpha-2)")
     source_latitude: Optional[float] = Field(None, description="Latitude of source location")
     source_longitude: Optional[float] = Field(None, description="Longitude of source location")
     destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
     destination_longitude: Optional[float] = Field(None, description="Longitude of destination location")
-
+    
     class Config:
         from_attributes = True
 
@@ -226,3 +224,29 @@ class PatientStageResponse(BaseModel):
     """Schema for current stage of a patient"""
     patient_id: str
     stage: Optional[PatientStage] = None
+
+
+# ============================================
+# DOCUMENT CHECKLIST SCHEMAS
+# ============================================
+
+class DocumentChecklistItem(BaseModel):
+    """Schema for document checklist item from shipment leg"""
+    stage: str = Field(..., description="Stage in format 'from_location - to_location'")
+    actual: Optional[int] = Field(None, description="Actual document count (doc_count_actual)")
+    needed: Optional[int] = Field(None, description="Required document count (doc_count_needed)")
+    missed: Optional[int] = Field(None, description="Missed document count (needed - actual, minimum 0)")
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentChecklistResponse(BaseModel):
+    """Schema for document checklist API response"""
+    items: List[DocumentChecklistItem] = Field(..., description="List of document checklist items")
+    total_items: int = Field(..., description="Total number of items")
+    missing_documents: List[str] = Field(default_factory=list, description="Overall list of missing document names across all shipment legs")
+    non_compliance_percentage: float = Field(..., description="Non-compliance percentage calculated as ((total_needed - total_actual) / total_needed) * 100")
+
+    class Config:
+        from_attributes = True
