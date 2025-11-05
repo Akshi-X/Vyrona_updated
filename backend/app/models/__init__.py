@@ -11,6 +11,7 @@ from .provider_model import Provider
 from .carrier_model import Carrier
 from .shipment_model import Shipment
 from .shipment_leg_model import ShipmentLeg
+from .shipment_leg_document_model import ShipmentLegDocument
 from .task_model import Tasks
 from .chat_model import ChatMessage
 from .chat_read_status import ChatReadStatus
