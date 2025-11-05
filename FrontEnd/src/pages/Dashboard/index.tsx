@@ -7,6 +7,7 @@ import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import PatientSummaryAlertModal from '../../components/PatientSummaryAlertModal';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
@@ -27,6 +28,7 @@ import Header from '../../components/Header';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
+import PatientSummaryAlertIcon from '../../assets/DashBoardIcons/Patient_Summary_Alert.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
 
@@ -53,6 +55,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
+  const [showPatientSummaryAlert, setShowPatientSummaryAlert] = useState(false);
 
   // Real data from APIs
   const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
@@ -94,6 +97,7 @@ export default function Dashboard({ }: DashboardProps) {
   const stakeholderChatCount = stakeholderChats.length; // Show total chats count
   const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
   const myTasksCount = myTasks.length; // Show total tasks count
+  const patientSummaryAlertCount = 1; // placeholder badge (can be wired to API)
 
 
   // Fetch critical alerts from API
@@ -553,6 +557,30 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
                   </div>
 
+                  {/* Patient Summary Alert */}
+                  <div className="relative group">
+                    <img
+                      className="w-[22px] h-[22px] cursor-pointer"
+                      alt="Patient Summary Alert"
+                      src={PatientSummaryAlertIcon}
+                      onClick={() => setShowPatientSummaryAlert(true)}
+                    />
+                    {patientSummaryAlertCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">
+                          {patientSummaryAlertCount}
+                        </span>
+                      </div>
+                    )}
+                    {/* Tooltip */}
+                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      <div className="font-semibold text-black text-xs whitespace-nowrap">
+                        Patient Summary Alert
+                      </div>
+                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                    </div>
+                  </div>
+
                   {/* My Tasks */}
                   <div className="relative group">
                     <img
@@ -758,6 +786,32 @@ export default function Dashboard({ }: DashboardProps) {
         onClose={() => setShowStakeholderChats(false)}
         chats={stakeholderChats}
         loading={loadingChats}
+      />
+
+      {/* Patient Summary Alert Modal */}
+      <PatientSummaryAlertModal
+        isOpen={showPatientSummaryAlert}
+        onClose={() => setShowPatientSummaryAlert(false)}
+        patient={{
+          patientId: 'Patient RT-659123',
+          condition: 'CAR-T Cell Therapy',
+          currentStage: 'Reengineering Completed',
+          lastUpdated: new Date().toLocaleString(),
+        }}
+        alerts={[
+          { id: 'a1', type: 'success', message: 'Sample arrived at Pharma Facility – 05/01/25, 14:15', timestamp: '05/01/25, 14:15', provider: 'DHL Supply Chain' },
+          { id: 'a2', type: 'warning', message: 'QC Testing delayed due to equipment check', timestamp: '05/02/25, 09:30', provider: 'Pharma QC Lab' },
+          { id: 'a3', type: 'error', message: 'Temperature deviation detected in transit – FRA to Paris CDG', timestamp: '05/03/25, 11:05', provider: 'World Courier' },
+          { id: 'a4', type: 'info', message: 'Leg 2 transport scheduled for 05/10/25', timestamp: '05/04/25, 08:00', provider: 'DHL Supply Chain' },
+        ]}
+        statusSummary={[
+          'Leg 1 Completed',
+          'Reengineering in progress',
+          'Leg 2 Scheduled',
+        ]}
+        progressPercent={66}
+        onViewSummary={() => navigate('/track-and-trace')}
+        onAcknowledge={() => setShowPatientSummaryAlert(false)}
       />
 
       {/* Track Shipment Modal */}
