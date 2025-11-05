@@ -159,11 +159,14 @@ def get_control_tower_map(
                     "source_latitude": 40.7128,
                     "source_longitude": -74.0060,
                     "destination_latitude": 34.0522,
-                    "destination_longitude": -118.2437
+                    "destination_longitude": -118.2437,
+                    "route_status": "safe",
+                    "last_updated": "16:25:17"
                 },
                 ...
             ],
-            "total_routes": 10
+            "total_routes": 10,
+            "last_updated": "16:25:17"
         }
     """
     try:

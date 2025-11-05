@@ -204,6 +204,8 @@ class ControlTowerMapRoute(BaseModel):
     source_longitude: Optional[float] = Field(None, description="Longitude of source location")
     destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
     destination_longitude: Optional[float] = Field(None, description="Longitude of destination location")
+    route_status: str = Field(..., description="Route status: safe, delayed, high_risk, or failed")
+    last_updated: Optional[str] = Field(None, description="Last updated time in 24-hour format (e.g., '16:25:17')")
     
     class Config:
         from_attributes = True
@@ -213,6 +215,7 @@ class ControlTowerMapResponse(BaseModel):
     """Schema for control tower map API response"""
     routes: List[ControlTowerMapRoute] = Field(..., description="List of routes for map display")
     total_routes: int = Field(..., description="Total number of routes")
+    last_updated: Optional[str] = Field(None, description="Most recent updated time across all shipments in 24-hour format (e.g., '16:25:17')")
 
     class Config:
         from_attributes = True
