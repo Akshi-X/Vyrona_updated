@@ -7,6 +7,7 @@ interface ModalProps {
   description: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  containerClassName?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -15,7 +16,8 @@ const Modal: React.FC<ModalProps> = ({
   title,
   description,
   icon,
-  children
+  children,
+  containerClassName
 }) => {
   if (!isOpen) return null;
 
@@ -26,7 +28,7 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div className="flex items-center justify-center min-h-screen p-4">
         <div 
-          className="relative mx-auto border w-4/5 shadow-lg rounded-md bg-white w-[40%] overflow-y-auto"
+          className={`relative mx-auto border ${containerClassName ?? 'w-4/5'} shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
