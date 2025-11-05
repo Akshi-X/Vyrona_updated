@@ -212,6 +212,14 @@ class ShipmentService:
             return shipment.updated_at.date().isoformat()
         return None
     
+    def _format_time_12hour(self, dt: Optional[datetime]) -> Optional[str]:
+        """Format datetime to 24-hour time format like '16:25:17'."""
+        if not dt:
+            return None
+        dt_normalized = self._normalize_datetime_to_utc(dt)
+        # Format as 24-hour time (HH:MM:SS)
+        return dt_normalized.strftime("%H:%M:%S")
+    
     # ============================================
     # PUBLIC SERVICE METHODS
     # ============================================
@@ -834,6 +842,7 @@ class ShipmentService:
             results = query.all()
             
             routes = []
+            most_recent_updated_at = None
             
             for shipment in results:
                 route_data = {
@@ -846,17 +855,25 @@ class ShipmentService:
                     "source_latitude": shipment.source_latitude,
                     "source_longitude": shipment.source_longitude,
                     "destination_latitude": shipment.destination_latitude,
-                    "destination_longitude": shipment.destination_longitude
+                    "destination_longitude": shipment.destination_longitude,
+                    "route_status": shipment.routes_status.value if shipment.routes_status else "unknown",
+                    "last_updated": self._format_time_12hour(shipment.updated_at)
                 }
                 
                 routes.append(route_data)
+                
+                # Track the most recent updated_at time
+                if shipment.updated_at:
+                    if most_recent_updated_at is None or shipment.updated_at > most_recent_updated_at:
+                        most_recent_updated_at = shipment.updated_at
             
             # Sort by shipment ID
             routes.sort(key=lambda x: x['shipment_id'], reverse=True)
             
             return {
                 "routes": routes,
-                "total_routes": len(routes)
+                "total_routes": len(routes),
+                "last_updated": self._format_time_12hour(most_recent_updated_at)
             }
             
         except Exception as e:
