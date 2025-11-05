@@ -6,8 +6,8 @@ export default function FrequentlyMissedDocs() {
     'Temperature Deviation Reports',
   ];
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[270px] w-[200px]">
-      <h3 className="font-bold text-black text-base text-[16px] mb-2 text-[16px]">Frequently Missed Docs</h3>
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
+      <h3 className="font-bold text-black text-base text-[16px] mb-2 text-[16px]">Missed Docs</h3>
       {docs.length  ? (
         <ul className="text-[12px] text-[#6B1176] p-3 list-disc list-inside space-y-1">
           {docs.map((d, i) => (

@@ -1,4 +1,4 @@
-import { BaseApiService } from './baseApiService';
+import { BaseApiService, type ApiResponse } from './baseApiService';
 
 export interface ActiveRouteApiItem {
   id: string | number;
@@ -23,6 +23,22 @@ export interface ActiveRouteItem {
   supplyChain: string;
   status: 'Safe' | 'Risk' | 'Delayed' | string;
   date: string;
+}
+
+export interface ThreePLPlayer {
+  player_name: string;
+  modes: string;
+  source: string;
+  destination: string;
+  departure_time: string;
+  arrival_time: string;
+  handover_time: string;
+  ln2_refill: string;
+  warehouse: string | null;
+}
+
+export interface ThreePLPlayersResponse extends ApiResponse<ThreePLPlayer[]> {
+  data?: ThreePLPlayer[];
 }
 
 class ShipmentService extends BaseApiService {
@@ -104,6 +120,51 @@ class ShipmentService extends BaseApiService {
 
       return { id, patientId, origin, destination, routeText, supplyChain, status: statusText, date };
     });
+  }
+
+  /**
+   * Get 3PL players for a specific patient
+   */
+  async get3PLPlayers(patientId: string): Promise<ThreePLPlayer[]> {
+    try {
+      const response = await this.request<ThreePLPlayer[] | ThreePLPlayersResponse>(
+        `/api/shipment/3pl-players/${patientId}`
+      );
+
+      if (Array.isArray(response)) {
+        return response;
+      }
+
+      if (response && typeof response === 'object' && 'data' in response) {
+        const data = (response as any).data;
+        if (Array.isArray(data)) {
+          return data;
+        }
+      }
+
+      return [];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Transport time comparison for a patient
+   * GET /api/shipment/transport-time-comparison/:patientId
+   */
+  async getTransportTimeComparison(
+    patientId: string
+  ): Promise<
+    Array<{
+      source_location: string;
+      destination_location: string;
+      scheduled_time: string;
+      actual_time: string;
+    }>
+  > {
+    return this.get(
+      `/api/shipment/transport-time-comparison/${encodeURIComponent(patientId)}`
+    );
   }
 }
 
