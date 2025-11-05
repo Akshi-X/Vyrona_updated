@@ -20,7 +20,8 @@ export default function ThreePLTable() {
         setLoading(true);
         setError(null);
         const data = await shipmentService.get3PLPlayers(patientId);
-        setPlayers(data);
+        // Ensure null/undefined entries from backend are removed
+        setPlayers((Array.isArray(data) ? data : []).filter(Boolean) as ThreePLPlayer[]);
       } catch (err: any) {
         setError(err.message || 'Failed to fetch 3PL players');
         setPlayers([]);
@@ -110,7 +111,7 @@ export default function ThreePLTable() {
                 </tr>
               </thead>
               <tbody>
-                {players.map((player, i) => (
+                {players.filter(Boolean).map((player, i) => (
                   <tr key={i} className="text-black text-[14px]">
                     <td className="px-3 py-2 break-words w-[140px]">{player.player_name || 'N/A'}</td>
                     <td className="px-3 py-2 break-words w-[140px]">{player.modes || 'N/A'}</td>

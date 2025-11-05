@@ -39,6 +39,17 @@ import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } fro
 import { tasksService, type Task } from '../../services/tasksService';
 import { userService } from '../../services/userService';
 
+const steps = [
+  { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
+  { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+  { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+  { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
+  { key: 'Post-Reengineering', dark: DarkPostReIcon, light: PostReIcon },
+  { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
+  { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
+  { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
+];
+
 export default function TrackPage() {
   const { patientId } = useParams();
   const { logout } = useAuth();
@@ -78,6 +89,8 @@ export default function TrackPage() {
     }
   };
 
+  
+
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
@@ -110,6 +123,11 @@ export default function TrackPage() {
     fetchUserProfile();
   }, []);
 
+  const currentIndex = Math.max(
+    0,
+    steps.findIndex(s => s.key === (currentStage ?? ''))
+  );
+
   const transformedTasks: MyTask[] = myTasks.map(task => ({
     id: task.id.toString(),
     patientId: task.patient_id || 'N/A',
@@ -123,34 +141,28 @@ export default function TrackPage() {
 
   useEffect(() => {
     let isMounted = true;
-    const loadStage = async () => {
-      if (!patientId) return;
-      try {
-        const data = await patientService.getPatientStage(patientId);
-        if (isMounted) setCurrentStage(data?.stage ?? null);
-      } catch {
-        if (isMounted) setCurrentStage(null);
-      }
-    };
-    loadStage();
-    return () => { isMounted = false; };
-  }, [patientId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadPatient = async () => {
+    const loadData = async () => {
       if (!patientId) return;
       setLoadingPatient(true);
       try {
-        const data = await patientService.getPatientById(patientId);
-        if (isMounted) setPatientData(data);
+        const [stageData, patientDataResp] = await Promise.all([
+          patientService.getPatientStage(patientId),
+          patientService.getPatientById(patientId),
+        ]);
+        if (isMounted) {
+          setCurrentStage(stageData?.stage ?? null);
+          setPatientData(patientDataResp);
+        }
       } catch {
-        if (isMounted) setPatientData(null);
+        if (isMounted) {
+          setCurrentStage(null);
+          setPatientData(null);
+        }
       } finally {
         if (isMounted) setLoadingPatient(false);
       }
     };
-    loadPatient();
+    loadData();
     return () => { isMounted = false; };
   }, [patientId]);
 
@@ -231,22 +243,6 @@ export default function TrackPage() {
           {/* Top progress rail with icons (dynamic) */}
           <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
             {(() => {
-              const steps = [
-                { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
-                { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
-                { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
-                { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
-                { key: 'Post-Reengineering', dark: DarkPostReIcon, light: PostReIcon },
-                { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
-                { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
-                { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
-              ];
-
-              const currentIndex = Math.max(
-                0,
-                steps.findIndex(s => s.key === (currentStage ?? ''))
-              );
-
               return (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-0 w-full">
