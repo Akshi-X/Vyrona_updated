@@ -9,7 +9,7 @@ from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTow
 from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 from app.exceptions.custom_exceptions import AppException
 from app.constants.error_codes import ERROR_CODES
-from app.constants.messages import ErrorMessages
+from app.constants.messages import ErrorMessages 
 
 router = APIRouter(prefix="/shipment", tags=["shipment"])
 
@@ -27,7 +27,7 @@ def get_three_pl_players(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting 3PL player details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_3PL_PLAYER_DETAILS_ERROR}: {str(e)}")
 
 
 @router.get("/active-routes", response_model=Dict[str, Any])
@@ -35,6 +35,7 @@ def get_active_routes(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
     carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
+    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
     db: Session = Depends(get_db)
 ):
     """
@@ -62,11 +63,11 @@ def get_active_routes(
     """
     try:
         service = ShipmentService(db)
-        routes = service.get_active_routes(pharma_id, route_status=route_status, carriers=carriers)
-        metrics = service.get_real_time_metrics(pharma_id)
+        routes = service.get_active_routes(pharma_id, route_status=route_status, carriers=carriers, regions=regions)
+        metrics = service.get_real_time_metrics(pharma_id, regions=regions)
         return {"routes": routes, "metrics": metrics}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting active routes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_ACTIVE_ROUTES_ERROR}: {str(e)}")
 
 
 @router.get("/transport-time-comparison/{patient_id}", response_model=List[Dict[str, Any]])
@@ -95,7 +96,7 @@ def get_transport_time_comparison(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting transport time comparison: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_TRANSPORT_TIME_COMPARISON_ERROR}: {str(e)}")
 
 
 @router.get("/patient/{patient_id}/summary", response_model=PatientJourneySummaryResponse)
@@ -129,7 +130,7 @@ def get_patient_journey_summary(
     except (PatientNotFoundException, ShipmentNotStartedException):
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting patient journey summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_PATIENT_JOURNEY_SUMMARY_ERROR}: {str(e)}")
 
 
 @router.get("/control-tower-map", response_model=ControlTowerMapResponse)
@@ -173,7 +174,64 @@ def get_control_tower_map(
         )
         return ControlTowerMapResponse(**map_data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting control tower map data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_CONTROL_TOWER_MAP_ERROR}: {str(e)}")
+
+
+@router.get("/carriers", response_model=List[str])
+def get_carriers(
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    active_only: bool = Query(True, description="Return only active carriers. If False, returns all carriers."),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of carrier names used in shipments for the specified pharma.
+    
+    Returns carrier names that appear in shipments for the logged-in user's pharma company.
+    The pharma_id is automatically extracted from the authentication token.
+    
+    Args:
+        active_only: If True (default), return only active carriers. If False, return all carriers.
+    
+    Response:
+        [
+            "Carrier Name 1",
+            "Carrier Name 2",
+            ...
+        ]
+    """
+    try:
+        service = ShipmentService(db)
+        carriers = service.get_all_carriers(pharma_id=pharma_id, active_only=active_only)
+        return carriers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_CARRIERS_ERROR}: {str(e)}")
+
+
+@router.get("/regions", response_model=List[str])
+def get_available_regions(
+    pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of unique regions available for shipments based on source and destination countries.
+    
+    Returns region names that appear in shipments for the logged-in user's pharma company.
+    The pharma_id is automatically extracted from the authentication token.
+    
+    Response:
+        [
+            "Asia",
+            "Europe",
+            "North America",
+            ...
+        ]
+    """
+    try:
+        service = ShipmentService(db)
+        regions = service.get_available_regions(pharma_id=pharma_id)
+        return regions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_REGIONS_ERROR}: {str(e)}")
 
 
 @router.get("/document-checklist/{patient_id}", response_model=DocumentChecklistResponse)
@@ -227,4 +285,5 @@ def get_document_checklist(
             status_code=500,
             details={"operation": "get_document_checklist", "error": str(e)}
         )
+
 
