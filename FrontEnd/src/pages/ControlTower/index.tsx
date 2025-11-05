@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
+import ControlTowerMap from '../../components/ControlTowerMap';
 
 const ControlTower = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -259,76 +260,7 @@ const ControlTower = () => {
 
             {/* Right Panel - Map Visualization */}
             <div className="flex flex-col gap-6 min-w-0 w-full row-span-2">
-              {/* Map Container with embedded Network Status */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[400px] lg:min-w-[674px] lg:h-[868px]">
-                <div className="absolute inset-0 bg-black">
-                  {/* Map Placeholder - Can be replaced with React Leaflet or other map library */}
-                  <div className="w-full h-full relative">
-                    {/* Network Status overlay (top-right) */}
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm border border-[#E7E1E1] rounded-lg px-3 py-2 shadow-sm">
-                      <div className="flex items-center justify-between gap-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-xs text-gray-700">Operational</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500">{new Date().toLocaleTimeString()}</div>
-                      </div>
-                    </div>
-                    {/* Simulated map background */}
-                    <div className="absolute inset-0 opacity-20">
-                      <svg viewBox="0 0 800 600" className="w-full h-full">
-                        {/* Simulated map paths/lines */}
-                        <path
-                          d="M 100 150 Q 200 100 350 120 T 600 150"
-                          stroke="#22c55e"
-                          strokeWidth="3"
-                          fill="none"
-                          opacity="0.8"
-                        />
-                        <path
-                          d="M 150 300 Q 300 250 450 280 T 650 300"
-                          stroke="#ef4444"
-                          strokeWidth="3"
-                          fill="none"
-                          opacity="0.8"
-                        />
-                        <path
-                          d="M 200 450 Q 350 400 500 430 T 700 450"
-                          stroke="#eab308"
-                          strokeWidth="3"
-                          fill="none"
-                          opacity="0.8"
-                        />
-                        {/* Hub markers */}
-                        <circle cx="100" cy="150" r="8" fill="#22c55e" />
-                        <circle cx="600" cy="150" r="8" fill="#22c55e" />
-                        <circle cx="150" cy="300" r="8" fill="#ef4444" />
-                        <circle cx="650" cy="300" r="8" fill="#ef4444" />
-                        <circle cx="200" cy="450" r="8" fill="#eab308" />
-                        <circle cx="700" cy="450" r="8" fill="#eab308" />
-                      </svg>
-                    </div>
-                    {/* Map overlay text */}
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white text-xs">
-                      <span className="bg-black/50 px-2 py-1 rounded">Interactive Map</span>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-2 bg-black/50 px-2 py-1 rounded">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span>Safe</span>
-                        </div>
-                        <div className="flex items-center gap-2 bg-black/50 px-2 py-1 rounded">
-                          <div className="w-2 h-2 bg-red-500 rounded-full" />
-                          <span>Risk</span>
-                        </div>
-                        <div className="flex items-center gap-2 bg-black/50 px-2 py-1 rounded">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                          <span>Delayed</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ControlTowerMap />
             </div>
           </div>
         </div>

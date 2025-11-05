@@ -16,6 +16,7 @@ from ..models.pharma_model import Pharma
 from ..models.provider_model import Provider
 from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
+from ..models.shipment_leg_document_model import ShipmentLegDocument
 from ..constants.enums import PatientStage, RouteStatus
 from ..constants.messages import ErrorMessages
 from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
@@ -969,6 +970,110 @@ class ShipmentService:
             
         except Exception as e:
             logger.error(f"{ErrorMessages.SHIPMENT_REGIONS_ERROR}: {str(e)}")
+            raise
+    
+    def get_document_checklist(self, patient_id: str, pharma_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get document checklist from shipment legs for a specific patient.
+        
+        Args:
+            patient_id: Patient ID to get document checklist for
+            pharma_id: Optional pharma ID to validate patient belongs to pharma (required for security)
+            
+        Returns:
+            Dict containing:
+            - items: List of document checklist items with stage, actual, needed
+            - total_items: Total number of items
+            
+        Raises:
+            PatientNotFoundException: If patient doesn't exist or doesn't belong to pharma
+        """
+        try:
+            # Validate patient exists and belongs to pharma if pharma_id is provided
+            if pharma_id:
+                patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+                if not patient:
+                    raise PatientNotFoundException(patient_id=patient_id)
+                if patient.pharma_id != pharma_id:
+                    raise PatientNotFoundException(patient_id=patient_id)
+            
+            # Query shipment legs with join to shipment to filter by patient_id and pharma_id
+            query = self.db.query(ShipmentLeg).join(
+                Shipment,
+                ShipmentLeg.shipment_id == Shipment.id
+            ).filter(Shipment.patient_id == patient_id)
+            
+            # Additional filter by pharma_id if provided (double check for security)
+            if pharma_id:
+                query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Get all matching shipment legs ordered by leg_order for logical sequence
+            legs = query.order_by(ShipmentLeg.leg_order.asc(), ShipmentLeg.id.asc()).all()
+            
+            # Get all leg IDs for this patient's shipment legs
+            leg_ids = [leg.id for leg in legs]
+            
+            # Get all missing documents across all legs for this patient
+            all_missing_docs = []
+            if leg_ids:
+                all_missing_docs = self.db.query(ShipmentLegDocument).filter(
+                    and_(
+                        ShipmentLegDocument.shipment_leg_id.in_(leg_ids),
+                        ShipmentLegDocument.is_missing == True
+                    )
+                ).all()
+            
+            # Extract unique document names (in case same document is missing in multiple legs)
+            missing_document_names = list(set([doc.document_name for doc in all_missing_docs]))
+            
+            # Build checklist items and calculate totals
+            checklist_items = []
+            total_needed = 0
+            total_actual = 0
+            
+            for leg in legs:
+                # Format stage as "from_location - to_location"
+                stage = f"{leg.from_location} - {leg.to_location}"
+                
+                # Sum up actual and needed counts (handle None values)
+                leg_actual = leg.doc_count_actual or 0
+                leg_needed = leg.doc_count_needed or 0
+                
+                # Calculate missed documents (needed - actual, minimum 0)
+                leg_missed = max(0, leg_needed - leg_actual)
+                
+                total_actual += leg_actual
+                total_needed += leg_needed
+                
+                checklist_items.append({
+                    "stage": stage,
+                    "actual": leg.doc_count_actual,
+                    "needed": leg.doc_count_needed,
+                    "missed": leg_missed
+                })
+            
+            # Calculate non-compliance percentage
+            # Formula: ((total_needed - total_actual) / total_needed) * 100
+            # If total_needed is 0, non-compliance is 0%
+            if total_needed > 0:
+                non_compliance_percentage = ((total_needed - total_actual) / total_needed) * 100
+            else:
+                non_compliance_percentage = 0.0
+            
+            # Round to 2 decimal places
+            non_compliance_percentage = round(non_compliance_percentage, 2)
+            
+            return {
+                "items": checklist_items,
+                "total_items": len(checklist_items),
+                "missing_documents": missing_document_names,
+                "non_compliance_percentage": non_compliance_percentage
+            }
+            
+        except PatientNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting document checklist: {str(e)}")
             raise
 
 

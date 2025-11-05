@@ -20,14 +20,18 @@ interface CurveBarProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   gradient?: LinearGradientDef;
+  backgroundColor?: string;
+  strokeWidth?: number;
 }
 
-export const CurveBar: React.FC<CurveBarProps> = ({ 
-  percentage, 
-  color, 
+export const CurveBar: React.FC<CurveBarProps> = ({
+  percentage,
+  color,
   size = 'md',
   className = '',
-  gradient
+  gradient,
+  backgroundColor = '#ffffff',
+  strokeWidth: strokeWidthProp,
 }) => {
   const sizeClasses = {
     sm: 'w-[120px] h-[60px]',
@@ -35,7 +39,7 @@ export const CurveBar: React.FC<CurveBarProps> = ({
     lg: 'w-[240px] h-[120px]'
   };
 
-  const strokeWidth =  9;
+  const strokeWidth = typeof strokeWidthProp === 'number' ? strokeWidthProp : 9;
   const radius= 75;
   
   // For semi-circle, we use half the circumference
@@ -62,7 +66,7 @@ export const CurveBar: React.FC<CurveBarProps> = ({
         <path
           d={`M ${strokeWidth / 2} ${radius + strokeWidth / 2} A ${radius} ${radius} 0 0 1 ${radius * 2 + strokeWidth / 2} ${radius + strokeWidth / 2}`}
           fill="none"
-          stroke="#ffffff"
+          stroke={backgroundColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
         />
