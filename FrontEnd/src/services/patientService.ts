@@ -31,7 +31,54 @@ export interface PatientApiResponse extends ApiResponse<Patient[][]> {
   data: Patient[][];
 }
 
+export interface PatientResponse {
+  id: string;
+  patient_name: string;
+  condition: string;
+  therapy_id: string | null;
+  insurance_provider: string | null;
+  insurance_type: string | null;
+  hospital_name: string | null;
+  location: string | null;
+  provider_id: string | null;
+  pharma_id: number | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
 export class PatientService extends BaseApiService {
+  /**
+   * Get a patient by ID to validate existence
+   */
+  async getPatientById(patientId: string): Promise<PatientResponse> {
+    try {
+      const response = await this.request<PatientResponse>(
+        `/api/patients/${encodeURIComponent(patientId)}`
+      );
+      return response;
+    } catch (error) {
+      // Re-throw so callers can inspect message (e.g., "Patient not found...")
+      throw error;
+    }
+  }
+
+  /**
+   * Get a patient's current stage
+   */
+  async getPatientStage(patientId: string): Promise<{ patient_id: string; stage: string } | null> {
+    try {
+      const response = await this.request<{ patient_id: string; stage: string }>(
+        `/api/patients/${patientId}/stage`
+      );
+      return response ?? null;
+    } catch (error) {
+      // Surface errors to caller for optional handling
+      throw error;
+    }
+  }
+
   /**
    * Get detailed patient information
    */

@@ -5,7 +5,7 @@ export default function AuditTrailTable() {
     { date: 'April 20', user: 'j.doe', doc: 'Agency' },
   ];
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[270px]">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
       <h3 className="font-bold text-black text-[16px] mb-2">Audit Trail Summary</h3>
       <div className="overflow-x-auto h-[193px]">
         <table className="w-full text-xs">

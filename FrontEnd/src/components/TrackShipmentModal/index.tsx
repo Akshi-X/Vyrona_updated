@@ -5,12 +5,14 @@ interface TrackShipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTrack?: (patientId: string) => void;
+  error?: string;
 }
 
 const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
   isOpen,
   onClose,
   onTrack,
+  error,
 }) => {
   const [patientId, setPatientId] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -27,7 +29,6 @@ const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
     e.preventDefault();
     if (!patientId.trim()) return;
     onTrack?.(patientId.trim());
-    onClose();
   };
 
   return (
@@ -52,6 +53,9 @@ const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
             placeholder="e.g., ZQ812457"
             className="w-full px-4 py-3 rounded-md border border-[#650458] outline-none focus:ring-2 focus:ring-[#bd56af] focus:border-[#bd56af]"
           />
+          {error ? (
+            <p className="mt-2 text-sm text-red-600">{error}</p>
+          ) : null}
         </div>
         <div className="flex justify-end gap-3">
           <button
