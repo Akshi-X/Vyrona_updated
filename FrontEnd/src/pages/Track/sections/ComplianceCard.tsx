@@ -32,11 +32,11 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
         {!loading && !error && items.length === 0 && (
           <div className="px-4 py-3 text-sm text-gray-500">No checklist items</div>
         )}
-        {!loading && !error && items.map((it, idx) => (
-          <div key={`${it.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-            <div className="text-black font-medium">{it.stage}</div>
-            <div className="text-center text-black font-medium">{it.needed}</div>
-            <div className="text-center text-red-600 font-medium">{it.missed}</div>
+        {!loading && !error && items.map((item, idx) => (
+          <div key={`${item.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
+            <div className="text-black font-medium">{item.stage}</div>
+            <div className="text-center text-black font-medium">{item.needed}</div>
+            <div className="text-center text-red-600 font-medium">{item.missed}</div>
           </div>
         ))}
       </div>
