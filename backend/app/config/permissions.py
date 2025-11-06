@@ -42,6 +42,9 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("*", "/docs"),
     ("*", "/openapi.json"),
     ("*", "/redoc"),
+    # Quality monitoring health check - public
+    ("GET", "/api/quality/health"),
+    ("GET", "/api/quality/test"),  # Test endpoint for debugging
 }
 
 
@@ -114,6 +117,11 @@ AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/tasks"),                        # Get all tasks (filtered by ownership)
     ("GET", "/api/tasks/{task_id}"),              # Get task by ID (if creator or assignee)
     ("PATCH", "/api/tasks/{task_id}/status"),     # Update task status (if assignee)
+    # Quality monitoring endpoints - authenticated users can access
+    ("GET", "/api/quality/patients"),
+    ("GET", "/api/quality/history"),
+    ("GET", "/api/quality/connections"),
+    # WebSocket endpoint: /api/quality/ws - authentication handled in endpoint
 }
 
 
