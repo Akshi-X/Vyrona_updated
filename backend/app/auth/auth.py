@@ -59,6 +59,41 @@ def verify_token(token: str) -> dict:
         raise InvalidTokenException()
 
 
+def verify_websocket_token(token: str) -> dict:
+    """
+    Verify JWT token for WebSocket connection and extract user info.
+    
+    This is a convenience function for WebSocket authentication that:
+    - Verifies the token
+    - Extracts user_id (sub) and pharma_id from payload
+    - Validates required fields are present
+    
+    Args:
+        token: JWT token string
+        
+    Returns:
+        Dictionary with 'user_id' and 'pharma_id'
+        
+    Raises:
+        InvalidTokenException: If token is invalid or missing required fields
+    """
+    if not token:
+        raise InvalidTokenException()
+    
+    payload = verify_token(token)
+    user_id = payload.get("sub")
+    pharma_id = payload.get("pharma_id")
+    
+    if not user_id or pharma_id is None:
+        raise InvalidTokenException("Token missing user_id or pharma_id")
+    
+    return {
+        "user_id": user_id,
+        "pharma_id": pharma_id,
+        "payload": payload
+    }
+
+
 def get_current_user_from_request(request: Request) -> User:
     """
     Get authenticated user from request state.
