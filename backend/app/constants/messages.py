@@ -98,10 +98,16 @@ class ErrorMessages:
     FEEDBACK_STATUS_UPDATE_FAILED = "Failed to update feedback status"
     FEEDBACK_STATUS_INVALID = "Invalid status value"
     FEEDBACK_STATUS_ACCESS_DENIED = "Access denied to update status"
+    
     FEEDBACK_STATUS_ALREADY_SET = "Status is already set to this value"
     FEEDBACK_EMAIL_SEND_FAILED = "Failed to send feedback notification email"
     FEEDBACK_EMAIL_TEMPLATE_ERROR = "Email template error for feedback notification"
     FEEDBACK_EMAIL_RECIPIENT_INVALID = "Invalid email recipient for feedback notification"
+    
+    # Quality Monitoring
+    REDIS_CONNECTION_ERROR = "Redis connection failed. Please check Redis server status"
+    QUALITY_DATA_NOT_FOUND = "Quality data not found"
+    QUALITY_SERVICE_ERROR = "Quality monitoring service error"
     
     # General
     INTERNAL_ERROR = "An internal server error occurred"
