@@ -27,6 +27,7 @@ import LightTransportationIcon from '../../assets/TrackAndTraceIcons/LightTransp
 import ReinfusionIcon from '../../assets/TrackAndTraceIcons/Reinfusion.svg';
 import DarkReinfusionIcon from '../../assets/TrackAndTraceIcons/DarkReinfusion.svg';
 import { patientService, type PatientResponse } from '../../services/patientService';
+import { shipmentService } from '../../services/shipmentService';
 
 // Header icons & modals (reuse from Dashboard)
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
@@ -67,6 +68,13 @@ export default function TrackPage() {
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [patientData, setPatientData] = useState<PatientResponse | null>(null);
   const [loadingPatient, setLoadingPatient] = useState(false);
+  const [checklistData, setChecklistData] = useState<{
+    items: Array<{ stage: string; actual: number; needed: number; missed: number }>;
+    missing_documents?: string[];
+    non_compliance_percentage?: number;
+  } | null>(null);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+  const [checklistError, setChecklistError] = useState<string | null>(null);
 
   const stakeholderChats = [
     { id: '1', sender: 'Dr. Sarah Johnson', patientId: `Patient ID : ${patientId}`, message: 'Need update on patient transport status', timestamp: '2024-05-28 14:20', isRead: false },
@@ -163,6 +171,34 @@ export default function TrackPage() {
       }
     };
     loadData();
+    return () => { isMounted = false; };
+  }, [patientId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadChecklist = async () => {
+      if (!patientId) return;
+      setLoadingChecklist(true);
+      setChecklistError(null);
+      try {
+        const res = await shipmentService.getDocumentChecklist(patientId);
+        if (isMounted) {
+          setChecklistData({
+            items: res.items || [],
+            missing_documents: res.missing_documents,
+            non_compliance_percentage: res.non_compliance_percentage,
+          });
+        }
+      } catch (e: any) {
+        if (isMounted) {
+          setChecklistData(null);
+          setChecklistError(e?.message || 'Failed to load document checklist');
+        }
+      } finally {
+        if (isMounted) setLoadingChecklist(false);
+      }
+    };
+    loadChecklist();
     return () => { isMounted = false; };
   }, [patientId]);
 
@@ -300,10 +336,18 @@ export default function TrackPage() {
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
           <div className="grid grid-cols-1 md:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
             <div className="min-w-0 h-full">
-              <ComplianceCard />
+              <ComplianceCard 
+                items={checklistData?.items || []}
+                loading={loadingChecklist}
+                error={checklistError}
+              />
             </div>
             <div className="h-full">
-              <NonComplianceCard />
+              <NonComplianceCard 
+                percentage={checklistData?.non_compliance_percentage ?? 0}
+                loading={loadingChecklist}
+                error={checklistError}
+              />
             </div>
             <div className="min-w-0 h-full">
               <TransportTimeComparison />
@@ -313,7 +357,13 @@ export default function TrackPage() {
           {/* Audit Trail / Frequently Missed Docs / Risk */}
           <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr_5fr] lg:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
             <div className="min-w-0 h-full"><AuditTrailTable /></div>
-            <div className="h-full"><FrequentlyMissedDocs /></div>
+            <div className="h-full">
+              <FrequentlyMissedDocs 
+                missingDocs={checklistData?.missing_documents || []}
+                loading={loadingChecklist}
+                error={checklistError}
+              />
+            </div>
             <div className="min-w-0 h-full"><RiskPanel /></div>
           </div>
 
