@@ -151,6 +151,39 @@ export default function Dashboard({ }: DashboardProps) {
     }
   }, [isAuthenticated]);
 
+  // Lightweight polling to keep unread chat badge updated on dashboard
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      fetchStakeholderChats();
+      intervalId = setInterval(fetchStakeholderChats, 20000);
+    };
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stop();
+    };
+  }, [isAuthenticated]);
+
   // Fetch user profile to compute initials
   useEffect(() => {
     const fetchUserProfile = async () => {
