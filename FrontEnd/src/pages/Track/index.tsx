@@ -91,8 +91,6 @@ export default function TrackPage() {
     }
   };
 
-  
-
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
@@ -104,7 +102,6 @@ export default function TrackPage() {
       ];
       setMyTasks(allTasks);
     } catch (e) {
-      console.error('Error fetching tasks:', e);
       setMyTasks([]);
     } finally {
       setLoadingTasks(false);
@@ -121,7 +118,7 @@ export default function TrackPage() {
         const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
         setUserInitials(initials);
     } catch (error) {
-      console.error('Error fetching current user profile:', error);
+      // Error handled silently
     }
   };
 
@@ -146,14 +143,11 @@ export default function TrackPage() {
       }));
       setStakeholderChats(transformedChats);
     } catch (error) {
-      console.error('Error fetching unread messages:', error);
       setStakeholderChats([]);
     }
   };
 
-
-// user initials are set in fetchCurrentUser
-
+  // user initials are set in fetchCurrentUser
   const currentIndex = Math.max(
     0,
     steps.findIndex(s => s.key === (currentStage ?? ''))
@@ -286,8 +280,6 @@ export default function TrackPage() {
           }}
         />
 
-        
-
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           {/* Top progress rail with icons (dynamic) */}
           <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
@@ -402,16 +394,13 @@ export default function TrackPage() {
           fetchMyTasks();
         }}
         onAdd={() => {
-          // This is called after successful task creation
-          console.log('Task added successfully');
+          // Task creation handled by onTaskCreated callback
         }}
-        onEdit={(task) => {
+        onEdit={(_task) => {
           // TODO: Implement edit task functionality
-          console.log('Edit task clicked:', task);
         }}
-        onDelete={(taskId) => {
+        onDelete={(_taskId) => {
           // TODO: Implement delete task functionality
-          console.log('Delete task clicked:', taskId);
         }}
       />
       {/* Legacy modal retained but not used by icon click */}
