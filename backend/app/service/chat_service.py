@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
@@ -18,11 +18,93 @@ from ..schemas.chat_schema import (
 from ..exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
     ChatUserNotFoundException, ChatPatientNotFoundException,
-    ChatPharmaAccessDeniedException, ChatInvalidDataException
+    ChatPharmaAccessDeniedException, ChatInvalidDataException,
+    ChatException, ChatWebSocketInvalidTypeException
 )
+from ..constants.app_constants import (
+    WS_MSG_TYPE_SUBSCRIBE_PATIENT, WS_MSG_TYPE_UNSUBSCRIBE_PATIENT,
+    WS_MSG_TYPE_GET_PATIENT_MESSAGES, WS_MSG_TYPE_GET_UNREAD_MESSAGES,
+    WS_MSG_TYPE_MARK_READ, WS_MSG_TYPE_PATIENT_MESSAGES,
+    WS_MSG_TYPE_UNREAD_MESSAGES, WS_MSG_TYPE_SUCCESS, WS_MSG_TYPE_ERROR,
+    WS_MSG_TYPE_NEW_MESSAGE
+)
+from ..constants.error_codes import ERROR_CODES
+from ..constants.messages import ErrorMessages
+from ..utils.chat_websocket_manager import ChatConnectionManager
+from fastapi import WebSocketDisconnect
+from ..dependencies.auth_dependencies import authenticate_websocket as default_auth
 
 # Setup logger
 logger = logging.getLogger(__name__)
+
+
+async def broadcast_new_message(
+    result: ChatMessageCreateResponse,
+    sender_pharma_id: int,
+    connection_manager,
+    db: Session
+):
+    """Broadcast new message to WebSocket connections and update unread messages"""
+    try:
+        message_broadcast = ChatMessageResponse(
+            id=result.message_id,
+            message_content=result.message_content,
+            patient_id=result.patient_id,
+            sender_id=result.sender_id,
+            sender_name=result.sender_name,
+            tagged_user_ids=result.tagged_user_ids,
+            created_at=result.created_at,
+            is_read=False,
+            read_at=None
+        )
+        
+        broadcast_payload = {
+            "type": WS_MSG_TYPE_NEW_MESSAGE,
+            "data": message_broadcast.model_dump(mode='json')
+        }
+        
+        await connection_manager.broadcast_to_patient(
+            result.patient_id,
+            broadcast_payload,
+            sender_pharma_id,
+            db
+        )
+        
+        if result.tagged_user_ids:
+            for user_id in result.tagged_user_ids:
+                await connection_manager.send_to_user(user_id, broadcast_payload)
+        
+        # Update unread messages for all connected users
+        try:
+            pharma_connections = connection_manager.get_connections_by_pharma(sender_pharma_id)
+            if not pharma_connections:
+                return
+            
+            disconnected = []
+            for connection_id, conn_data in list(pharma_connections.items()):
+                websocket = conn_data.get("websocket")
+                if not websocket or websocket.client_state.name != "CONNECTED":
+                    if not websocket:
+                        disconnected.append(connection_id)
+                    continue
+                
+                try:
+                    unread_result = get_unread_messages(conn_data.get("user_id"), sender_pharma_id, db)
+                    await websocket.send_json({
+                        "type": WS_MSG_TYPE_UNREAD_MESSAGES,
+                        "success": True,
+                        "data": unread_result.model_dump(mode='json')
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to send unread update to {connection_id}: {e}")
+                    disconnected.append(connection_id)
+            
+            for conn_id in disconnected:
+                connection_manager.disconnect(conn_id)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast unread updates: {e}")
+    except Exception as e:
+        logger.error(f"Failed to broadcast message: {e}", exc_info=True)
 
 
 def create_chat_message(
@@ -41,6 +123,13 @@ def create_chat_message(
         
         # Validate tagged users are in same pharma
         if request.tagged_user_ids:
+            # Check if sender is trying to tag themselves
+            if sender_id in request.tagged_user_ids:
+                raise ChatInvalidDataException(
+                    reason="User attempted to tag themselves",
+                    custom_message=ErrorMessages.CHAT_CANNOT_TAG_SELF
+                )
+            
             tagged_users = db.query(User).filter(
                 User.user_id.in_(request.tagged_user_ids)
             ).all()
@@ -56,11 +145,21 @@ def create_chat_message(
                     )
         
         # Create chat message
+        # Always save tagged_user_ids as JSON string (even if empty list)
+        # Use explicit None check, not truthiness check (empty list [] is falsy but should be saved as "[]")
+        logger.info(f"create_chat_message - request.tagged_user_ids: {request.tagged_user_ids} (type: {type(request.tagged_user_ids)})")
+        if request.tagged_user_ids is not None:
+            tagged_user_ids_json = json.dumps(request.tagged_user_ids)
+            logger.info(f"create_chat_message - Serialized tagged_user_ids: {tagged_user_ids_json}")
+        else:
+            tagged_user_ids_json = None
+            logger.info(f"create_chat_message - tagged_user_ids is None, saving as None")
+        
         chat_message = ChatMessage(
             message_content=request.message_content,
             patient_id=request.patient_id,
             sender_id=sender_id,
-            tagged_user_ids=json.dumps(request.tagged_user_ids) if request.tagged_user_ids else None,
+            tagged_user_ids=tagged_user_ids_json,
             created_by=sender_id
         )
         
@@ -87,8 +186,6 @@ def create_chat_message(
         db.add(sender_read_status)
         
         db.commit()
-        
-        # sender_name passed in
         
         return ChatMessageCreateResponse(
             message_id=chat_message.id,
@@ -130,7 +227,7 @@ def get_patient_messages(
             )
         ).order_by(ChatMessage.created_at.asc()).all()
         
-        # Mark messages as read for current user
+        # Mark all messages as read for current user
         for message in messages:
             read_status = db.query(ChatReadStatus).filter(
                 and_(
@@ -161,15 +258,7 @@ def get_patient_messages(
             sender = db.query(User).filter(User.user_id == message.sender_id).first()
             sender_name = f"{sender.first_name} {sender.last_name}" if sender else "Unknown"
             
-            # Parse tagged user IDs
-            tagged_user_ids = []
-            if message.tagged_user_ids:
-                try:
-                    tagged_user_ids = json.loads(message.tagged_user_ids)
-                except json.JSONDecodeError:
-                    tagged_user_ids = []
-            
-            # Check if current user has read this message
+            # Get read status for current user
             user_read_status = db.query(ChatReadStatus).filter(
                 and_(
                     ChatReadStatus.message_id == message.id,
@@ -179,6 +268,14 @@ def get_patient_messages(
             
             is_read = user_read_status.is_read if user_read_status else False
             read_at = user_read_status.read_at if user_read_status and user_read_status.is_read else None
+            
+            # Parse tagged_user_ids from JSON string
+            tagged_user_ids = []
+            if message.tagged_user_ids:
+                try:
+                    tagged_user_ids = json.loads(message.tagged_user_ids)
+                except (json.JSONDecodeError, TypeError):
+                    tagged_user_ids = []
             
             message_responses.append(ChatMessageResponse(
                 id=message.id,
@@ -192,20 +289,24 @@ def get_patient_messages(
                 read_at=read_at
             ))
         
+        # Get patient name for response
+        patient_name = patient.patient_name if patient else None
+        
         return PatientMessagesResponse(
             patient_id=patient_id,
-            patient_name=patient.patient_name,
+            patient_name=patient_name,
             messages=message_responses,
-            total_messages=len(message_responses),
-            unread_count=0  # All messages are now read
+            total_messages=len(message_responses)
         )
         
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to get patient messages: {str(e)}")
-        if isinstance(e, (ChatPatientNotFoundException, ChatUserNotFoundException)):
+        logger.error(f"Failed to get patient messages: {str(e)}", exc_info=True)
+        # Re-raise known exceptions as-is
+        if isinstance(e, (ChatPatientNotFoundException, ChatMessageNotFoundException, ChatMessageCreateFailedException)):
             raise
-        raise ChatMessageNotFoundException(f"Failed to get patient messages: {str(e)}")
+        # For unknown exceptions, raise ChatMessageCreateFailedException with proper context
+        raise ChatMessageCreateFailedException(reason=f"Failed to get patient messages: {str(e)}")
 
 
 def get_unread_messages(
@@ -266,7 +367,338 @@ def get_unread_messages(
         )
         
     except Exception as e:
-        logger.error(f"Failed to get unread messages: {str(e)}")
-        if isinstance(e, ChatUserNotFoundException):
+        logger.error(f"Failed to get unread messages: {str(e)}", exc_info=True)
+        # Re-raise known exceptions as-is
+        if isinstance(e, (ChatUserNotFoundException, ChatMessageNotFoundException, ChatMessageCreateFailedException)):
             raise
-        raise ChatMessageNotFoundException(f"Failed to get unread messages: {str(e)}")
+        # For unknown exceptions, raise ChatMessageCreateFailedException with proper context
+        # This is a generic chat operation failure, not specifically about creating messages
+        raise ChatMessageCreateFailedException(reason=f"Failed to get unread messages: {str(e)}")
+
+
+# ============================================
+# WEBSOCKET MESSAGE HANDLERS
+# ============================================
+
+async def handle_websocket_message(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    current_user: User,
+    pharma_id: int,
+    connection_manager: ChatConnectionManager,
+    db: Session
+) -> Dict[str, Any]:
+    """
+    Handle incoming WebSocket message and route to appropriate handler
+    
+    Returns response dict to send back to client
+    """
+    message_type = message_data.get("type")
+    
+    if not message_type:
+        raise ChatWebSocketInvalidTypeException("Message type is required")
+    
+    try:
+        if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
+            return await handle_subscribe_patient(
+                message_data, connection_id, pharma_id, connection_manager, db
+            )
+        
+        elif message_type == WS_MSG_TYPE_UNSUBSCRIBE_PATIENT:
+            return await handle_unsubscribe_patient(
+                message_data, connection_id, connection_manager
+            )
+        
+        elif message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
+            return await handle_get_patient_messages_ws(
+                message_data, connection_id, current_user, pharma_id, connection_manager, db
+            )
+        
+        elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
+            return await handle_get_unread_messages_ws(
+                current_user, pharma_id, db
+            )
+        
+        elif message_type == WS_MSG_TYPE_MARK_READ:
+            return await handle_mark_read_ws(
+                message_data, current_user, pharma_id, db
+            )
+        
+        else:
+            raise ChatWebSocketInvalidTypeException(message_type=message_type)
+    
+    except ChatException as e:
+        logger.error(f"Chat exception in WebSocket handler: {e}")
+        return create_websocket_error_response(e)
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in WebSocket handler: {e}", exc_info=True)
+        return create_websocket_error_response(
+            ChatInvalidDataException(reason=str(e))
+        )
+
+
+async def handle_subscribe_patient(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    pharma_id: int,
+    connection_manager: ChatConnectionManager,
+    db: Session
+) -> Dict[str, Any]:
+    """Handle subscribe to patient messages"""
+    patient_id = message_data.get("patient_id")
+    if not patient_id:
+        raise ChatInvalidDataException("patient_id is required")
+    
+    # Validate patient exists and belongs to pharma
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise ChatInvalidDataException(f"Patient {patient_id} not found")
+    if patient.pharma_id != pharma_id:
+        raise ChatInvalidDataException(f"Patient {patient_id} does not belong to your pharma")
+    
+    # Subscribe connection to patient
+    connection_manager.subscribe_to_patient(connection_id, patient_id)
+    
+    return {
+        "type": WS_MSG_TYPE_SUCCESS,
+        "success": True,
+        "message": f"Subscribed to patient {patient_id}",
+        "data": {"patient_id": patient_id}
+    }
+
+
+async def handle_unsubscribe_patient(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    connection_manager: ChatConnectionManager
+) -> Dict[str, Any]:
+    """Handle unsubscribe from patient messages"""
+    patient_id = message_data.get("patient_id")
+    if not patient_id:
+        raise ChatInvalidDataException("patient_id is required")
+    
+    connection_manager.unsubscribe_from_patient(connection_id, patient_id)
+    
+    return {
+        "type": WS_MSG_TYPE_SUCCESS,
+        "success": True,
+        "message": f"Unsubscribed from patient {patient_id}",
+        "data": {"patient_id": patient_id}
+    }
+
+
+async def handle_get_patient_messages_ws(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    current_user: User,
+    pharma_id: int,
+    connection_manager: ChatConnectionManager,
+    db: Session
+) -> Dict[str, Any]:
+    """Handle get patient messages request via WebSocket"""
+    patient_id = message_data.get("patient_id")
+    if not patient_id:
+        raise ChatInvalidDataException("patient_id is required")
+    
+    # Auto-subscribe to patient when fetching messages
+    connection_manager.subscribe_to_patient(connection_id, patient_id)
+    
+    # Get messages using existing service
+    result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+    
+    return {
+        "type": WS_MSG_TYPE_PATIENT_MESSAGES,
+        "success": True,
+        "data": result.model_dump(mode='json')
+    }
+
+
+async def handle_get_unread_messages_ws(
+    current_user: User,
+    pharma_id: int,
+    db: Session
+) -> Dict[str, Any]:
+    """Handle get unread messages request via WebSocket"""
+    result = get_unread_messages(current_user.user_id, pharma_id, db)
+    
+    return {
+        "type": WS_MSG_TYPE_UNREAD_MESSAGES,
+        "success": True,
+        "data": result.model_dump(mode='json')
+    }
+
+
+async def handle_mark_read_ws(
+    message_data: Dict[str, Any],
+    current_user: User,
+    pharma_id: int,
+    db: Session
+) -> Dict[str, Any]:
+    """Handle mark messages as read via WebSocket"""
+    patient_id = message_data.get("patient_id")
+    if not patient_id:
+        raise ChatInvalidDataException("patient_id is required")
+    
+    # Mark as read by fetching messages (service automatically marks as read)
+    get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+    
+    return {
+        "type": WS_MSG_TYPE_SUCCESS,
+        "success": True,
+        "message": f"Messages for patient {patient_id} marked as read",
+        "data": {"patient_id": patient_id}
+    }
+
+
+def create_websocket_error_response(exception: ChatException) -> Dict[str, Any]:
+    """Create error response from exception for WebSocket"""
+    return {
+        "type": WS_MSG_TYPE_ERROR,
+        "success": False,
+        "error_code": exception.error_code,
+        "message": exception.message,
+        "details": exception.details if hasattr(exception, 'details') else {}
+    }
+
+
+async def handle_websocket_connection(
+    websocket,
+    token: str,
+    patient_id: Optional[str],
+    connection_manager: ChatConnectionManager,
+    authenticate_websocket_func
+):
+    """Handle WebSocket connection lifecycle. Returns: (connection_id, current_user, pharma_id, db)"""
+    connection_id = None
+    current_user = None
+    pharma_id = None
+    db = None
+    
+    try:
+        # Accept WebSocket connection
+        await websocket.accept()
+        
+        # Authenticate connection
+        auth_func = authenticate_websocket_func or default_auth
+        current_user, pharma_id, db = await auth_func(websocket, token)
+        
+        # Register connection
+        connection_id = await connection_manager.connect(
+            websocket, current_user.user_id, pharma_id
+        )
+        
+        patient_messages_data = None
+        if patient_id:
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.pharma_id == pharma_id:
+                connection_manager.subscribe_to_patient(connection_id, patient_id)
+                try:
+                    result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+                    patient_messages_data = result.model_dump(mode='json')
+                except Exception as e:
+                    logger.warning(f"Failed to fetch patient messages: {e}")
+        
+        unread_messages_data = None
+        try:
+            unread_result = get_unread_messages(current_user.user_id, pharma_id, db)
+            unread_messages_data = unread_result.model_dump(mode='json')
+        except Exception as e:
+            logger.warning(f"Failed to fetch unread messages: {e}")
+        
+        connection_response = {
+            "type": "connection_confirmed",
+            "success": True,
+            "user_id": current_user.user_id,
+            "pharma_id": pharma_id,
+            "connection_id": connection_id,
+            "patient_id": patient_id if patient_id else None
+        }
+        
+        if patient_messages_data:
+            connection_response["patient_messages"] = patient_messages_data
+        if unread_messages_data:
+            connection_response["unread_messages"] = unread_messages_data
+        
+        await websocket.send_json(connection_response)
+        
+        return connection_id, current_user, pharma_id, db
+        
+    except ChatException as e:
+        if websocket.client_state.name == "CONNECTED":
+            await websocket.send_json({
+                "type": WS_MSG_TYPE_ERROR,
+                "success": False,
+                "error_code": e.error_code,
+                "message": e.message,
+                "details": e.details if hasattr(e, 'details') else {}
+            })
+            await websocket.close()
+        raise
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}", exc_info=True)
+        if websocket.client_state.name == "CONNECTED":
+            try:
+                await websocket.send_json({
+                    "type": WS_MSG_TYPE_ERROR,
+                    "success": False,
+                    "error_code": ERROR_CODES.get("SERVER_ERROR", "ERR_00000"),
+                    "message": ErrorMessages.INTERNAL_ERROR if hasattr(ErrorMessages, 'INTERNAL_ERROR') else "Internal server error",
+                    "details": {"reason": str(e)}
+                })
+                await websocket.close()
+            except:
+                pass
+            raise
+
+
+async def handle_websocket_message_loop(
+    websocket,
+    connection_id: str,
+    current_user: User,
+    pharma_id: int,
+    connection_manager: ChatConnectionManager,
+    db: Session
+):
+    """Handle WebSocket message loop"""
+    while True:
+        try:
+            message_text = await websocket.receive_text()
+            try:
+                message_data = json.loads(message_text)
+            except json.JSONDecodeError as e:
+                await websocket.send_json({
+                    "type": WS_MSG_TYPE_ERROR,
+                    "success": False,
+                    "error_code": ERROR_CODES["CHAT_WEBSOCKET_INVALID_MESSAGE"],
+                    "message": ErrorMessages.CHAT_WEBSOCKET_INVALID_MESSAGE,
+                    "details": {"reason": str(e)}
+                })
+                continue
+            
+            response = await handle_websocket_message(
+                message_data,
+                connection_id,
+                current_user,
+                pharma_id,
+                connection_manager,
+                db
+            )
+            
+            if response:
+                await websocket.send_json(response)
+        
+        except WebSocketDisconnect:
+            break
+        except Exception as e:
+            logger.error(f"Error processing WebSocket message: {e}", exc_info=True)
+            try:
+                await websocket.send_json({
+                    "type": WS_MSG_TYPE_ERROR,
+                    "success": False,
+                    "error_code": ERROR_CODES.get("SERVER_ERROR", "ERR_00000"),
+                    "message": ErrorMessages.INTERNAL_ERROR if hasattr(ErrorMessages, 'INTERNAL_ERROR') else "Internal server error",
+                    "details": {"reason": str(e)}
+                })
+            except:
+                pass

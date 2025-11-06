@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+import json
+import logging
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -9,15 +12,26 @@ from app.schemas.chat_schema import (
     ChatErrorResponse
 )
 from app.service.chat_service import (
-    create_chat_message, get_patient_messages, get_unread_messages
+    create_chat_message, get_patient_messages, get_unread_messages,
+    broadcast_new_message, handle_websocket_connection, handle_websocket_message_loop
 )
-from app.dependencies.auth_dependencies import get_current_user, get_pharma_id_from_request
+from app.dependencies.auth_dependencies import (
+    get_current_user, get_pharma_id_from_request, authenticate_websocket
+)
 from app.models import user_model
+from app.utils.chat_websocket_manager import ChatConnectionManager
 from app.exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
     ChatUserNotFoundException, ChatPatientNotFoundException,
-    ChatPharmaAccessDeniedException, ChatInvalidDataException
+    ChatPharmaAccessDeniedException, ChatInvalidDataException,
+    ChatWebSocketInvalidMessageException, ChatException
 )
+from app.constants.messages import ErrorMessages
+
+logger = logging.getLogger(__name__)
+
+# Create singleton connection manager
+chat_connection_manager = ChatConnectionManager()
 
 router = APIRouter(
     tags=["Chat"],
@@ -36,14 +50,21 @@ router = APIRouter(
     description="""
     Send a chat message for a specific patient.
     Tag other users within the same pharma to notify them.
+    Messages are broadcast to WebSocket connections in real-time.
     """)
-def send_chat_message(
+async def send_chat_message(
     request: ChatMessageCreateRequest,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
     """Send a chat message for a specific patient"""
     try:
+        if request.tagged_user_ids and current_user.user_id in request.tagged_user_ids:
+            raise ChatInvalidDataException(
+                reason="User attempted to tag themselves",
+                custom_message=ErrorMessages.CHAT_CANNOT_TAG_SELF
+            )
+        
         sender_name = f"{current_user.first_name} {current_user.last_name}"
         result = create_chat_message(
             request,
@@ -52,6 +73,14 @@ def send_chat_message(
             sender_name,
             db
         )
+        
+        await broadcast_new_message(
+            result,
+            current_user.pharma_id,
+            chat_connection_manager,
+            db
+        )
+        
         return result
     except ChatMessageCreateFailedException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
@@ -144,3 +173,74 @@ def chat_health_check():
         "service": "chat",
         "message": "Chat service is running"
     }
+
+
+# ============================================
+# WEBSOCKET ENDPOINT
+# ============================================
+
+@router.websocket("/ws")
+async def websocket_chat_endpoint(
+    websocket: WebSocket,
+    token: str = Query(...),
+    patient_id: str = Query(None)
+):
+    """
+    WebSocket endpoint for real-time chat messaging
+    
+    Connection: ws://host/api/chat/ws?token=<jwt_token>&patient_id=<patient_id>
+    
+    Query Parameters:
+    - token: JWT authentication token (required)
+    - patient_id: Optional patient ID to auto-subscribe on connection
+    
+    Message Types (Client -> Server):
+        - subscribe_patient: Subscribe to patient messages
+        - unsubscribe_patient: Unsubscribe from patient messages
+        - get_patient_messages: Get all messages for a patient
+    - get_unread_messages: Get unread messages
+    - mark_read: Mark messages as read
+    
+    Response Types (Server -> Client):
+    - patient_messages: Patient messages response
+    - unread_messages: Unread messages response
+    - new_message: Real-time new message broadcast
+    - error: Error response
+    - success: Success response
+    """
+    connection_id = None
+    db = None
+    
+    try:
+        # Handle connection setup via service
+        connection_id, current_user, pharma_id, db = await handle_websocket_connection(
+            websocket,
+            token,
+            patient_id,
+            chat_connection_manager,
+            authenticate_websocket
+        )
+        
+        # Handle message loop via service
+        await handle_websocket_message_loop(
+            websocket,
+            connection_id,
+            current_user,
+            pharma_id,
+            chat_connection_manager,
+            db
+        )
+    
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected: connection_id={connection_id}")
+    
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}", exc_info=True)
+    
+    finally:
+        # Cleanup
+        if connection_id:
+            chat_connection_manager.disconnect(connection_id)
+        if db:
+            db.close()
+        logger.info(f"WebSocket connection closed: connection_id={connection_id}")
