@@ -213,6 +213,13 @@ ERROR_CODES = {
     "TASK_UNAUTHORIZED_EDIT": "ERR_10007",
     "TASK_UNAUTHORIZED_STATUS": "ERR_10008",
     "TASK_MANAGER_ONLY": "ERR_10009",
+    
+    # ============================================
+    # QUALITY MONITORING (11xxx)
+    # ============================================
+    "REDIS_CONNECTION_ERROR": "ERR_11001",
+    "QUALITY_DATA_NOT_FOUND": "ERR_11002",
+    "QUALITY_SERVICE_ERROR": "ERR_11003",
 
     # ============================================
     # GENERAL (9xxx)
