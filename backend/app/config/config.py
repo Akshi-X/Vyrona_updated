@@ -6,8 +6,10 @@ Loaded from environment variables (.env file)
 from pydantic_settings import BaseSettings
 from typing import List, Optional, Dict, Any
 from functools import lru_cache
+from urllib.parse import quote_plus
 import json
 import os
+import logging
  
  
 class Settings(BaseSettings):
@@ -48,6 +50,21 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     RELOAD: bool = True
+    # URLs - MUST be provided in .env file
+    FRONTEND_URL: str
+    BACKEND_URL: str
+    # CORS - MUST be provided in .env file
+    # Can be comma-separated list: "http://localhost:5173,http://localhost:3000"
+    # Or "*" for all origins (not recommended for production)
+    ALLOWED_ORIGINS: str
+    # Audit logging feature flag (default off for safety)
+    AUDIT_LOG_ENABLED: bool = True
+    # Redis Configuration (Optional - defaults provided)
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_SOCKET_CONNECT_TIMEOUT: int = 5
+    REDIS_SOCKET_TIMEOUT: int = 5
     # URLs
     FRONTEND_URL: str = "http://localhost:5173"
     BACKEND_URL: str = "http://localhost:8000"
@@ -59,7 +76,6 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Construct database URL from components"""
-        from urllib.parse import quote_plus
         password = quote_plus(self.DB_PASSWORD)
         return f"postgresql+psycopg2://{self.DB_USER}:{password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     @property
@@ -96,7 +112,6 @@ class Settings(BaseSettings):
                 
         except Exception as e:
             # Log the error but don't raise it to avoid breaking the app
-            import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error loading pharma admins: {str(e)}")
             return []
