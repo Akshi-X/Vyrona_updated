@@ -1,6 +1,14 @@
  
+type ChecklistItem = { stage: string; actual: number; needed: number; missed: number };
 
-export default function ComplianceCard() {
+interface ComplianceCardProps {
+  items: ChecklistItem[];
+  loading: boolean;
+  error: string | null;
+}
+
+export default function ComplianceCard({ items, loading, error }: ComplianceCardProps) {
+
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
       <h3 className="font-bold text-black text-base mb-1 text-[16px]">Compliance</h3>
@@ -15,16 +23,22 @@ export default function ComplianceCard() {
 
       {/* Data rows */}
       <div className="mt-3 text-[14px]">
-        <div className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-          <div className="text-black font-medium">Paris-Lille</div>
-          <div className="text-center text-black font-medium">8</div>
-          <div className="text-center text-red-600 font-medium">2</div>
-        </div>
-        <div className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-          <div className="text-black font-medium">Paris-Lille</div>
-          <div className="text-center text-black font-medium">8</div>
-          <div className="text-center text-red-600 font-medium">2</div>
-        </div>
+        {loading && (
+          <div className="px-4 py-3 text-sm text-gray-500">Loading...</div>
+        )}
+        {!loading && error && (
+          <div className="px-4 py-3 text-sm text-red-600">{error}</div>
+        )}
+        {!loading && !error && items.length === 0 && (
+          <div className="px-4 py-3 text-sm text-gray-500">No checklist items</div>
+        )}
+        {!loading && !error && items.map((item, idx) => (
+          <div key={`${item.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
+            <div className="text-black font-medium">{item.stage}</div>
+            <div className="text-center text-black font-medium">{item.needed}</div>
+            <div className="text-center text-red-600 font-medium">{item.missed}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

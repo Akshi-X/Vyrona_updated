@@ -42,6 +42,39 @@ export interface ThreePLPlayersResponse extends ApiResponse<ThreePLPlayer[]> {
 }
 
 class ShipmentService extends BaseApiService {
+  /**
+   * Control Tower Map routes
+   * GET /api/shipment/control-tower-map
+   */
+  async getControlTowerMapRoutes(): Promise<
+    Array<{
+      shipment_id: number | string;
+      patient_id: string;
+      source_location: string;
+      destination_location: string;
+      source_latitude: number;
+      source_longitude: number;
+      destination_latitude: number;
+      destination_longitude: number;
+    }>
+  > {
+    const res = await this.get<{
+      routes: Array<{
+        shipment_id: number | string;
+        patient_id: string;
+        source_location: string;
+        destination_location: string;
+        source_latitude: number;
+        source_longitude: number;
+        destination_latitude: number;
+        destination_longitude: number;
+      }>;
+      total_routes?: number;
+    } | Array<any>>('/api/shipment/control-tower-map');
+
+    const list = Array.isArray(res) ? (res as any) : (res as any)?.routes || [];
+    return list as any;
+  }
   async getActiveRoutes(): Promise<ActiveRouteItem[]> {
     const res = await this.get<{ routes: ActiveRouteApiItem[] } | ActiveRouteApiItem[]>(
       '/api/shipment/active-routes'
@@ -169,6 +202,23 @@ class ShipmentService extends BaseApiService {
 
   async getPatientJourneySummary(patientId: string): Promise<PatientJourneySummaryResponse> {
     return await this.get<PatientJourneySummaryResponse>(`/api/shipment/patient/${encodeURIComponent(patientId)}/summary`);
+  }
+
+  /**
+   * Document checklist for a patient
+   * GET /api/shipment/document-checklist/:patientId
+   */
+  async getDocumentChecklist(
+    patientId: string
+  ): Promise<{
+    items: Array<{ stage: string; actual: number; needed: number; missed: number }>;
+    total_items?: number;
+    missing_documents?: string[];
+    non_compliance_percentage?: number;
+  }> {
+    return this.get(
+      `/api/shipment/document-checklist/${encodeURIComponent(patientId)}`
+    );
   }
 }
 
