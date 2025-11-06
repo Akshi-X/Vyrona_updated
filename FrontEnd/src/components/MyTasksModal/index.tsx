@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AlertCard from '../AlertCard';
 import { tasksService } from '../../services/tasksService';
+import { TASK_FIELD_ERRORS } from '../../constants/validation';
 
 // MyTasksModal component with API integration
 
@@ -79,28 +80,25 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   };
 
   const validateTask = (): boolean => {
+    const requiredFields: Record<string, string> = {
+      taskName: TASK_FIELD_ERRORS.taskName,
+      description: TASK_FIELD_ERRORS.description,
+      patientId: TASK_FIELD_ERRORS.patientId,
+      dueDate: TASK_FIELD_ERRORS.dueDate,
+      assigneeId: TASK_FIELD_ERRORS.assigneeId,
+    };
+
     const errors: Record<string, string> = {};
-    
-    if (!newTask.taskName || !newTask.taskName.trim()) {
-      errors.taskName = 'Task name is required';
-    }
-    
-    if (!newTask.description || !newTask.description.trim()) {
-      errors.description = 'Description is required';
-    }
-    
-    if (!newTask.patientId || !newTask.patientId.trim()) {
-      errors.patientId = 'Patient ID is required';
-    }
-    
-    if (!newTask.dueDate || !newTask.dueDate.trim()) {
-      errors.dueDate = 'Due date is required';
-    }
-    
-    if (!newTask.assigneeId || !newTask.assigneeId.trim()) {
-      errors.assigneeBy = 'Assignee is required';
-    }
-    
+
+    Object.entries(requiredFields).forEach(([key, message]) => {
+      const value = newTask[key as keyof typeof newTask];
+      if (!value || !String(value).trim()) {
+        // Map assigneeId validation to assigneeBy UI field for error rendering
+        const errorKey = key === 'assigneeId' ? 'assigneeBy' : key;
+        errors[errorKey] = message;
+      }
+    });
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
