@@ -1,174 +1,168 @@
+import { useMemo } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler
+);
+
 export default function RiskPanel() {
   // Line chart data for Phase Risk Prediction
   // Light gray line: fluctuating between 6-10
   // Magenta line: fluctuating between 4-8
-  // SVG height is ~60, Y-axis goes from top (0) to bottom (60), need to invert
-  // Scale: 0 maps to Y=60, 12 maps to Y=0
-
-  // More data points for smoother wavy lines
-  const lightGrayPoints = [
-    { x: 0, y: 8 },
-    { x: 10, y: 8.8 },
-    { x: 20, y: 9.5 },
-    { x: 30, y: 8.2 },
-    { x: 40, y: 7.5 },
-    { x: 50, y: 8.8 },
-    { x: 60, y: 9.2 },
-    { x: 70, y: 9.8 },
-    { x: 80, y: 10 },
-    { x: 90, y: 8.5 },
-    { x: 100, y: 6.5 },
-    { x: 110, y: 7.8 },
-    { x: 120, y: 9 },
-    { x: 130, y: 7.5 },
-    { x: 140, y: 8.2 },
-    { x: 150, y: 9.5 },
-    { x: 160, y: 8 }
+  
+  // Data points for smooth wavy lines (matching the image description)
+  const lightGrayData = [
+    7, 8.8, 9.5, 8.2, 7.5, 8.8, 9.2, 9.8, 10, 8.5, 6.5, 7.8, 9, 7.5, 8.2, 9.5, 8
   ];
 
-  const magentaPoints = [
-    { x: 0, y: 5 },
-    { x: 10, y: 5.8 },
-    { x: 20, y: 7 },
-    { x: 30, y: 5.5 },
-    { x: 40, y: 4.5 },
-    { x: 50, y: 5.8 },
-    { x: 60, y: 6.5 },
-    { x: 70, y: 7.5 },
-    { x: 80, y: 8 },
-    { x: 90, y: 6.2 },
-    { x: 100, y: 4 },
-    { x: 110, y: 5.5 },
-    { x: 120, y: 7 },
-    { x: 130, y: 6 },
-    { x: 140, y: 5.5 },
-    { x: 150, y: 7.5 },
-    { x: 160, y: 6 }
+  const magentaData = [
+    7, 5.8, 7, 5.5, 4.5, 5.8, 6.5, 7.5, 8, 6.2, 4, 5.5, 7, 6, 5.5, 7.5, 5.5
   ];
 
-  const convertToSVG = (value: number, maxValue: number, svgHeight: number, padding: number) => {
-    const actualHeight = svgHeight - padding * 2;
-    return svgHeight - padding - (value / maxValue) * actualHeight;
-  };
+  // Generate labels for phases (matching the image which shows Phase 2 and Phase 4)
+  // Since we have 17 data points, we'll use empty strings for most labels and only show Phase 2 and Phase 4
+  const labels = useMemo(() => {
+    const totalPoints = lightGrayData.length;
+    const midpoint = Math.floor(totalPoints / 2);
+    return Array.from({ length: totalPoints }, (_, i) => {
+      if (i === 0) {
+        return 'Phase 2';
+      }
+      if (i === midpoint) {
+        return 'Phase 4';
+      }
+      return '';
+    });
+  }, []);
 
-  const lightGrayPath = lightGrayPoints.map((p, i) =>
-    `${i === 0 ? 'M' : 'L'} ${p.x} ${convertToSVG(p.y, 12, 60, 5)}`
-  ).join(' ');
+  const chartData = useMemo(
+    () => ({
+      labels,
+      datasets: [
+        {
+          label: 'Gray Line',
+          data: lightGrayData,
+          borderColor: '#D3D3D3',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4, // Smooth curves
+          fill: false,
+        },
+        {
+          label: 'Magenta Line',
+          data: magentaData,
+          borderColor: '#9c3aa6',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4, // Smooth curves
+          fill: false,
+        },
+      ],
+    }),
+    [labels]
+  );
 
-  const magentaPath = magentaPoints.map((p, i) =>
-    `${i === 0 ? 'M' : 'L'} ${p.x} ${convertToSVG(p.y, 12, 60, 5)}`
-  ).join(' ');
-
-  // Radar chart data
-  const radarData = [
-    { label: 'Human errors', value: 11.5 },
-    { label: 'Infrastruc', value: 8.5 },
-    { label: 'Weather', value: 6 },
-    { label: 'Customs', value: 8.5 },
-    { label: 'Carrier', value: 11.5 }
-  ];
-
-  const radarCenter = { x: 70, y: 70 };
-  const radarRadius = 50;
-  const maxRadarValue = 15;
-  const categories = radarData.length;
-  const angleStep = (2 * Math.PI) / categories;
-
-  // Generate radar grid (concentric polygons)
-  const gridLevels = [0, 2.5, 5, 7.5, 10, 12.5, 15];
-
-  // Generate radar points for data polygon
-  const radarPoints = radarData.map((item, index) => {
-    const angle = (index * angleStep) - (Math.PI / 2); // Start from top
-    const radius = (item.value / maxRadarValue) * radarRadius;
-    return {
-      x: radarCenter.x + radius * Math.cos(angle),
-      y: radarCenter.y + radius * Math.sin(angle),
-      angle,
-      label: item.label,
-      value: item.value
-    };
-  });
-
-  const radarPolygonPoints = radarPoints.map(p => `${p.x},${p.y}`).join(' ');
-
-  // Generate axis lines (spokes)
-  const axisLines = radarData.map((_, index) => {
-    const angle = (index * angleStep) - (Math.PI / 2);
-    const x2 = radarCenter.x + radarRadius * Math.cos(angle);
-    const y2 = radarCenter.y + radarRadius * Math.sin(angle);
-    return { x2, y2, angle, label: radarData[index].label };
-  });
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 8,
+          titleFont: {
+            size: 12,
+          },
+          bodyFont: {
+            size: 11,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false,
+          },
+          ticks: {
+            color: '#4B4B4B',
+            font: {
+              size: 11,
+            },
+            maxRotation: 0,
+            minRotation: 0,
+            autoSkip: false,
+            // Show labels only where they're not empty
+            callback: function (_value: any, index: number) {
+              const labels = (this as any).chart.data.labels as string[];
+              return labels[index] || '';
+            },
+          },
+          border: {
+            display: false,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          max: 12,
+          grid: {
+            color: '#E5E5E5',
+            drawBorder: false,
+            borderDash: [2, 2],
+          },
+          ticks: {
+            stepSize: 2,
+            color: '#666666',
+            font: {
+              size: 11,
+            },
+            callback: function (value: any) {
+              return value;
+            },
+          },
+          border: {
+            display: false,
+          },
+        },
+      },
+    }),
+    []
+  );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
       <h3 className="font-semibold text-black text-sm">Risk</h3>
 
       {/* Phase Risk Prediction - Line Chart */}
-      <div className="border border-white rounded p-3">
+      <div className="mt-2 flex-1 flex flex-col">
         <div className="text-xs text-gray-600 mb-2">Phase Risk Prediction</div>
-        <svg viewBox="0 0 170 70" className="w-full h-24" preserveAspectRatio="xMidYMid meet">
-          {/* Grid lines (horizontal dotted) */}
-          {[0, 2, 4, 6, 8, 10, 12].map(value => {
-            const y = convertToSVG(value, 12, 60, 5);
-            return (
-              <line
-                key={value}
-                x1="15"
-                y1={y}
-                x2="160"
-                y2={y}
-                stroke="#E5E5E5"
-                strokeWidth="0.5"
-                strokeDasharray="2,2"
-              />
-            );
-          })}
-
-          {/* Y-axis labels */}
-          {[0, 2, 4, 6, 8, 10, 12].map(value => {
-            const y = convertToSVG(value, 12, 60, 5);
-            return (
-              <text
-                key={value}
-                x="10"
-                y={y + 3}
-                textAnchor="end"
-                fontSize="7"
-                fill="#666"
-              >
-                {value}
-              </text>
-            );
-          })}
-
-          {/* X-axis labels */}
-          <text x="45" y="68" textAnchor="middle" fontSize="7" fill="#666">
-            Phase 2
-          </text>
-          <text x="135" y="68" textAnchor="middle" fontSize="7" fill="#666">
-            Phase 4
-          </text>
-
-          {/* Light gray line */}
-          <path
-            d={lightGrayPath}
-            fill="none"
-            stroke="#D3D3D3"
-            strokeWidth="2"
-          />
-
-          {/* Magenta/purple line */}
-          <path
-            d={magentaPath}
-            fill="none"
-            stroke="#9c3aa6"
-            strokeWidth="2"
-          />
-        </svg>
+        <div className="flex-1 w-full min-h-0">
+          <Line data={chartData} options={chartOptions as any} />
+        </div>
       </div>
     </div>
   );
 }
-
-
