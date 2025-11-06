@@ -443,8 +443,15 @@ export default function QualityTrackingChart() {
         },
         tooltip: {
           enabled: true,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          padding: 8,
+          backgroundColor: 'rgba(20, 20, 20, 0.92)',
+          padding: 10,
+          cornerRadius: 6,
+          caretSize: 6,
+          usePointStyle: true, // show small circular indicators
+          boxWidth: 8,
+          boxHeight: 8,
+          titleMarginBottom: 6,
+          bodySpacing: 4,
           titleFont: {
             size: 12,
           },
@@ -464,26 +471,27 @@ export default function QualityTrackingChart() {
               if (!point) return '';
 
               const label = context.dataset.label || '';
+              const fmt = (v: number) => (typeof v === 'number' ? (Math.round(v * 10) / 10).toFixed(1) : v);
               switch (label) {
                 case 'Temperature (°C)':
-                  return `Temperature (°C) : ${point.temperature}`;
+                  return `Temperature (°C): ${fmt(point.temperature)}`;
                 case 'Humidity (%)':
-                  return `Humidity (%) : ${point.humidity}`;
+                  return `Humidity (%): ${fmt(point.humidity)}`;
                 case 'pH Level':
-                  return `pH Level : ${point.ph_level}`;
+                  return `pH Level: ${fmt(point.ph_level)}`;
                 case 'O₂ Level (%)':
-                  return `O₂ Level (%) : ${point.o2_level}`;
+                  return `O₂ Level (%): ${fmt(point.o2_level)}`;
                 case 'CO₂ Level (%)':
-                  return `CO₂ Level (%) : ${point.co2_level}`;
+                  return `CO₂ Level (%): ${fmt(point.co2_level)}`;
                 case 'Agitation (%)':
-                  return `Agitation (%) : ${point.agitation}`;
+                  return `Agitation (%): ${fmt(point.agitation)}`;
                 default:
                   return `${label}: ${context.parsed.y}`;
               }
             },
-            labelColor: (context: any) => {
+            labelPointStyle: (context: any) => {
               const color = context.dataset.borderColor || '#999999';
-              return { borderColor: color, backgroundColor: color, borderWidth: 2 }; 
+              return { pointStyle: 'circle', rotation: 0, borderColor: color, backgroundColor: color };
             },
           },
         },
