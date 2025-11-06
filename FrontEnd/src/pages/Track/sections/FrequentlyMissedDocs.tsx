@@ -1,34 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { shipmentService } from '../../../services/shipmentService';
+interface FrequentlyMissedDocsProps {
+  missingDocs: string[];
+  loading: boolean;
+  error: string | null;
+}
 
-export default function FrequentlyMissedDocs() {
-  const { patientId } = useParams();
-  const [missingDocs, setMissingDocs] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (!patientId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await shipmentService.getDocumentChecklist(patientId);
-        if (isMounted) setMissingDocs(res?.missing_documents || []);
-      } catch (e: any) {
-        if (isMounted) {
-          setMissingDocs([]);
-          setError(e?.message || 'Failed to load missed documents');
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { isMounted = false; };
-  }, [patientId]);
+export default function FrequentlyMissedDocs({ missingDocs, loading, error }: FrequentlyMissedDocsProps) {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">

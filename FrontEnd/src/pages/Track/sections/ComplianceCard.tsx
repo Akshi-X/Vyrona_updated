@@ -1,40 +1,13 @@
  
-
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { shipmentService } from '../../../services/shipmentService';
-
 type ChecklistItem = { stage: string; actual: number; needed: number; missed: number };
 
-export default function ComplianceCard() {
-  const { patientId } = useParams();
-  const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface ComplianceCardProps {
+  items: ChecklistItem[];
+  loading: boolean;
+  error: string | null;
+}
 
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (!patientId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await shipmentService.getDocumentChecklist(patientId);
-        if (isMounted) setItems(res.items || []);
-      } catch (e: any) {
-        if (isMounted) {
-          setItems([]);
-          setError(e?.message || 'Failed to load document checklist');
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [patientId]);
+export default function ComplianceCard({ items, loading, error }: ComplianceCardProps) {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">

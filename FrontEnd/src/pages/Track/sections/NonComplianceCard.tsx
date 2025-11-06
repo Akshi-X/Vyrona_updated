@@ -1,35 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import { CurveBar } from '../../../components/CurveBar';
-import { shipmentService } from '../../../services/shipmentService';
 
-export default function NonComplianceCard() {
-  const { patientId } = useParams();
-  const [percentage, setPercentage] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+interface NonComplianceCardProps {
+  percentage: number;
+  loading: boolean;
+  error: string | null;
+}
 
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (!patientId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await shipmentService.getDocumentChecklist(patientId);
-        const value = Number(res?.non_compliance_percentage ?? 0);
-        if (isMounted) setPercentage(Number.isFinite(value) ? value : 0);
-      } catch (e: any) {
-        if (isMounted) setError(e?.message || 'Failed to load');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { isMounted = false; };
-  }, [patientId]);
-
-  const display = Math.round(percentage);
+export default function NonComplianceCard({ percentage, loading, error }: NonComplianceCardProps) {
+  const value = Number.isFinite(percentage) ? percentage : 0;
+  const display = Math.round(value);
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
