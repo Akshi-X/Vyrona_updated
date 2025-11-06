@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
@@ -21,7 +21,6 @@ import DarkTransportationIcon from '../../assets/TrackAndTraceIcons/DarkTranspor
 import PreReIcon from '../../assets/TrackAndTraceIcons/Pre-Reengineering.svg';
 import LightPreReIcon from '../../assets/TrackAndTraceIcons/LightPre-Reengineering.svg';
 import PostReIcon from '../../assets/TrackAndTraceIcons/Post-Reengineering.svg';
-import DarkPostReIcon from '../../assets/TrackAndTraceIcons/DarkPost-Reengineering.svg';
 import LightCryopreservationIcon from '../../assets/TrackAndTraceIcons/LightCryopreservation.svg';
 import LightTransportationIcon from '../../assets/TrackAndTraceIcons/LightTransportation.svg';
 import ReinfusionIcon from '../../assets/TrackAndTraceIcons/Reinfusion.svg';
@@ -36,16 +35,19 @@ import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import PatientSummaryAlertModal from '../../components/PatientSummaryAlertModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
-import { userService } from '../../services/userService';
 
+import { userService, type UserProfileDto } from '../../services/userService';
+import { chatService } from '../../services/chatService';
+import StakeholderChatBox from '../../components/StakeholderChatBox';
 const steps = [
   { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
   { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
   { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
   { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
-  { key: 'Post-Reengineering', dark: DarkPostReIcon, light: PostReIcon },
+  { key: 'Post-Reengineering', dark: PostReIcon, light: PostReIcon },
   { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
   { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
   { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
@@ -53,13 +55,15 @@ const steps = [
 
 export default function TrackPage() {
   const { patientId } = useParams();
-  const { logout } = useAuth();
+  const { logout, userRole } = useAuth();
   const navigate = useNavigate();
 
   // Header interactions state (mirrors Dashboard behavior)
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
+  const [showStakeholderChatScreen, setShowStakeholderChatScreen] = useState(false);
+  const [showPatientSummaryAlert, setShowPatientSummaryAlert] = useState(false);
   const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
@@ -75,11 +79,9 @@ export default function TrackPage() {
   } | null>(null);
   const [loadingChecklist, setLoadingChecklist] = useState(false);
   const [checklistError, setChecklistError] = useState<string | null>(null);
-
-  const stakeholderChats = [
-    { id: '1', sender: 'Dr. Sarah Johnson', patientId: `Patient ID : ${patientId}`, message: 'Need update on patient transport status', timestamp: '2024-05-28 14:20', isRead: false },
-    { id: '2', sender: 'Dr. Sarah Johnson', patientId: `Patient ID : ${patientId}`, message: 'Need update on patient transport status', timestamp: '2024-05-28 14:20', isRead: true },
-  ];
+  const [stakeholderChats, setStakeholderChats] = useState<Array<{ id: string; sender: string; patientId: string; message: string; timestamp: string; isRead: boolean }>>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
 
   const stakeholderChatCount = stakeholderChats.length;
   const criticalAlertsCount = criticalAlerts.length;
@@ -97,13 +99,16 @@ export default function TrackPage() {
     }
   };
 
-  
-
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
       const response = await tasksService.getMyTasks();
-      setMyTasks(response.tasks || []);
+      // Combine created_tasks and assigned_tasks into a single array
+      const allTasks = [
+        ...(response.created_tasks || []),
+        ...(response.assigned_tasks || [])
+      ];
+      setMyTasks(allTasks);
     } catch (e) {
       setMyTasks([]);
     } finally {
@@ -111,26 +116,46 @@ export default function TrackPage() {
     }
   };
 
-  useEffect(() => {
-    fetchCriticalAlerts();
-    fetchMyTasks();
-  }, []);
-
-  useEffect(() => {
-    const fetchUserProfile = async () => {
+  const fetchCurrentUser = async () => {
       try {
         const profile = await userService.getProfile();
+      setCurrentUser(profile);
+      setCurrentUserId(profile.user_id);
         const first = profile.first_name?.trim?.() || '';
         const last = profile.last_name?.trim?.() || '';
         const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
         setUserInitials(initials);
-      } catch {
-        setUserInitials('U');
-      }
-    };
-    fetchUserProfile();
+    } catch (error) {
+      // Error handled silently
+    }
+  };
+
+  useEffect(() => {
+    fetchCriticalAlerts();
+    fetchMyTasks();
+    fetchUnreadMessages();
+    fetchCurrentUser();
   }, []);
 
+  // Fetch unread messages to populate stakeholder chats
+  const fetchUnreadMessages = async () => {
+    try {
+      const response = await chatService.getUnreadMessages();
+      const transformedChats = response.unread_messages.map((msg) => ({
+        id: msg.patient_id,
+        sender: msg.sender_name,
+        patientId: `Patient ID : ${msg.patient_id}`,
+        message: msg.message_content,
+        timestamp: new Date(msg.created_at).toLocaleString(),
+        isRead: false
+      }));
+      setStakeholderChats(transformedChats);
+    } catch (error) {
+      setStakeholderChats([]);
+    }
+  };
+
+  // user initials are set in fetchCurrentUser
   const currentIndex = Math.max(
     0,
     steps.findIndex(s => s.key === (currentStage ?? ''))
@@ -189,10 +214,11 @@ export default function TrackPage() {
             non_compliance_percentage: res.non_compliance_percentage,
           });
         }
-      } catch (e: any) {
+      } catch (e) {
         if (isMounted) {
           setChecklistData(null);
-          setChecklistError(e?.message || 'Failed to load document checklist');
+          const errorMessage = e instanceof Error ? e.message : 'Failed to load document checklist';
+          setChecklistError(errorMessage);
         }
       } finally {
         if (isMounted) setLoadingChecklist(false);
@@ -242,7 +268,7 @@ export default function TrackPage() {
                 className="w-[22px] h-[22px] cursor-pointer"
                 alt="Stakeholder Chats"
                 src={StakeholderChatsIcon}
-                onClick={() => setShowStakeholderChats(true)}
+                onClick={() => setShowStakeholderChatScreen(true)}
               />
               {stakeholderChatCount > 0 && (
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -270,17 +296,33 @@ export default function TrackPage() {
                 className="w-[22px] h-[22px] cursor-pointer"
                 alt="Patient Summary"
                 src={PatientSummaryIcon}
+                onClick={() => {
+                  if (patientId) {
+                    setShowPatientSummaryAlert(true);
+                  }
+                }}
               />
             </div>
           </div>
         </div>
+
+        {/* Stakeholder Chat Box */}
+        <StakeholderChatBox
+          isOpen={showStakeholderChatScreen}
+          onClose={() => setShowStakeholderChatScreen(false)}
+          patientId={patientId}
+          onMessagesUpdated={() => {
+            // Refresh unread messages to update badge count
+            fetchUnreadMessages();
+          }}
+        />
 
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           {/* Top progress rail with icons (dynamic) */}
           <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 pb-8 px-[40px]">
             {(() => {
               return (
-                <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                   <div className="flex items-center gap-0 w-full">
                     {steps.map((s, idx) => {
                       const isCompleted = idx < currentIndex;
@@ -294,7 +336,7 @@ export default function TrackPage() {
                         if (idx === currentIndex - 1) return (
                           <div className="flex-1">
                             <div className="w-full h-[2px] bg-[repeating-linear-gradient(90deg,_#8d2b8f,_#8d2b8f_6px,_transparent_6px,_transparent_12px)] rounded-full opacity-70" />
-                          </div>
+                  </div>
                         );
                         return <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />;
                       })();
@@ -308,15 +350,15 @@ export default function TrackPage() {
                           <div className="relative flex flex-col items-center w-9 shrink-0">
                             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
                               <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
-                            </div>
+                  </div>
                             <div className={`absolute top-full mt-2 text-[10px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
-                          </div>
+                </div>
                           {connector}
-                        </div>
+                  </div>
                       );
                     })}
-                  </div>
                 </div>
+              </div>
               );
             })()}
           </div>
@@ -350,7 +392,7 @@ export default function TrackPage() {
               />
             </div>
             <div className="min-w-0 h-full">
-              <TransportTimeComparison />
+            <TransportTimeComparison />
             </div>
           </div>
 
@@ -373,6 +415,7 @@ export default function TrackPage() {
           </div>
         </div>
       </main>
+      
       {/* Modals */}
       <CriticalAlertsModal
         isOpen={showCriticalAlerts}
@@ -391,26 +434,44 @@ export default function TrackPage() {
       <MyTasksModal
         isOpen={showMyTasks}
         onClose={() => setShowMyTasks(false)}
-        tasks={myTasks.map((task) => ({
-          id: task.id.toString(),
-          patientId: task.patient_id || 'N/A',
-          taskName: task.task_name,
-          description: task.description || '',
-          assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
-          dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
-          priority: task.priority,
-          status: task.status
-        }))}
+        tasks={transformedTasks}
         loading={loadingTasks}
+        variant="track"
+        currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
+        currentUserId={currentUserId}
+        userRole={userRole || currentUser?.role || ''}
+        onTaskCreated={() => {
+          // Refresh tasks after creation
+          fetchMyTasks();
+        }}
+        onAdd={() => {
+          // Task creation handled by onTaskCreated callback
+        }}
+        onEdit={(_task) => {
+          // TODO: Implement edit task functionality
+        }}
+        onDelete={(_taskId) => {
+          // TODO: Implement delete task functionality
+        }}
       />
+      {/* Legacy modal retained but not used by icon click */}
       <StakeholderChatsModal
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
         chats={stakeholderChats}
       />
+
+      {/* Patient Summary Alert Modal */}
+      {patientId && (
+        <PatientSummaryAlertModal
+          isOpen={showPatientSummaryAlert}
+          onClose={() => setShowPatientSummaryAlert(false)}
+          patientId={patientId}
+          onViewSummary={() => {
+            // Already on track page, could scroll or highlight if needed
+          }}
+        />
+      )}
     </div>
   );
 }
-
-
-
