@@ -435,37 +435,3 @@ export default function TrackPage() {
     </div>
   );
 }
-
-
-
-
-          // TODO: Implement delete task functionality
-          console.log('Delete task clicked:', taskId);
-        }}
-      />
-      {/* Legacy modal retained but not used by icon click */}
-      <StakeholderChatsModal
-        isOpen={showStakeholderChats}
-        onClose={() => setShowStakeholderChats(false)}
-        chats={stakeholderChats}
-      />
-
-
-      {/* Patient Summary Alert Modal */}
-      {patientId && (
-        <PatientSummaryAlertModal
-          isOpen={showPatientSummaryAlert}
-          onClose={() => setShowPatientSummaryAlert(false)}
-          patientId={patientId}
-          onViewSummary={() => {
-            // Already on track page, could scroll or highlight if needed
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-
-
-
