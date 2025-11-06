@@ -14,6 +14,7 @@ interface AlertCardProps {
   dataLength?: number;
   containerClassName?: string;
   contentHeightClassName?: string; // allows per-modal height control
+  headerAction?: React.ReactNode;
 }
 
 const AlertCard: React.FC<AlertCardProps> = ({
@@ -28,7 +29,8 @@ const AlertCard: React.FC<AlertCardProps> = ({
   emptyText = "No data found",
   dataLength = 0,
   containerClassName,
-  contentHeightClassName = 'h-[300px]'
+  contentHeightClassName = 'h-[300px]',
+  headerAction
 }) => {
   return (
     <Modal
@@ -38,6 +40,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
       description={description}
       icon={icon}
       containerClassName={containerClassName}
+      headerAction={headerAction}
     >
       <div className="w-full">
         {loading ? (
@@ -56,7 +59,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
           </div>
         ) : (
           <div className={`w-full ${contentHeightClassName} overflow-x-hidden relative`}>
-            <div className="overflow-y-auto h-full">
+            <div className="overflow-y-auto overflow-x-visible h-full" style={{ overflowX: 'visible' }}>
               <style>{`
                 .alert-card-table thead {
                   position: sticky;

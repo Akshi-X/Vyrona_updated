@@ -8,6 +8,7 @@ interface ModalProps {
   icon: React.ReactNode;
   children: React.ReactNode;
   containerClassName?: string;
+  headerAction?: React.ReactNode;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -17,7 +18,8 @@ const Modal: React.FC<ModalProps> = ({
   description,
   icon,
   children,
-  containerClassName
+  containerClassName,
+  headerAction
 }) => {
   if (!isOpen) return null;
 
@@ -43,15 +45,18 @@ const Modal: React.FC<ModalProps> = ({
                   <p className="text-sm text-gray-500">{description}</p>
                 </div>
               </div>
-              {/* Close Icon */}
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-3">
+                {headerAction}
+                {/* Close Icon */}
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Modal Content */}
