@@ -12,7 +12,6 @@ const ControlTower = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
-  const [networkHubsEnabled, setNetworkHubsEnabled] = useState<boolean>(false);
 
   const handleLogout = () => {
     logout();
@@ -54,6 +53,38 @@ const ControlTower = () => {
     }
     return result;
   }, [routes]);
+
+  // Build filter option lists from API data
+  const regionOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => {
+      if (r?.origin && r.origin.trim()) set.add(r.origin.trim());
+      if (r?.destination && r.destination.trim()) set.add(r.destination.trim());
+    });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  const statusOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  const carrierOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => { if (r?.supplyChain && r.supplyChain.trim()) set.add(r.supplyChain.trim()); });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  // Apply filters to routes
+  const filteredRoutes = useMemo(() => {
+    return (augmentedRoutes || []).filter(r => {
+      const matchRegion = selectedRegion === 'All' || r.origin === selectedRegion || r.destination === selectedRegion;
+      const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
+      const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
+      return matchRegion && matchStatus && matchCarrier;
+    });
+  }, [augmentedRoutes, selectedRegion, selectedStatus, selectedCarrier]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -125,9 +156,9 @@ const ControlTower = () => {
             {/* Left Panel - Filters and Routes */}
             <div className="flex flex-col gap-6 min-w-0">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-4 pt-4 pb-2 w-[453px] h-[380px] flex-shrink-0">
-                <h2 className="font-bold text-black text-lg mb-4">Filters</h2>
-                <div className="flex flex-col gap-2">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-4 pt-4 pb-2 w-[453px] h-[380px] flex-shrink-0 overflow-hidden">
+                <h2 className="font-bold text-black text-lg mb-2">Filters</h2>
+                <div className="flex flex-col gap-3">
                   {/* Region Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -136,13 +167,11 @@ const ControlTower = () => {
                      <select
                       value={selectedRegion}
                       onChange={(e) => setSelectedRegion(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Regions</option>
-                      <option value="North">North</option>
-                      <option value="South">South</option>
-                      <option value="East">East</option>
-                      <option value="West">West</option>
+                      {regionOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Regions' : o}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -154,12 +183,11 @@ const ControlTower = () => {
                      <select
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Status</option>
-                      <option value="Safe">Safe</option>
-                      <option value="Risk">Risk</option>
-                      <option value="Delayed">Delayed</option>
+                      {statusOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Status' : o}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -171,34 +199,15 @@ const ControlTower = () => {
                      <select
                       value={selectedCarrier}
                       onChange={(e) => setSelectedCarrier(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Carriers</option>
-                      <option value="FedEx">FedEx</option>
-                      <option value="UPS">UPS</option>
-                      <option value="DHL">DHL</option>
+                      {carrierOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Carriers' : o}</option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Network Hubs Filter (single toggle) */}
-                  <div className="my-auto">
-                    <div className="flex items-center justify-between h-11">
-                      <label className="block text-sm font-medium text-black leading-none">
-                        Network Hubs
-                      </label>
-                      <button
-                        onClick={() => setNetworkHubsEnabled((v) => !v)}
-                        aria-label="Toggle Network Hubs"
-                        className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                          networkHubsEnabled ? 'bg-[#9c3aa6]' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200 ${
-                          networkHubsEnabled ? 'translate-x-4' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                  </div>
+                  {/* Network Hubs removed per request */}
                 </div>
               </div>
 
@@ -217,8 +226,8 @@ const ControlTower = () => {
                   {!loadingRoutes && routesError && (
                     <div className="p-4 text-xs text-red-600">{routesError}</div>
                   )}
-                  {!loadingRoutes && !routesError && (augmentedRoutes && augmentedRoutes.length > 0 ? (
-                    (augmentedRoutes || []).map((route) => {
+                  {!loadingRoutes && !routesError && (filteredRoutes && filteredRoutes.length > 0 ? (
+                    (filteredRoutes || []).map((route) => {
                       const statusText = route?.status || 'N/A';
                       const statusColor = statusText === 'Safe'
                         ? 'text-[#00B050]'

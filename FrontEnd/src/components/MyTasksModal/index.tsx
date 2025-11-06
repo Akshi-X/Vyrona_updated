@@ -27,6 +27,7 @@ interface MyTasksModalProps {
   currentUserName?: string; // Current user's full name for "Assigned by" field
   currentUserId?: string; // Current user's ID
   onTaskCreated?: () => void; // Callback to refresh tasks after creation
+  userRole?: string; // User's role for role-based access control
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -40,8 +41,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   variant = 'dashboard',
   currentUserName = '',
   currentUserId = '',
-  onTaskCreated
+  onTaskCreated,
+  userRole = ''
 }) => {
+  const isUserRole = userRole?.toLowerCase() === 'user';
   const [showInputRow, setShowInputRow] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
@@ -180,14 +183,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     }));
   };
 
-  const handleEditClick = (task: MyTask) => {
-    setEditingTaskId(task.id);
-    setEditedTask({ ...task });
-    if (onEdit) {
-      onEdit(task);
-    }
-  };
-
   const handleEditInputChange = (field: keyof MyTask, value: string) => {
     if (editedTask) {
       setEditedTask(prev => prev ? ({
@@ -208,15 +203,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const handleCancelEdit = () => {
     setEditingTaskId(null);
     setEditedTask(null);
-  };
-
-  const handleDeleteClick = (taskId: string) => {
-    // Add task ID to deleted set to remove it from display
-    setDeletedTaskIds(prev => new Set(prev).add(taskId));
-    // Call the onDelete callback if provided
-    if (onDelete) {
-      onDelete(taskId);
-    }
   };
 
   // Update form when user info changes
@@ -266,7 +252,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         </svg>
       }
       headerAction={
-        onAdd ? (
+        onAdd && !isUserRole ? (
           <button
             onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
@@ -303,19 +289,19 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             </>
           )}
         </colgroup>
-        <thead className="bg-purple-50">
+        <thead>
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Patient ID</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Task Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Description</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Assigned by</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Due date</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Priority</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">Status</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Patient ID</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Task Name</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Description</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Assigned by</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Due date</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Priority</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Status</th>
             {variant === 'track' && (
               <>
-                <th className="px-4 py-3 text-center text-xs font-medium text-purple-700 uppercase tracking-wider">Edit</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-purple-700 uppercase tracking-wider">Delete</th>
+                <th className="pl-4 pr-0 py-3 text-right"></th>
+                <th className="pl-4 pr-0 py-3 text-right"></th>
               </>
             )}
           </tr>
@@ -498,7 +484,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             return (
               <tr key={task.id} className={`hover:bg-gray-50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="px-4 py-4">
-                  {isEditing ? (
+                  {isEditing && !isUserRole ? (
                     <input
                       type="text"
                       value={displayTask.patientId || ''}
@@ -507,12 +493,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     />
                   ) : (
                     <div className="text-sm text-gray-900 font-mono font-normal truncate">
-                      {task.patientId}
+                {task.patientId}
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-4">
-                  {isEditing ? (
+              </td>
+              <td className="px-4 py-4">
+                  {isEditing && !isUserRole ? (
                     <input
                       type="text"
                       value={displayTask.taskName || ''}
@@ -520,11 +506,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="text-sm font-normal text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
+                <div className="text-sm font-normal text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
                   )}
-                </td>
+              </td>
                 <td className="px-4 py-4">
-                  {isEditing ? (
+                  {isEditing && !isUserRole ? (
                     <input
                       type="text"
                       value={displayTask.description || ''}
@@ -534,9 +520,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   ) : (
                     <div className="text-sm text-gray-900 truncate" title={task.description}>{task.description}</div>
                   )}
-                </td>
+              </td>
                 <td className="px-4 py-4">
-                  {isEditing ? (
+                  {isEditing && !isUserRole ? (
                     <input
                       type="text"
                       value={displayTask.assigneeBy || ''}
@@ -546,9 +532,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   ) : (
                     <div className="text-sm text-gray-900 truncate">{task.assigneeBy}</div>
                   )}
-                </td>
-                <td className="px-4 py-4">
-                  {isEditing ? (
+              </td>
+              <td className="px-4 py-4">
+                  {isEditing && !isUserRole ? (
                     <input
                       type="date"
                       value={displayTask.dueDate || ''}
@@ -560,7 +546,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
                 </td>
               <td className="px-4 py-4 relative" style={{ overflow: 'visible' }}>
-                  {isEditing ? (
+                  {isEditing && !isUserRole ? (
                     <div className="relative" style={{ zIndex: 1000 }}>
                       <select
                         value={displayTask.priority}
@@ -620,20 +606,20 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       </select>
                     </div>
                   ) : (
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      task.status === 'Done' ? 'bg-green-100 text-green-800' :
-                      task.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {task.status}
-                    </span>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  task.status === 'Done' ? 'bg-green-100 text-green-800' :
+                  task.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {task.status}
+                </span>
                   )}
               </td>
-                {variant === 'track' && (
+                {variant === 'track' && !isUserRole && (
                   <>
-                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                    <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
                       {isEditing ? (
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={handleSaveEdit}
                             className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
@@ -655,30 +641,77 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </div>
                       ) : (
                         <button
-                          onClick={() => handleEditClick(task)}
-                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
+                          onClick={() => {
+                            setEditingTaskId(task.id);
+                            setEditedTask({ ...task });
+                          }}
+                          className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
                           title="Edit task"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                           </svg>
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                    <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
                       {!isEditing && (
                         <button
-                          onClick={() => handleDeleteClick(task.id)}
-                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                          onClick={() => {
+                            setDeletedTaskIds(prev => new Set([...prev, task.id]));
+                            if (onDelete) {
+                              onDelete(task.id);
+                            }
+                          }}
+                          className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
                           title="Delete task"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                           </svg>
                         </button>
                       )}
-              </td>
+                    </td>
                   </>
+                )}
+                {variant === 'track' && isUserRole && (
+                  <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
+                    {isEditing ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={handleSaveEdit}
+                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                          title="Save changes"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded transition-colors"
+                          title="Cancel editing"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingTaskId(task.id);
+                          setEditedTask({ ...task });
+                        }}
+                        className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
+                        title="Edit status"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                      </button>
+                    )}
+              </td>
                 )}
             </tr>
             );
