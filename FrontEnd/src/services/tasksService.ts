@@ -36,9 +36,10 @@ export interface Task {
 }
 
 export interface TaskListResponse {
-  tasks: Task[];
-  total_count: number;
-  can_create: boolean;
+  created_tasks?: Task[];
+  assigned_tasks?: Task[];
+  total_created: number;
+  total_assigned: number;
 }
 
 export class TasksService extends BaseApiService {
@@ -66,7 +67,7 @@ export class TasksService extends BaseApiService {
   async createTask(taskData: {
     task_name: string;
     description?: string;
-    assignee_id: number;
+    assignee_id: string;
     patient_id?: string;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';

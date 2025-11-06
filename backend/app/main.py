@@ -1,11 +1,12 @@
 import os
 import logging
+import asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -17,6 +18,12 @@ from app.middleware.patient_validation_middleware import PatientValidationMiddle
 from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.token_validation_middleware import TokenValidationMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
+from app.service.quality_service import QualityService
+from app.config.database import SessionLocal
+from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
+from app.schemas.response_schema import HealthCheckResponse
+from app.constants.status_constants import HEALTH_HEALTHY
+import uvicorn
 
 # Create logs directory if it doesn't exist (BEFORE logging setup)
 os.makedirs('logs', exist_ok=True)
@@ -117,6 +124,13 @@ async def startup_event():
     logger.info("Creating pharma admin users...")
     create_admin()
     
+    # Step 3: Start quality monitoring background tasks
+    logger.info("Starting quality monitoring background tasks...")
+    db = SessionLocal()
+    quality_service = QualityService(db)
+    asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
+    asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
+
     print("!" * 60 + "\n")
 
 # Enable CORS (add FIRST so it executes FIRST in the chain)
@@ -143,7 +157,6 @@ if not os.path.exists(STATIC_DIR):
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Create uploads directory for feedback attachments
-from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
 if not os.path.exists(FEEDBACK_UPLOAD_DIR):
     os.makedirs(FEEDBACK_UPLOAD_DIR, exist_ok=True)
 
@@ -159,14 +172,13 @@ app.include_router(dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(chat_controller.router, prefix=API_PREFIX)
 app.include_router(shipment_controller.router, prefix=API_PREFIX)
 app.include_router(lane_risk_controller.router, prefix=API_PREFIX)
+app.include_router(quality_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
-    from app.schemas.response_schema import HealthCheckResponse
-    from app.constants.status_constants import HEALTH_HEALTHY
     return HealthCheckResponse(
         status=HEALTH_HEALTHY,
         platform="MyGrape",
@@ -176,10 +188,10 @@ def health_check():
     )
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(
         app, 
         host=settings.HOST, 
         port=settings.PORT, 
-        reload=settings.RELOAD
+        reload=settings.RELOAD,
+        ws="websockets"  # Explicitly enable WebSocket support
     )
