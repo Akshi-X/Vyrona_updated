@@ -157,15 +157,15 @@ class PatientService:
                 )
             ).count()
             
-            # Get current month treatment count (patients with therapy_id)
-            current_month_treatment_count = self.db.query(Patient).filter(
+            # Get current month treatment count (distinct therapy_id)
+            current_month_treatment_count = self.db.query(func.count(func.distinct(Patient.therapy_id))).filter(
                 and_(
                     Patient.pharma_id == pharma_id,
                     Patient.therapy_id.isnot(None),
                     Patient.created_at >= current_month_start,
                     Patient.created_at < next_month_start
                 )
-            ).count()
+            ).scalar() or 0
             
             statistics_data = {
                 "pharma_id": pharma_id,
