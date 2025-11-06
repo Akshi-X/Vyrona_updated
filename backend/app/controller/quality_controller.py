@@ -34,17 +34,6 @@ router = APIRouter(prefix="/quality", tags=["Quality Monitoring"])
 # Global connection manager instance
 manager = ConnectionManager()
 
-
-@router.get("/test")
-async def test_endpoint():
-    """Test endpoint to verify router is working"""
-    return {"message": "Quality router is working", "path": "/api/quality/test"}
-
-
-
-
-
-
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
