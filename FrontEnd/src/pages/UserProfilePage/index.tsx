@@ -537,7 +537,7 @@ const UserProfilePage: React.FC = () => {
                     </td>
                     <td className="bg-white p-[10px] font-normal text-[#333333] text-xs">
                       <div className="truncate break-words max-w-[220px]">
-                        {ticket.title}
+                      {ticket.title}
                       </div>
                     </td>
                     <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
