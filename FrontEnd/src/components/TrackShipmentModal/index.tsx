@@ -42,6 +42,7 @@ const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a1 1 0 001 1h13a1 1 0 001-1V9m-8-4l6 6" />
         </svg>
       }
+      containerClassName="w-[40%]"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
