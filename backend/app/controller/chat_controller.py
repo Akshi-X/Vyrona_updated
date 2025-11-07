@@ -107,7 +107,7 @@ async def send_chat_message(
     Get all messages for a specific patient.
     Messages are automatically marked as read when this endpoint is called.
     """)
-def get_patient_chat_messages(
+async def get_patient_chat_messages(
     patient_id: str = Path(..., description="Patient ID"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
@@ -115,7 +115,7 @@ def get_patient_chat_messages(
 ):
     """Get all messages for a specific patient and mark them as read"""
     try:
-        result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+        result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
         return result
     except ChatPatientNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
