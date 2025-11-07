@@ -163,6 +163,25 @@ FEEDBACK_DEFAULT_SORT_FIELD = "submitted_on"
 FEEDBACK_DEFAULT_SORT_ORDER = "desc"
 
 # ============================================
+# CHAT WEBSOCKET MESSAGE TYPES
+# ============================================
+# Client -> Server message types
+WS_MSG_TYPE_SUBSCRIBE_PATIENT = "subscribe_patient"
+WS_MSG_TYPE_UNSUBSCRIBE_PATIENT = "unsubscribe_patient"
+WS_MSG_TYPE_SEND_MESSAGE = "send_message"
+WS_MSG_TYPE_GET_PATIENT_MESSAGES = "get_patient_messages"
+WS_MSG_TYPE_GET_UNREAD_MESSAGES = "get_unread_messages"
+WS_MSG_TYPE_MARK_READ = "mark_read"
+
+# Server -> Client message types
+WS_MSG_TYPE_MESSAGE_SENT = "message_sent"
+WS_MSG_TYPE_PATIENT_MESSAGES = "patient_messages"
+WS_MSG_TYPE_UNREAD_MESSAGES = "unread_messages"
+WS_MSG_TYPE_NEW_MESSAGE = "new_message"
+WS_MSG_TYPE_ERROR = "error"
+WS_MSG_TYPE_SUCCESS = "success"
+
+# ============================================
 # REGEX PATTERNS
 # ============================================
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'

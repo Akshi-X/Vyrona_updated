@@ -36,8 +36,17 @@ class ChatMessageCreateRequest(BaseModel):
             return []
         if not isinstance(v, list):
             raise ValueError("Tagged user IDs must be a list")
-        # Remove duplicates and empty strings
-        unique_ids = list(set([uid.strip() for uid in v if uid and uid.strip()]))
+        # Ensure all items are strings and remove duplicates/empty strings
+        valid_ids = []
+        for uid in v:
+            if uid is None:
+                continue
+            # Convert to string if not already
+            uid_str = str(uid).strip() if uid else ""
+            if uid_str:
+                valid_ids.append(uid_str)
+        # Remove duplicates
+        unique_ids = list(set(valid_ids))
         return unique_ids
 
 
@@ -53,6 +62,7 @@ class ChatMessageResponse(BaseModel):
     sender_id: str
     sender_name: str
     tagged_user_ids: List[str]
+    tagged_user_names: Optional[List[str]] = None
     created_at: datetime
     is_read: bool = False
     read_at: Optional[datetime] = None
@@ -69,6 +79,7 @@ class ChatMessageCreateResponse(BaseModel):
     sender_id: str
     sender_name: str
     tagged_user_ids: List[str]
+    tagged_user_names: Optional[List[str]] = None
     created_at: datetime
     success: bool = True
     message: str = "Message sent successfully"
