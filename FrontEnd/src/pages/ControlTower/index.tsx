@@ -215,10 +215,10 @@ const ControlTower = () => {
               {/* Active Routes List */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[464px] flex-shrink-0 flex flex-col">
                 <h2 className="font-bold text-black text-lg mb-3">Active Routes</h2>
-                <div className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 px-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
+                <div className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
                   <div className="text-left">Route</div>
-                  <div className="text-left justify-self-start">Status</div>
-                  <div className="text-left justify-self-start">Date</div>
+                  <div className="text-left -ml-6">Status</div>
+                  <div className="text-left">Date</div>
                 </div>
                 <div className="flex-1 overflow-y-auto mt-1 divide-y divide-gray-100">
                   {loadingRoutes && (
@@ -238,8 +238,8 @@ const ControlTower = () => {
                             ? 'text-[#FFA500]'
                             : 'text-gray-500';
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 items-center px-4 py-3 hover:bg-gray-50">
-                          <div className="min-w-0">
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 hover:bg-gray-50 items-center">
+                          <div className="min-w-0 text-left">
                             <button className="text-[#6b1176] text-xs font-bold hover:underline">{route?.patientId || 'N/A'}</button>
                             <div className="text-sm text-gray-900 leading-snug">
                               {(route?.origin && route?.destination) ? (
@@ -255,8 +255,8 @@ const ControlTower = () => {
                               <div className="text-[11px] text-gray-400 truncate">{route?.supplyChain}</div>
                             )}
                           </div>
-                          <div className={`text-left text-xs font-medium justify-self-start ${statusColor}`}>{statusText}</div>
-                          <div className="text-left text-xs font-bold text-gray-600 justify-self-start">{route?.date || '-'}</div>
+                          <div className={`text-left text-xs font-medium -ml-6 ${statusColor}`}>{statusText}</div>
+                          <div className="text-left text-xs font-bold text-gray-600">{route?.date || '-'}</div>
                         </div>
                       );
                     })
