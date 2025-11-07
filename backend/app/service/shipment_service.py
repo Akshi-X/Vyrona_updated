@@ -179,7 +179,7 @@ class ShipmentService:
         return query
     
     def _format_duration(self, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> Optional[str]:
-        """Format duration between two datetimes as 'Xh Ym' string."""
+        """Format duration between two datetimes as '<hours> h' with up to two decimal places."""
         if not start_dt or not end_dt:
             return None
         
@@ -192,17 +192,14 @@ class ShipmentService:
         if total_seconds <= 0:
             return None
         
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}h {minutes}m"
-        elif hours > 0:
-            return f"{hours}h"
-        elif minutes > 0:
-            return f"{minutes}m"
-        else:
-            return "0m"
+        total_hours = total_seconds / 3600
+        rounded_hours = round(total_hours, 2)
+        formatted_hours = f"{rounded_hours:.2f}".rstrip('0').rstrip('.')
+
+        if not formatted_hours:
+            formatted_hours = "0"
+
+        return f"{formatted_hours} h"
     
     def _get_start_date_from_shipment(self, shipment: Shipment) -> Optional[str]:
         """Get start date from shipment (departure_time or updated_at as fallback)."""
@@ -531,8 +528,8 @@ class ShipmentService:
             List of dictionaries containing:
             - source_location: Source location of the leg
             - destination_location: Destination location of the leg
-            - scheduled_time: Scheduled transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to scheduled_time, or None
-            - actual_time: Actual transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to handover_time or arrival_time
+            - scheduled_time: Scheduled transport time as string in hours format with up to two decimals (e.g., "2.5 h") calculated from departure_time to scheduled_time, or None
+            - actual_time: Actual transport time as string in hours format with up to two decimals (e.g., "1.75 h") calculated from departure_time to handover_time or arrival_time
         """
         try:
             # Validate patient and shipment status
