@@ -42,7 +42,12 @@ const ControlTowerMap: React.FC = () => {
 
   const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAD7-vocQRsa6eAn3eieib9M8--AJaKscY';
 
-  const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: apiKey, preventGoogleFontsLoading: true });
+  const { isLoaded } = useJsApiLoader({ 
+    id: 'google-map-script', 
+    googleMapsApiKey: apiKey, 
+    libraries: ['geometry', 'maps'],
+    preventGoogleFontsLoading: true 
+  });
 
   useEffect(() => {
     let mounted = true;
