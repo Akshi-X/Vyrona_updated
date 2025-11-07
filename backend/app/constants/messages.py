@@ -147,6 +147,19 @@ class ErrorMessages:
     TASK_UNAUTHORIZED_EDIT = "You are not authorized to edit this task"
     TASK_UNAUTHORIZED_STATUS = "You are not authorized to change this task's status"
     TASK_MANAGER_ONLY = "Only managers can create tasks"
+    
+    # Chat System
+    CHAT_MESSAGE_CREATE_FAILED = "Failed to create chat message"
+    CHAT_MESSAGE_NOT_FOUND = "Chat message not found"
+    CHAT_USER_NOT_FOUND = "User not found"
+    CHAT_PATIENT_NOT_FOUND = "Patient not found"
+    CHAT_PHARMA_ACCESS_DENIED = "Access denied - users must be in same pharma"
+    CHAT_INVALID_DATA = "Invalid chat data"
+    CHAT_CANNOT_TAG_SELF = "You cannot tag yourself in a message"
+    CHAT_WEBSOCKET_INVALID_MESSAGE = "Invalid WebSocket message format"
+    CHAT_WEBSOCKET_INVALID_TYPE = "Invalid message type"
+    CHAT_WEBSOCKET_AUTH_FAILED = "WebSocket authentication failed"
+    CHAT_WEBSOCKET_CONNECTION_FAILED = "WebSocket connection failed"
 
 
 class SuccessMessages:

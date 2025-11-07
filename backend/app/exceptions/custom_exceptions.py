@@ -1179,8 +1179,8 @@ class ChatMessageCreateFailedException(ChatException):
 
     def __init__(self, reason: Optional[str] = None):
         super().__init__(
-            message="Failed to create chat message",
-            error_code="CHAT_MESSAGE_CREATE_FAILED",
+            message=ErrorMessages.CHAT_MESSAGE_CREATE_FAILED,
+            error_code=ERROR_CODES["CHAT_MESSAGE_CREATE_FAILED"],
             status_code=500,
             reason=reason
         )
@@ -1191,8 +1191,8 @@ class ChatMessageNotFoundException(ChatException):
 
     def __init__(self, message_id: Optional[int] = None):
         super().__init__(
-            message="Chat message not found",
-            error_code="CHAT_MESSAGE_NOT_FOUND",
+            message=ErrorMessages.CHAT_MESSAGE_NOT_FOUND,
+            error_code=ERROR_CODES["CHAT_MESSAGE_NOT_FOUND"],
             status_code=404,
             message_id=message_id
         )
@@ -1203,8 +1203,8 @@ class ChatUserNotFoundException(ChatException):
 
     def __init__(self, user_id: Optional[str] = None):
         super().__init__(
-            message="User not found",
-            error_code="CHAT_USER_NOT_FOUND",
+            message=ErrorMessages.CHAT_USER_NOT_FOUND,
+            error_code=ERROR_CODES["CHAT_USER_NOT_FOUND"],
             status_code=404,
             user_id=user_id
         )
@@ -1215,8 +1215,8 @@ class ChatPatientNotFoundException(ChatException):
 
     def __init__(self, patient_id: Optional[str] = None):
         super().__init__(
-            message="Patient not found",
-            error_code="CHAT_PATIENT_NOT_FOUND",
+            message=ErrorMessages.CHAT_PATIENT_NOT_FOUND,
+            error_code=ERROR_CODES["CHAT_PATIENT_NOT_FOUND"],
             status_code=404,
             patient_id=patient_id
         )
@@ -1227,8 +1227,8 @@ class ChatPharmaAccessDeniedException(ChatException):
 
     def __init__(self, reason: Optional[str] = None):
         super().__init__(
-            message="Access denied - users must be in same pharma",
-            error_code="CHAT_PHARMA_ACCESS_DENIED",
+            message=ErrorMessages.CHAT_PHARMA_ACCESS_DENIED,
+            error_code=ERROR_CODES["CHAT_PHARMA_ACCESS_DENIED"],
             status_code=403,
             reason=reason
         )
@@ -1237,10 +1237,48 @@ class ChatPharmaAccessDeniedException(ChatException):
 class ChatInvalidDataException(ChatException):
     """Invalid chat data"""
 
+    def __init__(self, reason: Optional[str] = None, custom_message: Optional[str] = None):
+        # Use custom message if provided, otherwise use default
+        message = custom_message if custom_message else ErrorMessages.CHAT_INVALID_DATA
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES["CHAT_INVALID_DATA"],
+            status_code=400,
+            reason=reason
+        )
+
+
+class ChatWebSocketInvalidMessageException(ChatException):
+    """Invalid WebSocket message format"""
+
     def __init__(self, reason: Optional[str] = None):
         super().__init__(
-            message="Invalid chat data",
-            error_code="CHAT_INVALID_DATA",
+            message=ErrorMessages.CHAT_WEBSOCKET_INVALID_MESSAGE,
+            error_code=ERROR_CODES["CHAT_WEBSOCKET_INVALID_MESSAGE"],
             status_code=400,
+            reason=reason
+        )
+
+
+class ChatWebSocketInvalidTypeException(ChatException):
+    """Invalid WebSocket message type"""
+
+    def __init__(self, message_type: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.CHAT_WEBSOCKET_INVALID_TYPE,
+            error_code=ERROR_CODES["CHAT_WEBSOCKET_INVALID_TYPE"],
+            status_code=400,
+            message_type=message_type
+        )
+
+
+class ChatWebSocketAuthFailedException(ChatException):
+    """WebSocket authentication failed"""
+
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.CHAT_WEBSOCKET_AUTH_FAILED,
+            error_code=ERROR_CODES["CHAT_WEBSOCKET_AUTH_FAILED"],
+            status_code=401,
             reason=reason
         )
