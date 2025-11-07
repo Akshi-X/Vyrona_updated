@@ -62,6 +62,7 @@ class ChatMessageResponse(BaseModel):
     sender_id: str
     sender_name: str
     tagged_user_ids: List[str]
+    tagged_user_names: Optional[List[str]] = None
     created_at: datetime
     is_read: bool = False
     read_at: Optional[datetime] = None
@@ -78,6 +79,7 @@ class ChatMessageCreateResponse(BaseModel):
     sender_id: str
     sender_name: str
     tagged_user_ids: List[str]
+    tagged_user_names: Optional[List[str]] = None
     created_at: datetime
     success: bool = True
     message: str = "Message sent successfully"

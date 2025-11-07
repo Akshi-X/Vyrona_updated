@@ -38,6 +38,45 @@ from ..dependencies.auth_dependencies import authenticate_websocket as default_a
 logger = logging.getLogger(__name__)
 
 
+async def broadcast_unread_messages_update(
+    user_id: str,
+    pharma_id: int,
+    connection_manager,
+    db: Session
+):
+    """Broadcast updated unread messages to all connections for a specific user"""
+    try:
+        unread_result = get_unread_messages(user_id, pharma_id, db)
+        unread_payload = {
+            "type": WS_MSG_TYPE_UNREAD_MESSAGES,
+            "success": True,
+            "data": unread_result.model_dump(mode='json')
+        }
+        
+        # Send to all connections for this user
+        disconnected = []
+        for connection_id, conn_data in list(connection_manager.get_connections_by_pharma(pharma_id).items()):
+            if conn_data.get("user_id") != user_id:
+                continue
+            
+            websocket = conn_data.get("websocket")
+            if not websocket or websocket.client_state.name != "CONNECTED":
+                if not websocket:
+                    disconnected.append(connection_id)
+                continue
+            
+            try:
+                await websocket.send_json(unread_payload)
+            except Exception as e:
+                logger.warning(f"Failed to send unread update to {connection_id}: {e}")
+                disconnected.append(connection_id)
+        
+        for conn_id in disconnected:
+            connection_manager.disconnect(conn_id)
+    except Exception as e:
+        logger.warning(f"Failed to broadcast unread messages update: {e}")
+
+
 async def broadcast_new_message(
     result: ChatMessageCreateResponse,
     sender_pharma_id: int,
@@ -53,6 +92,7 @@ async def broadcast_new_message(
             sender_id=result.sender_id,
             sender_name=result.sender_name,
             tagged_user_ids=result.tagged_user_ids,
+            tagged_user_names=result.tagged_user_names,
             created_at=result.created_at,
             is_read=False,
             read_at=None
@@ -187,6 +227,13 @@ def create_chat_message(
         
         db.commit()
         
+        # Get tagged user names
+        tagged_user_names = []
+        if request.tagged_user_ids:
+            tagged_users = db.query(User).filter(User.user_id.in_(request.tagged_user_ids)).all()
+            user_name_map = {user.user_id: f"{user.first_name} {user.last_name}" for user in tagged_users}
+            tagged_user_names = [user_name_map.get(uid, "Unknown") for uid in request.tagged_user_ids]
+        
         return ChatMessageCreateResponse(
             message_id=chat_message.id,
             patient_id=chat_message.patient_id,
@@ -194,6 +241,7 @@ def create_chat_message(
             sender_id=chat_message.sender_id,
             sender_name=sender_name,
             tagged_user_ids=request.tagged_user_ids,
+            tagged_user_names=tagged_user_names if tagged_user_names else None,
             created_at=chat_message.created_at
         )
         
@@ -206,11 +254,12 @@ def create_chat_message(
         raise ChatMessageCreateFailedException(f"Failed to create chat message: {str(e)}")
 
 
-def get_patient_messages(
+async def get_patient_messages(
     patient_id: str,
     current_user_id: str,
     current_user_pharma_id: int,
-    db: Session
+    db: Session,
+    connection_manager=None
 ) -> PatientMessagesResponse:
     """Get all messages for a specific patient and mark them as read"""
     try:
@@ -227,6 +276,9 @@ def get_patient_messages(
             )
         ).order_by(ChatMessage.created_at.asc()).all()
         
+        # Track if any messages were marked as read (to trigger broadcast)
+        messages_marked_read = False
+        
         # Mark all messages as read for current user
         for message in messages:
             read_status = db.query(ChatReadStatus).filter(
@@ -239,6 +291,7 @@ def get_patient_messages(
             if read_status and not read_status.is_read:
                 read_status.is_read = True
                 read_status.read_at = datetime.now(timezone.utc)
+                messages_marked_read = True
             elif not read_status:
                 # Create read status if it doesn't exist
                 new_read_status = ChatReadStatus(
@@ -248,8 +301,21 @@ def get_patient_messages(
                     read_at=datetime.now(timezone.utc)
                 )
                 db.add(new_read_status)
+                messages_marked_read = True
         
         db.commit()
+        
+        # Broadcast updated unread messages if messages were marked as read and connection_manager is available
+        if messages_marked_read and connection_manager:
+            try:
+                await broadcast_unread_messages_update(
+                    current_user_id,
+                    current_user_pharma_id,
+                    connection_manager,
+                    db
+                )
+            except Exception as e:
+                logger.warning(f"Failed to broadcast unread update after marking messages as read: {e}")
         
         # Build response
         message_responses = []
@@ -271,9 +337,15 @@ def get_patient_messages(
             
             # Parse tagged_user_ids from JSON string
             tagged_user_ids = []
+            tagged_user_names = []
             if message.tagged_user_ids:
                 try:
                     tagged_user_ids = json.loads(message.tagged_user_ids)
+                    # Get names for tagged users
+                    if tagged_user_ids:
+                        tagged_users = db.query(User).filter(User.user_id.in_(tagged_user_ids)).all()
+                        user_name_map = {user.user_id: f"{user.first_name} {user.last_name}" for user in tagged_users}
+                        tagged_user_names = [user_name_map.get(uid, "Unknown") for uid in tagged_user_ids]
                 except (json.JSONDecodeError, TypeError):
                     tagged_user_ids = []
             
@@ -284,6 +356,7 @@ def get_patient_messages(
                 sender_id=message.sender_id,
                 sender_name=sender_name,
                 tagged_user_ids=tagged_user_ids,
+                tagged_user_names=tagged_user_names if tagged_user_names else None,
                 created_at=message.created_at,
                 is_read=is_read,
                 read_at=read_at
@@ -421,7 +494,7 @@ async def handle_websocket_message(
         
         elif message_type == WS_MSG_TYPE_MARK_READ:
             return await handle_mark_read_ws(
-                message_data, current_user, pharma_id, db
+                message_data, current_user, pharma_id, connection_manager, db
             )
         
         else:
@@ -504,8 +577,8 @@ async def handle_get_patient_messages_ws(
     # Auto-subscribe to patient when fetching messages
     connection_manager.subscribe_to_patient(connection_id, patient_id)
     
-    # Get messages using existing service
-    result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+    # Get messages using existing service (pass connection_manager to trigger unread broadcast)
+    result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
     
     return {
         "type": WS_MSG_TYPE_PATIENT_MESSAGES,
@@ -533,6 +606,7 @@ async def handle_mark_read_ws(
     message_data: Dict[str, Any],
     current_user: User,
     pharma_id: int,
+    connection_manager: ChatConnectionManager,
     db: Session
 ) -> Dict[str, Any]:
     """Handle mark messages as read via WebSocket"""
@@ -540,8 +614,8 @@ async def handle_mark_read_ws(
     if not patient_id:
         raise ChatInvalidDataException("patient_id is required")
     
-    # Mark as read by fetching messages (service automatically marks as read)
-    get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+    # Mark as read by fetching messages (service automatically marks as read and broadcasts unread update)
+    await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
     
     return {
         "type": WS_MSG_TYPE_SUCCESS,
@@ -588,24 +662,6 @@ async def handle_websocket_connection(
             websocket, current_user.user_id, pharma_id
         )
         
-        patient_messages_data = None
-        if patient_id:
-            patient = db.query(Patient).filter(Patient.id == patient_id).first()
-            if patient and patient.pharma_id == pharma_id:
-                connection_manager.subscribe_to_patient(connection_id, patient_id)
-                try:
-                    result = get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
-                    patient_messages_data = result.model_dump(mode='json')
-                except Exception as e:
-                    logger.warning(f"Failed to fetch patient messages: {e}")
-        
-        unread_messages_data = None
-        try:
-            unread_result = get_unread_messages(current_user.user_id, pharma_id, db)
-            unread_messages_data = unread_result.model_dump(mode='json')
-        except Exception as e:
-            logger.warning(f"Failed to fetch unread messages: {e}")
-        
         connection_response = {
             "type": "connection_confirmed",
             "success": True,
@@ -615,10 +671,23 @@ async def handle_websocket_connection(
             "patient_id": patient_id if patient_id else None
         }
         
-        if patient_messages_data:
-            connection_response["patient_messages"] = patient_messages_data
-        if unread_messages_data:
-            connection_response["unread_messages"] = unread_messages_data
+        if patient_id:
+            # With patient_id: send only patient messages
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.pharma_id == pharma_id:
+                connection_manager.subscribe_to_patient(connection_id, patient_id)
+                try:
+                    result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
+                    connection_response["patient_messages"] = result.model_dump(mode='json')
+                except Exception as e:
+                    logger.warning(f"Failed to fetch patient messages: {e}")
+        else:
+            # Without patient_id: send only unread messages
+            try:
+                unread_result = get_unread_messages(current_user.user_id, pharma_id, db)
+                connection_response["unread_messages"] = unread_result.model_dump(mode='json')
+            except Exception as e:
+                logger.warning(f"Failed to fetch unread messages: {e}")
         
         await websocket.send_json(connection_response)
         
