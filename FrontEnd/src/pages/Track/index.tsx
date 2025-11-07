@@ -137,6 +137,38 @@ export default function TrackPage() {
     fetchCurrentUser();
   }, []);
 
+  // Lightweight polling to keep unread chat badge updated when chat window is closed
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      fetchUnreadMessages();
+      intervalId = setInterval(fetchUnreadMessages, 15000);
+    };
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stop();
+    };
+  }, []);
+
   // Fetch unread messages to populate stakeholder chats
   const fetchUnreadMessages = async () => {
     try {

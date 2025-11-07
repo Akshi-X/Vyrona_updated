@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { chatService } from '../../services/chatService';
 import { userService, type UserListItem, type UserProfileDto } from '../../services/userService';
-import renderMessageWithMentions from './utils/renderMessageWithMentions.tsx';
+import renderMessageWithMentions from './utils/renderMessageWithMentions';
 
 type ChatMessage = { 
   id: string; 
@@ -33,6 +33,8 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const unreadSeparatorRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const mentionMapRef = useRef<Map<string, string>>(new Map());
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -44,6 +46,12 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(-1);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const [isUserTyping, setIsUserTyping] = useState(false);
+
+  // Polling interval in milliseconds (5 seconds)
+  const POLLING_INTERVAL_MS = 5000;
+  // Typing timeout - resume polling after user stops typing for this duration (2 seconds)
+  const TYPING_TIMEOUT_MS = 2000;
 
   // Fetch current user
   const fetchCurrentUser = async (): Promise<UserProfileDto | null> => {
@@ -53,7 +61,6 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       setCurrentUserId(profile.user_id);
       return profile;
     } catch (error) {
-      console.error('Error fetching current user profile:', error);
       return null;
     }
   };
@@ -64,15 +71,16 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       const response = await userService.getAllUsersInCompany();
       setUsers(response.users || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       setUsers([]);
     }
   };
 
   // Load messages for selected patient
-  const loadPatientMessages = async (patientId: string, userId?: string) => {
+  const loadPatientMessages = async (patientId: string, userId?: string, showLoader: boolean = true) => {
     if (!patientId) return;
-    setLoadingMessages(true);
+    if (showLoader) {
+      setLoadingMessages(true);
+    }
     try {
       // Use provided userId or currentUserId from state
       const userIdToCompare = userId || currentUserId;
@@ -111,10 +119,14 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         onMessagesUpdated();
       }
     } catch (error) {
-      console.error('Error loading patient messages:', error);
-      setMessages([]);
+      // Only clear messages if this was an initial load, not a polling update
+      if (showLoader) {
+        setMessages([]);
+      }
     } finally {
-      setLoadingMessages(false);
+      if (showLoader) {
+        setLoadingMessages(false);
+      }
     }
   };
 
@@ -132,10 +144,42 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         }
       };
       initializeChat();
+    } else {
+      // Clear messages when chat is closed
+      setMessages([]);
     }
   }, [isOpen, patientId]);
 
-  // message rendering is handled by utils/renderMessageWithMentions
+  // Polling effect - fetch new messages periodically when chat is open
+  useEffect(() => {
+    // Clear any existing polling interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    // Start polling only if chat is open, patientId exists, user is not typing, and we have currentUserId
+    if (isOpen && patientId && !isUserTyping && currentUserId) {
+      // Set up polling interval
+      // The effect will automatically recreate the interval when dependencies change
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          // Poll without showing loader to avoid UI flicker
+          await loadPatientMessages(patientId, currentUserId, false);
+        } catch (error) {
+          // Silently handle polling errors to avoid console spam
+        }
+      }, POLLING_INTERVAL_MS);
+    }
+
+    // Cleanup function - clears interval when dependencies change or component unmounts
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [isOpen, patientId, currentUserId, isUserTyping]);
 
   // Auto scroll to first unread message
   useEffect(() => {
@@ -298,16 +342,24 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       
       setDraftMessage('');
       setShowMentionDropdown(false);
+      setIsUserTyping(false); // Resume polling after sending
+      
+      // Clear typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
       
       // Reload messages with current user ID to ensure proper sender detection
-      await loadPatientMessages(patientId, currentUser?.user_id || currentUserId);
+      // Don't show loader for this refresh as it's immediate after sending
+      await loadPatientMessages(patientId, currentUser?.user_id || currentUserId, false);
       
       // Notify parent to refresh unread messages
       if (onMessagesUpdated) {
         onMessagesUpdated();
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      setIsUserTyping(false); // Resume polling even on error
       const now = new Date();
       setMessages(prev => ([
         ...prev,
@@ -323,11 +375,45 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       ]));
       setDraftMessage('');
       setShowMentionDropdown(false);
+      setIsUserTyping(false); // Resume polling after error
+      
+      // Clear typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
     }
   };
 
+  // Cleanup polling and typing timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const handleMessageChange = (value: string) => {
     setDraftMessage(value);
+    
+    // Pause polling while user is typing
+    setIsUserTyping(true);
+    
+    // Clear existing typing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Resume polling after user stops typing for TYPING_TIMEOUT_MS
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsUserTyping(false);
+    }, TYPING_TIMEOUT_MS);
     
     const cursorPos = inputRef.current?.selectionStart || value.length;
     const textBeforeCursor = value.substring(0, cursorPos);
