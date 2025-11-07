@@ -23,7 +23,6 @@ const ApprovalScreen: React.FC = () => {
   const [userLoading, setUserLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
-  const [linkUsed, setLinkUsed] = useState(false);
 
   const apiService = new BaseApiService();
   const location = useLocation();
@@ -42,12 +41,6 @@ const ApprovalScreen: React.FC = () => {
           setStatus("Registration ID not found in URL");
           setUserLoading(false);
           return;
-        }
-
-        // If this approval link was used before in this browser, mark it
-        const storageKey = `approval_used_${registrationId}`;
-        if (localStorage.getItem(storageKey) === '1') {
-          setLinkUsed(true);
         }
 
         // Fetch user details from API
@@ -77,6 +70,7 @@ const ApprovalScreen: React.FC = () => {
     setShowConfirmModal(false);
     setPendingAction(null);
   };
+
 
   // Approve / Reject Handler - executed after confirmation
   const handleAction = async (action: "approve" | "reject") => {
@@ -109,16 +103,18 @@ const ApprovalScreen: React.FC = () => {
       setLastAction(action);
       setCompleted(true);
 
-      // Mark this approval link as used in this browser AFTER successful completion
+      // Refresh user info to get updated status
       try {
-        const storageKey = `approval_used_${registrationId}`;
-        localStorage.setItem(storageKey, '1');
-        setLinkUsed(true);
-      } catch {}
-      // After successful approval or rejection, navigate to dashboard
+        const updatedUserData = await userService.getUserById(registrationId);
+        setUserInfo(updatedUserData);
+      } catch (error) {
+        // Ignore error, user info will be stale but that's okay
+      }
+
+      // Navigate to dashboard after 3 seconds
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 1500);
+      }, 1000);
     } catch (err: any) {
       if (err.message?.includes('401')) {
         setStatus("Session expired. Please login again.");
@@ -155,11 +151,6 @@ const ApprovalScreen: React.FC = () => {
   // If there is no auth token at all, redirect to login
   if (!isAuthenticated && !cookieToken) {
     return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  // If this approval link was used before (in this browser), block revisiting
-  if (linkUsed && !completed) {
-    return <Navigate to="/dashboard" replace />;
   }
 
   return (
@@ -328,7 +319,7 @@ const ApprovalScreen: React.FC = () => {
                   </div>
                 </div>
                 {status && (
-                  <p className="text-center text-gray-800 font-medium">{status}</p>
+                  <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
                 )}
               </div>
             )}
