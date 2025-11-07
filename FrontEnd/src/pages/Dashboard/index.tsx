@@ -209,6 +209,7 @@ export default function Dashboard({ }: DashboardProps) {
     taskName: task.task_name,
     description: task.description || '',
     assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
+    assignedTo: `${task.assignee.first_name} ${task.assignee.last_name}`,
     dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
     priority: task.priority,
     status: task.status
