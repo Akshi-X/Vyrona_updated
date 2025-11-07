@@ -308,8 +308,8 @@ export default function Dashboard({ }: DashboardProps) {
     },
     {
       label: "Failures",
-      icon: MyTasksIcon,
-      alt: "My Tasks",
+      icon: CriticalAlertsIcon,
+      alt: "Failures",
     },
   ];
 
