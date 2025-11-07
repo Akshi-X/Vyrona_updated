@@ -177,6 +177,20 @@ async def get_history(
     )
 
 
+@router.get("/patients/{patient_id}/export")
+async def export_patient_quality_data(
+    patient_id: str,
+    pharma_id: int = Depends(get_current_user_pharma_id),
+    db: Session = Depends(get_db)
+):
+    """Export a patient's quality data as a CSV for the default time window."""
+    quality_service = QualityService(db)
+    return quality_service.export_patient_quality_data_csv(
+        patient_id=patient_id,
+        pharma_id=pharma_id
+    )
+
+
 @router.get("/connections", response_model=QualityConnectionsResponse)
 async def get_connections(
     current_user: User = Depends(get_current_user),
