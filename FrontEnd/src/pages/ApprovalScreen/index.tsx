@@ -227,16 +227,26 @@ const ApprovalScreen: React.FC = () => {
       {/* Right Section */}
       <main className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
         <div className="w-full max-w-[28rem]">
-          {!completed && (
-            <>
-              <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">
-                Approval Request
-              </h2>
-              <p className="text-gray-500 mb-6">
-                Review user details and proceed to approve or reject.
-              </p>
-            </>
-          )}
+          {(() => {
+            const isAlreadyProcessed = userInfo && 
+              (userInfo.approved_status === 'approved' || userInfo.approved_status === 'rejected' || userInfo.approved_status === 'reject');
+            
+            if (!completed) {
+              return (
+                <>
+                  <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">
+                    Approval Request
+                  </h2>
+                  <p className="text-gray-500 mb-6">
+                    {isAlreadyProcessed 
+                      ? "This user request has already been processed."
+                      : "Review user details and proceed to approve or reject."}
+                  </p>
+                </>
+              );
+            }
+            return null;
+          })()}
 
           {/* User Information Card */}
           {userInfo && !completed && (
@@ -284,46 +294,68 @@ const ApprovalScreen: React.FC = () => {
           )}
 
           {/* Action Buttons or Success Card */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-            {!completed && (
-              <div className="flex gap-4 justify-center">
-                <button
-                  className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
-                  onClick={() => handleButtonClick("approve")}
-                  disabled={loadingAction !== null}
-                >
-                  Approve
-                </button>
-                <button
-                  className="w-full py-3 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition disabled:opacity-50"
-                  onClick={() => handleButtonClick("reject")}
-                  disabled={loadingAction !== null}
-                >
-                  Reject
-                </button>
-              </div>
-            )}
-            {completed && (
-              <div className="flex flex-col items-center">
-                <div className="flex justify-center mb-4">
-                  <div className={`w-8 h-8 ${lastAction === 'reject' ? 'bg-red-500' : 'bg-green-500'} rounded-lg flex items-center justify-center`}>
-                    {lastAction === 'reject' ? (
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    ) : (
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                      </svg>
+          <div className="bg-white rounded-lg">
+            {(() => {
+              // Check if user is already approved or rejected
+              const isAlreadyProcessed = userInfo && 
+                (userInfo.approved_status === 'approved' || userInfo.approved_status === 'rejected' || userInfo.approved_status === 'reject');
+              
+              if (isAlreadyProcessed && !completed) {
+                return (
+                  <div className="flex flex-col items-center">
+                    <p className="text-center text-gray-600 font-medium">
+                      This user request has already been processed. No further action is required.
+                    </p>
+                  </div>
+                );
+              }
+              
+              if (!completed) {
+                return (
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
+                      onClick={() => handleButtonClick("approve")}
+                      disabled={loadingAction !== null}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="w-full py-3 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition disabled:opacity-50"
+                      onClick={() => handleButtonClick("reject")}
+                      disabled={loadingAction !== null}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                );
+              }
+              
+              if (completed) {
+                return (
+                  <div className="flex flex-col items-center">
+                    <div className="flex justify-center mb-4">
+                      <div className={`w-8 h-8 ${lastAction === 'reject' ? 'bg-red-500' : 'bg-green-500'} rounded-lg flex items-center justify-center`}>
+                        {lastAction === 'reject' ? (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : (
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    {status && (
+                      <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
                     )}
                   </div>
-                </div>
-                {status && (
-                  <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
-                )}
-              </div>
-            )}
-
+                );
+              }
+              
+              return null;
+            })()}
           </div>
         </div>
       </main>
