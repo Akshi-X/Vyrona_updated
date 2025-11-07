@@ -327,7 +327,7 @@ export default function Dashboard({ }: DashboardProps) {
           className=""
           offsetLeft="15rem"
           rightContent={(
-            <div 
+            <div
               className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
@@ -715,7 +715,7 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Compliance Section */}
                 <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
-                    Compliance
+                    Shipment Status 
                   </h2>
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
@@ -740,7 +740,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
                       </div>
                       <div className="font-normal text-black text-[12px]">
-                        Audit Coverage
+                        Success %
                       </div>
                     </div>
                   </div>
