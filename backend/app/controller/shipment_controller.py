@@ -84,8 +84,8 @@ def get_transport_time_comparison(
             {
                 "source_location": "Location A",
                 "destination_location": "Location B",
-                "scheduled_time": "2h 30m",  # Scheduled transport time in hours and minutes format (e.g., "2h 15m", "45m", "3h") or null
-                "actual_time": "1h 30m"  # Actual transport time in hours and minutes format (e.g., "2h 15m", "45m", "3h")
+                "scheduled_time": "2.5 h",  # Scheduled transport time in hours with up to two decimals (e.g., "2.5 h", "0.75 h") or null
+                "actual_time": "1.5 h"  # Actual transport time in hours with up to two decimals (e.g., "2 h", "0.75 h")
             },
             ...
         ]
