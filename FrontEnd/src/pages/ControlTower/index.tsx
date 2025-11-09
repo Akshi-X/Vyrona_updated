@@ -213,14 +213,14 @@ const ControlTower = () => {
               </div>
 
               {/* Active Routes List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[544px] flex-shrink-0 flex flex-col">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
                 <h2 className="font-bold text-black text-lg mb-3">Active Routes</h2>
-                <div className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
+                <div className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 rounded-t-lg bg-[#F7ECFF] text-sm font-semibold text-gray-900">
                   <div className="text-left">Route</div>
                   <div className="text-left -ml-6">Status</div>
                   <div className="text-left">Date</div>
                 </div>
-                <div className="flex-1 overflow-y-auto mt-1 divide-y divide-gray-100">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100">
                   {loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">Loading routes...</div>
                   )}
@@ -238,9 +238,18 @@ const ControlTower = () => {
                             ? 'text-[#FFA500]'
                             : 'text-gray-500';
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 hover:bg-gray-50 items-center">
-                          <div className="min-w-0 text-left">
-                            <button className="text-[#6b1176] text-xs font-bold hover:underline">{route?.patientId || 'N/A'}</button>
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 hover:bg-gray-50 items-center overflow-hidden">
+                          <div className="min-w-0 text-left overflow-hidden">
+                            {route?.patientId ? (
+                              <Link 
+                                to={`/track/${route.patientId}`}
+                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer"
+                              >
+                                {route.patientId}
+                              </Link>
+                            ) : (
+                              <span className="text-[#6b1176] text-xs font-bold">N/A</span>
+                            )}
                             <div className="text-sm text-gray-900 leading-snug">
                               {(route?.origin && route?.destination) ? (
                                 <>
@@ -279,3 +288,5 @@ const ControlTower = () => {
 };
 
 export default ControlTower;
+
+
