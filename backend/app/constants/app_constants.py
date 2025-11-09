@@ -188,6 +188,11 @@ EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\+?1?\d{9,15}$'
 
 # ============================================
+# QUALITY MONITORING
+# ============================================
+QUALITY_EXPORT_DEFAULT_MINUTES = 10
+
+# ============================================
 # COMMON API RESPONSE HEADERS
 # ============================================
 # Common headers used across all API responses for CORS and security
