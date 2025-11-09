@@ -54,29 +54,70 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     if (statusLower.includes('completed') || statusLower.includes('complete')) {
       return { label: 'Completed', className: 'bg-green-100 text-green-700' };
     } else if (statusLower.includes('ongoing') || statusLower.includes('in_progress') || statusLower.includes('in progress')) {
-      return { label: 'In Progress', className: 'bg-blue-100 text-blue-700' };
+      return { label: 'In Progress', className: 'bg-orange-100 text-orange-700' };
     } else if (statusLower.includes('upcoming') || statusLower.includes('scheduled')) {
       return { label: 'Upcoming', className: 'bg-orange-100 text-orange-700' };
     }
     return { label: status, className: 'bg-gray-100 text-gray-700' };
   };
 
-  const renderLegSection = (leg: ShipmentLegSummary, title: string, borderColor: string, bgColor: string, textColor: string) => {
+  const getStatusColors = (status: string): { borderColor: string; bgColor: string; textColor: string } | null => {
+    if (!status) return null;
+    
+    const statusLower = status.toLowerCase();
+    
+    // Don't display if not started or null
+    if (statusLower.includes('not started') || statusLower === 'null' || statusLower === '') {
+      return null;
+    }
+    
+    // Completed -> green
+    if (statusLower.includes('completed') || statusLower.includes('complete')) {
+      return {
+        borderColor: 'border-green-400',
+        bgColor: 'border border-green-200 bg-green-50',
+        textColor: 'bg-green-500'
+      };
+    }
+    
+    // In progress -> orange
+    if (statusLower.includes('ongoing') || statusLower.includes('in_progress') || statusLower.includes('in progress')) {
+      return {
+        borderColor: 'border-orange-400',
+        bgColor: 'border border-orange-200 bg-orange-50',
+        textColor: 'bg-orange-500'
+      };
+    }
+    
+    // Default to gray if status doesn't match
+    return {
+      borderColor: 'border-gray-400',
+      bgColor: 'border border-gray-200 bg-gray-50',
+      textColor: 'bg-gray-500'
+    };
+  };
+
+  const renderLegSection = (leg: ShipmentLegSummary, title: string) => {
+    const colors = getStatusColors(leg.status);
+    
+    // Don't render if status is not started or null
+    if (!colors) return null;
+    
     const badge = getStatusBadge(leg.status);
     
     return (
-      <div className={`pl-3 border-l-4 ${borderColor}`}>
+      <div className={`pl-3 border-l-4 ${colors.borderColor}`}>
         <div className="flex items-center gap-3 mb-2">
           <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${badge.className}`}>
             {badge.label}
           </span>
           <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
         </div>
-        <div className={`rounded-lg border ${bgColor} p-4`}>
+        <div className={`rounded-lg border ${colors.bgColor} p-4`}>
           <div className="space-y-3 text-sm">
             {leg.provider_name && (
               <div className="flex items-start gap-2">
-                <span className={`mt-2 w-2 h-2 rounded-full ${textColor}`} />
+                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
                 <div>
                   <span className="font-semibold text-gray-900">Provider:</span>
                   <span className="text-gray-800"> {leg.provider_name}</span>
@@ -86,7 +127,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             
             {leg.legs.map((legDetail, index) => (
               <div key={index} className="flex items-start gap-2">
-                <span className={`mt-2 w-2 h-2 rounded-full ${textColor}`} />
+                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
                 <div>
                   <div className="font-semibold text-gray-900">{legDetail.mode_of_transport}:</div>
                   <div className="text-gray-800">
@@ -121,21 +162,26 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
   };
 
   const renderReengineeringSection = (reengineering: ReengineeringStage) => {
+    const colors = getStatusColors(reengineering.status);
+    
+    // Don't render if status is not started or null
+    if (!colors) return null;
+    
     const badge = getStatusBadge(reengineering.status);
     
     return (
-      <div className="pl-3 border-l-4 border-blue-300">
+      <div className={`pl-3 border-l-4 ${colors.borderColor}`}>
         <div className="flex items-center gap-3 mb-2">
           <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${badge.className}`}>
             {badge.label}
           </span>
           <h3 className="text-sm font-semibold text-gray-900">Reengineering (Manufacturing Phase)</h3>
         </div>
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className={`rounded-lg border ${colors.bgColor} p-4`}>
           <div className="space-y-2 text-sm">
             {reengineering.start_date && reengineering.end_date && (
               <div className="flex items-start gap-2 text-gray-800">
-                <span className="mt-2 w-2 h-2 rounded-full bg-blue-600" />
+                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
                 <span>
                   Cryopreservation + CAR-T reengineering ({formatDate(reengineering.start_date)} – {formatDate(reengineering.end_date)}).
                 </span>
@@ -143,7 +189,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             )}
             {reengineering.scheduled_start && reengineering.scheduled_end && (
               <div className="flex items-start gap-2 text-gray-800">
-                <span className="mt-2 w-2 h-2 rounded-full bg-blue-600" />
+                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
                 <span>
                   Scheduled: {formatDate(reengineering.scheduled_start)} – {formatDate(reengineering.scheduled_end)}.
                 </span>
@@ -151,7 +197,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             )}
             {reengineering.description && (
               <div className="flex items-start gap-2 text-gray-800">
-                <span className="mt-2 w-2 h-2 rounded-full bg-blue-600" />
+                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
                 <span>{reengineering.description}</span>
               </div>
             )}
@@ -213,25 +259,19 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             </div>
           </div>
 
-          {/* Leg 1 — Only show if not null */}
+          {/* Leg 1 — Only show if not null and status is not "not started" */}
           {summary.leg1 && renderLegSection(
             summary.leg1,
-            'Leg 1 — Hospital to Pharma Manufacturing Site',
-            'border-green-400',
-            'border border-green-200 bg-green-50',
-            'bg-green-500'
+            'Leg 1 — Hospital to Pharma Manufacturing Site'
           )}
 
-          {/* Reengineering — Only show if not null */}
+          {/* Reengineering — Only show if not null and status is not "not started" */}
           {summary.reengineering && renderReengineeringSection(summary.reengineering)}
 
-          {/* Leg 2 — Only show if not null */}
+          {/* Leg 2 — Only show if not null and status is not "not started" */}
           {summary.leg2 && renderLegSection(
             summary.leg2,
-            'Leg 2 — Pharma to Hospital',
-            'border-yellow-400',
-            'border border-yellow-200 bg-yellow-50',
-            'bg-yellow-500'
+            'Leg 2 — Pharma to Hospital'
           )}
 
           {/* Current Status */}
