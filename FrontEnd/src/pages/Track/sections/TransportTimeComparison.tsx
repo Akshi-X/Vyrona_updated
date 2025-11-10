@@ -89,7 +89,7 @@ export default function TransportTimeComparison() {
         {
           label: 'Scheduled (hrs)'
           , data: scheduled,
-          backgroundColor: '#5B0D8E',
+          backgroundColor: '#6B1176',
           borderRadius: 6,
           borderSkipped: 'bottom' as any,
           barThickness: 32,
@@ -99,7 +99,7 @@ export default function TransportTimeComparison() {
         {
           label: 'Actual (hrs)'
           , data: actual,
-          backgroundColor: '#A340F9',
+          backgroundColor: '#9C3AA6',
           borderRadius: 6,
           borderSkipped: 'bottom' as any,
           barThickness: 32,
@@ -117,7 +117,21 @@ export default function TransportTimeComparison() {
       maintainAspectRatio: false,
       indexAxis: 'x' as const,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'top' as const,
+          align: 'center' as const,
+          labels: {
+            usePointStyle: true,
+            padding: 15,
+            boxWidth: 8,
+            boxHeight: 8,
+            font: {
+              size: 12,
+            },
+            color: '#4B4B4B',
+          },
+        },
         tooltip: {
           callbacks: {
             title: (items: any[]) => {
