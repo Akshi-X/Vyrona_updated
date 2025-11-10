@@ -141,3 +141,18 @@ __all__ = [
     'TaskManagerOnlyException',
 ]
 
+# Quality monitoring exceptions
+from .quality_exceptions import (
+    QualityException,
+    RedisConnectionException,
+    QualityDataNotFoundException,
+    QualityServiceException,
+)
+
+__all__.extend([
+    'QualityException',
+    'RedisConnectionException',
+    'QualityDataNotFoundException',
+    'QualityServiceException',
+])
+

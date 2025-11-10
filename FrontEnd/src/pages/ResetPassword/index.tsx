@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
+import EyeOffIcon from "../../assets/eye-off.svg";
+import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
 
 const ResetPassword: React.FC = () => {
@@ -13,6 +15,7 @@ const ResetPassword: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [confirmError, setConfirmError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
@@ -88,27 +91,32 @@ const ResetPassword: React.FC = () => {
         <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
             {/* Left Section */}
             <aside
-                className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden 
+                className="w-[35%] h-screen flex flex-col justify-between text-white relative overflow-hidden 
              bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
              rounded-tr-[40px] rounded-br-[40px]"
             >
-                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0">
+                {/* Background Banner Image */}
+                <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+                    <img
+                        src={MyGrapeBanner}
+                        className="w-full h-auto max-h-full object-contain"
+                        alt="banner"
+                    />
+                </div>
+                
+                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
                     <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
                     <h1 className="font-semibold text-[30px]">myGrape</h1>
                 </div>
-                <div className="flex items-center overflow-hidden">
-                    <img
-                        src={MyGrapeBanner}
-                        alt="banner"
-                        className="w-full h-[125%] object-fill"
-                    />
-                </div>
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12">
+
+                <div className="flex-1 relative z-0"></div>
+
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
                     </h2>
-                    <p className="mt-4 text-sm opacity-80">
+                    <p className="mt-4 opacity-80 font-[12px]">
                         Because every patient is someone's everything.
                     </p>
                 </div>
@@ -127,20 +135,32 @@ const ResetPassword: React.FC = () => {
 
                         {/* Password Field */}
                         <div className="relative w-full my-4">
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter new password"
-                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"}`}
-                            />
-                            <label
-                                className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
-                            >
-                                New Password
-                            </label>
-
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Enter new password"
+                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${passwordError ? "border-red-500" : "border-gray-300"}`}
+                                />
+                                <label
+                                    className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
+                                    ${passwordError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                >
+                                    New Password
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                                >
+                                    <img
+                                        src={showPassword ? EyeOpenIcon : EyeOffIcon}
+                                        alt="toggle password visibility"
+                                        className="w-5 h-5"
+                                    />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Confirm Password Field */}

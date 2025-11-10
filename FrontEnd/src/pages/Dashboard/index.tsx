@@ -8,7 +8,6 @@ import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import { patientService } from '../../services/patientService';
-import PatientSummaryAlertModal from '../../components/PatientSummaryAlertModal';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
@@ -29,7 +28,6 @@ import Header from '../../components/Header';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
-import PatientSummaryAlertIcon from '../../assets/DashBoardIcons/Patient_Summary_Alert.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
 
@@ -56,7 +54,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
-  const [showPatientSummaryAlert, setShowPatientSummaryAlert] = useState(false);
 
   // Real data from APIs
   const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
@@ -99,7 +96,6 @@ export default function Dashboard({ }: DashboardProps) {
   const stakeholderChatCount = stakeholderChats.length; // Show total chats count
   const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
   const myTasksCount = myTasks.length; // Show total tasks count
-  const patientSummaryAlertCount = 1; // placeholder badge (can be wired to API)
 
 
   // Fetch critical alerts from API
@@ -129,8 +125,14 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingTasks(true);
     try {
       const response = await tasksService.getMyTasks();
-      setMyTasks(response.tasks || []);
+      // Combine created_tasks and assigned_tasks into a single array
+      const allTasks = [
+        ...(response.created_tasks || []),
+        ...(response.assigned_tasks || [])
+      ];
+      setMyTasks(allTasks);
     } catch (error) {
+      console.error('Error fetching tasks:', error);
       setMyTasks([]);
     } finally {
       setLoadingTasks(false);
@@ -147,6 +149,39 @@ export default function Dashboard({ }: DashboardProps) {
     if (isAuthenticated) {
       fetchStakeholderChats();
     }
+  }, [isAuthenticated]);
+
+  // Lightweight polling to keep unread chat badge updated on dashboard
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      fetchStakeholderChats();
+      intervalId = setInterval(fetchStakeholderChats, 20000);
+    };
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stop();
+    };
   }, [isAuthenticated]);
 
   // Fetch user profile to compute initials
@@ -174,6 +209,7 @@ export default function Dashboard({ }: DashboardProps) {
     taskName: task.task_name,
     description: task.description || '',
     assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
+    assignedTo: `${task.assignee.first_name} ${task.assignee.last_name}`,
     dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
     priority: task.priority,
     status: task.status
@@ -273,8 +309,8 @@ export default function Dashboard({ }: DashboardProps) {
     },
     {
       label: "Failures",
-      icon: MyTasksIcon,
-      alt: "My Tasks",
+      icon: CriticalAlertsIcon,
+      alt: "Failures",
     },
   ];
 
@@ -292,7 +328,7 @@ export default function Dashboard({ }: DashboardProps) {
           className=""
           offsetLeft="15rem"
           rightContent={(
-            <div 
+            <div
               className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
@@ -508,7 +544,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Critical Alerts */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="Critical Alerts"
                       src={CriticalAlertsIcon}
                       onClick={() => {
@@ -517,7 +553,7 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {criticalAlertsCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                         <span className="font-semibold text-white text-[10px]">
                           {criticalAlertsCount}
                         </span>
@@ -535,7 +571,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Stakeholder Chats */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => {
@@ -559,34 +595,11 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
                   </div>
 
-                  {/* Patient Summary Alert */}
-                  <div className="relative group">
-                    <img
-                      className="w-[22px] h-[22px] cursor-pointer"
-                      alt="Patient Summary Alert"
-                      src={PatientSummaryAlertIcon}
-                      onClick={() => setShowPatientSummaryAlert(true)}
-                    />
-                    {patientSummaryAlertCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                        <span className="font-semibold text-white text-[10px]">
-                          {patientSummaryAlertCount}
-                        </span>
-                      </div>
-                    )}
-                    {/* Tooltip */}
-                    <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                      <div className="font-semibold text-black text-xs whitespace-nowrap">
-                        Patient Summary Alert
-                      </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                    </div>
-                  </div>
 
                   {/* My Tasks */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="My Tasks"
                       src={MyTasksIcon}
                       onClick={() => {
@@ -595,7 +608,7 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {myTasksCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                         <span className="font-semibold text-white text-[10px]">
                           {myTasksCount}
                         </span>
@@ -703,7 +716,7 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Compliance Section */}
                 <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
-                    Compliance
+                    Shipment Status 
                   </h2>
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
@@ -728,7 +741,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
                       </div>
                       <div className="font-normal text-black text-[12px]">
-                        Audit Coverage
+                        Success %
                       </div>
                     </div>
                   </div>
@@ -780,6 +793,7 @@ export default function Dashboard({ }: DashboardProps) {
         onClose={() => setShowMyTasks(false)}
         tasks={transformedTasks}
         loading={loadingTasks}
+        variant="dashboard"
       />
 
       {/* Stakeholder Chats Modal */}
@@ -790,31 +804,6 @@ export default function Dashboard({ }: DashboardProps) {
         loading={loadingChats}
       />
 
-      {/* Patient Summary Alert Modal */}
-      <PatientSummaryAlertModal
-        isOpen={showPatientSummaryAlert}
-        onClose={() => setShowPatientSummaryAlert(false)}
-        patient={{
-          patientId: 'Patient RT-659123',
-          condition: 'CAR-T Cell Therapy',
-          currentStage: 'Reengineering Completed',
-          lastUpdated: new Date().toLocaleString(),
-        }}
-        alerts={[
-          { id: 'a1', type: 'success', message: 'Sample arrived at Pharma Facility – 05/01/25, 14:15', timestamp: '05/01/25, 14:15', provider: 'DHL Supply Chain' },
-          { id: 'a2', type: 'warning', message: 'QC Testing delayed due to equipment check', timestamp: '05/02/25, 09:30', provider: 'Pharma QC Lab' },
-          { id: 'a3', type: 'error', message: 'Temperature deviation detected in transit – FRA to Paris CDG', timestamp: '05/03/25, 11:05', provider: 'World Courier' },
-          { id: 'a4', type: 'info', message: 'Leg 2 transport scheduled for 05/10/25', timestamp: '05/04/25, 08:00', provider: 'DHL Supply Chain' },
-        ]}
-        statusSummary={[
-          'Leg 1 Completed',
-          'Reengineering in progress',
-          'Leg 2 Scheduled',
-        ]}
-        progressPercent={66}
-        onViewSummary={() => navigate('/track-and-trace')}
-        onAcknowledge={() => setShowPatientSummaryAlert(false)}
-      />
 
       {/* Track Shipment Modal */}
       <TrackShipmentModal

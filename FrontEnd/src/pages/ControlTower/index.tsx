@@ -5,6 +5,7 @@ import { Sidebar } from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
+import { Link } from 'react-router-dom';
 
 const ControlTower = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -13,7 +14,6 @@ const ControlTower = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
-  const [networkHubsEnabled, setNetworkHubsEnabled] = useState<boolean>(false);
 
   const handleLogout = () => {
     logout();
@@ -55,6 +55,38 @@ const ControlTower = () => {
     }
     return result;
   }, [routes]);
+
+  // Build filter option lists from API data
+  const regionOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => {
+      if (r?.origin && r.origin.trim()) set.add(r.origin.trim());
+      if (r?.destination && r.destination.trim()) set.add(r.destination.trim());
+    });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  const statusOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  const carrierOptions = useMemo(() => {
+    const set = new Set<string>();
+    augmentedRoutes.forEach(r => { if (r?.supplyChain && r.supplyChain.trim()) set.add(r.supplyChain.trim()); });
+    return ['All', ...Array.from(set).sort()];
+  }, [augmentedRoutes]);
+
+  // Apply filters to routes
+  const filteredRoutes = useMemo(() => {
+    return (augmentedRoutes || []).filter(r => {
+      const matchRegion = selectedRegion === 'All' || r.origin === selectedRegion || r.destination === selectedRegion;
+      const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
+      const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
+      return matchRegion && matchStatus && matchCarrier;
+    });
+  }, [augmentedRoutes, selectedRegion, selectedStatus, selectedCarrier]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -122,13 +154,12 @@ const ControlTower = () => {
           </h1>
 
           {/* Main Content Grid */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[453px_1fr] lg:grid-rows-[380px_464px] gap-6 min-h-0 items-start">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[453px_1fr] lg:grid-rows-[300px_544px] gap-6 min-h-0 items-start">
             {/* Left Panel - Filters and Routes */}
             <div className="flex flex-col gap-6 min-w-0">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-4 pt-4 pb-2 w-[453px] h-[380px] flex-shrink-0">
-                <h2 className="font-bold text-black text-lg mb-4">Filters</h2>
-                <div className="flex flex-col gap-2">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-4 py-4 w-[453px] h-[300px] flex-shrink-0 flex flex-col justify-center">
+                <div className="flex flex-col gap-3">
                   {/* Region Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -137,13 +168,11 @@ const ControlTower = () => {
                      <select
                       value={selectedRegion}
                       onChange={(e) => setSelectedRegion(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Regions</option>
-                      <option value="North">North</option>
-                      <option value="South">South</option>
-                      <option value="East">East</option>
-                      <option value="West">West</option>
+                      {regionOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Regions' : o}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -155,12 +184,11 @@ const ControlTower = () => {
                      <select
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Status</option>
-                      <option value="Safe">Safe</option>
-                      <option value="Risk">Risk</option>
-                      <option value="Delayed">Delayed</option>
+                      {statusOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Status' : o}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -172,54 +200,35 @@ const ControlTower = () => {
                      <select
                       value={selectedCarrier}
                       onChange={(e) => setSelectedCarrier(e.target.value)}
-                      className="w-full px-3 h-11 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
                     >
-                      <option value="All">All Carriers</option>
-                      <option value="FedEx">FedEx</option>
-                      <option value="UPS">UPS</option>
-                      <option value="DHL">DHL</option>
+                      {carrierOptions.map(o => (
+                        <option key={o} value={o}>{o === 'All' ? 'All Carriers' : o}</option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Network Hubs Filter (single toggle) */}
-                  <div className="my-auto">
-                    <div className="flex items-center justify-between h-11">
-                      <label className="block text-sm font-medium text-black leading-none">
-                        Network Hubs
-                      </label>
-                      <button
-                        onClick={() => setNetworkHubsEnabled((v) => !v)}
-                        aria-label="Toggle Network Hubs"
-                        className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                          networkHubsEnabled ? 'bg-[#9c3aa6]' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200 ${
-                          networkHubsEnabled ? 'translate-x-4' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                  </div>
+                  {/* Network Hubs removed per request */}
                 </div>
               </div>
 
               {/* Active Routes List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[464px] flex-shrink-0 flex flex-col">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
                 <h2 className="font-bold text-black text-lg mb-3">Active Routes</h2>
-                <div className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 px-4 py-3 rounded-t-lg bg-[#F7ECFF] text-[12px] text-gray-700">
+                <div className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 rounded-t-lg bg-[#F7ECFF] text-sm font-semibold text-gray-900">
                   <div className="text-left">Route</div>
-                  <div className="text-left justify-self-start">Status</div>
-                  <div className="text-left justify-self-start">Date</div>
+                  <div className="text-left -ml-6">Status</div>
+                  <div className="text-left">Date</div>
                 </div>
-                <div className="flex-1 overflow-y-auto mt-1 divide-y divide-gray-100">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100">
                   {loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">Loading routes...</div>
                   )}
                   {!loadingRoutes && routesError && (
                     <div className="p-4 text-xs text-red-600">{routesError}</div>
                   )}
-                  {!loadingRoutes && !routesError && (augmentedRoutes && augmentedRoutes.length > 0 ? (
-                    (augmentedRoutes || []).map((route) => {
+                  {!loadingRoutes && !routesError && (filteredRoutes && filteredRoutes.length > 0 ? (
+                    (filteredRoutes || []).map((route) => {
                       const statusText = route?.status || 'N/A';
                       const statusColor = statusText === 'Safe'
                         ? 'text-[#00B050]'
@@ -229,9 +238,18 @@ const ControlTower = () => {
                             ? 'text-[#FFA500]'
                             : 'text-gray-500';
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[1fr_84px_110px] justify-items-start gap-4 items-center px-4 py-3 hover:bg-gray-50">
-                          <div className="min-w-0">
-                            <button className="text-[#6b1176] text-xs font-bold hover:underline">{route?.patientId || 'N/A'}</button>
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 hover:bg-gray-50 items-center overflow-hidden">
+                          <div className="min-w-0 text-left overflow-hidden">
+                            {route?.patientId ? (
+                              <Link 
+                                to={`/track/${route.patientId}`}
+                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer"
+                              >
+                                {route.patientId}
+                              </Link>
+                            ) : (
+                              <span className="text-[#6b1176] text-xs font-bold">N/A</span>
+                            )}
                             <div className="text-sm text-gray-900 leading-snug">
                               {(route?.origin && route?.destination) ? (
                                 <>
@@ -246,8 +264,8 @@ const ControlTower = () => {
                               <div className="text-[11px] text-gray-400 truncate">{route?.supplyChain}</div>
                             )}
                           </div>
-                          <div className={`text-left text-xs font-medium justify-self-start ${statusColor}`}>{statusText}</div>
-                          <div className="text-left text-xs font-bold text-gray-600 justify-self-start">{route?.date || '-'}</div>
+                          <div className={`text-left text-xs font-medium -ml-6 ${statusColor}`}>{statusText}</div>
+                          <div className="text-left text-xs font-bold text-gray-600">{route?.date || '-'}</div>
                         </div>
                       );
                     })
@@ -270,3 +288,5 @@ const ControlTower = () => {
 };
 
 export default ControlTower;
+
+

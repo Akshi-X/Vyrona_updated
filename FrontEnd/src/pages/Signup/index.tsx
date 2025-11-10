@@ -184,26 +184,29 @@ const Signup: React.FC = () => {
              bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
              rounded-tr-[40px] rounded-br-[40px]"
             >
-                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0">
+                {/* Background Banner Image */}
+                <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+                    <img
+                        src={MyGrapeBanner}
+                        className="w-full h-auto max-h-full object-contain"
+                        alt="banner"
+                    />
+                </div>
+                
+                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
                     <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
                     <h1 className="font-semibold text-[30px]">myGrape</h1>
                 </div>
 
-                <div className="flex-1 flex items-center justify-center overflow-hidden">
-                    <img
-                        src={MyGrapeBanner}
-                        className="w-full h-full object-cover"
-                        alt="banner"
-                    />
-                </div>
+                <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
                     </h2>
                     <p className="mt-4 opacity-80 font-[12px]">
-                        Because every patient is someone’s everything.
+                        Because every patient is someone's everything.
                     </p>
                 </div>
             </aside>

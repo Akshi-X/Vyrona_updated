@@ -200,6 +200,10 @@ class ShipmentService extends BaseApiService {
     );
   }
 
+  async getPatientJourneySummary(patientId: string): Promise<PatientJourneySummaryResponse> {
+    return await this.get<PatientJourneySummaryResponse>(`/api/shipment/patient/${encodeURIComponent(patientId)}/summary`);
+  }
+
   /**
    * Document checklist for a patient
    * GET /api/shipment/document-checklist/:patientId
@@ -216,6 +220,59 @@ class ShipmentService extends BaseApiService {
       `/api/shipment/document-checklist/${encodeURIComponent(patientId)}`
     );
   }
+}
+
+export interface ShipmentLegDetail {
+  leg_order: number;
+  mode_of_transport: string;
+  from_location: string;
+  to_location: string;
+  carrier_name?: string;
+  provider_name?: string;
+  departure_time?: string;
+  arrival_time?: string;
+  scheduled_time?: string;
+  handover_time?: string;
+  leg_status: string;
+  leg_quality_loss?: number;
+  ln2_refill?: string;
+  warehouse?: string;
+  doc_count_actual?: number;
+  doc_count_needed?: number;
+}
+
+export interface ShipmentLegSummary {
+  status: string;
+  provider_name?: string;
+  legs: ShipmentLegDetail[];
+  arrival_date?: string;
+  planned_date?: string;
+}
+
+export interface ReengineeringStage {
+  status: string;
+  start_date?: string;
+  end_date?: string;
+  scheduled_start?: string;
+  scheduled_end?: string;
+  description?: string;
+}
+
+export interface CurrentStatusSummary {
+  leg1_status: string;
+  reengineering_status: string;
+  leg2_status: string;
+  overall_stage?: string;
+}
+
+export interface PatientJourneySummaryResponse {
+  patient_id: string;
+  condition: string;
+  hospital_name?: string;
+  leg1?: ShipmentLegSummary;
+  reengineering?: ReengineeringStage;
+  leg2?: ShipmentLegSummary;
+  current_status: CurrentStatusSummary;
 }
 
 export const shipmentService = new ShipmentService();
