@@ -627,7 +627,7 @@ export default function Dashboard({ }: DashboardProps) {
 
               {/* Volume Section (Top Row) */}
               <section className="w-full">
-                <div className="flex gap-6 mt-7">
+                <div className="flex gap-6 mt-5">
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}
