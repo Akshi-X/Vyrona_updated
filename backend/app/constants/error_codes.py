@@ -213,7 +213,29 @@ ERROR_CODES = {
     "TASK_UNAUTHORIZED_EDIT": "ERR_10007",
     "TASK_UNAUTHORIZED_STATUS": "ERR_10008",
     "TASK_MANAGER_ONLY": "ERR_10009",
+    
+    # ============================================
+    # QUALITY MONITORING (11xxx)
+    # ============================================
+    "REDIS_CONNECTION_ERROR": "ERR_11001",
+    "QUALITY_DATA_NOT_FOUND": "ERR_11002",
+    "QUALITY_SERVICE_ERROR": "ERR_11003",
+    "QUALITY_CSV_EXPORT_FAILED": "ERR_11004",
 
+    # ============================================
+    # CHAT SYSTEM (11xxx)
+    # ============================================
+    "CHAT_MESSAGE_CREATE_FAILED": "ERR_11001",
+    "CHAT_MESSAGE_NOT_FOUND": "ERR_11002",
+    "CHAT_USER_NOT_FOUND": "ERR_11003",
+    "CHAT_PATIENT_NOT_FOUND": "ERR_11004",
+    "CHAT_PHARMA_ACCESS_DENIED": "ERR_11005",
+    "CHAT_INVALID_DATA": "ERR_11006",
+    "CHAT_WEBSOCKET_INVALID_MESSAGE": "ERR_11007",
+    "CHAT_WEBSOCKET_INVALID_TYPE": "ERR_11008",
+    "CHAT_WEBSOCKET_AUTH_FAILED": "ERR_11009",
+    "CHAT_WEBSOCKET_CONNECTION_FAILED": "ERR_11010",
+    
     # ============================================
     # GENERAL (9xxx)
     # ============================================

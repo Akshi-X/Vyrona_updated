@@ -1,0 +1,114 @@
+"""
+WebSocket Connection Manager
+Manages WebSocket connections for quality monitoring
+"""
+from fastapi import WebSocket
+from typing import Dict, Optional
+import uuid
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class ConnectionManager:
+    """Manages WebSocket connections for quality monitoring"""
+    
+    def __init__(self):
+        self.active_connections: Dict[str, Dict] = {}  # {connection_id: {websocket, connected_at, client_info, patient_id}}
+
+    async def connect(self, websocket: WebSocket, connection_id: str = None) -> str:
+        """Register WebSocket connection (connection should already be accepted)"""
+        # Note: Connection should already be accepted before calling this
+        if connection_id is None:
+            connection_id = str(uuid.uuid4())
+        
+        self.active_connections[connection_id] = {
+            "websocket": websocket,
+            "connected_at": datetime.now().isoformat(),
+            "client_info": {
+                "host": websocket.client.host if websocket.client else "unknown",
+                "port": websocket.client.port if websocket.client else "unknown"
+            },
+            "patient_id": None  # Patient ID this connection is subscribed to
+        }
+        logger.info(f"WebSocket connection registered: {connection_id}")
+        return connection_id
+
+    def disconnect(self, connection_id: str):
+        """Remove connection by connection ID"""
+        if connection_id in self.active_connections:
+            del self.active_connections[connection_id]
+            logger.info(f"WebSocket connection removed: {connection_id}")
+
+    def disconnect_by_websocket(self, websocket: WebSocket) -> Optional[str]:
+        """Remove connection by websocket object"""
+        for conn_id, conn_data in list(self.active_connections.items()):
+            if conn_data["websocket"] == websocket:
+                del self.active_connections[conn_id]
+                logger.info(f"WebSocket connection removed: {conn_id}")
+                return conn_id
+        return None
+
+    def set_patient_subscription(self, connection_id: str, patient_id: str):
+        """Set which patient this connection is subscribed to"""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id]["patient_id"] = patient_id
+            logger.info(f"Connection {connection_id} subscribed to patient {patient_id}")
+
+    async def broadcast(self, data: dict, db):
+        """
+        Broadcast data only to connections subscribed to this patient
+        and validate patient belongs to connection's pharma
+        """
+        if not self.active_connections:
+            return
+        
+        patient_id = data.get("patient_id")
+        if not patient_id:
+            # If data has no patient_id, don't send to anyone
+            return
+        
+        # Get patient's pharma_id from database
+        from app.models.patient_model import Patient
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            return  # Patient doesn't exist
+        
+        patient_pharma_id = patient.pharma_id
+            
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            # Check if connection's pharma matches patient's pharma
+            connection_pharma_id = conn_data.get("pharma_id")
+            if connection_pharma_id != patient_pharma_id:
+                continue  # Skip connections from different pharma
+            
+            # Only send to connections subscribed to this patient
+            subscribed_patient = conn_data.get("patient_id")
+            if subscribed_patient == patient_id:
+                try:
+                    await conn_data["websocket"].send_json(data)
+                except Exception as e:
+                    logger.error(f"Error sending to client {connection_id}: {e}")
+                    disconnected.append(connection_id)
+        
+        # Remove disconnected clients
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
+    def get_connections_info(self):
+        """Get information about all active connections"""
+        return {
+            "count": len(self.active_connections),
+            "connections": [
+                {
+                    "id": conn_id,
+                    "connected_at": conn_data["connected_at"],
+                    "client_info": conn_data["client_info"],
+                    "patient_id": conn_data.get("patient_id", None)
+                }
+                for conn_id, conn_data in self.active_connections.items()
+            ]
+        }
+

@@ -207,15 +207,6 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('location')}
-              >
-                <div className="flex items-center gap-2">
-                  Manufacturing Location
-                  <SortIcon field="location" />
-                </div>
-              </th>
-              <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider"
               >
                 <div className="flex items-center gap-2 relative" ref={dropdownRef}>
@@ -279,11 +270,21 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
               </th>
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('location')}
+              >
+                <div className="flex items-center gap-2">
+                  Manufacturing Location
+                  <SortIcon field="location" />
+                </div>
+              </th>
+              {/* As per client requirement as for now the document column is commended */}
+              {/* <th
+                className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center gap-2">
                   Document
                 </div>
-              </th>
+              </th> */}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -326,15 +327,16 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                   <td className="px-6 py-4 text-sm text-gray-900">
                     {patient.hospital}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {patient.location}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTreatmentStatusColor(patient.treatment_status, patient.stage)}`}>
                       {patient.stage}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {patient.location}
+                  </td>
+                  {/* As per client requirement as for now the document column is commended */}
+                  {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <button
                       className="text-[#6b1176] hover:text-[#5a0f66] font-medium underline"
                       onClick={() => {
@@ -356,7 +358,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                     >
                       Download Doc
                     </button>
-                  </td>
+                  </td> */}
                 </tr>
               ));
             })()}

@@ -3,13 +3,16 @@ Authentication Dependencies
 
 FastAPI dependencies for validation and authentication.
 These are used with Depends() in route handlers.
+Supports both HTTP/REST and WebSocket authentication.
 """
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from typing import Tuple
+import logging
 
-from ..config.database import get_db
+from ..config.database import get_db, SessionLocal
 from ..service.otp_service import verify_otp as verify_otp_service
 from ..utils.utils import get_user_by_email, get_user_by_id
 from ..auth.auth import verify_password
@@ -34,8 +37,14 @@ from ..exceptions import (
     UserApproveNotFoundException,
     UserRejectNotFoundException
 )
+from ..exceptions.custom_exceptions import (
+    ChatWebSocketAuthFailedException
+)
 from ..models.user_model import User
 from ..schemas.user_schema import UserRegister
+from ..auth.auth import verify_token
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -273,4 +282,77 @@ def validate_reject_user_request(user_id: str, db: Session) -> User:
         raise UserRejectNotFoundException(registration_id=str(user_id))
     
     return user
+
+
+# ============================================
+# WebSocket Authentication
+# ============================================
+
+async def authenticate_websocket(
+    websocket: WebSocket,
+    token: str = Query(...)
+) -> Tuple[User, int, Session]:
+    """
+    Authenticate WebSocket connection using JWT token
+    
+    Returns:
+        Tuple of (user, pharma_id, db_session)
+    
+    Raises:
+        ChatWebSocketAuthFailedException if authentication fails
+    """
+    db = SessionLocal()
+    
+    try:
+        # Verify token
+        try:
+            payload = verify_token(token)
+        except Exception as e:
+            logger.error(f"Token verification failed: {e}")
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason="Invalid or expired token")
+        
+        # Extract user_id from token (check both 'user_id' and 'sub' fields)
+        # JWT standard uses 'sub' (subject) for user identifier
+        user_id = payload.get("user_id") or payload.get("sub")
+        if not user_id:
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason="Token missing user_id or sub")
+        
+        # Load user from database
+        user = db.query(User).filter(User.user_id == user_id).first()
+        
+        if not user:
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason=f"User {user_id} not found")
+        
+        # Check if user is active
+        if not user.status:
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason="Account is inactive")
+        
+        # Check if user is approved
+        if user.approved_status != 'approved':
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason="Account is not approved")
+        
+        # Extract pharma_id from token or user
+        pharma_id = payload.get("pharma_id")
+        if pharma_id is None:
+            pharma_id = user.pharma_id
+        
+        if pharma_id is None:
+            db.close()
+            raise ChatWebSocketAuthFailedException(reason="Pharma ID not found")
+        
+        logger.info(f"WebSocket authenticated: user_id={user_id}, pharma_id={pharma_id}")
+        
+        return user, pharma_id, db
+    
+    except ChatWebSocketAuthFailedException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during WebSocket authentication: {e}", exc_info=True)
+        db.close()
+        raise ChatWebSocketAuthFailedException(reason=str(e))
 

@@ -20,6 +20,21 @@ export interface UserProfileDto {
   session_timeout: number;
 }
 
+export interface UserListItem {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+  pharma_id?: number;
+  company_name?: string;
+}
+
+export interface UserListResponse {
+  total_users: number;
+  users: UserListItem[];
+}
+
 export interface UserRegistration {
   first_name: string;
   last_name: string;
@@ -168,6 +183,15 @@ export class UserService extends BaseApiService {
    */
   async getAllUsers(): Promise<UserProfileDto[]> {
     return await this.request<UserProfileDto[]>('/api/users', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all users in company (for mentions, dropdowns, etc.)
+   */
+  async getAllUsersInCompany(): Promise<UserListResponse> {
+    return await this.request<UserListResponse>('/api/users', {
       method: 'GET',
     });
   }
