@@ -380,11 +380,11 @@ export default function TrackPage() {
 
                       return (
                         <div className={containerClass} key={`${s.key}-${idx}`}>
-                          <div className="relative flex flex-col items-center w-9 shrink-0">
+                          <div className="relative flex flex-col items-center w-9 my-2 shrink-0">
                             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
                               <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
                   </div>
-                            <div className={`absolute top-full mt-2 text-[10px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                            <div className={`absolute top-full font-semibold mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
                 </div>
                           {connector}
                   </div>

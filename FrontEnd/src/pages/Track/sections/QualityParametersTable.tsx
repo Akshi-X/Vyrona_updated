@@ -41,17 +41,77 @@ interface QualityPayload {
 export default function QualityParametersTable() {
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [latest, setLatest] = useState<QualityPayload | null>(null);
+  const [exporting, setExporting] = useState(false);
   const { patientId } = useParams<{ patientId: string }>();
   const { token } = useAuth();
 
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
 
-  const getWebSocketUrl = () => {
+  const getApiBaseUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    return envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+  };
+
+  const getWebSocketUrl = () => {
+    const baseUrl = getApiBaseUrl();
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/quality/ws`;
+  };
+
+  const handleExport = async () => {
+    if (!patientId) return;
+
+    const authToken = token || authUtils.getToken();
+    if (!authToken) {
+      console.error('Authentication token not found');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const baseUrl = getApiBaseUrl();
+      const url = `${baseUrl}/api/quality/patients/${patientId}/export`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+
+      // Get filename from Content-Disposition header or use a default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `quality_export_${patientId}.xlsx`; // Default filename
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      // Create a download link and trigger it
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Error exporting quality data:', error);
+      // You might want to show a toast/notification here
+    } finally {
+      setExporting(false);
+    }
   };
 
   useEffect(() => {
@@ -177,9 +237,18 @@ export default function QualityParametersTable() {
           <button
             type="button"
             aria-label="Download"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow hover:bg-purple-700"
+            onClick={handleExport}
+            disabled={exporting || !patientId}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <img src={ExtractIcon} alt="Download" className="h-4 w-4" />
+            {exporting ? (
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <img src={ExtractIcon} alt="Download" className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
