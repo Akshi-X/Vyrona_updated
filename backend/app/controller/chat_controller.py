@@ -209,11 +209,10 @@ async def websocket_chat_endpoint(
     - success: Success response
     """
     connection_id = None
-    db = None
     
     try:
         # Handle connection setup via service
-        connection_id, current_user, pharma_id, db = await handle_websocket_connection(
+        connection_id, current_user, pharma_id = await handle_websocket_connection(
             websocket,
             token,
             patient_id,
@@ -227,8 +226,7 @@ async def websocket_chat_endpoint(
             connection_id,
             current_user,
             pharma_id,
-            chat_connection_manager,
-            db
+            chat_connection_manager
         )
     
     except WebSocketDisconnect:
@@ -241,6 +239,4 @@ async def websocket_chat_endpoint(
         # Cleanup
         if connection_id:
             chat_connection_manager.disconnect(connection_id)
-        if db:
-            db.close()
         logger.info(f"WebSocket connection closed: connection_id={connection_id}")
