@@ -544,7 +544,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Critical Alerts */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="Critical Alerts"
                       src={CriticalAlertsIcon}
                       onClick={() => {
@@ -553,7 +553,7 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {criticalAlertsCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                         <span className="font-semibold text-white text-[10px]">
                           {criticalAlertsCount}
                         </span>
@@ -571,7 +571,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Stakeholder Chats */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => {
@@ -599,7 +599,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* My Tasks */}
                   <div className="relative group">
                     <img
-                      className="w-[22px] h-[22px] cursor-pointer"
+                      className="w-[30px] h-[30px] cursor-pointer"
                       alt="My Tasks"
                       src={MyTasksIcon}
                       onClick={() => {
@@ -608,7 +608,7 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {myTasksCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                         <span className="font-semibold text-white text-[10px]">
                           {myTasksCount}
                         </span>
@@ -627,7 +627,7 @@ export default function Dashboard({ }: DashboardProps) {
 
               {/* Volume Section (Top Row) */}
               <section className="w-full">
-                <div className="flex gap-6 mt-7">
+                <div className="flex gap-6 mt-5">
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}

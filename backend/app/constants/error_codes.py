@@ -220,6 +220,7 @@ ERROR_CODES = {
     "REDIS_CONNECTION_ERROR": "ERR_11001",
     "QUALITY_DATA_NOT_FOUND": "ERR_11002",
     "QUALITY_SERVICE_ERROR": "ERR_11003",
+    "QUALITY_CSV_EXPORT_FAILED": "ERR_11004",
 
     # ============================================
     # CHAT SYSTEM (11xxx)
