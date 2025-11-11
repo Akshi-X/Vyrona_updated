@@ -54,9 +54,6 @@ interface DataPoint {
   timestamp: string;
   temperature: number;
   humidity: number;
-  ph_level: number;
-  o2_level: number;
-  co2_level: number;
   agitation: number;
 }
 
@@ -222,9 +219,6 @@ export default function QualityTrackingChart() {
                     timestamp: qualityData.timestamp,
                     temperature: qualityData.temperature,
                     humidity: qualityData.humidity,
-                    ph_level: qualityData.ph_level,
-                    o2_level: qualityData.o2_level,
-                    co2_level: qualityData.co2_level,
                     agitation: qualityData.agitation,
                   },
                 ];
@@ -313,12 +307,9 @@ export default function QualityTrackingChart() {
   const chartData = useMemo(() => {
     // Unified color palette
     const palette = {
-      temperature: '#FF6B57', // warm coral
-      humidity: '#6C7CFF', // indigo
-      ph: '#33C38E', // green
-      o2: '#F5B82E', // gold
-      co2: '#1DB9C3', // teal
-      agitation: '#E46ECB', // magenta
+      temperature: '#6C7CFF',
+      humidity: '#DE88E6',
+      agitation: '#BDBDBD',
     } as const;
 
     const labels = dataPoints.map((point) => formatTimestamp(point.timestamp));
@@ -340,7 +331,7 @@ export default function QualityTrackingChart() {
           data: dataPoints.map((point) => point.temperature),
           borderColor: palette.temperature,
           backgroundColor: 'transparent',
-          borderWidth: 3,
+          borderWidth: 1.5,
           pointRadius: 2,
           pointHoverRadius: 5,
           pointBackgroundColor: palette.temperature,
@@ -354,7 +345,7 @@ export default function QualityTrackingChart() {
           data: dataPoints.map((point) => point.humidity),
           borderColor: palette.humidity,
           backgroundColor: 'transparent',
-          borderWidth: 3,
+          borderWidth: 1.5,
           pointRadius: 2,
           pointHoverRadius: 5,
           pointBackgroundColor: palette.humidity,
@@ -364,53 +355,11 @@ export default function QualityTrackingChart() {
           fill: false,
         },
         {
-          label: 'pH Level',
-          data: dataPoints.map((point) => point.ph_level),
-          borderColor: palette.ph,
-          backgroundColor: 'transparent',
-          borderWidth: 3,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.ph,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
-          tension: 0.4,
-          fill: false,
-        },
-        {
-          label: 'O₂ Level (%)',
-          data: dataPoints.map((point) => point.o2_level),
-          borderColor: palette.o2,
-          backgroundColor: 'transparent',
-          borderWidth: 3,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.o2,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
-          tension: 0.4,
-          fill: false,
-        },
-        {
-          label: 'CO₂ Level (%)',
-          data: dataPoints.map((point) => point.co2_level),
-          borderColor: palette.co2,
-          backgroundColor: 'transparent',
-          borderWidth: 3,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.co2,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
-          tension: 0.4,
-          fill: false,
-        },
-        {
-          label: 'Agitation (%)',
+          label: 'Agitation / Vibration',
           data: dataPoints.map((point) => point.agitation),
           borderColor: palette.agitation,
           backgroundColor: 'transparent',
-          borderWidth: 3,
+          borderWidth: 1.5,
           pointRadius: 2,
           pointHoverRadius: 5,
           pointBackgroundColor: palette.agitation,
@@ -432,13 +381,13 @@ export default function QualityTrackingChart() {
           display: true,
           position: 'top' as const,
           labels: {
-            boxWidth: 10,
-            boxHeight: 10,
+            boxWidth: 8,
+            boxHeight: 8,
             padding: 16,
             color: '#4B4B4B',
             usePointStyle: true,
             pointStyle: 'circle',
-            font: { size: 12 },
+            font: { size: 11 },
           },
         },
         tooltip: {
@@ -448,8 +397,8 @@ export default function QualityTrackingChart() {
           cornerRadius: 6,
           caretSize: 6,
           usePointStyle: true, // show small circular indicators
-          boxWidth: 8,
-          boxHeight: 8,
+          boxWidth: 6,
+          boxHeight: 6,
           titleMarginBottom: 6,
           bodySpacing: 4,
           titleFont: {
@@ -477,14 +426,8 @@ export default function QualityTrackingChart() {
                   return `Temperature (°C): ${fmt(point.temperature)}`;
                 case 'Humidity (%)':
                   return `Humidity (%): ${fmt(point.humidity)}`;
-                case 'pH Level':
-                  return `pH Level: ${fmt(point.ph_level)}`;
-                case 'O₂ Level (%)':
-                  return `O₂ Level (%): ${fmt(point.o2_level)}`;
-                case 'CO₂ Level (%)':
-                  return `CO₂ Level (%): ${fmt(point.co2_level)}`;
-                case 'Agitation (%)':
-                  return `Agitation (%): ${fmt(point.agitation)}`;
+                case 'Agitation / Vibration':
+                  return `Agitation / Vibration: ${fmt(point.agitation)}`;
                 default:
                   return `${label}: ${context.parsed.y}`;
               }
@@ -496,7 +439,7 @@ export default function QualityTrackingChart() {
           },
         },
       },
-      layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+      layout: { padding: { top: 0, right: 8, bottom: 0, left: 0 } },
       interaction: { mode: 'index' as const, intersect: false },
       scales: {
         x: {
@@ -530,9 +473,6 @@ export default function QualityTrackingChart() {
             const allValues = dataPoints.flatMap((p) => [
               p.temperature,
               p.humidity,
-              p.ph_level,
-              p.o2_level,
-              p.co2_level,
               p.agitation,
             ]);
             if (allValues.length === 0) return 110;
@@ -566,8 +506,8 @@ export default function QualityTrackingChart() {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-black text-[16px]">Quality Tracking</h3>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         {isConnected && (
           <span className="text-xs text-green-600">● Connected</span>
         )}

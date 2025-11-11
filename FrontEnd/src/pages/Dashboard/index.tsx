@@ -387,7 +387,7 @@ export default function Dashboard({ }: DashboardProps) {
                           />
                         </div>
                         <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Treatments Count:
+                          Quality Deviation Flagged:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : patientStats?.current_month_treatment_count || '0'}
@@ -716,7 +716,7 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Compliance Section */}
                 <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
-                    Shipment Status 
+                    Shipment Status
                   </h2>
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
