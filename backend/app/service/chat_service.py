@@ -2,9 +2,11 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from ..config.database import SessionLocal
 
 from ..models.chat_model import ChatMessage
 from ..models.chat_read_status import ChatReadStatus
@@ -458,8 +460,7 @@ async def handle_websocket_message(
     connection_id: str,
     current_user: User,
     pharma_id: int,
-    connection_manager: ChatConnectionManager,
-    db: Session
+    connection_manager: ChatConnectionManager
 ) -> Dict[str, Any]:
     """
     Handle incoming WebSocket message and route to appropriate handler
@@ -474,7 +475,7 @@ async def handle_websocket_message(
     try:
         if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
             return await handle_subscribe_patient(
-                message_data, connection_id, pharma_id, connection_manager, db
+                message_data, connection_id, pharma_id, connection_manager
             )
         
         elif message_type == WS_MSG_TYPE_UNSUBSCRIBE_PATIENT:
@@ -484,17 +485,17 @@ async def handle_websocket_message(
         
         elif message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
             return await handle_get_patient_messages_ws(
-                message_data, connection_id, current_user, pharma_id, connection_manager, db
+                message_data, connection_id, current_user, pharma_id, connection_manager
             )
         
         elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
             return await handle_get_unread_messages_ws(
-                current_user, pharma_id, db
+                current_user, pharma_id
             )
         
         elif message_type == WS_MSG_TYPE_MARK_READ:
             return await handle_mark_read_ws(
-                message_data, current_user, pharma_id, connection_manager, db
+                message_data, current_user, pharma_id, connection_manager
             )
         
         else:
@@ -515,19 +516,20 @@ async def handle_subscribe_patient(
     message_data: Dict[str, Any],
     connection_id: str,
     pharma_id: int,
-    connection_manager: ChatConnectionManager,
-    db: Session
+    connection_manager: ChatConnectionManager
 ) -> Dict[str, Any]:
     """Handle subscribe to patient messages"""
     patient_id = message_data.get("patient_id")
     if not patient_id:
         raise ChatInvalidDataException("patient_id is required")
     
-    # Validate patient exists and belongs to pharma
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise ChatInvalidDataException(f"Patient {patient_id} not found")
-    if patient.pharma_id != pharma_id:
+    with SessionLocal() as db:
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        if not patient:
+            raise ChatInvalidDataException(f"Patient {patient_id} not found")
+        patient_pharma_id = patient.pharma_id
+
+    if patient_pharma_id != pharma_id:
         raise ChatInvalidDataException(f"Patient {patient_id} does not belong to your pharma")
     
     # Subscribe connection to patient
@@ -566,8 +568,7 @@ async def handle_get_patient_messages_ws(
     connection_id: str,
     current_user: User,
     pharma_id: int,
-    connection_manager: ChatConnectionManager,
-    db: Session
+    connection_manager: ChatConnectionManager
 ) -> Dict[str, Any]:
     """Handle get patient messages request via WebSocket"""
     patient_id = message_data.get("patient_id")
@@ -578,7 +579,14 @@ async def handle_get_patient_messages_ws(
     connection_manager.subscribe_to_patient(connection_id, patient_id)
     
     # Get messages using existing service (pass connection_manager to trigger unread broadcast)
-    result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
+    with SessionLocal() as db:
+        result = await get_patient_messages(
+            patient_id,
+            current_user.user_id,
+            pharma_id,
+            db,
+            connection_manager
+        )
     
     return {
         "type": WS_MSG_TYPE_PATIENT_MESSAGES,
@@ -589,11 +597,11 @@ async def handle_get_patient_messages_ws(
 
 async def handle_get_unread_messages_ws(
     current_user: User,
-    pharma_id: int,
-    db: Session
+    pharma_id: int
 ) -> Dict[str, Any]:
     """Handle get unread messages request via WebSocket"""
-    result = get_unread_messages(current_user.user_id, pharma_id, db)
+    with SessionLocal() as db:
+        result = get_unread_messages(current_user.user_id, pharma_id, db)
     
     return {
         "type": WS_MSG_TYPE_UNREAD_MESSAGES,
@@ -606,8 +614,7 @@ async def handle_mark_read_ws(
     message_data: Dict[str, Any],
     current_user: User,
     pharma_id: int,
-    connection_manager: ChatConnectionManager,
-    db: Session
+    connection_manager: ChatConnectionManager
 ) -> Dict[str, Any]:
     """Handle mark messages as read via WebSocket"""
     patient_id = message_data.get("patient_id")
@@ -615,7 +622,14 @@ async def handle_mark_read_ws(
         raise ChatInvalidDataException("patient_id is required")
     
     # Mark as read by fetching messages (service automatically marks as read and broadcasts unread update)
-    await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
+    with SessionLocal() as db:
+        await get_patient_messages(
+            patient_id,
+            current_user.user_id,
+            pharma_id,
+            db,
+            connection_manager
+        )
     
     return {
         "type": WS_MSG_TYPE_SUCCESS,
@@ -643,11 +657,10 @@ async def handle_websocket_connection(
     connection_manager: ChatConnectionManager,
     authenticate_websocket_func
 ):
-    """Handle WebSocket connection lifecycle. Returns: (connection_id, current_user, pharma_id, db)"""
+    """Handle WebSocket connection lifecycle. Returns: (connection_id, current_user, pharma_id)"""
     connection_id = None
     current_user = None
     pharma_id = None
-    db = None
     
     try:
         # Accept WebSocket connection
@@ -655,7 +668,7 @@ async def handle_websocket_connection(
         
         # Authenticate connection
         auth_func = authenticate_websocket_func or default_auth
-        current_user, pharma_id, db = await auth_func(websocket, token)
+        current_user, pharma_id = await auth_func(websocket, token)
         
         # Register connection
         connection_id = await connection_manager.connect(
@@ -673,25 +686,33 @@ async def handle_websocket_connection(
         
         if patient_id:
             # With patient_id: send only patient messages
-            patient = db.query(Patient).filter(Patient.id == patient_id).first()
-            if patient and patient.pharma_id == pharma_id:
-                connection_manager.subscribe_to_patient(connection_id, patient_id)
-                try:
-                    result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, connection_manager)
-                    connection_response["patient_messages"] = result.model_dump(mode='json')
-                except Exception as e:
-                    logger.warning(f"Failed to fetch patient messages: {e}")
+            with SessionLocal() as db:
+                patient = db.query(Patient).filter(Patient.id == patient_id).first()
+                if patient and patient.pharma_id == pharma_id:
+                    connection_manager.subscribe_to_patient(connection_id, patient_id)
+                    try:
+                        result = await get_patient_messages(
+                            patient_id,
+                            current_user.user_id,
+                            pharma_id,
+                            db,
+                            connection_manager
+                        )
+                        connection_response["patient_messages"] = result.model_dump(mode='json')
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch patient messages: {e}")
         else:
             # Without patient_id: send only unread messages
             try:
-                unread_result = get_unread_messages(current_user.user_id, pharma_id, db)
-                connection_response["unread_messages"] = unread_result.model_dump(mode='json')
+                with SessionLocal() as db:
+                    unread_result = get_unread_messages(current_user.user_id, pharma_id, db)
+                    connection_response["unread_messages"] = unread_result.model_dump(mode='json')
             except Exception as e:
                 logger.warning(f"Failed to fetch unread messages: {e}")
         
         await websocket.send_json(connection_response)
         
-        return connection_id, current_user, pharma_id, db
+        return connection_id, current_user, pharma_id
         
     except ChatException as e:
         if websocket.client_state.name == "CONNECTED":
@@ -726,8 +747,7 @@ async def handle_websocket_message_loop(
     connection_id: str,
     current_user: User,
     pharma_id: int,
-    connection_manager: ChatConnectionManager,
-    db: Session
+    connection_manager: ChatConnectionManager
 ):
     """Handle WebSocket message loop"""
     while True:
@@ -750,8 +770,7 @@ async def handle_websocket_message_loop(
                 connection_id,
                 current_user,
                 pharma_id,
-                connection_manager,
-                db
+                connection_manager
             )
             
             if response:
