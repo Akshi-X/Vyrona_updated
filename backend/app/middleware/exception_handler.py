@@ -48,9 +48,28 @@ async def exception_handler_middleware(request: Request, call_next):
                 "method": request.method
             }
         )
+
+    except PatientException as exc:
+        # Handle patient-specific exceptions
+        logger.error(
+            f"PatientException: {exc.error_code} - {exc.message}",
+            extra={
+                "error_code": exc.error_code,
+                "status_code": exc.status_code,
+                "details": exc.details,
+                "path": request.url.path,
+                "method": request.method
+            }
+        )
         return JSONResponse(
             status_code=exc.status_code,
-            content=exc.to_dict(),
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "status": STATUS_FAILED,
+                "timestamp": datetime.utcnow().isoformat(),
+                **exc.details
+            },
             headers=COMMON_API_HEADERS
         )
 
@@ -177,6 +196,30 @@ def setup_exception_handlers(app):
                 "method": request.method
             }
         )
+
+    @app.exception_handler(PatientException)
+    async def patient_exception_handler(request: Request, exc: PatientException):
+        """Handle patient domain exceptions"""
+        logger.error(
+            f"PatientException: {exc.error_code} - {exc.message}",
+            extra={
+                "error_code": exc.error_code,
+                "path": request.url.path,
+                "method": request.method
+            }
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": exc.error_code,
+                "message": exc.message,
+                "status": STATUS_FAILED,
+                "timestamp": datetime.utcnow().isoformat(),
+                **exc.details
+            },
+            headers=COMMON_API_HEADERS
+        )
+
         return JSONResponse(
             status_code=exc.status_code,
             content=exc.to_dict(),
