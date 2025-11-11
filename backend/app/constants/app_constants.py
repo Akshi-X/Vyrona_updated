@@ -101,7 +101,7 @@ MAX_PAGE_SIZE = 100
 # ============================================
 # DATABASE
 # ============================================
-DB_POOL_SIZE = 5
+DB_POOL_SIZE = 15
 DB_MAX_OVERFLOW = 10
 DB_POOL_TIMEOUT = 30
 DB_POOL_RECYCLE = 3600
