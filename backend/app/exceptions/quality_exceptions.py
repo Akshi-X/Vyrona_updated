@@ -92,3 +92,21 @@ class QualityServiceException(QualityException):
             details=details
         )
 
+
+class QualityCsvExportException(QualityException):
+    """Exception raised when CSV export generation fails"""
+
+    def __init__(self, detail: Optional[str] = None):
+        message = ErrorMessages.QUALITY_CSV_EXPORT_FAILED
+        details = {}
+
+        if detail:
+            message = f"{message}: {detail}"
+            details["detail"] = detail
+
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES.get("QUALITY_CSV_EXPORT_FAILED", "ERR_11004"),
+            status_code=500,
+            details=details
+        )

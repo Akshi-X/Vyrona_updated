@@ -284,13 +284,13 @@ export default function TrackPage() {
             {/* Critical Alerts */}
             <div className="relative group">
               <img
-                className="w-[22px] h-[22px] cursor-pointer"
+                className="w-[30px] h-[30px] cursor-pointer"
                 alt="Critical Alerts"
                 src={CriticalAlertsIcon}
                 onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
               />
               {criticalAlertsCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                   <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
                 </div>
               )}
@@ -298,7 +298,7 @@ export default function TrackPage() {
             {/* Stakeholder Chats */}
             <div className="relative group">
               <img
-                className="w-[22px] h-[22px] cursor-pointer"
+                className="w-[30px] h-[30px] cursor-pointer"
                 alt="Stakeholder Chats"
                 src={StakeholderChatsIcon}
                 onClick={() => setShowStakeholderChatScreen(true)}
@@ -312,13 +312,13 @@ export default function TrackPage() {
             {/* My Tasks */}
             <div className="relative group">
               <img
-                className="w-[22px] h-[22px] cursor-pointer"
+                className="w-[30px] h-[30px] cursor-pointer"
                 alt="My Tasks"
                 src={MyTasksIcon}
                 onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
               />
               {myTasksCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
                   <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
                 </div>
               )}
@@ -326,7 +326,7 @@ export default function TrackPage() {
              {/* Patient Summary */}
              <div className="relative group">
               <img
-                className="w-[22px] h-[22px] cursor-pointer"
+                className="w-[30px] h-[30px] cursor-pointer"
                 alt="Patient Summary"
                 src={PatientSummaryIcon}
                 onClick={() => {
@@ -380,11 +380,11 @@ export default function TrackPage() {
 
                       return (
                         <div className={containerClass} key={`${s.key}-${idx}`}>
-                          <div className="relative flex flex-col items-center w-9 shrink-0">
+                          <div className="relative flex flex-col items-center w-9 my-2 shrink-0">
                             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
                               <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
                   </div>
-                            <div className={`absolute top-full mt-2 text-[10px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                            <div className={`absolute top-full font-semibold mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
                 </div>
                           {connector}
                   </div>
