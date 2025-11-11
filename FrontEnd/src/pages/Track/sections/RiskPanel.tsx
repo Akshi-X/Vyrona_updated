@@ -41,10 +41,16 @@ export default function RiskPanel() {
     const totalPoints = lightGrayData.length;
     const midpoint = Math.floor(totalPoints / 2);
     return Array.from({ length: totalPoints }, (_, i) => {
-      if (i === 0) {
+      if (i === 2) {
+        return 'Phase 1';
+      }
+      if (i === 6) {
         return 'Phase 2';
       }
-      if (i === midpoint) {
+      if (i === 10) {
+        return 'Phase 3';
+      }
+      if (i === 14) {
         return 'Phase 4';
       }
       return '';
@@ -154,7 +160,7 @@ export default function RiskPanel() {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
-      <h3 className="font-semibold text-black text-sm">Risk</h3>
+      <h3 className="font-semibold text-black text-sm text-[16px]">Risk</h3>
 
       {/* Phase Risk Prediction - Line Chart */}
       <div className="mt-2 flex-1 flex flex-col">

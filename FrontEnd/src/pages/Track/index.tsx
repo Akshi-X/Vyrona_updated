@@ -18,9 +18,8 @@ import DarkApheresisIcon from '../../assets/TrackAndTraceIcons/DarkApheresis.svg
 import LightApheresisIcon from '../../assets/TrackAndTraceIcons/LightApheresis.svg';
 import DarkCryopreservationIcon from '../../assets/TrackAndTraceIcons/DarkCryopreservation.svg';
 import DarkTransportationIcon from '../../assets/TrackAndTraceIcons/DarkTransportation.svg';
-import PreReIcon from '../../assets/TrackAndTraceIcons/Pre-Reengineering.svg';
-import LightPreReIcon from '../../assets/TrackAndTraceIcons/LightPre-Reengineering.svg';
 import PostReIcon from '../../assets/TrackAndTraceIcons/Post-Reengineering.svg';
+import DarkPostReIcon from '../../assets/TrackAndTraceIcons/DarkPost-Reengineering.svg';
 import LightCryopreservationIcon from '../../assets/TrackAndTraceIcons/LightCryopreservation.svg';
 import LightTransportationIcon from '../../assets/TrackAndTraceIcons/LightTransportation.svg';
 import ReinfusionIcon from '../../assets/TrackAndTraceIcons/Reinfusion.svg';
@@ -46,8 +45,7 @@ const steps = [
   { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
   { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
   { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
-  { key: 'Pre-Reengineering', dark: PreReIcon, light: LightPreReIcon },
-  { key: 'Post-Reengineering', dark: PostReIcon, light: PostReIcon },
+  { key: 'Reengineering', dark: DarkPostReIcon, light: PostReIcon },
   { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
   { key: 'Transportation', dark: DarkTransportationIcon, light: LightTransportationIcon },
   { key: 'Reinfusion', dark: DarkReinfusionIcon, light: ReinfusionIcon },
@@ -384,7 +382,7 @@ export default function TrackPage() {
                             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
                               <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
                   </div>
-                            <div className={`absolute top-full font-semibold mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                            <div className={`absolute top-full font-medium mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
                 </div>
                           {connector}
                   </div>

@@ -35,8 +35,8 @@ const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Enter Patient ID"
-      description="Please enter a valid patient ID from the ongoing treatments list."
+      title="Track shipment"
+      description="Please Enter the patient ID"
       icon={
         <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a1 1 0 001 1h13a1 1 0 001-1V9m-8-4l6 6" />

@@ -166,7 +166,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
 
   return (
     <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
-      <div className="h-[565px] overflow-y-auto overflow-x-auto [scrollbar-width:thin]">
+      <div className="h-[70vh] overflow-y-auto overflow-x-auto [scrollbar-width:thin]">
         <table className="w-full">
           <thead className="sticky top-0 bg-[#fdeeff] z-10">
             <tr>
