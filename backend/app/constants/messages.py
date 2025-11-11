@@ -108,6 +108,7 @@ class ErrorMessages:
     REDIS_CONNECTION_ERROR = "Redis connection failed. Please check Redis server status"
     QUALITY_DATA_NOT_FOUND = "Quality data not found"
     QUALITY_SERVICE_ERROR = "Quality monitoring service error"
+    QUALITY_CSV_EXPORT_FAILED = "Failed to generate quality data export"
     
     # General
     INTERNAL_ERROR = "An internal server error occurred"

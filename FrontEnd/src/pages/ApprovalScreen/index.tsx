@@ -181,11 +181,10 @@ const ApprovalScreen: React.FC = () => {
                 Cancel
               </button>
               <button
-                className={`px-6 py-2 rounded-md font-medium transition disabled:opacity-50 ${
-                  pendingAction === "approve"
-                    ? "bg-[#8b2a96] text-white hover:bg-[#7a247e]"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                }`}
+                className={`px-6 py-2 rounded-md font-medium transition disabled:opacity-50 ${pendingAction === "approve"
+                  ? "bg-[#8b2a96] text-white hover:bg-[#7a247e]"
+                  : "bg-red-600 text-white hover:bg-red-700"
+                  }`}
                 onClick={() => pendingAction && handleAction(pendingAction)}
                 disabled={loadingAction !== null}
               >
@@ -197,169 +196,172 @@ const ApprovalScreen: React.FC = () => {
       )}
 
       <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
-{/* Left Section */}
-<aside
-                className="w-[36%] flex flex-col justify-between text-white relative overflow-hidden 
+        {/* Left Section */}
+        <aside
+          className="w-[35%] h-screen flex flex-col justify-between text-white relative overflow-hidden 
              bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
              rounded-tr-[40px] rounded-br-[40px]"
-            >
-                <div className="flex h-[15%] items-center space-x-2  p-12 pb-0 ">
-                    <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
-                    <h1 className="font-semibold text-[30px]">myGrape</h1>
-                </div>
-                <div className="flex items-center overflow-hidden">
-                    <img
-                        src={MyGrapeBanner}
-                        alt="banner"
-                        className="w-full h-[125%] object-fill"
-                    />
-                </div>
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 ">
-                    <h2 className="text-2xl font-bold leading-snug mt-8">
-                        Driving Health Forward <br />
-                        One Smart Solution At a Time
-                    </h2>
-                    <p className="mt-4 opacity-80 font-[12px]">
-                        Because every patient is someone’s everything.
-                    </p>
-                </div>
-            </aside>
-      {/* Right Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
-        <div className="w-full max-w-[28rem]">
-          {(() => {
-            const isAlreadyProcessed = userInfo && 
-              (userInfo.approved_status === 'approved' || userInfo.approved_status === 'rejected' || userInfo.approved_status === 'reject');
-            
-            if (!completed) {
-              return (
-                <>
-                  <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">
-                    Approval Request
-                  </h2>
-                  <p className="text-gray-500 mb-6">
-                    {isAlreadyProcessed 
-                      ? "This user request has already been processed."
-                      : "Review user details and proceed to approve or reject."}
-                  </p>
-                </>
-              );
-            }
-            return null;
-          })()}
+        >
+          {/* Background Banner Image */}
+          <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+            <img
+              src={MyGrapeBanner}
+              className="w-full h-auto max-h-full object-contain"
+              alt="banner"
+            />
+          </div>
 
-          {/* User Information Card */}
-          {userInfo && !completed && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">User Information</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Name:</span>
-                  <span className="text-gray-800">{userInfo.first_name} {userInfo.last_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Email:</span>
-                  <span className="text-gray-800">{userInfo.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Role:</span>
-                  <span className="text-gray-800">{userInfo.role}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Company:</span>
-                  <span className="text-gray-800">{userInfo.company_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Status:</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    userInfo.approved_status === 'pending' 
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : userInfo.approved_status === 'approved'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {userInfo.approved_status}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Account Status:</span>
-                  <span className={`font-medium ${
-                    userInfo.status ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {userInfo.status ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
+            <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
+            <h1 className="font-semibold text-[30px]">myGrape</h1>
+          </div>
 
-          {/* Action Buttons or Success Card */}
-          <div className="bg-white rounded-lg">
+          <div className="flex-1 relative z-0"></div>
+
+          <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+            <h2 className="text-2xl font-bold leading-snug mt-8">
+              Driving Health Forward <br />
+              One Smart Solution At a Time
+            </h2>
+            <p className="mt-4 opacity-80 font-[12px]">
+              Because every patient is someone's everything.
+            </p>
+          </div>
+        </aside>
+        {/* Right Section */}
+        <main className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
+          <div className="w-full max-w-[28rem]">
             {(() => {
-              // Check if user is already approved or rejected
-              const isAlreadyProcessed = userInfo && 
+              const isAlreadyProcessed = userInfo &&
                 (userInfo.approved_status === 'approved' || userInfo.approved_status === 'rejected' || userInfo.approved_status === 'reject');
-              
-              if (isAlreadyProcessed && !completed) {
-                return (
-                  <div className="flex flex-col items-center">
-                    <p className="text-center text-gray-600 font-medium">
-                      This user request has already been processed. No further action is required.
-                    </p>
-                  </div>
-                );
-              }
-              
+
               if (!completed) {
                 return (
-                  <div className="flex gap-4 justify-center">
-                    <button
-                      className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
-                      onClick={() => handleButtonClick("approve")}
-                      disabled={loadingAction !== null}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="w-full py-3 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition disabled:opacity-50"
-                      onClick={() => handleButtonClick("reject")}
-                      disabled={loadingAction !== null}
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  <>
+                    <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">
+                      Approval Request
+                    </h2>
+                    <p className="text-gray-500 mb-6">
+                      {isAlreadyProcessed
+                        ? "This user request has already been processed."
+                        : "Review user details and proceed to approve or reject."}
+                    </p>
+                  </>
                 );
               }
-              
-              if (completed) {
-                return (
-                  <div className="flex flex-col items-center">
-                    <div className="flex justify-center mb-4">
-                      <div className={`w-8 h-8 ${lastAction === 'reject' ? 'bg-red-500' : 'bg-green-500'} rounded-lg flex items-center justify-center`}>
-                        {lastAction === 'reject' ? (
-                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        ) : (
-                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    {status && (
-                      <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
-                    )}
-                  </div>
-                );
-              }
-              
               return null;
             })()}
+
+            {/* User Information Card */}
+            {userInfo && !completed && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">User Information</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Name:</span>
+                    <span className="text-gray-800">{userInfo.first_name} {userInfo.last_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Email:</span>
+                    <span className="text-gray-800">{userInfo.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Role:</span>
+                    <span className="text-gray-800">{userInfo.role}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Company:</span>
+                    <span className="text-gray-800">{userInfo.company_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Status:</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${userInfo.approved_status === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : userInfo.approved_status === 'approved'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                      }`}>
+                      {userInfo.approved_status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 font-medium">Account Status:</span>
+                    <span className={`font-medium ${userInfo.status ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                      {userInfo.status ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons or Success Card */}
+            <div className="bg-white rounded-lg">
+              {(() => {
+                // Check if user is already approved or rejected
+                const isAlreadyProcessed = userInfo &&
+                  (userInfo.approved_status === 'approved' || userInfo.approved_status === 'rejected' || userInfo.approved_status === 'reject');
+
+                if (isAlreadyProcessed && !completed) {
+                  return (
+                    <div className="flex flex-col items-center">
+                      <p className="text-center text-gray-600 font-medium">
+                        This user request has already been processed. No further action is required.
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (!completed) {
+                  return (
+                    <div className="flex gap-4 justify-center">
+                      <button
+                        className="w-full py-3 bg-[#8b2a96] text-white rounded-md font-medium transition disabled:opacity-50"
+                        onClick={() => handleButtonClick("approve")}
+                        disabled={loadingAction !== null}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="w-full py-3 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition disabled:opacity-50"
+                        onClick={() => handleButtonClick("reject")}
+                        disabled={loadingAction !== null}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (completed) {
+                  return (
+                    <div className="flex flex-col items-center">
+                      <div className="flex justify-center mb-4">
+                        <div className={`w-8 h-8 ${lastAction === 'reject' ? 'bg-red-500' : 'bg-green-500'} rounded-lg flex items-center justify-center`}>
+                          {lastAction === 'reject' ? (
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          ) : (
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      {status && (
+                        <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
     </>
   );
 };

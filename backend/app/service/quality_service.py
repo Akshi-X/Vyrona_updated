@@ -3,18 +3,29 @@ Quality Monitoring Service
 Handles quality data retrieval and validation with pharma filtering
 """
 import asyncio
+import csv
+import io
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+
+from fastapi.responses import Response
 
 from app.models.patient_model import Patient
 from app.models.user_model import User
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
 from app.exceptions.patient_exceptions import PatientNotFoundException
-from app.exceptions.quality_exceptions import QualityServiceException
+from app.constants.app_constants import COMMON_API_HEADERS, QUALITY_EXPORT_DEFAULT_MINUTES
+from app.exceptions.quality_exceptions import (
+    QualityCsvExportException,
+    QualityDataNotFoundException,
+    QualityServiceException,
+    RedisConnectionException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +190,178 @@ class QualityService:
             logger.error(f"Error getting latest quality data: {e}")
             raise
     
+    @staticmethod
+    def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
+        """Parse timestamp strings into naive UTC datetime objects."""
+        if not value:
+            return None
+
+        parse_attempts = [
+            datetime.fromisoformat,
+        ]
+
+        formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        ]
+
+        for parser in parse_attempts:
+            try:
+                parsed = parser(value)
+                if parsed.tzinfo:
+                    parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+                return parsed
+            except ValueError:
+                continue
+
+        for fmt in formats:
+            try:
+                parsed = datetime.strptime(value, fmt)
+                return parsed
+            except ValueError:
+                continue
+
+        return None
+
+    def export_patient_quality_data_csv(
+        self,
+        patient_id: str,
+        pharma_id: int,
+        duration_minutes: int = QUALITY_EXPORT_DEFAULT_MINUTES
+    ) -> Response:
+        """
+        Export quality data for a patient within the specified time range as CSV.
+
+        Args:
+            patient_id: Patient identifier.
+            pharma_id: Pharma identifier for authorization.
+            duration_minutes: Time window for export in minutes (default 10).
+
+        Returns:
+            FastAPI Response containing CSV data.
+
+        Raises:
+            PatientNotFoundException: When patient does not belong to pharma.
+            RedisConnectionException: When Redis is unreachable.
+            QualityDataNotFoundException: When no data found for time window.
+            QualityCsvExportException: On CSV generation failure.
+            QualityServiceException: On invalid parameters.
+        """
+        if duration_minutes <= 0 or duration_minutes > 1440:
+            raise QualityServiceException(
+                operation="export_patient_quality_data_csv",
+                detail="duration_minutes must be between 1 and 1440"
+            )
+
+        # Validate patient ownership
+        self.validate_patient_belongs_to_pharma(patient_id, pharma_id)
+
+        try:
+            redis_client = get_redis()
+        except Exception as exc:
+            logger.error(f"Redis connection failed during CSV export: {exc}")
+            raise RedisConnectionException(detail=str(exc)) from exc
+
+        history_key = f"quality_history:{patient_id}"
+
+        try:
+            raw_history = redis_client.lrange(history_key, 0, -1)
+        except Exception as exc:
+            logger.error(f"Failed to read Redis history for {patient_id}: {exc}")
+            raise QualityCsvExportException(detail="Unable to read quality history from Redis") from exc
+
+        if not raw_history:
+            raise QualityDataNotFoundException(patient_id=patient_id)
+
+        cutoff = datetime.now() - timedelta(minutes=duration_minutes)
+        filtered_records = []
+
+        for item in raw_history:
+            try:
+                record = json.loads(item)
+            except json.JSONDecodeError:
+                logger.warning(f"Skipping invalid JSON entry in quality history for patient {patient_id}")
+                continue
+
+            parsed_timestamp = self._parse_timestamp(record.get("timestamp"))
+            if not parsed_timestamp:
+                logger.warning(
+                    "Skipping record with unparseable timestamp for patient %s: %s",
+                    patient_id,
+                    record.get("timestamp")
+                )
+                continue
+
+            if parsed_timestamp < cutoff:
+                continue
+
+            record["_parsed_timestamp"] = parsed_timestamp
+            filtered_records.append(record)
+
+        if not filtered_records:
+            raise QualityDataNotFoundException(
+                patient_id=patient_id,
+                detail=f"No quality data found in the last {duration_minutes} minutes."
+            )
+
+        filtered_records.sort(key=lambda entry: entry.get("_parsed_timestamp"))
+
+        fieldnames = [
+            "timestamp",
+            "patient_id",
+            "temperature",
+            "humidity",
+            "ph_level",
+            "o2_level",
+            "co2_level",
+            "agitation",
+        ]
+
+        buffer = io.StringIO()
+
+        try:
+            writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for record in filtered_records:
+                writer.writerow({
+                    "timestamp": record.get("timestamp"),
+                    "patient_id": record.get("patient_id"),
+                    "temperature": record.get("temperature"),
+                    "humidity": record.get("humidity"),
+                    "ph_level": record.get("ph_level"),
+                    "o2_level": record.get("o2_level"),
+                    "co2_level": record.get("co2_level"),
+                    "agitation": record.get("agitation"),
+                })
+
+            csv_text = buffer.getvalue()
+        except Exception as exc:
+            logger.error(
+                "CSV export generation failed for patient %s: %s",
+                patient_id,
+                exc,
+                exc_info=True
+            )
+            raise QualityCsvExportException(detail=str(exc)) from exc
+        finally:
+            buffer.close()
+
+        csv_content = csv_text.encode("utf-8")
+        for record in filtered_records:
+            record.pop("_parsed_timestamp", None)
+
+        filename = f"{patient_id}_quality_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+        response = Response(content=csv_content, media_type="text/csv")
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        for header, value in COMMON_API_HEADERS.items():
+            response.headers.setdefault(header, value)
+
+        return response
+
     def check_redis_health(self) -> Dict[str, str]:
         """
         Check Redis connection health

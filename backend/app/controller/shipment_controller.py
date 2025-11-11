@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user_pharma_id
 from app.service.shipment_service import ShipmentService
+from app.utils.shipment_utils import add_no_routes_message
 from app.schemas.patient_schema import PatientJourneySummaryResponse, ControlTowerMapResponse, DocumentChecklistResponse
 from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 from app.exceptions.custom_exceptions import AppException
@@ -44,6 +45,7 @@ def get_active_routes(
     Optional filters:
     - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
     - carriers: Filter by carrier names (can specify multiple). If not provided, returns all carriers.
+    - regions: Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'
     
     Response:
         {
@@ -58,14 +60,16 @@ def get_active_routes(
              "delayed_routes": 2,
              "risky_routes": 1,
              "last_updated": "..."
-          }
+          },
+          "message": "Active routes not available" (only when filters applied and no routes found)
         }
     """
     try:
         service = ShipmentService(db)
         routes = service.get_active_routes(pharma_id, route_status=route_status, carriers=carriers, regions=regions)
         metrics = service.get_real_time_metrics(pharma_id, regions=regions)
-        return {"routes": routes, "metrics": metrics}
+        response = {"routes": routes, "metrics": metrics}
+        return add_no_routes_message(response, route_status, carriers, regions, len(routes))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{ErrorMessages.SHIPMENT_ACTIVE_ROUTES_ERROR}: {str(e)}")
 
@@ -84,8 +88,8 @@ def get_transport_time_comparison(
             {
                 "source_location": "Location A",
                 "destination_location": "Location B",
-                "scheduled_time": "2h 30m",  # Scheduled transport time in hours and minutes format (e.g., "2h 15m", "45m", "3h") or null
-                "actual_time": "1h 30m"  # Actual transport time in hours and minutes format (e.g., "2h 15m", "45m", "3h")
+                "scheduled_time": "2.5 h",  # Scheduled transport time in hours with up to two decimals (e.g., "2.5 h", "0.75 h") or null
+                "actual_time": "1.5 h"  # Actual transport time in hours with up to two decimals (e.g., "2 h", "0.75 h")
             },
             ...
         ]
@@ -137,6 +141,8 @@ def get_patient_journey_summary(
 def get_control_tower_map(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
+    carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
+    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
     db: Session = Depends(get_db)
 ):
     """
@@ -147,6 +153,8 @@ def get_control_tower_map(
     
     Optional filters:
     - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
+    - carriers: Filter by carrier names (can specify multiple). If not provided, returns all carriers.
+    - regions: Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'
     
     Response:
         {
@@ -166,14 +174,17 @@ def get_control_tower_map(
                 ...
             ],
             "total_routes": 10,
-            "last_updated": "16:25:17"
+            "last_updated": "16:25:17",
+            "message": "Active routes not available" (only when filters applied and no routes found)
         }
     """
     try:
         service = ShipmentService(db)
         map_data = service.get_control_tower_map_data(
             pharma_id=pharma_id,
-            route_status=route_status
+            route_status=route_status,
+            carriers=carriers,
+            regions=regions
         )
         return ControlTowerMapResponse(**map_data)
     except Exception as e:

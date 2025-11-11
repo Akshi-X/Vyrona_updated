@@ -6,8 +6,8 @@ Service for calculating real-time metrics for shipment tracking and management.
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session, Query
+from sqlalchemy import and_, or_, func
 
 from ..models.shipment_model import Shipment
 from ..models.patient_stage_model import PatientStage as PatientStageModel
@@ -18,9 +18,21 @@ from ..models.carrier_model import Carrier
 from ..models.shipment_leg_model import ShipmentLeg
 from ..models.shipment_leg_document_model import ShipmentLegDocument
 from ..constants.enums import PatientStage, RouteStatus
-from ..constants.messages import ErrorMessages
+from ..constants.messages import ErrorMessages, InfoMessages
 from ..exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException
 from ..utils.utils import get_countries_by_regions, country_to_region
+from ..utils.shipment_utils import (
+    has_filters_applied,
+    add_no_routes_message,
+    normalize_datetime_to_utc,
+    calculate_transit_days,
+    parse_route_status_filter,
+    carrier_matches_filter,
+    apply_region_filter,
+    format_duration,
+    get_start_date_from_shipment,
+    format_time_12hour
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +46,6 @@ class ShipmentService:
     # ============================================
     # PRIVATE HELPER METHODS
     # ============================================
-    
-    def _normalize_datetime_to_utc(self, dt: datetime) -> datetime:
-        """Normalize a datetime to UTC timezone."""
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        elif dt.tzinfo != timezone.utc:
-            return dt.astimezone(timezone.utc)
-        return dt
     
     def _get_active_transportation_stage(self, patient_id: str) -> Optional[PatientStageModel]:
         """Get the active TRANSPORTATION stage for a patient."""
@@ -95,25 +99,6 @@ class ShipmentService:
         
         return patient
     
-    def _calculate_transit_days(self, departure_time: Optional[datetime]) -> Optional[float]:
-        """Calculate transit days from departure time to now."""
-        if not departure_time:
-            return None
-        departure = self._normalize_datetime_to_utc(departure_time)
-        now = datetime.now(timezone.utc)
-        transit_duration = now - departure
-        return transit_duration.total_seconds() / (24 * 3600)
-    
-    def _parse_route_status_filter(self, route_status: str) -> Optional[RouteStatus]:
-        """Parse route status filter string to RouteStatus enum."""
-        route_status_lower = route_status.lower()
-        if route_status_lower == "safe":
-            return RouteStatus.SAFE
-        elif route_status_lower == "delayed":
-            return RouteStatus.DELAYED
-        elif route_status_lower in ("high_risk", "risk_route"):
-            return RouteStatus.HIGH_RISK
-        return None
     
     def _get_shipment_carrier(self, shipment_id: int, fallback_carrier: Optional[str] = None) -> Optional[str]:
         """Get the primary carrier name from the first leg (leg_order = 1) of a shipment, with fallback."""
@@ -131,94 +116,107 @@ class ShipmentService:
         # Fallback to provided carrier if no carrier found in legs
         return fallback_carrier
     
-    def _carrier_matches_filter(self, route_carrier: Optional[str], filter_carriers: List[str]) -> bool:
-        """Check if the route carrier matches any of the filter carriers (partial match, case-insensitive)."""
-        if not route_carrier:
-            return False
-        
-        route_carrier_lower = route_carrier.lower()
-        filter_carriers_lower = [c.lower() for c in filter_carriers]
-        
-        for filter_carrier in filter_carriers_lower:
-            if filter_carrier in route_carrier_lower or route_carrier_lower in filter_carrier:
-                return True
-        return False
-    
-    def _apply_region_filter(self, query, regions: Optional[List[str]] = None):
+    def _batch_get_shipment_carriers(self, shipment_ids: List[int]) -> Dict[int, Optional[str]]:
         """
-        Apply region-based filtering to a shipment query.
-        Matches if either source OR destination is in the specified regions.
+        Batch fetch primary carrier names from first leg for multiple shipments.
+        Returns a dictionary mapping shipment_id -> carrier_name.
         
         Args:
-            query: SQLAlchemy query object
-            regions: Filter by regions - matches if either source OR destination is in the specified regions
+            shipment_ids: List of shipment IDs to fetch carriers for
             
         Returns:
-            Filtered query object
+            Dictionary mapping shipment_id to carrier_name (or None if not found)
         """
-        if not regions:
-            return query
+        if not shipment_ids:
+            return {}
         
-        # Get country codes for the specified regions
-        region_countries = get_countries_by_regions(regions)
+        # Use subquery to get minimum leg_order per shipment, then join to get carrier
+        subquery = self.db.query(
+            ShipmentLeg.shipment_id,
+            func.min(ShipmentLeg.leg_order).label('min_leg_order')
+        ).filter(
+            ShipmentLeg.shipment_id.in_(shipment_ids)
+        ).group_by(ShipmentLeg.shipment_id).subquery()
         
-        # If regions were provided but no countries match (invalid region), return empty result
-        if not region_countries:
-            # Apply a filter that will never match (no results)
-            query = query.filter(Shipment.id == -1)
-            return query
+        first_leg_carriers = self.db.query(
+            ShipmentLeg.shipment_id,
+            Carrier.name
+        ).join(
+            subquery,
+            and_(
+                ShipmentLeg.shipment_id == subquery.c.shipment_id,
+                ShipmentLeg.leg_order == subquery.c.min_leg_order
+            )
+        ).join(
+            Carrier, ShipmentLeg.carrier_id == Carrier.id
+        ).filter(
+            Carrier.name.isnot(None)
+        ).all()
         
-        # Match if source OR destination is in the regions
-        query = query.filter(
-            or_(
-                Shipment.source_country.in_(region_countries),
-                Shipment.destination_country.in_(region_countries)
+        # Build map of shipment_id -> carrier_name
+        carriers_map = {}
+        for shipment_id, carrier_name in first_leg_carriers:
+            carriers_map[shipment_id] = carrier_name
+        
+        return carriers_map
+    
+    def _build_filtered_active_routes_query(
+        self,
+        pharma_id: Optional[int] = None,
+        route_status: Optional[str] = None,
+        regions: Optional[List[str]] = None
+    ) -> Query:
+        """
+        Build a query for active routes (shipments in TRANSPORTATION stage) with filters applied.
+        
+        Args:
+            pharma_id: Optional pharma ID to filter routes
+            route_status: Optional route status filter (safe, delayed, high_risk)
+            regions: Optional list of regions to filter by
+            
+        Returns:
+            SQLAlchemy query object with all filters applied
+        """
+        # Query shipments with joins to get pharma name, provider name, carrier name, and check active stage
+        query = self.db.query(
+            Shipment,
+            Pharma.pharma_name,
+            Provider.name.label('provider_name'),
+            Carrier.name.label('carrier_name')
+        ).join(
+            Pharma, Shipment.pharma_id == Pharma.id
+        ).outerjoin(
+            Patient, Shipment.patient_id == Patient.id
+        ).outerjoin(
+            Provider, Shipment.provider_id == Provider.id  # Direct join from shipment
+        ).outerjoin(
+            Carrier, Shipment.carrier_id == Carrier.id  # Direct join from shipment
+        ).outerjoin(
+            PatientStageModel,
+            and_(
+                PatientStageModel.patient_id == Shipment.patient_id,
+                PatientStageModel.stage == PatientStage.TRANSPORTATION,
+                PatientStageModel.is_active == True
             )
         )
         
+        if pharma_id:
+            query = query.filter(Shipment.pharma_id == pharma_id)
+        
+        # Filter by route status if provided
+        if route_status:
+            parsed_status = parse_route_status_filter(route_status)
+            if parsed_status:
+                query = query.filter(Shipment.routes_status == parsed_status)
+        
+        # Apply region-based filtering
+        query = apply_region_filter(query, regions=regions)
+        
+        # Filter only active routes (where PatientStage exists)
+        query = query.filter(PatientStageModel.id.isnot(None))
+        
         return query
     
-    def _format_duration(self, start_dt: Optional[datetime], end_dt: Optional[datetime]) -> Optional[str]:
-        """Format duration between two datetimes as 'Xh Ym' string."""
-        if not start_dt or not end_dt:
-            return None
-        
-        start = self._normalize_datetime_to_utc(start_dt)
-        end = self._normalize_datetime_to_utc(end_dt)
-        
-        duration = end - start
-        total_seconds = int(duration.total_seconds())
-        
-        if total_seconds <= 0:
-            return None
-        
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}h {minutes}m"
-        elif hours > 0:
-            return f"{hours}h"
-        elif minutes > 0:
-            return f"{minutes}m"
-        else:
-            return "0m"
-    
-    def _get_start_date_from_shipment(self, shipment: Shipment) -> Optional[str]:
-        """Get start date from shipment (departure_time or updated_at as fallback)."""
-        if shipment.departure_time:
-            return shipment.departure_time.date().isoformat()
-        elif shipment.updated_at:
-            return shipment.updated_at.date().isoformat()
-        return None
-    
-    def _format_time_12hour(self, dt: Optional[datetime]) -> Optional[str]:
-        """Format datetime to 24-hour time format like '16:25:17'."""
-        if not dt:
-            return None
-        dt_normalized = self._normalize_datetime_to_utc(dt)
-        # Format as 24-hour time (HH:MM:SS)
-        return dt_normalized.strftime("%H:%M:%S")
     
     # ============================================
     # PUBLIC SERVICE METHODS
@@ -276,7 +274,11 @@ class ShipmentService:
         """
         try:
             # Base query for shipments with join to PatientStage to check active TRANSPORTATION stage
-            query = self.db.query(Shipment).outerjoin(
+            # Use join to get active stage info in single query (optimize N+1)
+            query = self.db.query(
+                Shipment,
+                PatientStageModel.id.label('active_stage_id')
+            ).outerjoin(
                 PatientStageModel,
                 and_(
                     PatientStageModel.patient_id == Shipment.patient_id,
@@ -289,7 +291,7 @@ class ShipmentService:
                 query = query.filter(Shipment.pharma_id == pharma_id)
             
             # Apply region-based filtering
-            query = self._apply_region_filter(query, regions=regions)
+            query = apply_region_filter(query, regions=regions)
             
             results = query.all()
             
@@ -301,18 +303,15 @@ class ShipmentService:
             
             # Transit times for active routes
             transit_times = []
-            now = datetime.now(timezone.utc)
             
             # Process each shipment
-            for shipment in results:
-                # Check if patient is in TRANSPORTATION stage
-                active_stage = self._get_active_transportation_stage(shipment.patient_id)
-                
-                if active_stage:
+            for shipment, active_stage_id in results:
+                # Check if patient is in TRANSPORTATION stage (using joined data)
+                if active_stage_id:
                     active_routes_count += 1
                     
                     # Calculate transit time in days for active routes
-                    transit_days = self._calculate_transit_days(shipment.departure_time)
+                    transit_days = calculate_transit_days(shipment.departure_time)
                     if transit_days is not None:
                         transit_times.append(transit_days)
                 
@@ -368,68 +367,38 @@ class ShipmentService:
             - updated_at: Last update timestamp
         """
         try:
-            # Query shipments with joins to get pharma name, provider name, carrier name, and check active stage
-            query = self.db.query(
-                Shipment,
-                Pharma.pharma_name,
-                Provider.name.label('provider_name'),
-                Carrier.name.label('carrier_name')
-            ).join(
-                Pharma, Shipment.pharma_id == Pharma.id
-            ).outerjoin(
-                Patient, Shipment.patient_id == Patient.id
-            ).outerjoin(
-                Provider, Shipment.provider_id == Provider.id  # Direct join from shipment
-            ).outerjoin(
-                Carrier, Shipment.carrier_id == Carrier.id  # Direct join from shipment
-            ).outerjoin(
-                PatientStageModel,
-                and_(
-                    PatientStageModel.patient_id == Shipment.patient_id,
-                    PatientStageModel.stage == PatientStage.TRANSPORTATION,
-                    PatientStageModel.is_active == True
-                )
+            # Build filtered query using shared method
+            query = self._build_filtered_active_routes_query(
+                pharma_id=pharma_id,
+                route_status=route_status,
+                regions=regions
             )
-            
-            if pharma_id:
-                query = query.filter(Shipment.pharma_id == pharma_id)
-            
-            # Filter by route status if provided
-            if route_status:
-                parsed_status = self._parse_route_status_filter(route_status)
-                if parsed_status:
-                    query = query.filter(Shipment.routes_status == parsed_status)
-            
-            # Apply region-based filtering
-            query = self._apply_region_filter(query, regions=regions)
-            
-            # Filter only active routes (where PatientStage exists)
-            query = query.filter(PatientStageModel.id.isnot(None))
             
             results = query.all()
             
-            now = datetime.now(timezone.utc)
+            # Batch fetch carriers for all shipments to avoid N+1 queries
+            shipment_ids = [row[0].id for row in results]
+            carriers_map = self._batch_get_shipment_carriers(shipment_ids)
+            
             active_routes = []
             
             for shipment, pharma_name, provider_name, carrier_name in results:
                 # Calculate transit days
-                transit_days_float = self._calculate_transit_days(shipment.departure_time)
+                transit_days_float = calculate_transit_days(shipment.departure_time)
                 transit_days = int(transit_days_float) if transit_days_float is not None else None
                 
                 # Machine-friendly status should match DB enum values exactly
                 route_status = shipment.routes_status.value if shipment.routes_status else "unknown"
                 
                 # Start date from departure_time (fallback to updated_at date when missing)
-                start_date = self._get_start_date_from_shipment(shipment)
+                start_date = get_start_date_from_shipment(shipment)
                 
-                # Get carrier name (from Carrier table, or Provider name)
+                # Get carrier name (from Carrier table, or Provider name, or from legs map)
                 fallback_carrier = carrier_name if carrier_name else provider_name
-                
-                # Get primary carrier from first leg
-                route_carrier = self._get_shipment_carrier(shipment.id, fallback_carrier)
+                route_carrier = carriers_map.get(shipment.id, fallback_carrier)
                 
                 # Filter by carriers if provided
-                if carriers and not self._carrier_matches_filter(route_carrier, carriers):
+                if carriers and not carrier_matches_filter(route_carrier, carriers):
                     continue
                 
                 route_data = {
@@ -531,8 +500,8 @@ class ShipmentService:
             List of dictionaries containing:
             - source_location: Source location of the leg
             - destination_location: Destination location of the leg
-            - scheduled_time: Scheduled transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to scheduled_time, or None
-            - actual_time: Actual transport time as string in hours and minutes format (e.g., "1h 30m") calculated from departure_time to handover_time or arrival_time
+            - scheduled_time: Scheduled transport time as string in hours format with up to two decimals (e.g., "2.5 h") calculated from departure_time to scheduled_time, or None
+            - actual_time: Actual transport time as string in hours format with up to two decimals (e.g., "1.75 h") calculated from departure_time to handover_time or arrival_time
         """
         try:
             # Validate patient and shipment status
@@ -560,14 +529,14 @@ class ShipmentService:
                 # Calculate scheduled_time: scheduled_time - departure_time (scheduled duration)
                 scheduled_time_str = None
                 if leg.departure_time and leg.scheduled_time:
-                    scheduled_time_str = self._format_duration(leg.departure_time, leg.scheduled_time)
+                    scheduled_time_str = format_duration(leg.departure_time, leg.scheduled_time)
                 
                 # Calculate actual_time: handover_time - departure_time, or arrival_time - departure_time if handover_time is not available
                 actual_time_str = None
                 if leg.departure_time:
                     end_time = leg.handover_time or leg.arrival_time
                     if end_time:
-                        actual_time_str = self._format_duration(leg.departure_time, end_time)
+                        actual_time_str = format_duration(leg.departure_time, end_time)
                 
                 results.append({
                     "source_location": leg.from_location,
@@ -801,7 +770,9 @@ class ShipmentService:
     def get_control_tower_map_data(
         self,
         pharma_id: Optional[int] = None,
-        route_status: Optional[str] = None
+        route_status: Optional[str] = None,
+        carriers: Optional[List[str]] = None,
+        regions: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Get control tower map data with source and destination locations including coordinates.
@@ -810,6 +781,8 @@ class ShipmentService:
         Args:
             pharma_id: Optional pharma ID to filter routes
             route_status: Optional route status filter (safe, delayed, high_risk). If None, returns all statuses.
+            carriers: Optional list of carrier names to filter by. If None, returns all carriers.
+            regions: Optional list of regions to filter by. Matches if either source or destination is in the specified regions.
             
         Returns:
             Dictionary containing:
@@ -817,34 +790,31 @@ class ShipmentService:
             - total_routes: Total count of routes
         """
         try:
-            # Query shipments with joins to check active stage
-            query = self.db.query(Shipment).outerjoin(
-                PatientStageModel,
-                and_(
-                    PatientStageModel.patient_id == Shipment.patient_id,
-                    PatientStageModel.stage == PatientStage.TRANSPORTATION,
-                    PatientStageModel.is_active == True
-                )
+            # Build filtered query using shared method
+            query = self._build_filtered_active_routes_query(
+                pharma_id=pharma_id,
+                route_status=route_status,
+                regions=regions
             )
             
-            if pharma_id:
-                query = query.filter(Shipment.pharma_id == pharma_id)
-            
-            # Filter by route status if provided
-            if route_status:
-                parsed_status = self._parse_route_status_filter(route_status)
-                if parsed_status:
-                    query = query.filter(Shipment.routes_status == parsed_status)
-            
-            # Filter only active routes (where PatientStage exists)
-            query = query.filter(PatientStageModel.id.isnot(None))
-            
             results = query.all()
+            
+            # Batch fetch carriers for all shipments to avoid N+1 queries
+            shipment_ids = [row[0].id for row in results]
+            carriers_map = self._batch_get_shipment_carriers(shipment_ids)
             
             routes = []
             most_recent_updated_at = None
             
-            for shipment in results:
+            for shipment, pharma_name, provider_name, carrier_name in results:
+                # Get carrier name (from Carrier table, or Provider name, or from legs map)
+                fallback_carrier = carrier_name if carrier_name else provider_name
+                route_carrier = carriers_map.get(shipment.id, fallback_carrier)
+                
+                # Filter by carriers if provided
+                if carriers and not carrier_matches_filter(route_carrier, carriers):
+                    continue
+                
                 route_data = {
                     "shipment_id": shipment.id,
                     "patient_id": shipment.patient_id,
@@ -857,7 +827,7 @@ class ShipmentService:
                     "destination_latitude": shipment.destination_latitude,
                     "destination_longitude": shipment.destination_longitude,
                     "route_status": shipment.routes_status.value if shipment.routes_status else "unknown",
-                    "last_updated": self._format_time_12hour(shipment.updated_at)
+                    "last_updated": format_time_12hour(shipment.updated_at)
                 }
                 
                 routes.append(route_data)
@@ -870,10 +840,16 @@ class ShipmentService:
             # Sort by shipment ID
             routes.sort(key=lambda x: x['shipment_id'], reverse=True)
             
+            # Check if filters are applied and no routes found
+            message = None
+            if has_filters_applied(route_status, carriers, regions) and len(routes) == 0:
+                message = InfoMessages.SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE
+            
             return {
                 "routes": routes,
                 "total_routes": len(routes),
-                "last_updated": self._format_time_12hour(most_recent_updated_at)
+                "last_updated": format_time_12hour(most_recent_updated_at),
+                "message": message
             }
             
         except Exception as e:
