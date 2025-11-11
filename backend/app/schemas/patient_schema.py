@@ -216,6 +216,7 @@ class ControlTowerMapResponse(BaseModel):
     routes: List[ControlTowerMapRoute] = Field(..., description="List of routes for map display")
     total_routes: int = Field(..., description="Total number of routes")
     last_updated: Optional[str] = Field(None, description="Most recent updated time across all shipments in 24-hour format (e.g., '16:25:17')")
+    message: Optional[str] = Field(None, description="Message when no routes are found after applying filters")
 
     class Config:
         from_attributes = True
