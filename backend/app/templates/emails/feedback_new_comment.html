@@ -48,15 +48,34 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .comment-details-card p {
-            margin: 8px 0;
-            font-size: 14px;
-            color: #374151;
+        .comment-details-table {
+            display: table;
+            width: 100%;
         }
-        .comment-details-card strong {
+        .comment-details-row {
+            display: table-row;
+        }
+        .comment-details-label {
+            display: table-cell;
             color: #6B1176;
-            display: inline-block;
-            width: 120px;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-details-value {
+            display: table-cell;
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .comment-box {
             background-color: #F8F9FA;
@@ -65,11 +84,35 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .comment-box p {
-            margin: 6px 0;
+        .comment-box-table {
+            display: table;
+            width: 100%;
+        }
+        .comment-box-row {
+            display: table-row;
+        }
+        .comment-box-label {
+            display: table-cell;
+            color: #6B1176;
+            font-weight: 600;
             font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-box-value {
+            display: table-cell;
             color: #374151;
+            font-size: 14px;
+            padding: 8px 0;
+            vertical-align: top;
+            text-align: left;
             font-style: italic;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .footer {
             background-color: #F8F9FA;
@@ -106,15 +149,33 @@
             <p>A new comment has been added to your support ticket.</p>
             
             <div class="comment-details-card">
-                <p><strong>🎫 Ticket ID:</strong> {{ ticket_id }}</p>
-                <p><strong>📧 Subject:</strong> {{ feedback_subject }}</p>
-                <p><strong>👤 Commented By:</strong> {{ commented_by_name }}</p>
-                <p><strong>📅 Commented:</strong> {{ commented_on }}</p>
+                <div class="comment-details-table">
+                    <div class="comment-details-row">
+                        <div class="comment-details-label">🎫 Ticket ID:</div>
+                        <div class="comment-details-value">{{ ticket_id }}</div>
+                    </div>
+                    <div class="comment-details-row">
+                        <div class="comment-details-label">📧 Subject:</div>
+                        <div class="comment-details-value">{{ feedback_subject }}</div>
+                    </div>
+                    <div class="comment-details-row">
+                        <div class="comment-details-label">👤 Commented By:</div>
+                        <div class="comment-details-value">{{ commented_by_name }}</div>
+                    </div>
+                    <div class="comment-details-row">
+                        <div class="comment-details-label">📅 Commented:</div>
+                        <div class="comment-details-value">{{ commented_on }}</div>
+                    </div>
+                </div>
             </div>
             
             <div class="comment-box">
-                <p><strong>💬 Comment:</strong></p>
-                <p>"{{ comment }}"</p>
+                <div class="comment-box-table">
+                    <div class="comment-box-row">
+                        <div class="comment-box-label">💬 Comment:</div>
+                        <div class="comment-box-value">"{{ comment }}"</div>
+                    </div>
+                </div>
             </div>
             
             <div class="divider"></div>

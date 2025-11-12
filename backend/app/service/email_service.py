@@ -317,7 +317,7 @@ def send_feedback_new_ticket_email(
     Send new feedback ticket notification email
     """
     email_subject = EMAIL_FEEDBACK_NEW_TICKET_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
@@ -366,7 +366,7 @@ def send_feedback_status_update_email(
     Send feedback status update notification email
     """
     email_subject = EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
@@ -411,7 +411,7 @@ def send_feedback_new_comment_email(
     Send new comment notification email
     """
     email_subject = EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
