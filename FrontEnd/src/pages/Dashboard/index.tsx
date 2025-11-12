@@ -44,7 +44,6 @@ interface StakeholderChat {
 // Performance Icons
 import OnTimeIcon from '../../assets/DashBoardIcons/OnTime.svg';
 import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
-import FailureCostIcon from '../../assets/DashBoardIcons/FailureCost.svg';
 
 interface DashboardProps { }
 
@@ -387,7 +386,7 @@ export default function Dashboard({ }: DashboardProps) {
                           />
                         </div>
                         <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Treatments Count:
+                          Quality Deviation Flagged:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
                           {loading ? '...' : patientStats?.current_month_treatment_count || '0'}
@@ -460,11 +459,11 @@ export default function Dashboard({ }: DashboardProps) {
                 <h2 className="font-semibold text-black text-base mb-4">
                   Performance
                 </h2>
-                <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
-                  <div className="grid grid-cols-3 gap-12 relative">
+                <div className="p-0">
+                  <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* On Time Percentage */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -487,8 +486,8 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Lead Time */}
-                    <div className="flex flex-col">
-                      <div className="flex flex-col items-start mb-2">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                      <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
                             className="w-[18px] h-[18px]"
@@ -508,29 +507,7 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Failure Cost */}
-                    <div className="flex flex-col">
-                      <div className="flex flex-col items-start mb-2">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
-                          <img
-                            className="w-[18px] h-[18px]"
-                            alt="Failure Cost"
-                            src={FailureCostIcon}
-                          />
-                        </div>
-                        <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Failure Cost:
-                        </div>
-                        <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading
-                            ? '...'
-                            : performanceMetrics?.failure_cost_million != null
-                              ? `$${performanceMetrics.failure_cost_million}M`
-                              : '$0M'}
-                        </div>
-                      </div>
-                    </div>
+                    
                   </div>
                 </div>
               </section>
@@ -695,7 +672,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-[7px] mb-3 mt-4">
+                  <div className="flex items-center gap-[7px] mb-3 mt-6">
                     <img
                       className="w-[18px] h-[18px]"
                       alt="Risk"
@@ -706,8 +683,8 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
                   </div>
 
-                  <div className="h-[30px] bg-[#ffffff] rounded-[10px] border border-solid border-[#E7E1E1] px-4">
-                    <span className="font-semibold text-orange-600 text-xs whitespace-nowrap mt-2 py-1">
+                  <div className="h-[30px] bg-[#ffffff] rounded-[10px] px-4">
+                    <span className="font-semibold text-orange-600 text-xs whitespace-nowrap mt-2 py-3">
                       {loading ? '...' : riskMetrics?.top_risk_driver?.name || 'N/A'}
                     </span>
                   </div>
@@ -716,7 +693,7 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Compliance Section */}
                 <div className="flex-1 bg-[#e4f5ff] rounded-lg border border-[#E7E1E1] p-5 flex flex-col items-center ">
                   <h2 className="self-start font-semibold text-black text-base">
-                    Shipment Status 
+                    Shipment Status
                   </h2>
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
@@ -741,7 +718,7 @@ export default function Dashboard({ }: DashboardProps) {
                         {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
                       </div>
                       <div className="font-normal text-black text-[12px]">
-                        Success %
+                        Success Rate
                       </div>
                     </div>
                   </div>
@@ -757,7 +734,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </span>
                   </div>
 
-                  <div className="bg-[#ffffff] border-[#E7E1E1] px-4 h-[30px] rounded mt-0 gap-1 flex items-center justify-center">
+                  <div className="bg-[#ffffff] px-4 h-[30px] rounded-[10px] mt-0 gap-1 flex items-center justify-center">
                     <span className="font-bold text-[#1083c5] text-sm">
                       {loading ? '...' : complianceMetrics?.emissions_per_treatment_tco2e || 0}
                     </span>
@@ -771,7 +748,7 @@ export default function Dashboard({ }: DashboardProps) {
           </div>
           {/* Ongoing Treatments Section */}
           <section>
-            <h2 className="font-semibold text-black text-sm mb-4">
+            <h2 className="font-semibold text-black text-base mb-4">
               Ongoing Treatments
             </h2>
             <OngoingTreatments />

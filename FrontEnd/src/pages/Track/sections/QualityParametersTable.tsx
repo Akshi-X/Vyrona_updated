@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
 import ExtractIcon from '../../../assets/TrackAndTraceIcons/Extract.svg';
+import LightExtractIcon from '../../../assets/TrackAndTraceIcons/LightExtract.svg';
 
 interface Threshold {
   min: number | null;
@@ -168,10 +169,7 @@ export default function QualityParametersTable() {
     const mapping: Array<{ key: Row['key']; label: string; value: number }> = [
       { key: 'temperature', label: 'Temperature', value: latest.temperature },
       { key: 'humidity', label: 'Humidity', value: latest.humidity },
-      { key: 'ph_level', label: 'pH Level', value: latest.ph_level },
-      { key: 'o2_level', label: 'O₂ Level', value: latest.o2_level },
-      { key: 'co2_level', label: 'CO₂ Level', value: latest.co2_level },
-      { key: 'agitation', label: 'Agitation', value: latest.agitation },
+      { key: 'agitation', label: 'Agitation / Vibration', value: latest.agitation },
     ];
 
     return mapping.map((m) => ({
@@ -186,6 +184,8 @@ export default function QualityParametersTable() {
   const filteredRows = useMemo(() => {
     return showAnomalies ? rows.filter((r) => r.violated) : rows;
   }, [rows, showAnomalies]);
+
+  const hasRows = filteredRows.length > 0;
 
   const formatRange = (t: Threshold) => {
     const min = t.min !== null && t.min !== undefined ? `${t.min}` : '-';
@@ -202,14 +202,20 @@ export default function QualityParametersTable() {
     if (t.unit) return `${value}${t.unit ? ` ${t.unit}` : ''}`;
     if (label.includes('Temperature')) return `${value} °C`;
     if (label.includes('Humidity')) return `${value} %`;
-    if (label.includes('O₂') || label.includes('CO₂') || label.includes('Agitation')) return `${value} %`;
+    if (label.includes('Agitation') || label.includes('Vibration')) {
+      // Display as g-force or % index based on unit
+      if (t.unit && (t.unit.toLowerCase().includes('g') || t.unit.toLowerCase().includes('force'))) {
+        return `${value} ${t.unit}`;
+      }
+      return `${value} %`;
+    }
     return `${value}`;
   };
 
   return (
     <div className="rounded-[5px] border border-gray-200 bg-white p-4">
       <div className="mb-3">
-        <h3 className="text-base font-bold text-gray-900 text-[16px] mb-2">Quality Parameter</h3>
+        <h3 className="text-base font-semibold text-gray-900 text-[16px] mb-2">Quality Parameter</h3>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-black text-[14px] font-medium">Anomalies</span>
@@ -219,7 +225,7 @@ export default function QualityParametersTable() {
               aria-pressed={showAnomalies}
               onClick={() => setShowAnomalies((v) => !v)}
               className={`h-5 w-9 rounded-full transition-colors ${
-                showAnomalies ? 'bg-purple-600' : 'bg-gray-300'
+                showAnomalies ? 'bg-[#6B1176]' : 'bg-gray-300'
               } relative`}
             >
               <span
@@ -238,7 +244,7 @@ export default function QualityParametersTable() {
               aria-label="Download"
               onClick={handleExport}
               disabled={exporting || !patientId}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow hover:bg-[#FDF4FF] hover:text-[#6B1176] hover:border-1 hover:border-[#6B1176] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {exporting ? (
                 <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -246,15 +252,27 @@ export default function QualityParametersTable() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : (
-                <img src={ExtractIcon} alt="Download" className="h-4 w-4" />
+                <>
+                  <img src={ExtractIcon} alt="Download" className="h-4 w-4 block group-hover:hidden" />
+                  <img src={LightExtractIcon} alt="Download" className="h-5 w-5 hidden group-hover:block" />
+                </>
               )}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto h-[195px] overflow-y-auto" style={{ scrollbarWidth: 'thin' as any }}>
-        <table className="w-full text-xs">
+      <div
+        className={`overflow-x-auto ${hasRows ? 'h-[224px] overflow-y-auto' : ''}`}
+        style={{ scrollbarWidth: 'thin' as any }}
+      >
+        <table className="w-full text-xs table-fixed">
+          <colgroup>
+            <col className="w-1.5/6" />
+            <col className="w-1.5/6" />
+            <col className="w-1/6" />
+            <col className="w-2/6" />
+          </colgroup>
           <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] h-[56px] sticky top-0">
             <tr>
               <th className="px-3 py-2 text-left font-normal">Parameter</th>
@@ -264,10 +282,10 @@ export default function QualityParametersTable() {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {hasRows === false ? (
               <tr>
                 <td className="px-3 py-4 text-gray-600 text-center" colSpan={4}>
-                  <div className="flex items-center justify-center h-[139px]">
+                  <div className="flex items-center justify-center">
                     {latest ? 'No anomalies' : 'Waiting for live data...'}
                   </div>
                 </td>
@@ -275,11 +293,11 @@ export default function QualityParametersTable() {
             ) : (
               filteredRows.map((r, i) => (
                 <tr key={i} className="text-black text-[14px] h-[56px]">
-                  <td className="px-3 py-2 text-gray-800">{r.label}</td>
-                  <td className={`px-3 py-2 font-semibold ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
+                  <td className="px-3 py-2 text-gray text-[14px] ">{r.label}</td>
+                  <td className={`px-3 py-2  ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
                     {formatValueWithUnit(r.value, r.threshold, r.label)}
                   </td>
-                  <td className={`px-3 py-2 font-medium ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
+                  <td className={`px-3 py-2 ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
                     {r.violated ? 'Anomaly' : 'Normal'}
                   </td>
                   <td className="px-3 py-2 text-gray-600">{formatRange(r.threshold)}</td>

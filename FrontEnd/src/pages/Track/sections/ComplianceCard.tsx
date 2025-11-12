@@ -11,7 +11,7 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
-      <h3 className="font-bold text-black text-base mb-1 text-[16px]">Compliance</h3>
+      <h3 className="font-semibold text-black text-base mb-1 text-[16px]">Compliance</h3>
       <div className="text-xs text-gray-400 mb-3 text-[12px]">Logistic Document Checklist</div>
 
       {/* Header row */}
@@ -34,9 +34,9 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
         )}
         {!loading && !error && items.map((item, idx) => (
           <div key={`${item.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-            <div className="text-black font-medium py-2">{item.stage}</div>
-            <div className="text-center text-black font-medium py-2">{item.needed}</div>
-            <div className="text-center text-red-600 font-medium py-2">{item.missed}</div>
+            <div className="text-black py-2">{item.stage}</div>
+            <div className="text-center text-black py-2">{item.needed}</div>
+            <div className="text-center text-red-600 py-2">{item.missed}</div>
           </div>
         ))}
       </div>

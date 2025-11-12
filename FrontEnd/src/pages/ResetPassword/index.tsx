@@ -111,7 +111,7 @@ const ResetPassword: React.FC = () => {
 
                 <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
@@ -219,7 +219,7 @@ const ResetPassword: React.FC = () => {
                     <div className="text-center text-sm text-gray-500 mt-3 space-y-2">
                         <p>
                             Need help?{" "}
-                            <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
+                            <Link to="/forgot-password" className="text-[#8b2a96] font-semibold underline">
                                 Forgot Password
                             </Link>
                         </p>

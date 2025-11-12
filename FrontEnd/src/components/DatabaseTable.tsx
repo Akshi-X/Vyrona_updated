@@ -166,7 +166,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
 
   return (
     <div className="bg-white rounded-lg border border-[#E7E1E1] overflow-hidden">
-      <div className="h-[565px] overflow-y-auto overflow-x-auto [scrollbar-width:thin]">
+      <div className="h-[70vh] overflow-y-auto overflow-x-auto [scrollbar-width:thin]">
         <table className="w-full">
           <thead className="sticky top-0 bg-[#fdeeff] z-10">
             <tr>
@@ -175,7 +175,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('patient_id')}
               >
                 <div className="flex items-center gap-2">
-                  Patient ID
+                  <span className="whitespace-nowrap">Patient ID</span>
                   <SortIcon field="patient_id" />
                 </div>
               </th>
@@ -210,7 +210,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider"
               >
                 <div className="flex items-center gap-2 relative" ref={dropdownRef}>
-                  <span>Stage</span>
+                  <span className="whitespace-nowrap">Stage</span>
                   <div className="relative">
                     <button
                       type="button"
@@ -224,7 +224,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                       title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
                     >
                       <svg 
-                        className="w-4 h-4"
+                        className={`w-4 h-4 ${stageFilter === 'all' ? 'text-gray-400' : 'text-[#6b1176]'}`}
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -273,7 +273,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-2">
-                  Manufacturing Location
+                  <span className="whitespace-nowrap">Manufacturing Location</span>
                   <SortIcon field="location" />
                 </div>
               </th>

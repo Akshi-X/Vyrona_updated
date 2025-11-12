@@ -218,7 +218,7 @@ const ApprovalScreen: React.FC = () => {
 
           <div className="flex-1 relative z-0"></div>
 
-          <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+          <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
             <h2 className="text-2xl font-bold leading-snug mt-8">
               Driving Health Forward <br />
               One Smart Solution At a Time
@@ -270,7 +270,7 @@ const ApprovalScreen: React.FC = () => {
                     <span className="text-gray-800">{userInfo.role}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 font-medium">Company:</span>
+                    <span className="text-gray-600 font-medium">Organization:</span>
                     <span className="text-gray-800">{userInfo.company_name}</span>
                   </div>
                   <div className="flex justify-between">
