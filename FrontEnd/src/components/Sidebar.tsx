@@ -45,22 +45,12 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     >
       {/* Decorative DNA/Wave Pattern Background */}
       <div 
-        className="absolute left-0 w-full pointer-events-none"
-        style={{ 
-          bottom: '8%',
-          height: '50%',
-          overflow: 'hidden'
-        }}
+        className="absolute left-0 w-full pointer-events-none bottom-[8%] h-[50%] overflow-hidden"
       >
         <img
           src={IsolationModeBanner}
           alt="Decorative wave pattern"
-          className="w-full h-full object-cover object-bottom"
-          style={{ 
-            opacity: 0.4,
-            mixBlendMode: "screen",
-            transform: "scale(1.2) translateY(10%)"
-          }}
+          className="w-full h-full object-cover object-bottom opacity-40 mix-blend-screen scale-[1.2] translate-y-[10%]"
         />
       </div>
 
