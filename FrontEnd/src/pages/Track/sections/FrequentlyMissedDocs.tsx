@@ -16,7 +16,7 @@ export default function FrequentlyMissedDocs({ missingDocs, loading, error }: Fr
       ) : (missingDocs && missingDocs.length) ? (
         <ul className="text-[12px] text-[#6B1176] p-3 list-disc list-inside space-y-1 overflow-y-auto [scrollbar-width:thin]">
           {missingDocs.map((d, i) => (
-            <li key={i} className="hover:underline cursor-pointer font-semibold">{d}</li>
+            <li key={i} className="hover:underline cursor-pointer">{d}</li>
           ))}
         </ul>
       ) : (

@@ -112,7 +112,7 @@ export default function ThreePLTable() {
               </thead>
               <tbody>
                 {players.filter(Boolean).map((player, i) => (
-                  <tr key={i} className="text-black text-[14px] font-medium">
+                  <tr key={i} className="text-black text-[14px]">
                     <td className="px-3 py-2 break-words w-[140px]">{player.player_name || 'N/A'}</td>
                     <td className="px-3 py-2 break-words w-[140px]">{player.modes || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-pre-wrap break-words w-[140px]">{formatRoute(player.source, player.destination)}</td>

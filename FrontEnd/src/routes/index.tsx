@@ -15,9 +15,10 @@ import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
 import { RoleBasedRoute } from '../components/RoleBasedRoute'
+import { AuthRedirect } from '../components/AuthRedirect'
 
 export const router = createBrowserRouter([
-  { path: '/', element:<Login /> },
+  { path: '/', element: <AuthRedirect /> },
   { path: '/login', element: <Login /> },
   { path: '/signup', element: <Signup /> },
   { path: '/track-and-trace', element: <TrackAndTrace /> },

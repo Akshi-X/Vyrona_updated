@@ -200,7 +200,7 @@ const Signup: React.FC = () => {
 
                 <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
@@ -439,7 +439,7 @@ const Signup: React.FC = () => {
                             
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
-                                    ITAdmin@myGrape.com
+                                    ITAdmin@myGrape.org
                                 </a>{" "} for help.
                             </p>
 

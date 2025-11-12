@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 import MyGrapeLogo from "../../assets/logo.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
 import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -17,6 +18,7 @@ const Login: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+    const { isAuthenticated, isLoading, userRole } = useAuth();
 
     // Removed API_BASE_URL - now using authService
     const validateEmail = (email: string) => {
@@ -43,6 +45,36 @@ const Login: React.FC = () => {
             setPasswordError("");
         }
     };
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (!isLoading && isAuthenticated) {
+            // If user is mygrape_admin, redirect to user-profile or support
+            if (userRole === 'mygrape_admin') {
+                navigate('/user-profile', { replace: true });
+            } else {
+                // For other roles, redirect to dashboard
+                navigate('/dashboard', { replace: true });
+            }
+        }
+    }, [isAuthenticated, isLoading, userRole, navigate]);
+
+    // Show loading spinner while checking authentication
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]"></div>
+            </div>
+        );
+    }
+
+    // Redirect if authenticated (this handles the case where useEffect hasn't run yet)
+    if (isAuthenticated) {
+        if (userRole === 'mygrape_admin') {
+            return <Navigate to="/user-profile" replace />;
+        }
+        return <Navigate to="/dashboard" replace />;
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -125,7 +157,7 @@ const Login: React.FC = () => {
 
                 <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
@@ -215,8 +247,8 @@ const Login: React.FC = () => {
                                 />
                                 <span className="text-gray-700 font-medium">Remember me</span>
                             </label>
-                            <Link to="/forgot-password" className="text-[#8b2a96] font-medium underline">
-                                Forgot password?
+                            <Link to="/forgot-password" className="text-[#8b2a96] font-semibold underline">
+                                Forgot Password?
                             </Link>
                         </div>
 
@@ -237,7 +269,7 @@ const Login: React.FC = () => {
                     {/* Footer */}
                     <p className="text-center text-sm text-gray-500 mt-2">
                         New to myGrape?{" "}
-                        <Link to="/signup" className="text-[#8b2a96] font-medium underline">
+                        <Link to="/signup" className="text-[#8b2a96] font-semibold underline">
                             Create an account
                         </Link>
                     </p>
@@ -245,7 +277,7 @@ const Login: React.FC = () => {
                 </div>
                 <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                     Having trouble logging in? Contact <a href="#" className="text-[#6b1176] inline">
-                        ITAdmin@myGrape.com
+                        ITAdmin@myGrape.org
                     </a>{" "} for help.
                 </p>
             </main>

@@ -34,9 +34,9 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
         )}
         {!loading && !error && items.map((item, idx) => (
           <div key={`${item.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-            <div className="text-black font-medium py-2">{item.stage}</div>
-            <div className="text-center text-black font-medium py-2">{item.needed}</div>
-            <div className="text-center text-red-600 font-medium py-2">{item.missed}</div>
+            <div className="text-black py-2">{item.stage}</div>
+            <div className="text-center text-black py-2">{item.needed}</div>
+            <div className="text-center text-red-600 py-2">{item.missed}</div>
           </div>
         ))}
       </div>

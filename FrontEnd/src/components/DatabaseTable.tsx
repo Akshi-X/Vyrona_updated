@@ -175,7 +175,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('patient_id')}
               >
                 <div className="flex items-center gap-2">
-                  Patient ID
+                  <span className="whitespace-nowrap">Patient ID</span>
                   <SortIcon field="patient_id" />
                 </div>
               </th>
@@ -210,7 +210,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 className="px-6 py-4 text-left text-xs font-semibold text-[#6b1176] uppercase tracking-wider"
               >
                 <div className="flex items-center gap-2 relative" ref={dropdownRef}>
-                  <span>Stage</span>
+                  <span className="whitespace-nowrap">Stage</span>
                   <div className="relative">
                     <button
                       type="button"
@@ -273,7 +273,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-2">
-                  Manufacturing Location
+                  <span className="whitespace-nowrap">Manufacturing Location</span>
                   <SortIcon field="location" />
                 </div>
               </th>

@@ -50,7 +50,7 @@ export default function HistoricLaneRiskAssessment() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.route} className="hover:bg-gray-50 text-black text-[14px] font-semibold">
+                <tr key={r.route} className="hover:bg-gray-50 text-black text-[14px]">
                   <td className="px-4 py-5">{r.route}</td>
                   <td className="px-4 py-5">{r.quality_deviations || '-'}</td>
                   <td className="px-4 py-5">{r.returns_regulatory || '-'}</td>

@@ -19,7 +19,7 @@ export default function AuditTrailTable() {
           <tbody>
             {rows.length ? (
               rows.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-50 text-[14px] font-semibold">
+                <tr key={i} className="hover:bg-gray-50 text-[14px]">
                   <td className="px-3 py-4">{r.date}</td>
                   <td className="px-3 py-4">{r.user}</td>
                   <td className="px-3 py-4">{r.doc}</td>
