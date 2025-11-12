@@ -48,15 +48,31 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .status-update-card p {
-            margin: 8px 0;
-            font-size: 14px;
-            color: #374151;
+        .status-update-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .status-update-card strong {
+        .status-update-row {
+        }
+        .status-update-label {
             color: #6B1176;
-            display: inline-block;
-            width: 120px;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .status-update-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .status-change {
             background-color: #EFF6FF;
@@ -65,10 +81,31 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .status-change p {
-            margin: 6px 0;
-            font-size: 14px;
+        .status-change-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .status-change-row {
+        }
+        .status-change-label {
             color: #1E40AF;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .status-change-value {
+            color: #1E40AF;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .footer {
             background-color: #F8F9FA;
@@ -105,16 +142,37 @@
             <p>Your support ticket status has been updated. Here are the details:</p>
             
             <div class="status-update-card">
-                <p><strong>🎫 Ticket ID:</strong> {{ ticket_id }}</p>
-                <p><strong>📧 Subject:</strong> {{ feedback_subject }}</p>
-                <p><strong>📅 Updated:</strong> {{ updated_on }}</p>
-                <p><strong>👤 Updated By:</strong> {{ updated_by_name }}</p>
+                <table class="status-update-table">
+                    <tr class="status-update-row">
+                        <td class="status-update-label">🎫 Ticket ID:</td>
+                        <td class="status-update-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📧 Subject:</td>
+                        <td class="status-update-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📅 Updated:</td>
+                        <td class="status-update-value">{{ updated_on }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">👤 Updated By:</td>
+                        <td class="status-update-value">{{ updated_by_name }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="status-change">
-                <p><strong>📊 Status Change:</strong></p>
-                <p><strong>Previous Status:</strong> {{ old_status }}</p>
-                <p><strong>New Status:</strong> {{ new_status }}</p>
+                <table class="status-change-table">
+                    <tr class="status-change-row">
+                        <td class="status-change-label">Previous Status:</td>
+                        <td class="status-change-value">{{ old_status }}</td>
+                    </tr>
+                    <tr class="status-change-row">
+                        <td class="status-change-label">New Status:</td>
+                        <td class="status-change-value">{{ new_status }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>
