@@ -39,15 +39,19 @@ export default function RiskPanel() {
   // Since we have 17 data points, we'll use empty strings for most labels and only show Phase 2 and Phase 4
   const labels = useMemo(() => {
     const totalPoints = lightGrayData.length;
-    const midpoint = Math.floor(totalPoints / 2);
     return Array.from({ length: totalPoints }, (_, i) => {
-      if (i === 0) {
-        return 'Phase 2';
+      switch (i) {
+        case 2:
+          return 'Phase 1';
+        case 6:
+          return 'Phase 2';
+        case 10:
+          return 'Phase 3';
+        case 14:
+          return 'Phase 4';
+        default:
+          return '';
       }
-      if (i === midpoint) {
-        return 'Phase 4';
-      }
-      return '';
     });
   }, []);
 
@@ -154,7 +158,7 @@ export default function RiskPanel() {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
-      <h3 className="font-semibold text-black text-sm">Risk</h3>
+      <h3 className="font-semibold text-black text-sm text-[16px]">Risk</h3>
 
       {/* Phase Risk Prediction - Line Chart */}
       <div className="mt-2 flex-1 flex flex-col">

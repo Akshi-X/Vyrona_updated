@@ -148,7 +148,7 @@ const VerifyOtp: React.FC = () => {
 
                 <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
@@ -217,7 +217,7 @@ const VerifyOtp: React.FC = () => {
 
                         <button
                             type="button"
-                            className="w-full py-2 text-[#8b2a96] text-sm font-medium underline mt-2"
+                            className="w-full py-2 text-[#8b2a96] text-sm font-semibold underline mt-2"
                             onClick={() => navigate("/login")}
                         >
                             Back to Login

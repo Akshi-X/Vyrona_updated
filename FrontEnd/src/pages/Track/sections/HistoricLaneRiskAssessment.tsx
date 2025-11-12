@@ -27,7 +27,7 @@ export default function HistoricLaneRiskAssessment() {
 
   return (
     <div className="bg-white rounded-lg">
-      <h3 className="font-bold text-black text-[16px] mb-3">Historic Lane Risk Assessment</h3>
+      <h3 className="font-semibold text-black text-[16px] mb-3">Historic Lane Risk Assessment</h3>
       <div className="overflow-x-auto rounded-lg ">
         {loading ? (
           <div className="p-4 text-sm text-gray-500">Loading...</div>
@@ -45,9 +45,6 @@ export default function HistoricLaneRiskAssessment() {
                 <th className="px-4 py-5 text-left font-[600]">Loss/Physical Damage</th>
                 <th className="px-4 py-5 text-left font-[600]">3PL Reliability</th>
                 <th className="px-4 py-5 text-left font-[600]">Weather</th>
-                <th className="px-4 py-5 text-left font-[600]">Lane Complexity</th>
-                <th className="px-4 py-5 text-left font-[600]">Geopolitical</th>
-                <th className="px-4 py-5 text-left font-[600]">Digital Communication</th>
                 <th className="px-4 py-5 text-left font-[600]">Risk Level</th>
               </tr>
             </thead>
@@ -60,9 +57,6 @@ export default function HistoricLaneRiskAssessment() {
                   <td className="px-4 py-5">{r.loss_physical_damage || '-'}</td>
                   <td className="px-4 py-5">{r.three_pl_reliability || '-'}</td>
                   <td className="px-4 py-5">{r.weather || '-'}</td>
-                  <td className="px-4 py-5">{r.lane_complexity || '-'}</td>
-                  <td className="px-4 py-5">{r.geopolitical || '-'}</td>
-                  <td className="px-4 py-5">{r.digital_communication || '-'}</td>
                   <td className="px-4 py-5">{r.risk_level || '-'}</td>
                 </tr>
               ))}

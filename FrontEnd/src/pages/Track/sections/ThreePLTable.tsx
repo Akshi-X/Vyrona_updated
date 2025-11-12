@@ -79,7 +79,7 @@ export default function ThreePLTable() {
     <div className="rounded-[5px] border border-gray-200 bg-white p-4">
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="text-base font-bold text-gray-900  text-[16px]">3PL</h3>
+          <h3 className="text-base font-semibold text-gray-900  text-[16px]">Logistics</h3>
         </div>
       </div>
       <div className="overflow-x-auto h-[254px] [scrollbar-width:thin]">

@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export const AuthRedirect: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, userRole } = useAuth();
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -14,6 +14,16 @@ export const AuthRedirect: React.FC = () => {
     );
   }
 
-  // Redirect to dashboard if authenticated, otherwise to login
-  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
+  // Redirect based on authentication and role
+  if (isAuthenticated) {
+    // If user is mygrape_admin, redirect to user-profile or support
+    if (userRole === 'mygrape_admin') {
+      return <Navigate to="/user-profile" replace />;
+    }
+    // For other roles, redirect to dashboard
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Redirect to login if not authenticated
+  return <Navigate to="/login" replace />;
 };

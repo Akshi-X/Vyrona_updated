@@ -8,7 +8,7 @@ export default function FrequentlyMissedDocs({ missingDocs, loading, error }: Fr
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
-      <h3 className="font-bold text-black text-base text-[16px] mb-2 text-[16px]">Missed Docs</h3>
+      <h3 className="font-semibold text-black text-base text-[16px] mb-2 text-[16px]">Missed Docs</h3>
       {loading ? (
         <p className="text-[12px] text-gray-500">Loading...</p>
       ) : error ? (

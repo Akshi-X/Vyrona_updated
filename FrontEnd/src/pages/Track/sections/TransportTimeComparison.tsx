@@ -176,7 +176,7 @@ export default function TransportTimeComparison() {
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
-      <h3 className="font-bold text-black text-sm mb-3 text-[16px]">Transport Time Comparison</h3>
+      <h3 className="font-semibold text-black text-sm mb-3 text-[16px]">Transport Time Comparison</h3>
 
       {error && (
         <div className="text-red-500 text-xs mb-2" role="alert">{error}</div>

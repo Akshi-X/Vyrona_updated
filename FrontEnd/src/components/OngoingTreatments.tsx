@@ -170,7 +170,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
   return (
     <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
       <div 
-        className="h-[385px] overflow-y-auto"
+        className="h-[415px] overflow-y-auto"
         style={{
           scrollbarWidth: 'thin'
         }}
@@ -188,7 +188,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                 >
                   {header.hasFilter ? (
                     <div className="flex items-center gap-2 relative" ref={dropdownRef}>
-                      <span>{header.label}</span>
+                      <span className="whitespace-nowrap">{header.label}</span>
                       <div className="relative">
                         <button
                           type="button"
@@ -196,13 +196,13 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                             e.stopPropagation();
                             setIsDropdownOpen(!isDropdownOpen);
                           }}
-                          className={`text-xs p-1.5 text-[#6b1176] hover:bg-gray-50 transition-all duration-200 ${
+                          className={`text-xs p-1.5 text-[#6b1176] transition-all duration-200 ${
                             stageFilter !== 'all' ? 'text-[#6b1176]' : ''
                           }`}
                           title={stageFilter === 'all' ? 'All All Stages' : `Filtered: ${stageFilter}`}
                         >
                           <svg 
-                            className="w-4 h-4"
+                            className={`w-4 h-4 ${stageFilter === 'all' ? 'text-gray-400' : 'text-[#6b1176]'}`}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -247,7 +247,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span>{header.label}</span>
+                      <span className="whitespace-nowrap">{header.label}</span>
                       {header.hasSort && (
                         <div className="flex flex-col">
                           {sortField === header.field ? (

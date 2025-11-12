@@ -85,7 +85,7 @@ const ForgotPassword: React.FC = () => {
 
                 <div className="flex-1 relative z-0"></div>
 
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 relative z-10">
+                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
                         Driving Health Forward <br />
                         One Smart Solution At a Time
@@ -152,13 +152,13 @@ const ForgotPassword: React.FC = () => {
                     <div className="text-center text-sm text-gray-500 mt-2 space-y-2">
                         <p>
                             Remember your password?{" "}
-                            <Link to="/login" className="text-[#8b2a96] font-medium underline">
+                            <Link to="/login" className="text-[#8b2a96] font-semibold underline">
                                 Sign in
                             </Link>
                         </p>
                         <p>
                             Don't have an account?{" "}
-                            <Link to="/signup" className="text-[#8b2a96] font-medium underline">
+                            <Link to="/signup" className="text-[#8b2a96] font-semibold underline">
                                 Create one
                             </Link>
                         </p>

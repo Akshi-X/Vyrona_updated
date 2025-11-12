@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import './index.css'
 import "@fontsource/work-sans";
+import "@fontsource/open-sans";
 import router from './routes'
 import { AuthProvider } from './contexts/AuthContext'
 
