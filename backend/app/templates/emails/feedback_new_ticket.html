@@ -48,15 +48,31 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .ticket-details-card p {
-            margin: 8px 0;
-            font-size: 14px;
-            color: #374151;
+        .ticket-details-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .ticket-details-card strong {
+        .ticket-details-row {
+        }
+        .ticket-details-label {
             color: #6B1176;
-            display: inline-block;
-            width: 120px;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .ticket-details-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .priority-badge {
             display: inline-block;
@@ -113,12 +129,32 @@
             <p>Your support ticket has been successfully created and our team will review it shortly.</p>
             
             <div class="ticket-details-card">
-                <p><strong>🎫 Ticket ID:</strong> {{ ticket_id }}</p>
-                <p><strong>📧 Subject:</strong> {{ feedback_subject }}</p>
-                <p><strong>📝 Description:</strong> {{ description }}</p>
-                <p><strong>⚡ Priority:</strong> <span class="priority-badge priority-{{ priority|lower }}">{{ priority }}</span></p>
-                <p><strong>🏢 Department:</strong> {{ department }}</p>
-                <p><strong>📅 Submitted:</strong> {{ submitted_on }}</p>
+                <table class="ticket-details-table">
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">🎫 Ticket ID:</td>
+                        <td class="ticket-details-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📧 Subject:</td>
+                        <td class="ticket-details-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📝 Description:</td>
+                        <td class="ticket-details-value">{{ description }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">⚡ Priority:</td>
+                        <td class="ticket-details-value"><span class="priority-badge priority-{{ priority|lower }}">{{ priority }}</span></td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">🏢 Department:</td>
+                        <td class="ticket-details-value">{{ department }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📅 Submitted:</td>
+                        <td class="ticket-details-value">{{ submitted_on }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>
