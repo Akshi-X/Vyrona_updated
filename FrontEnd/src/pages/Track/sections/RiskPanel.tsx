@@ -39,21 +39,19 @@ export default function RiskPanel() {
   // Since we have 17 data points, we'll use empty strings for most labels and only show Phase 2 and Phase 4
   const labels = useMemo(() => {
     const totalPoints = lightGrayData.length;
-    const midpoint = Math.floor(totalPoints / 2);
     return Array.from({ length: totalPoints }, (_, i) => {
-      if (i === 2) {
-        return 'Phase 1';
+      switch (i) {
+        case 2:
+          return 'Phase 1';
+        case 6:
+          return 'Phase 2';
+        case 10:
+          return 'Phase 3';
+        case 14:
+          return 'Phase 4';
+        default:
+          return '';
       }
-      if (i === 6) {
-        return 'Phase 2';
-      }
-      if (i === 10) {
-        return 'Phase 3';
-      }
-      if (i === 14) {
-        return 'Phase 4';
-      }
-      return '';
     });
   }, []);
 
