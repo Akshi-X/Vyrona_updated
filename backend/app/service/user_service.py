@@ -315,7 +315,12 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
         company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
         
-        approved_date = user.approved_on.strftime("%B %d, %Y at %I:%M %p")
+        approved_on = user.approved_on
+        if approved_on.tzinfo is None:
+            approved_on = approved_on.replace(tzinfo=timezone.utc)
+        approved_date = approved_on.astimezone(timezone.utc).strftime(
+            "%B %d, %Y at %I:%M %p UTC"
+        )
         send_user_approved_notification(
             user_email=user.email,
             first_name=user.first_name,
