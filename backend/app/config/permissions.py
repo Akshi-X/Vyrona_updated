@@ -36,6 +36,7 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("*", "/api/dashboard/performance"),
     ("*", "/api/dashboard/risk"),
     ("*", "/api/dashboard/compliance"),
+    ("*", "/api/dashboard/volume"),
     ("*", "/api/dashboard/logistics"),
     ("*", "/api/dashboard/alerts"),
     ("*", "/health"),

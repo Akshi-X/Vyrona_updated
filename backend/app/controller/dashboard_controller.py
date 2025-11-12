@@ -27,16 +27,14 @@ def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)
     Returns:
     - On Time: 87%
     - Avg Lead Time: 23d
-    - Failure Cost: $6M
     """
     
     metrics = {
         "on_time_percentage": 87.0,
-        "avg_lead_time_days": 23,
-        "failure_cost_million": 6.0,
-        "total_shipments": 1250,
-        "completed_shipments": 1087,
-        "pending_shipments": 163
+        "avg_lead_time_days": 8,
+        "total_shipments": 30,
+        "completed_shipments": 18,
+        "pending_shipments": 12
     }
     
     return DashboardCategoryResponse(
@@ -123,7 +121,38 @@ def get_compliance_metrics(pharma_id: int = Depends(get_pharma_id_from_request))
 
 
 # ---------------------------
-# 4. Get Logistics Metrics
+# 4. Get Volume Metrics
+# ---------------------------
+@router.get("/volume", response_model=DashboardCategoryResponse)
+def get_volume_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
+    """
+    Get volume metrics only.
+    
+    Protected endpoint. Auth token required; pharma_id taken from token.
+    
+    Args:
+        pharma_id: Pharmaceutical company ID from token
+    
+    Returns:
+    - Quality Deviation Flagged: Count of quality deviations flagged
+    """
+    
+    metrics = {
+        "quality_deviation_flagged": 12,
+        "patient_count": 29,
+        "total_treatments": 29
+    }
+    
+    return DashboardCategoryResponse(
+        category="volume",
+        metrics=metrics,
+        last_updated=datetime.now(),
+        status="success"
+    )
+
+
+# ---------------------------
+# 5. Get Logistics Metrics
 # ---------------------------
 @router.get("/logistics", response_model=DashboardCategoryResponse)
 def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
@@ -143,8 +172,8 @@ def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
     metrics = {
         "cold_chain_packaging_failure_percentage": 4.2,
         "avg_quality_lost_per_patient_percentage": 23.0,
-        "total_shipments": 1250,
-        "successful_deliveries": 1198,
+        "total_shipments": 50,
+        "successful_deliveries": 38,
         "failed_deliveries": 52,
         "average_transit_time_hours": 18.5
     }
@@ -158,7 +187,7 @@ def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
 
 
 # ---------------------------
-# 5. Get Critical Alerts
+# 6. Get Critical Alerts
 # ---------------------------
 @router.get("/alerts", response_model=CriticalAlertsResponse)
 def get_critical_alerts(pharma_id: int = Depends(get_pharma_id_from_request)):
