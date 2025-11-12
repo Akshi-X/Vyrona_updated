@@ -245,7 +245,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       title={variant === 'track' ? 'My Tasks (Track & Trace)' : 'My Tasks (Dashboard)'}
       description="Manage and track your assigned tasks"
       icon={
-        <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-[18px] h-[18px] text-[#6b1176]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       }
@@ -287,28 +287,28 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             </>
           )}
         </colgroup>
-        <thead>
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Patient ID</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Task Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Description</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Assigned by</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Due date</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Priority</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider bg-purple-50">Status</th>
+        <thead className="bg-[#fdeeff]">
+          <tr className="border-b border-[#eeeeee]">
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Patient ID</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Task Name</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Description</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Assigned by</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Due date</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Priority</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Status</th>
             {variant === 'track' && (
               <>
-                <th className="pl-4 pr-0 py-3 text-right"></th>
-                <th className="pl-4 pr-0 py-3 text-right"></th>
+                <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-right"></th>
+                <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-right"></th>
               </>
             )}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody>
           {/* Input row for new task */}
           {showInputRow && (
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <td className="px-4 py-3">
+            <tr className="border-b border-[#eeeeee]">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <div>
                   <input
                     type="text"
@@ -327,7 +327,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <div>
                   <input
                     type="text"
@@ -346,7 +346,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <div>
                   <input
                     type="text"
@@ -365,7 +365,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <input
                   type="text"
                   value={newTask.assigneeBy}
@@ -373,7 +373,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-700 cursor-not-allowed"
                 />
               </td>
-              <td className="px-4 py-3">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <div>
                   <input
                     type="date"
@@ -391,7 +391,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3 relative" style={{ overflow: 'visible' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                 <div className="relative" style={{ zIndex: 1000 }}>
                   <select
                     value={newTask.priority}
@@ -416,7 +416,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   </select>
                 </div>
               </td>
-              <td className="px-4 py-3 relative" style={{ overflow: 'visible' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                 <div className="relative" style={{ zIndex: 1000 }}>
                   <select
                     value={newTask.status}
@@ -443,7 +443,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               </td>
               {variant === 'track' && (
                 <>
-                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={handleSaveAdd}
@@ -470,7 +470,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-3"></td>
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm"></td>
                 </>
               )}
             </tr>
@@ -480,8 +480,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             const displayTask = isEditing && editedTask ? editedTask : task;
             
             return (
-              <tr key={task.id} className={`hover:bg-gray-50 ${isEditing ? 'bg-gray-50' : ''}`}>
-                <td className="px-4 py-4">
+              <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
+                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && !isUserRole ? (
                     <input
                       type="text"
@@ -490,12 +490,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200 font-mono"
                     />
                   ) : (
-                    <div className="text-sm text-gray-900 font-mono font-normal truncate">
+                    <div className="font-mono truncate">
                 {task.patientId}
                     </div>
                   )}
               </td>
-              <td className="px-4 py-4">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && !isUserRole ? (
                     <input
                       type="text"
@@ -504,10 +504,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                <div className="text-sm font-normal text-gray-900 truncate" title={task.taskName}>{task.taskName}</div>
+                <div className="truncate" title={task.taskName}>{task.taskName}</div>
                   )}
               </td>
-                <td className="px-4 py-4">
+                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && !isUserRole ? (
                     <input
                       type="text"
@@ -516,10 +516,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="text-sm text-gray-900 truncate" title={task.description}>{task.description}</div>
+                    <div className="truncate" title={task.description}>{task.description}</div>
                   )}
               </td>
-                <td className="px-4 py-4">
+                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && !isUserRole ? (
                     <input
                       type="text"
@@ -528,10 +528,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="text-sm text-gray-900 truncate">{task.assigneeBy}</div>
+                    <div className="truncate">{task.assigneeBy}</div>
                   )}
               </td>
-              <td className="px-4 py-4">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && !isUserRole ? (
                     <input
                       type="date"
@@ -540,10 +540,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="text-sm text-gray-500 truncate">{task.dueDate}</div>
+                    <div className="truncate">{task.dueDate}</div>
                   )}
                 </td>
-              <td className="px-4 py-4 relative" style={{ overflow: 'visible' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                   {isEditing && !isUserRole ? (
                     <div className="relative" style={{ zIndex: 1000 }}>
                       <select
@@ -578,7 +578,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </span>
                   )}
               </td>
-              <td className="px-4 py-4 whitespace-nowrap relative" style={{ overflow: 'visible' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" style={{ overflow: 'visible' }}>
                   {isEditing ? (
                     <div className="relative" style={{ zIndex: 1000 }}>
                       <select
@@ -615,7 +615,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               </td>
                 {variant === 'track' && !isUserRole && (
                   <>
-                    <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
+                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
                       {isEditing ? (
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -652,7 +652,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         </button>
                       )}
                     </td>
-                    <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
+                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
                       {!isEditing && (
                         <button
                           onClick={() => {
@@ -673,7 +673,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   </>
                 )}
                 {variant === 'track' && isUserRole && (
-                  <td className="pl-4 pr-0 py-4 whitespace-nowrap text-right">
+                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
                     {isEditing ? (
                       <div className="flex items-center justify-end gap-2">
                         <button

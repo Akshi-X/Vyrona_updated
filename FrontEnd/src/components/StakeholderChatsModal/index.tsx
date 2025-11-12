@@ -30,7 +30,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
       title="Stakeholder Chats"
       description="Communicate with stakeholders and track conversations"
       icon={
-        <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-[18px] h-[18px] text-[#6b1176]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       }
@@ -53,24 +53,24 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
         {chats.map((chat) => (
           <div 
             key={chat.id} 
-            className="p-3 rounded-lg border bg-purple-50 border-purple-200 hover:bg-purple-100 transition-colors"
+            className="p-3 rounded-lg border bg-[#fdeeff] border-[#eeeeee] hover:bg-white/50 transition-colors"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center space-x-2 flex-shrink-0">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold bg-purple-600">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold bg-[#6b1176]">
                   {chat.sender.charAt(0)}
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-black">
+                  <h4 className="text-sm font-medium text-[#333333]">
                     {chat.sender}
                   </h4>
-                  <p className="text-xs text-gray-500">{chat.patientId}</p>
+                  <p className="text-xs text-[#333333] font-mono">{chat.patientId}</p>
                 </div>
               </div>
-              <p className="text-sm text-black flex-1 text-left chat-msg-2line ml-4" title={chat.message}>
+              <p className="text-sm text-[#333333] flex-1 text-left chat-msg-2line ml-4" title={chat.message}>
                 {chat.message}
               </p>
-              <span className="text-xs text-black flex-shrink-0">
+              <span className="text-xs text-[#333333] flex-shrink-0">
                 {chat.timestamp}
               </span>
             </div>
