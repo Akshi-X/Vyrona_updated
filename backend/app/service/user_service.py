@@ -34,7 +34,7 @@ from app.constants.app_constants import (
     USER_SESSION_TIMEOUT_MINUTES,
     DEFAULT_SESSION_TIMEOUT_MINUTES
 )
-from app.constants.messages import SuccessMessages
+from app.constants.messages import SuccessMessages, ErrorMessages
 from app.config.config import settings
 
 # Configure logger
@@ -144,8 +144,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         logger.error(f"Pharma '{request.company_name}' doesn't exist - registration not allowed")
         raise DatabaseQueryException(
             operation="user registration", 
-            reason=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
-            custom_message=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+            reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+            custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
             status_code=400
         )
     
@@ -193,8 +193,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             logger.error(f"No pharma admin found for pharma_id: {pharma_id}")
             raise DatabaseQueryException(
                 operation="user registration", 
-                reason=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
-                custom_message=f"user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.com.",
+                reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+                custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
                 status_code=400
             )
         
@@ -294,7 +294,7 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     if approver.role != 'pharma_admin' or approver.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
             company_name=f"pharma_id_{user.pharma_id}",
-            reason="Only pharma admin from the same company can approve users"
+            reason=ErrorMessages.PHARMA_ADMIN_APPROVE_ONLY
         )
     
     # Business Logic: Set approval status and audit trail
@@ -384,7 +384,7 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     if rejector.role != 'pharma_admin' or rejector.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
             company_name=f"pharma_id_{user.pharma_id}",
-            reason="Only pharma admin from the same company can reject users"
+            reason=ErrorMessages.PHARMA_ADMIN_REJECT_ONLY
         )
     
     # Business Logic: Set rejection status and audit trail
