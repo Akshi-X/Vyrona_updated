@@ -343,7 +343,7 @@ def send_feedback_new_ticket_email(
             feedback_type="Feedback",  # Could be enhanced to pass actual type
             submitted_by_name=submitted_by_name,
             submitted_by_email=submitted_by_email,
-            submitted_on=_current_utc_timestamp(),
+            submitted_on=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             ticket_url=ticket_url
         )
     except TemplateError as e:
@@ -389,7 +389,7 @@ def send_feedback_status_update_email(
             old_status=old_status,
             new_status=new_status,
             updated_by_name=updated_by_name,
-            updated_on=_current_utc_timestamp(),
+            updated_on=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             ticket_url=ticket_url
         )
     except TemplateError as e:
@@ -433,7 +433,7 @@ def send_feedback_new_comment_email(
             feedback_subject=subject,
             comment=comment,
             commented_by_name=commented_by_name,
-            commented_on=_current_utc_timestamp(),
+            commented_on=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             ticket_url=ticket_url
         )
     except TemplateError as e:
