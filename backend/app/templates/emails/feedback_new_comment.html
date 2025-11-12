@@ -48,15 +48,31 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .comment-details-card p {
-            margin: 8px 0;
-            font-size: 14px;
-            color: #374151;
+        .comment-details-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .comment-details-card strong {
+        .comment-details-row {
+        }
+        .comment-details-label {
             color: #6B1176;
-            display: inline-block;
-            width: 120px;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-details-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .comment-box {
             background-color: #F8F9FA;
@@ -65,11 +81,32 @@
             margin: 20px 0;
             border-radius: 8px;
         }
-        .comment-box p {
-            margin: 6px 0;
+        .comment-box-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .comment-box-row {
+        }
+        .comment-box-label {
+            color: #6B1176;
+            font-weight: 600;
             font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-box-value {
             color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
             font-style: italic;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         .footer {
             background-color: #F8F9FA;
@@ -106,15 +143,33 @@
             <p>A new comment has been added to your support ticket.</p>
             
             <div class="comment-details-card">
-                <p><strong>🎫 Ticket ID:</strong> {{ ticket_id }}</p>
-                <p><strong>📧 Subject:</strong> {{ feedback_subject }}</p>
-                <p><strong>👤 Commented By:</strong> {{ commented_by_name }}</p>
-                <p><strong>📅 Commented:</strong> {{ commented_on }}</p>
+                <table class="comment-details-table">
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">🎫 Ticket ID:</td>
+                        <td class="comment-details-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📧 Subject:</td>
+                        <td class="comment-details-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">👤 Commented By:</td>
+                        <td class="comment-details-value">{{ commented_by_name }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📅 Commented:</td>
+                        <td class="comment-details-value">{{ commented_on }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="comment-box">
-                <p><strong>💬 Comment:</strong></p>
-                <p>"{{ comment }}"</p>
+                <table class="comment-box-table">
+                    <tr class="comment-box-row">
+                        <td class="comment-box-label">💬 Comment:</td>
+                        <td class="comment-box-value">"{{ comment }}"</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>

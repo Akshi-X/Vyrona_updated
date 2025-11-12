@@ -3,7 +3,7 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from jinja2.exceptions import TemplateError
 from sendgrid import SendGridAPIClient
@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 # Setup Jinja2 template environment
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "emails"
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
+
+
+def _current_utc_timestamp(fmt: str = "%Y-%m-%d %H:%M:%S UTC") -> str:
+    """
+    Return current UTC timestamp as formatted string.
+    """
+    return datetime.now(timezone.utc).strftime(fmt)
 
 
 # ============================================
@@ -317,7 +324,7 @@ def send_feedback_new_ticket_email(
     Send new feedback ticket notification email
     """
     email_subject = EMAIL_FEEDBACK_NEW_TICKET_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
@@ -336,7 +343,7 @@ def send_feedback_new_ticket_email(
             feedback_type="Feedback",  # Could be enhanced to pass actual type
             submitted_by_name=submitted_by_name,
             submitted_by_email=submitted_by_email,
-            submitted_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            submitted_on=_current_utc_timestamp(),
             ticket_url=ticket_url
         )
     except TemplateError as e:
@@ -366,7 +373,7 @@ def send_feedback_status_update_email(
     Send feedback status update notification email
     """
     email_subject = EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
@@ -382,7 +389,7 @@ def send_feedback_status_update_email(
             old_status=old_status,
             new_status=new_status,
             updated_by_name=updated_by_name,
-            updated_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            updated_on=_current_utc_timestamp(),
             ticket_url=ticket_url
         )
     except TemplateError as e:
@@ -411,7 +418,7 @@ def send_feedback_new_comment_email(
     Send new comment notification email
     """
     email_subject = EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT
-    ticket_url = f"{settings.FRONTEND_URL}/feedback/{feedback_id}"
+    ticket_url = f"{settings.FRONTEND_URL}/user-profile"
     
     # Load and render HTML template
     try:
@@ -426,7 +433,7 @@ def send_feedback_new_comment_email(
             feedback_subject=subject,
             comment=comment,
             commented_by_name=commented_by_name,
-            commented_on=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            commented_on=_current_utc_timestamp(),
             ticket_url=ticket_url
         )
     except TemplateError as e:

@@ -48,11 +48,6 @@ async def exception_handler_middleware(request: Request, call_next):
                 "method": request.method
             }
         )
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=exc.to_dict(),
-            headers=COMMON_API_HEADERS
-        )
 
     except PatientException as exc:
         # Handle patient-specific exceptions
