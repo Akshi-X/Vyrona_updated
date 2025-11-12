@@ -178,11 +178,13 @@ const Support: React.FC = () => {
         // Update status from API response
         setStatus(details.status || 'Open');
         
-         // Parse affected modules (it's a single enum value, not comma-separated)
-         const affectedModule = details.affected_modules || '';
+         // Parse affected modules (it's now an array of strings)
+         const affectedModulesList = Array.isArray(details.affected_modules) 
+           ? details.affected_modules 
+           : (details.affected_modules ? [details.affected_modules] : []);
          
-         // Set the checkbox based on the single module
-         // Map backend module value to UI module name and find its index
+         // Set the checkboxes based on all selected modules
+         // Map backend module values to UI module names and find their indices
          const moduleMap: Record<string, string> = {
            'dashboard': 'Dashboard',
            'database': 'Database',
@@ -192,15 +194,19 @@ const Support: React.FC = () => {
            'failure': 'Failure',
            'stakeholder_chat': 'Stakeholder chat',
            'critical_alert': 'Critical alert',
-           'mytask': 'MyTask',
+           'my_task': 'MyTask',
            'other': 'Dashboard' // Default fallback
          };
          
-         const uiModuleName = moduleMap[affectedModule] || affectedModule;
-         const moduleIndex = modules.findIndex(m => m === uiModuleName);
+         const selectedIndices = affectedModulesList
+           .map(module => {
+             const uiModuleName = moduleMap[module] || module;
+             return modules.findIndex(m => m === uiModuleName);
+           })
+           .filter(index => index !== -1);
          
-         if (moduleIndex !== -1) {
-           setSelectedModuleIndices([moduleIndex]);
+         if (selectedIndices.length > 0) {
+           setSelectedModuleIndices(selectedIndices);
          }
 
          // Set existing attachments if available
@@ -336,16 +342,19 @@ const Support: React.FC = () => {
         'Failure': 'failure',
         'Stakeholder chat': 'stakeholder_chat',
         'Critical alert': 'critical_alert',
-        'MyTask': 'mytask',
+        'MyTask': 'my_task',
       };
       
-      // Return the first selected module (backend expects single enum value)
-      const firstSelected = selectedModules[0];
-      const affectedModule = firstSelected ? moduleMap[firstSelected] : 'other';
+      // Map all selected modules to backend enum values
+      const validEnumValues = ['dashboard', 'database', 'track_shipment', 'control_tower', 'after_care', 'failure', 'stakeholder_chat', 'critical_alert', 'my_task', 'other'];
+      const affectedModules = selectedModules
+        .map(module => moduleMap[module] || 'other')
+        .filter(module => validEnumValues.includes(module));
       
-      // Ensure we always send a valid enum value
-      const validEnumValues = ['dashboard', 'database', 'track_shipment', 'control_tower', 'after_care', 'failure', 'stakeholder_chat', 'critical_alert', 'mytask'];
-      const finalAffectedModule = validEnumValues.includes(affectedModule) ? affectedModule : 'dashboard';
+      // Ensure at least one module is selected
+      if (affectedModules.length === 0) {
+        affectedModules.push('other');
+      }
       
       const feedbackData: FeedbackSubmission = {
         department: 'other', // Default department since field is removed
@@ -353,7 +362,7 @@ const Support: React.FC = () => {
         subject,
         description,
         priority: priority || 'medium',
-        affected_modules: finalAffectedModule,
+        affected_modules: affectedModules,
         attachments: selectedFiles, // Send all selected files to backend
       };
 

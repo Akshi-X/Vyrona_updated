@@ -11,7 +11,7 @@ export interface FeedbackSubmission {
   subject: string;
   description: string;
   priority: string;
-  affected_modules: string;
+  affected_modules: string[];
   attachments?: File[];
 }
 
@@ -46,7 +46,7 @@ export interface FeedbackDetailResponse {
   description: string;
   attachment_paths?: string[];
   priority: string;
-  affected_modules: string;
+  affected_modules: string[];
   status: string;
   submitted_by: string;
   submitted_by_email: string;
