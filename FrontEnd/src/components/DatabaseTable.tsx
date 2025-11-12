@@ -224,7 +224,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                       title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
                     >
                       <svg 
-                        className="w-4 h-4"
+                        className={`w-4 h-4 ${stageFilter === 'all' ? 'text-gray-400' : 'text-[#6b1176]'}`}
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
