@@ -49,14 +49,12 @@
             border-radius: 8px;
         }
         .ticket-details-table {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
         }
         .ticket-details-row {
-            display: table-row;
         }
         .ticket-details-label {
-            display: table-cell;
             color: #6B1176;
             font-weight: 600;
             font-size: 14px;
@@ -67,10 +65,9 @@
             white-space: nowrap;
         }
         .ticket-details-value {
-            display: table-cell;
             color: #374151;
             font-size: 14px;
-            padding: 8px 0;
+            padding: 8px 0 8px 12px;
             vertical-align: top;
             text-align: left;
             word-wrap: break-word;
@@ -132,32 +129,32 @@
             <p>Your support ticket has been successfully created and our team will review it shortly.</p>
             
             <div class="ticket-details-card">
-                <div class="ticket-details-table">
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">🎫 Ticket ID:</div>
-                        <div class="ticket-details-value">{{ ticket_id }}</div>
-                    </div>
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">📧 Subject:</div>
-                        <div class="ticket-details-value">{{ feedback_subject }}</div>
-                    </div>
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">📝 Description:</div>
-                        <div class="ticket-details-value">{{ description }}</div>
-                    </div>
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">⚡ Priority:</div>
-                        <div class="ticket-details-value"><span class="priority-badge priority-{{ priority|lower }}">{{ priority }}</span></div>
-                    </div>
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">🏢 Department:</div>
-                        <div class="ticket-details-value">{{ department }}</div>
-                    </div>
-                    <div class="ticket-details-row">
-                        <div class="ticket-details-label">📅 Submitted:</div>
-                        <div class="ticket-details-value">{{ submitted_on }}</div>
-                    </div>
-                </div>
+                <table class="ticket-details-table">
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">🎫 Ticket ID:</td>
+                        <td class="ticket-details-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📧 Subject:</td>
+                        <td class="ticket-details-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📝 Description:</td>
+                        <td class="ticket-details-value">{{ description }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">⚡ Priority:</td>
+                        <td class="ticket-details-value"><span class="priority-badge priority-{{ priority|lower }}">{{ priority }}</span></td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">🏢 Department:</td>
+                        <td class="ticket-details-value">{{ department }}</td>
+                    </tr>
+                    <tr class="ticket-details-row">
+                        <td class="ticket-details-label">📅 Submitted:</td>
+                        <td class="ticket-details-value">{{ submitted_on }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>

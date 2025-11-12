@@ -49,14 +49,12 @@
             border-radius: 8px;
         }
         .comment-details-table {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
         }
         .comment-details-row {
-            display: table-row;
         }
         .comment-details-label {
-            display: table-cell;
             color: #6B1176;
             font-weight: 600;
             font-size: 14px;
@@ -67,10 +65,9 @@
             white-space: nowrap;
         }
         .comment-details-value {
-            display: table-cell;
             color: #374151;
             font-size: 14px;
-            padding: 8px 0;
+            padding: 8px 0 8px 12px;
             vertical-align: top;
             text-align: left;
             word-wrap: break-word;
@@ -85,14 +82,12 @@
             border-radius: 8px;
         }
         .comment-box-table {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
         }
         .comment-box-row {
-            display: table-row;
         }
         .comment-box-label {
-            display: table-cell;
             color: #6B1176;
             font-weight: 600;
             font-size: 14px;
@@ -103,10 +98,9 @@
             white-space: nowrap;
         }
         .comment-box-value {
-            display: table-cell;
             color: #374151;
             font-size: 14px;
-            padding: 8px 0;
+            padding: 8px 0 8px 12px;
             vertical-align: top;
             text-align: left;
             font-style: italic;
@@ -149,33 +143,33 @@
             <p>A new comment has been added to your support ticket.</p>
             
             <div class="comment-details-card">
-                <div class="comment-details-table">
-                    <div class="comment-details-row">
-                        <div class="comment-details-label">🎫 Ticket ID:</div>
-                        <div class="comment-details-value">{{ ticket_id }}</div>
-                    </div>
-                    <div class="comment-details-row">
-                        <div class="comment-details-label">📧 Subject:</div>
-                        <div class="comment-details-value">{{ feedback_subject }}</div>
-                    </div>
-                    <div class="comment-details-row">
-                        <div class="comment-details-label">👤 Commented By:</div>
-                        <div class="comment-details-value">{{ commented_by_name }}</div>
-                    </div>
-                    <div class="comment-details-row">
-                        <div class="comment-details-label">📅 Commented:</div>
-                        <div class="comment-details-value">{{ commented_on }}</div>
-                    </div>
-                </div>
+                <table class="comment-details-table">
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">🎫 Ticket ID:</td>
+                        <td class="comment-details-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📧 Subject:</td>
+                        <td class="comment-details-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">👤 Commented By:</td>
+                        <td class="comment-details-value">{{ commented_by_name }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📅 Commented:</td>
+                        <td class="comment-details-value">{{ commented_on }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="comment-box">
-                <div class="comment-box-table">
-                    <div class="comment-box-row">
-                        <div class="comment-box-label">💬 Comment:</div>
-                        <div class="comment-box-value">"{{ comment }}"</div>
-                    </div>
-                </div>
+                <table class="comment-box-table">
+                    <tr class="comment-box-row">
+                        <td class="comment-box-label">💬 Comment:</td>
+                        <td class="comment-box-value">"{{ comment }}"</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>

@@ -49,14 +49,12 @@
             border-radius: 8px;
         }
         .status-update-table {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
         }
         .status-update-row {
-            display: table-row;
         }
         .status-update-label {
-            display: table-cell;
             color: #6B1176;
             font-weight: 600;
             font-size: 14px;
@@ -67,10 +65,9 @@
             white-space: nowrap;
         }
         .status-update-value {
-            display: table-cell;
             color: #374151;
             font-size: 14px;
-            padding: 8px 0;
+            padding: 8px 0 8px 12px;
             vertical-align: top;
             text-align: left;
             word-wrap: break-word;
@@ -85,14 +82,12 @@
             border-radius: 8px;
         }
         .status-change-table {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
         }
         .status-change-row {
-            display: table-row;
         }
         .status-change-label {
-            display: table-cell;
             color: #1E40AF;
             font-weight: 600;
             font-size: 14px;
@@ -103,10 +98,9 @@
             white-space: nowrap;
         }
         .status-change-value {
-            display: table-cell;
             color: #1E40AF;
             font-size: 14px;
-            padding: 8px 0;
+            padding: 8px 0 8px 12px;
             vertical-align: top;
             text-align: left;
             word-wrap: break-word;
@@ -148,37 +142,37 @@
             <p>Your support ticket status has been updated. Here are the details:</p>
             
             <div class="status-update-card">
-                <div class="status-update-table">
-                    <div class="status-update-row">
-                        <div class="status-update-label">🎫 Ticket ID:</div>
-                        <div class="status-update-value">{{ ticket_id }}</div>
-                    </div>
-                    <div class="status-update-row">
-                        <div class="status-update-label">📧 Subject:</div>
-                        <div class="status-update-value">{{ feedback_subject }}</div>
-                    </div>
-                    <div class="status-update-row">
-                        <div class="status-update-label">📅 Updated:</div>
-                        <div class="status-update-value">{{ updated_on }}</div>
-                    </div>
-                    <div class="status-update-row">
-                        <div class="status-update-label">👤 Updated By:</div>
-                        <div class="status-update-value">{{ updated_by_name }}</div>
-                    </div>
-                </div>
+                <table class="status-update-table">
+                    <tr class="status-update-row">
+                        <td class="status-update-label">🎫 Ticket ID:</td>
+                        <td class="status-update-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📧 Subject:</td>
+                        <td class="status-update-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📅 Updated:</td>
+                        <td class="status-update-value">{{ updated_on }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">👤 Updated By:</td>
+                        <td class="status-update-value">{{ updated_by_name }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="status-change">
-                <div class="status-change-table">
-                    <div class="status-change-row">
-                        <div class="status-change-label">Previous Status:</div>
-                        <div class="status-change-value">{{ old_status }}</div>
-                    </div>
-                    <div class="status-change-row">
-                        <div class="status-change-label">New Status:</div>
-                        <div class="status-change-value">{{ new_status }}</div>
-                    </div>
-                </div>
+                <table class="status-change-table">
+                    <tr class="status-change-row">
+                        <td class="status-change-label">Previous Status:</td>
+                        <td class="status-change-value">{{ old_status }}</td>
+                    </tr>
+                    <tr class="status-change-row">
+                        <td class="status-change-label">New Status:</td>
+                        <td class="status-change-value">{{ new_status }}</td>
+                    </tr>
+                </table>
             </div>
             
             <div class="divider"></div>
