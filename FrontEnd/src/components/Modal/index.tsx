@@ -37,7 +37,7 @@ const Modal: React.FC<ModalProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center mr-3">
                   {icon}
                 </div>
                 <div>
