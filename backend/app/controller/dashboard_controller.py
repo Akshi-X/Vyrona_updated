@@ -121,37 +121,6 @@ def get_compliance_metrics(pharma_id: int = Depends(get_pharma_id_from_request))
 
 
 # ---------------------------
-# 4. Get Volume Metrics
-# ---------------------------
-@router.get("/volume", response_model=DashboardCategoryResponse)
-def get_volume_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
-    """
-    Get volume metrics only.
-    
-    Protected endpoint. Auth token required; pharma_id taken from token.
-    
-    Args:
-        pharma_id: Pharmaceutical company ID from token
-    
-    Returns:
-    - Quality Deviation Flagged: Count of quality deviations flagged
-    """
-    
-    metrics = {
-        "quality_deviation_flagged": 12,
-        "patient_count": 29,
-        "total_treatments": 29
-    }
-    
-    return DashboardCategoryResponse(
-        category="volume",
-        metrics=metrics,
-        last_updated=datetime.now(),
-        status="success"
-    )
-
-
-# ---------------------------
 # 5. Get Logistics Metrics
 # ---------------------------
 @router.get("/logistics", response_model=DashboardCategoryResponse)

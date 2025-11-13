@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func
+from sqlalchemy import and_, or_, desc
 from typing import List, Optional, Dict
 from datetime import datetime
 
@@ -157,20 +157,10 @@ class PatientService:
                 )
             ).count()
             
-            # Get current month treatment count (distinct therapy_id)
-            current_month_treatment_count = self.db.query(func.count(func.distinct(Patient.therapy_id))).filter(
-                and_(
-                    Patient.pharma_id == pharma_id,
-                    Patient.therapy_id.isnot(None),
-                    Patient.created_at >= current_month_start,
-                    Patient.created_at < next_month_start
-                )
-            ).scalar() or 0
-            
             statistics_data = {
                 "pharma_id": pharma_id,
                 "current_month_patient_count": current_month_patient_count,
-                "current_month_treatment_count": current_month_treatment_count
+                "quality_deviation_flagged": 11
             }
             
             return PharmaStatisticsResponse(**statistics_data)
