@@ -190,13 +190,7 @@ def setup_exception_handlers(app):
         )
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "error_code": exc.error_code,
-                "message": exc.message,
-                "status": STATUS_FAILED,
-                "timestamp": datetime.utcnow().isoformat(),
-                **exc.details
-            },
+            content=exc.to_dict(),
             headers=COMMON_API_HEADERS
         )
 
