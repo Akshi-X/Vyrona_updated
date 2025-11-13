@@ -389,7 +389,7 @@ export default function Dashboard({ }: DashboardProps) {
                           Quality Deviation Flagged:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : patientStats?.current_month_treatment_count || '0'}
+                          {loading ? '...' : patientStats?.quality_deviation_flagged || '0'}
                         </div>
                       </div>
                     </div>

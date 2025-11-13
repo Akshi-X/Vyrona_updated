@@ -31,7 +31,7 @@ const ResetPassword: React.FC = () => {
             const timer = setTimeout(() => {
                 navigate('/login');
             }, 3000);
-            
+
             return () => clearTimeout(timer);
         }
     }, [isSuccess, navigate]);
@@ -103,7 +103,7 @@ const ResetPassword: React.FC = () => {
                         alt="banner"
                     />
                 </div>
-                
+
                 <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
                     <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
                     <h1 className="font-semibold text-[30px]">myGrape</h1>
@@ -113,10 +113,10 @@ const ResetPassword: React.FC = () => {
 
                 <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
-                        Driving Health Forward <br />
+                        <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
                         One Smart Solution At a Time
                     </h2>
-                    <p className="mt-4 opacity-80 font-[12px]">
+                    <p className="mt-1 font-[12px] text-white">
                         Because every patient is someone's everything.
                     </p>
                 </div>
@@ -207,7 +207,7 @@ const ResetPassword: React.FC = () => {
                             </p>
                         </div>
                     )}
-                    
+
                     {/* Error Message */}
                     {!isSuccess && message && (
                         <div className="mt-3 flex justify-center">
