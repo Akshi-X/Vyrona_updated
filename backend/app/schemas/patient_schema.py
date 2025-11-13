@@ -79,7 +79,7 @@ class PharmaStatisticsResponse(BaseModel):
     """Schema for pharma statistics response - current month only"""
     pharma_id: int
     current_month_patient_count: int = Field(0, description="Number of patients added in current month")
-    current_month_treatment_count: int = Field(0, description="Number of treatments started in current month")
+    quality_deviation_flagged: int = Field(0, description="Number of quality deviation alerts flagged in current month")
 
 
 class PatientSummaryResponse(BaseModel):
