@@ -31,6 +31,13 @@ TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "emails"
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
 
+def _current_utc_timestamp(fmt: str = "%Y-%m-%d %H:%M:%S UTC") -> str:
+    """
+    Return current UTC timestamp as formatted string.
+    """
+    return datetime.now(timezone.utc).strftime(fmt)
+
+
 # ============================================
 # SENDGRID FUNCTIONS
 # ============================================
