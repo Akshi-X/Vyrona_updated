@@ -301,9 +301,11 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     user.approved_status = 'approved'
     user.status = True
     user.approved_by = str(approved_by_user_id)
-    user.approved_on = datetime.now(timezone.utc)
+    # Store as timezone-naive UTC to avoid timezone conversion issues in PostgreSQL
+    # The column is timezone-naive, so we store UTC time without timezone info
+    user.approved_on = datetime.now(timezone.utc).replace(tzinfo=None)
     user.updated_by = str(approved_by_user_id)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     db.commit()
     db.refresh(user)
@@ -316,7 +318,16 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
         
         # Format approved date in UTC with UTC label
-        approved_date = user.approved_on.astimezone(timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC")
+        # The datetime is stored as timezone-naive UTC, so we just add UTC timezone info
+        if user.approved_on.tzinfo is None:
+            # Timezone-naive datetime is stored as UTC, so add UTC timezone without conversion
+            approved_date_utc = user.approved_on.replace(tzinfo=timezone.utc)
+        else:
+            # If somehow timezone-aware, convert to UTC
+            approved_date_utc = user.approved_on.astimezone(timezone.utc)
+        
+        # Format the UTC datetime
+        approved_date = approved_date_utc.strftime("%B %d, %Y at %I:%M %p UTC")
         send_user_approved_notification(
             user_email=user.email,
             first_name=user.first_name,
