@@ -5,7 +5,7 @@
  * Patient Statistics Integration:
  * - getPatientStatistics() fetches current month patient and treatment counts
  * - API endpoint: /api/patients/statistics/pharma/{pharmaId}
- * - Returns: { pharma_id, current_month_patient_count, current_month_treatment_count }
+ * - Returns: { pharma_id, current_month_patient_count, quality_deviation_flagged }
  * - Used in Dashboard Volume section to display real-time data
  */
 
@@ -23,7 +23,7 @@ export interface LogisticsMetrics {
 export interface PatientStatistics {
   pharma_id: number;
   current_month_patient_count: number;
-  current_month_treatment_count: number;
+  quality_deviation_flagged: number;
 }
 
 export interface LogisticsApiResponse {
