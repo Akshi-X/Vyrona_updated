@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -83,10 +83,12 @@ async def broadcast_new_message(
     result: ChatMessageCreateResponse,
     sender_pharma_id: int,
     connection_manager,
-    db: Session
+    db_session_factory=SessionLocal
 ):
     """Broadcast new message to WebSocket connections and update unread messages"""
+    db = None
     try:
+        db = db_session_factory()
         # Note: Read status entries are only created for tagged users in create_chat_message
         # Subscribed users who are not tagged do NOT get read status entries (no unread tracking)
         
@@ -167,6 +169,9 @@ async def broadcast_new_message(
             logger.warning(f"Failed to broadcast unread updates: {e}")
     except Exception as e:
         logger.error(f"Failed to broadcast message: {e}", exc_info=True)
+    finally:
+        if db:
+            db.close()
 
 
 def create_chat_message(
@@ -299,33 +304,71 @@ async def get_patient_messages(
             )
         ).order_by(ChatMessage.created_at.asc()).all()
         
+        message_ids: List[int] = [message.id for message in messages]
+        sender_ids: Set[str] = {message.sender_id for message in messages if message.sender_id}
+        parsed_tagged_user_ids: Dict[int, List[str]] = {}
+        all_tagged_user_ids: Set[str] = set()
+        
+        for message in messages:
+            parsed_tagged_user_ids[message.id] = []
+            if message.tagged_user_ids:
+                try:
+                    parsed_ids = json.loads(message.tagged_user_ids)
+                    if isinstance(parsed_ids, list):
+                        parsed_tagged_user_ids[message.id] = parsed_ids
+                        all_tagged_user_ids.update(parsed_ids)
+                except (json.JSONDecodeError, TypeError):
+                    parsed_tagged_user_ids[message.id] = []
+        
+        sender_map: Dict[str, str] = {}
+        if sender_ids:
+            senders = db.query(User).filter(User.user_id.in_(sender_ids)).all()
+            sender_map = {
+                user.user_id: f"{user.first_name} {user.last_name}"
+                for user in senders
+            }
+        
+        tagged_user_map: Dict[str, str] = {}
+        if all_tagged_user_ids:
+            tagged_users = db.query(User).filter(User.user_id.in_(all_tagged_user_ids)).all()
+            tagged_user_map = {
+                user.user_id: f"{user.first_name} {user.last_name}"
+                for user in tagged_users
+            }
+        
+        read_status_map: Dict[int, ChatReadStatus] = {}
+        if message_ids:
+            existing_statuses = db.query(ChatReadStatus).filter(
+                ChatReadStatus.user_id == current_user_id,
+                ChatReadStatus.message_id.in_(message_ids)
+            ).all()
+            read_status_map = {status.message_id: status for status in existing_statuses}
+        
         # Track if any messages were marked as read (to trigger broadcast)
         messages_marked_read = False
         
-        if mark_as_read:
-            # Mark all messages as read for current user
-            for message in messages:
-                read_status = db.query(ChatReadStatus).filter(
-                    and_(
-                        ChatReadStatus.message_id == message.id,
-                        ChatReadStatus.user_id == current_user_id
-                    )
-                ).first()
-                
-                if read_status and not read_status.is_read:
-                    read_status.is_read = True
-                    read_status.read_at = datetime.now(timezone.utc)
-                    messages_marked_read = True
-                elif not read_status:
-                    # Create read status if it doesn't exist
+        if mark_as_read and message_ids:
+            new_read_status_objects: List[ChatReadStatus] = []
+            for message_id in message_ids:
+                read_status = read_status_map.get(message_id)
+                if read_status:
+                    if not read_status.is_read:
+                        read_status.is_read = True
+                        read_status.read_at = datetime.now(timezone.utc)
+                        messages_marked_read = True
+                else:
                     new_read_status = ChatReadStatus(
-                        message_id=message.id,
+                        message_id=message_id,
                         user_id=current_user_id,
                         is_read=True,
                         read_at=datetime.now(timezone.utc)
                     )
-                    db.add(new_read_status)
+                    new_read_status_objects.append(new_read_status)
+                    read_status_map[message_id] = new_read_status
                     messages_marked_read = True
+            
+            if new_read_status_objects:
+                db.add_all(new_read_status_objects)
             
             db.commit()
             
@@ -344,44 +387,22 @@ async def get_patient_messages(
         # Build response
         message_responses = []
         for message in messages:
-            # Get sender name
-            sender = db.query(User).filter(User.user_id == message.sender_id).first()
-            sender_name = f"{sender.first_name} {sender.last_name}" if sender else "Unknown"
+            sender_name = sender_map.get(message.sender_id, "Unknown")
             
-            # Get read status for current user
-            # Note: Read status only exists if user was tagged in this message
-            # If no read status exists, user was not tagged, so message is not "unread" for them
-            user_read_status = db.query(ChatReadStatus).filter(
-                and_(
-                    ChatReadStatus.message_id == message.id,
-                    ChatReadStatus.user_id == current_user_id
-                )
-            ).first()
+            user_read_status = read_status_map.get(message.id)
             
-            # If no read status exists, user was not tagged - message is not tracked as unread
-            # Set is_read based on whether read status exists
             if user_read_status:
                 is_read = user_read_status.is_read
                 read_at = user_read_status.read_at if user_read_status.is_read else None
             else:
-                # User was not tagged - message is not in their unread tracking
-                # For display purposes, we can consider it "read" (not unread)
                 is_read = True
                 read_at = None
             
-            # Parse tagged_user_ids from JSON string
-            tagged_user_ids = []
-            tagged_user_names = []
-            if message.tagged_user_ids:
-                try:
-                    tagged_user_ids = json.loads(message.tagged_user_ids)
-                    # Get names for tagged users
-                    if tagged_user_ids:
-                        tagged_users = db.query(User).filter(User.user_id.in_(tagged_user_ids)).all()
-                        user_name_map = {user.user_id: f"{user.first_name} {user.last_name}" for user in tagged_users}
-                        tagged_user_names = [user_name_map.get(uid, "Unknown") for uid in tagged_user_ids]
-                except (json.JSONDecodeError, TypeError):
-                    tagged_user_ids = []
+            tagged_user_ids = parsed_tagged_user_ids.get(message.id, [])
+            tagged_user_names = [
+                tagged_user_map.get(uid, "Unknown")
+                for uid in tagged_user_ids
+            ] if tagged_user_ids else []
             
             message_responses.append(ChatMessageResponse(
                 id=message.id,
@@ -452,18 +473,32 @@ def get_unread_messages(
             )
         ).order_by(desc(ChatMessage.created_at)).all()
         
+        sender_ids: Set[str] = {message.sender_id for message in unread_messages if message.sender_id}
+        patient_ids: Set[str] = {message.patient_id for message in unread_messages if message.patient_id}
+        
+        sender_map: Dict[str, str] = {}
+        if sender_ids:
+            senders = db.query(User).filter(User.user_id.in_(sender_ids)).all()
+            sender_map = {
+                user.user_id: f"{user.first_name} {user.last_name}"
+                for user in senders
+            }
+        
+        patient_map: Dict[str, str] = {}
+        if patient_ids:
+            patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+            patient_map = {
+                patient.id: patient.patient_name
+                for patient in patients
+            }
+        
         # Build response
         unread_responses = []
-        unread_by_patient = {}
+        unread_by_patient: Dict[str, int] = {}
         
         for message in unread_messages:
-            # Get sender name
-            sender = db.query(User).filter(User.user_id == message.sender_id).first()
-            sender_name = f"{sender.first_name} {sender.last_name}" if sender else "Unknown"
-            
-            # Get patient name
-            patient = db.query(Patient).filter(Patient.id == message.patient_id).first()
-            patient_name = patient.patient_name if patient else "Unknown Patient"
+            sender_name = sender_map.get(message.sender_id, "Unknown")
+            patient_name = patient_map.get(message.patient_id, "Unknown Patient")
             
             unread_responses.append(UnreadMessageResponse(
                 message_id=message.id,
@@ -475,11 +510,7 @@ def get_unread_messages(
                 created_at=message.created_at
             ))
             
-            # Count by patient
-            if message.patient_id in unread_by_patient:
-                unread_by_patient[message.patient_id] += 1
-            else:
-                unread_by_patient[message.patient_id] = 1
+            unread_by_patient[message.patient_id] = unread_by_patient.get(message.patient_id, 0) + 1
         
         return UnreadMessagesResponse(
             unread_messages=unread_responses,
