@@ -50,7 +50,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         <img
           src={IsolationModeBanner}
           alt="Decorative wave pattern"
-          className="w-full h-full object-cover object-bottom opacity-40 mix-blend-screen scale-[1.2] translate-y-[10%]"
+          className="w-full h-full object-cover object-bottom opacity-60 mix-blend-screen scale-[1.2] translate-y-[10%]"
         />
       </div>
 

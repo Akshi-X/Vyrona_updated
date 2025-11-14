@@ -218,7 +218,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                         e.stopPropagation();
                         setIsDropdownOpen(!isDropdownOpen);
                       }}
-                      className={`text-xs p-1.5 text-[#6b1176] hover:bg-gray-50 transition-all duration-200 ${
+                      className={`text-xs p-1.5 text-[#6b1176] transition-all duration-200 ${
                         stageFilter !== 'all' ? 'text-[#6b1176]' : ''
                       }`}
                       title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}

@@ -220,10 +220,10 @@ const ApprovalScreen: React.FC = () => {
 
           <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
             <h2 className="text-2xl font-bold leading-snug mt-8">
-              Driving Health Forward <br />
+            <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
               One Smart Solution At a Time
             </h2>
-            <p className="mt-4 opacity-80 font-[12px]">
+            <p className="mt-1 font-[12px] text-white">
               Because every patient is someone's everything.
             </p>
           </div>

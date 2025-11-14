@@ -49,7 +49,7 @@ const Signup: React.FC = () => {
 
     const validateEmail = (value: string) =>
         /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(value);
-        
+
     const validatePassword = (value: string) =>
         /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(value);
 
@@ -192,7 +192,7 @@ const Signup: React.FC = () => {
                         alt="banner"
                     />
                 </div>
-                
+
                 <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
                     <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
                     <h1 className="font-semibold text-[30px]">myGrape</h1>
@@ -202,10 +202,10 @@ const Signup: React.FC = () => {
 
                 <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
                     <h2 className="text-2xl font-bold leading-snug mt-8">
-                        Driving Health Forward <br />
+                        <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
                         One Smart Solution At a Time
                     </h2>
-                    <p className="mt-4 opacity-80 font-[12px]">
+                    <p className="mt-1 font-[12px] text-white">
                         Because every patient is someone's everything.
                     </p>
                 </div>
@@ -315,15 +315,14 @@ const Signup: React.FC = () => {
                                             </svg>
                                         </div>
                                     </div>
-                                    
+
                                     {isDropdownOpen && (
                                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
                                             {roleOptions.map((option) => (
                                                 <div
                                                     key={option.value}
-                                                    className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
-                                                        role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
-                                                    }`}
+                                                    className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
+                                                        }`}
                                                     onClick={() => handleRoleSelect(option.value)}
                                                 >
                                                     {option.label}
@@ -331,7 +330,7 @@ const Signup: React.FC = () => {
                                             ))}
                                         </div>
                                     )}
-                                    
+
                                     {roleError && (
                                         <p className="text-xs text-red-500 mt-1">{roleError}</p>
                                     )}
@@ -389,7 +388,7 @@ const Signup: React.FC = () => {
                                             className={`text-[10px] mt-1 ${password && !validatePassword(password) ? "text-red-500" : "text-[#9a9a9a]"
                                                 }`}
                                         >
-                                            Use at least 8 characters, including uppercase 
+                                            Use at least 8 characters, including uppercase
                                             <br />and lowercase letters, a number, and a special character.
                                         </p>
                                     </div>
@@ -436,7 +435,7 @@ const Signup: React.FC = () => {
                                     Sign in
                                 </Link>
                             </p>
-                            
+
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
                                     ITAdmin@myGrape.org
