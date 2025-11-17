@@ -88,33 +88,6 @@ const ControlTower = () => {
     });
   }, [augmentedRoutes, selectedRegion, selectedStatus, selectedCarrier]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Safe':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'Risk':
-        return 'bg-red-100 text-red-800 border-red-300';
-      case 'Delayed':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getStatusDotColor = (status: string) => {
-    switch (status) {
-      case 'Safe':
-        return 'bg-green-500';
-      case 'Risk':
-        return 'bg-red-500';
-      case 'Delayed':
-        return 'bg-orange-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-
-  // map color helper not needed here
 
   if (!isAuthenticated) {
     return (
@@ -148,17 +121,17 @@ const ControlTower = () => {
         />
 
         {/* Control Tower Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
           <h1 className="font-semibold text-black text-2xl">
             Control Tower
           </h1>
 
           {/* Main Content Grid */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[453px_1fr] lg:grid-rows-[300px_544px] gap-6 min-h-0 items-start">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[280px_544px] gap-6 min-h-0 items-start">
             {/* Left Panel - Filters and Routes */}
             <div className="flex flex-col gap-6 min-w-0">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-4 py-4 w-[453px] h-[300px] flex-shrink-0 flex flex-col justify-center">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] h-[280px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
                   {/* Region Filter */}
                   <div>
@@ -213,11 +186,11 @@ const ControlTower = () => {
               </div>
 
               {/* Active Routes List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 w-[453px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
-                <h2 className="font-bold text-black text-lg mb-3">Active Routes</h2>
-                <div className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 rounded-t-lg bg-[#F7ECFF] text-sm font-semibold text-gray-900">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
+                <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
+                <div className="grid grid-cols-[180px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-gray-900">
                   <div className="text-left">Route</div>
-                  <div className="text-left -ml-6">Status</div>
+                  <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
                 <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100">
@@ -238,19 +211,19 @@ const ControlTower = () => {
                             ? 'text-[#FFA500]'
                             : 'text-gray-500';
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[220px_84px_110px] pl-3 pr-4 py-3 hover:bg-gray-50 items-center overflow-hidden">
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[180px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden">
                           <div className="min-w-0 text-left overflow-hidden">
                             {route?.patientId ? (
                               <Link 
                                 to={`/track/${route.patientId}`}
-                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer"
+                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                               >
                                 {route.patientId}
                               </Link>
                             ) : (
                               <span className="text-[#6b1176] text-xs font-bold">N/A</span>
                             )}
-                            <div className="text-sm text-gray-900 leading-snug">
+                            <div className="text-xs text-gray-900 leading-snug">
                               {(route?.origin && route?.destination) ? (
                                 <>
                                   <div className="truncate">{route?.origin || '-'}</div>
@@ -261,11 +234,11 @@ const ControlTower = () => {
                               )}
                             </div>
                             {route?.supplyChain && (
-                              <div className="text-[11px] text-gray-400 truncate">{route?.supplyChain}</div>
+                              <div className="text-[10px] text-gray-400 truncate">{route?.supplyChain}</div>
                             )}
                           </div>
-                          <div className={`text-left text-xs font-medium -ml-6 ${statusColor}`}>{statusText}</div>
-                          <div className="text-left text-xs font-bold text-gray-600">{route?.date || '-'}</div>
+                          <div className={`text-left text-xs font-medium ${statusColor}`}>{statusText}</div>
+                          <div className="text-left text-xs font-bold text-gray-600 truncate">{route?.date || '-'}</div>
                         </div>
                       );
                     })
