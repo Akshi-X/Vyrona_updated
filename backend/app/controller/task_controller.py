@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.config import database
 from app.dependencies.auth_dependencies import get_current_user
+from app.constants.app_constants import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from app.constants.enums import TaskPriority, TaskStatus
 from app.models import user_model
 from app.schemas.task_schema import (
     CreateTaskRequest,
@@ -13,7 +16,8 @@ from app.schemas.task_schema import (
     UpdateTaskStatusResponse,
     DeleteTaskResponse,
     TaskResponse,
-    TaskListResponse
+    TaskListResponse,
+    PatientTaskListResponse
 )
 from app.service import task_service
 
@@ -107,6 +111,39 @@ def get_task(
     
     # Return DTO (result is already TaskResponse)
     return result
+
+
+@router.get("/patients/{patient_id}/tasks", response_model=PatientTaskListResponse)
+def get_patient_tasks(
+    patient_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    status: Optional[TaskStatus] = Query(None),
+    priority: Optional[TaskPriority] = Query(None),
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Retrieve paginated tasks linked to a patient with optional filters.
+    
+    Protected endpoint. Managers/pharma admins can see all patient tasks, others
+    are limited to their own created or assigned tasks.
+    
+    Query Parameters:
+    - page: Page number (default 1)
+    - page_size: Number of tasks per page (default from app constants)
+    - status: Filter by task status
+    - priority: Filter by task priority
+    """
+    return task_service.get_tasks_by_patient(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db,
+        status=status,
+        priority=priority,
+        page=page,
+        page_size=page_size
+    )
 
 
 # ---------------------------

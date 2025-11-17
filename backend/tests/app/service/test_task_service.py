@@ -93,6 +93,32 @@ def mock_patient():
     return patient
 
 
+def _setup_patient_task_queries(db_session, mock_patient, task_list, total_count=None):
+    """Helper to mock patient lookup and task query chain"""
+    patient_query = MagicMock()
+    patient_query.filter.return_value = patient_query
+    patient_query.first.return_value = mock_patient
+
+    tasks_query = MagicMock()
+    tasks_query.options.return_value = tasks_query
+    tasks_query.filter.return_value = tasks_query
+    tasks_query.order_by.return_value = tasks_query
+    tasks_query.offset.return_value = tasks_query
+    tasks_query.limit.return_value = tasks_query
+    tasks_query.count.return_value = total_count if total_count is not None else len(task_list)
+    tasks_query.all.return_value = task_list
+
+    def query_side_effect(model):
+        if model == Patient:
+            return patient_query
+        if model == Tasks:
+            return tasks_query
+        return MagicMock()
+
+    db_session.query.side_effect = query_side_effect
+    return patient_query, tasks_query
+
+
 # ==========================================
 # Tests for _build_task_response
 # ==========================================
@@ -518,6 +544,107 @@ def test_get_all_tasks_database_exception(db_session, mock_user):
         task_service.get_all_tasks(mock_user, db_session)
     
     assert "list tasks" in exc_info.value.details['operation'].lower()
+
+
+# ==========================================
+# Tests for get_tasks_by_patient
+# ==========================================
+
+def test_get_tasks_by_patient_success(db_session, mock_user, mock_task, mock_patient):
+    """Test fetching patient tasks successfully for privileged user"""
+    mock_task.patient_id = mock_patient.id
+    _setup_patient_task_queries(db_session, mock_patient, [mock_task], total_count=1)
+
+    result = task_service.get_tasks_by_patient(
+        patient_id=mock_patient.id,
+        current_user=mock_user,
+        db=db_session,
+        page=1,
+        page_size=10
+    )
+
+    assert result.patient_id == mock_patient.id
+    assert result.total == 1
+    assert len(result.tasks) == 1
+    assert result.has_next is False
+
+
+def test_get_tasks_by_patient_has_next(db_session, mock_user, mock_task, mock_patient):
+    """Test has_next flag when more records exist"""
+    mock_task.patient_id = mock_patient.id
+    _setup_patient_task_queries(db_session, mock_patient, [mock_task], total_count=3)
+
+    result = task_service.get_tasks_by_patient(
+        patient_id=mock_patient.id,
+        current_user=mock_user,
+        db=db_session,
+        page=1,
+        page_size=2
+    )
+
+    assert result.has_next is True
+
+
+def test_get_tasks_by_patient_non_privileged_filters(monkeypatch, db_session, mock_user, mock_task, mock_patient):
+    """Ensure non-privileged users trigger additional filtering"""
+    mock_user.role = "user"
+    mock_task.patient_id = mock_patient.id
+    _setup_patient_task_queries(db_session, mock_patient, [mock_task], total_count=1)
+
+    or_spy = MagicMock(return_value="or_clause")
+    monkeypatch.setattr(task_service, "or_", or_spy)
+
+    task_service.get_tasks_by_patient(
+        patient_id=mock_patient.id,
+        current_user=mock_user,
+        db=db_session
+    )
+
+    or_spy.assert_called_once()
+
+
+def test_get_tasks_by_patient_invalid_patient(db_session, mock_user):
+    """Test fetching patient tasks when patient does not exist"""
+    patient_query = MagicMock()
+    patient_query.filter.return_value = patient_query
+    patient_query.first.return_value = None
+
+    def query_side_effect(model):
+        if model == Patient:
+            return patient_query
+        return MagicMock()
+
+    db_session.query.side_effect = query_side_effect
+
+    with pytest.raises(TaskInvalidPatientException):
+        task_service.get_tasks_by_patient(
+            patient_id="PT-404",
+            current_user=mock_user,
+            db=db_session
+        )
+
+
+def test_get_tasks_by_patient_database_exception(db_session, mock_user, mock_patient):
+    """Test fetching patient tasks when database error occurs"""
+    patient_query = MagicMock()
+    patient_query.filter.return_value = patient_query
+    patient_query.first.return_value = mock_patient
+
+    def query_side_effect(model):
+        if model == Patient:
+            return patient_query
+        if model == Tasks:
+            raise Exception("Database error")
+        return MagicMock()
+
+    db_session.query.side_effect = query_side_effect
+
+    with pytest.raises(DatabaseQueryException):
+        task_service.get_tasks_by_patient(
+            patient_id=mock_patient.id,
+            current_user=mock_user,
+            db=db_session
+        )
 
 
 # ==========================================

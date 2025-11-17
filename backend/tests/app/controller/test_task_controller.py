@@ -31,7 +31,8 @@ from app.schemas.task_schema import (
     TaskListResponse,
     TaskAssigneeInfo,
     TaskCreatorInfo,
-    TaskPermissions
+    TaskPermissions,
+    PatientTaskListResponse
 )
 from app.constants.enums import TaskStatus, TaskPriority
 from app.middleware.rbac_middleware import RBACMiddleware
@@ -472,6 +473,100 @@ def test_get_task_by_id_database_exception(client):
     assert response.status_code == 500
     assert "error_code" in response.json()
     assert "message" in response.json()
+
+
+# ==========================================
+# Tests for GET /patients/{patient_id}/tasks (get_patient_tasks)
+# ==========================================
+
+def test_get_patient_tasks_success(client):
+    """Test retrieving tasks for a patient successfully"""
+    test_client, service_mock = client
+
+    expected_response = PatientTaskListResponse(
+        message="Tasks retrieved successfully",
+        patient_id="PT-123",
+        total=1,
+        page=2,
+        page_size=5,
+        has_next=False,
+        tasks=[
+            TaskResponse(
+                id=10,
+                task_name="Patient Task",
+                description="Follow up",
+                assignee=TaskAssigneeInfo(
+                    user_id="USER-456",
+                    first_name="Jane",
+                    last_name="Smith",
+                    email="jane@example.com",
+                    role="staff"
+                ),
+                created_by=TaskCreatorInfo(
+                    user_id="USER-123",
+                    first_name="John",
+                    last_name="Doe",
+                    email="john@example.com",
+                    role="manager"
+                ),
+                patient_id="PT-123",
+                due_date=None,
+                priority=TaskPriority.MEDIUM,
+                status=TaskStatus.IN_PROGRESS,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+                permissions=TaskPermissions(
+                    can_edit_all=True,
+                    can_edit_status_only=False
+                )
+            )
+        ]
+    )
+
+    service_mock.get_tasks_by_patient.return_value = expected_response
+
+    response = test_client.get(
+        "/patients/PT-123/tasks",
+        params={
+            "page": 2,
+            "page_size": 5,
+            "status": "In progress",
+            "priority": "Medium"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["patient_id"] == "PT-123"
+    assert data["page"] == 2
+    assert data["page_size"] == 5
+    assert len(data["tasks"]) == 1
+    service_mock.get_tasks_by_patient.assert_called_once()
+
+
+def test_get_patient_tasks_invalid_patient(client):
+    """Test retrieving patient tasks when patient is invalid"""
+    test_client, service_mock = client
+
+    service_mock.get_tasks_by_patient.side_effect = TaskInvalidPatientException(patient_id="PT-404")
+
+    response = test_client.get("/patients/PT-404/tasks")
+
+    assert response.status_code == 400
+    assert "error_code" in response.json()
+    service_mock.get_tasks_by_patient.assert_called_once()
+
+
+def test_get_patient_tasks_database_exception(client):
+    """Test retrieving patient tasks when database error occurs"""
+    test_client, service_mock = client
+
+    service_mock.get_tasks_by_patient.side_effect = DatabaseQueryException(operation="get patient tasks", reason="DB error")
+
+    response = test_client.get("/patients/PT-123/tasks")
+
+    assert response.status_code == 500
+    assert "error_code" in response.json()
 
 
 # ==========================================
