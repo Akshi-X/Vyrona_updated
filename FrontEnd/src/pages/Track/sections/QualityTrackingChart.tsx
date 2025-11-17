@@ -307,7 +307,7 @@ export default function QualityTrackingChart() {
   const chartData = useMemo(() => {
     // Unified color palette
     const palette = {
-      temperature: '#6B1176',
+      temperature: '#8AB6F9',
       humidity: '#DE88E6',
       agitation: '#BDBDBD',
     } as const;

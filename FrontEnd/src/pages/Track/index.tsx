@@ -10,7 +10,6 @@ import ComplianceCard from './sections/ComplianceCard.tsx';
 import NonComplianceCard from './sections/NonComplianceCard.tsx';
 import TransportTimeComparison from './sections/TransportTimeComparison.tsx';
 import AuditTrailTable from './sections/AuditTrailTable.tsx';
-import FrequentlyMissedDocs from './sections/FrequentlyMissedDocs.tsx';
 import RiskPanel from './sections/RiskPanel.tsx';
 import HistoricLaneRiskAssessment from './sections/HistoricLaneRiskAssessment.tsx';
 import PatientSummaryIcon from '../../assets/TrackAndTraceIcons/PatientSummary.svg';
@@ -407,21 +406,16 @@ export default function TrackPage() {
           </div>
 
           {/* Compliance / Non-Compliance / Transport Time Comparison */}
-          <div className="grid grid-cols-1 md:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-[6fr_6fr] gap-6 items-stretch">
             <div className="min-w-0 h-full">
               <ComplianceCard 
                 items={checklistData?.items || []}
+                missingDocuments={checklistData?.missing_documents || []}
                 loading={loadingChecklist}
                 error={checklistError}
               />
             </div>
-            <div className="h-full">
-              <NonComplianceCard 
-                percentage={checklistData?.non_compliance_percentage ?? 0}
-                loading={loadingChecklist}
-                error={checklistError}
-              />
-            </div>
+           
             <div className="min-w-0 h-full">
             <TransportTimeComparison />
             </div>
@@ -431,8 +425,9 @@ export default function TrackPage() {
           <div className="grid grid-cols-1 md:grid-cols-[4fr_3fr_5fr] lg:grid-cols-[4fr_2fr_6fr] gap-6 items-stretch">
             <div className="min-w-0 h-full"><AuditTrailTable /></div>
             <div className="h-full">
-              <FrequentlyMissedDocs 
-                missingDocs={checklistData?.missing_documents || []}
+              <NonComplianceCard 
+                percentage={checklistData?.non_compliance_percentage ?? 0}
+                missedDocsCount={checklistData?.missing_documents?.length ?? 0}
                 loading={loadingChecklist}
                 error={checklistError}
               />
