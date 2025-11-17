@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { laneRiskService, type LaneRiskItem } from '../../../services/laneRiskService';
+import { laneRiskService, type RiskFactor } from '../../../services/laneRiskService';
 
 export default function HistoricLaneRiskAssessment() {
-  const [rows, setRows] = useState<LaneRiskItem[]>([]);
+  const [factors, setFactors] = useState<RiskFactor[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export default function HistoricLaneRiskAssessment() {
       try {
         const res = await laneRiskService.getLaneRiskAssessment();
         if (!isMounted) return;
-        setRows(res?.lanes ?? []);
+        setFactors(res?.factors ?? []);
       } catch (e: any) {
         if (!isMounted) return;
         setError(e?.message || 'Failed to load lane risk assessment');
@@ -33,35 +33,35 @@ export default function HistoricLaneRiskAssessment() {
           <div className="p-4 text-sm text-gray-500">Loading...</div>
         ) : error ? (
           <div className="p-4 text-sm text-red-600">{error}</div>
-        ) : rows.length === 0 ? (
+        ) : factors.length === 0 ? (
           <div className="p-4 text-sm text-gray-500">No data available</div>
         ) : (
-          <table className="w-full text-xs border border-[#E7E1E1] sticky top-0 h-[320px]">
-            <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px]">
-              <tr>
-                <th className="px-4 py-5 text-left font-[600]">Route</th>
-                <th className="px-4 py-5 text-left font-[600]">Quality Deviations</th>
-                <th className="px-4 py-5 text-left font-[600]">Returns & Regulatory</th>
-                <th className="px-4 py-5 text-left font-[600]">Loss/Physical Damage</th>
-                <th className="px-4 py-5 text-left font-[600]">3PL Reliability</th>
-                <th className="px-4 py-5 text-left font-[600]">Weather</th>
-                <th className="px-4 py-5 text-left font-[600]">Risk Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.route} className="hover:bg-gray-50 text-black text-[14px]">
-                  <td className="px-4 py-5">{r.route}</td>
-                  <td className="px-4 py-5">{r.quality_deviations || '-'}</td>
-                  <td className="px-4 py-5">{r.returns_regulatory || '-'}</td>
-                  <td className="px-4 py-5">{r.loss_physical_damage || '-'}</td>
-                  <td className="px-4 py-5">{r.three_pl_reliability || '-'}</td>
-                  <td className="px-4 py-5">{r.weather || '-'}</td>
-                  <td className="px-4 py-5">{r.risk_level || '-'}</td>
+          <div className="max-h-[320px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+            <table className="w-full text-xs border border-[#E7E1E1]">
+              <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Factor</th>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Contributor</th>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Contributor</th>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Contributor</th>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Contributor</th>
+                  <th className="px-4 py-5 text-left font-[600]">Risk Scale</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {factors.map((factor, index) => (
+                  <tr key={index} className="hover:bg-gray-50 text-black text-[14px]">
+                    <td className="px-4 py-5">{factor.risk_factor}</td>
+                    <td className="px-4 py-5">{factor.risk_contributors[0] || '-'}</td>
+                    <td className="px-4 py-5">{factor.risk_contributors[1] || '-'}</td>
+                    <td className="px-4 py-5">{factor.risk_contributors[2] || '-'}</td>
+                    <td className="px-4 py-5">{factor.risk_contributors[3] || '-'}</td>
+                    <td className="px-4 py-5">{factor.risk_scale || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
