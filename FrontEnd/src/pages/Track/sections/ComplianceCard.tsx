@@ -3,11 +3,40 @@ type ChecklistItem = { stage: string; actual: number; needed: number; missed: nu
 
 interface ComplianceCardProps {
   items: ChecklistItem[];
+  missingDocuments: string[];
   loading: boolean;
   error: string | null;
 }
 
-export default function ComplianceCard({ items, loading, error }: ComplianceCardProps) {
+export default function ComplianceCard({ items, missingDocuments, loading, error }: ComplianceCardProps) {
+  // Create expanded rows: for each item, create rows based on missing documents
+  // If an item has missed > 0, show one row per missing document
+  // Otherwise show one row with empty missed column
+  const expandedRows: Array<{ stage: string; needed: number; missedDoc: string }> = [];
+  
+  let missingDocIndex = 0;
+  
+  items.forEach((item) => {
+    if (item.missed > 0 && missingDocuments.length > 0) {
+      // Show one row per missing document for this item
+      // Take the next 'missed' number of documents from the array
+      for (let i = 0; i < item.missed && missingDocIndex < missingDocuments.length; i++) {
+        expandedRows.push({
+          stage: item.stage,
+          needed: item.needed,
+          missedDoc: missingDocuments[missingDocIndex]
+        });
+        missingDocIndex++;
+      }
+    } else {
+      // Show one row with empty missed column
+      expandedRows.push({
+        stage: item.stage,
+        needed: item.needed,
+        missedDoc: ''
+      });
+    }
+  });
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full">
@@ -17,8 +46,8 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
       {/* Header row */}
       <div className="bg-[#FDF4FF] rounded-md px-4 py-2 grid grid-cols-3 text-xs font-medium text-[#6B1176]">
         <div>Transport Route</div>
-        <div className="text-center">Needed</div>
-        <div className="text-center">Missed</div>
+        <div className="text-center">Documents Required</div>
+        <div className="text-left px-2">Documents Missed</div>
       </div>
 
       {/* Data rows */}
@@ -29,14 +58,14 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
         {!loading && error && (
           <div className="px-4 py-3 text-sm text-red-600">{error}</div>
         )}
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && expandedRows.length === 0 && (
           <div className="px-4 py-3 text-sm text-gray-500">No checklist items</div>
         )}
-        {!loading && !error && items.map((item, idx) => (
-          <div key={`${item.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-            <div className="text-black py-2">{item.stage}</div>
-            <div className="text-center text-black py-2">{item.needed}</div>
-            <div className="text-center text-red-600 py-2">{item.missed}</div>
+        {!loading && !error && expandedRows.map((row, idx) => (
+          <div key={`${row.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
+            <div className="text-left text-black py-2">{row.stage}</div>
+            <div className="text-center text-black py-2">{row.needed}</div>
+            <div className="text-left text-black-600 py-2 px-4">{row.missedDoc || '-'}</div>
           </div>
         ))}
       </div>

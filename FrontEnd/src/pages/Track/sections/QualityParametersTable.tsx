@@ -293,14 +293,14 @@ export default function QualityParametersTable() {
             ) : (
               filteredRows.map((r, i) => (
                 <tr key={i} className="text-black text-[14px] h-[56px]">
-                  <td className="px-3 py-2 text-gray text-[14px] ">{r.label}</td>
+                  <td className="px-3 py-2 text-black text-[14px] ">{r.label}</td>
                   <td className={`px-3 py-2  ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
                     {formatValueWithUnit(r.value, r.threshold, r.label)}
                   </td>
                   <td className={`px-3 py-2 ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
                     {r.violated ? 'Anomaly' : 'Normal'}
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{formatRange(r.threshold)}</td>
+                  <td className="px-3 py-2">{formatRange(r.threshold)}</td>
                 </tr>
               ))
             )}
