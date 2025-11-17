@@ -24,62 +24,66 @@ def get_lane_risk_assessment(pharma_id: int = Depends(get_pharma_id_from_request
         pharma_id: Pharmaceutical company ID from token
     
     Returns:
-        List of lane risk assessment entries with:
-        - Route
-        - Quality Deviations
-        - Returns & Regulatory
-        - Loss/Physical Damage
-        - 3PL Reliability
-        - Weather
-        - Lane Complexity
-        - Geopolitical
-        - Digital & Communication
-        - Risk Level
+        Table of risk factors with their corresponding contributors and risk scale.
     """
     
-    # Mock lane risk assessment data
-    lanes = [
+    # Mock lane risk assessment data aligned with new UI table
+    factors = [
         LaneRiskAssessmentItem(
-            route="A",
-            quality_deviations="Temperature deviations (2.1% frequency)",
-            returns_regulatory="EU clearance: 12-16 hrs avg",
-            loss_physical_damage="0.3% lost shipments",
-            three_pl_reliability="DHL: 2.1% SLA breach",
-            weather="Storm delays: 4 events/year",
-            lane_complexity="3 carrier handovers",
-            geopolitical="Low risk: Stable regions",
-            digital_communication="98.5% tracking coverage",
-            risk_level="Medium"
+            risk_factor="Quality Deviations",
+            risk_contributors=[
+                "Temperature Deviation - 5",
+                "Humidity Deviation - 0",
+                "-",
+                "-"
+            ],
+            risk_scale="0"
         ),
         LaneRiskAssessmentItem(
-            route="B",
-            quality_deviations="Cold chain breaks (1.8% of duration)",
-            returns_regulatory="US FDA: 8-24 hrs processing",
-            loss_physical_damage="0.5% damaged packages",
-            three_pl_reliability="FedEx: 1.7% SLA breach",
-            weather="Hurricane seasons: 6 events",
-            lane_complexity="5 carrier handovers",
-            geopolitical="Medium: Trade tensions",
-            digital_communication="Real-time gaps: 4.2%",
-            risk_level="High"
+            risk_factor="Returns & Regulatory",
+            risk_contributors=[
+                "Temperature Deviation - 5",
+                "Humidity Deviation - 0",
+                "-",
+                "-"
+            ],
+            risk_scale="--"
         ),
         LaneRiskAssessmentItem(
-            route="C",
-            quality_deviations="Humidity excursions (3.2% severity)",
-            returns_regulatory="APAC clearance: 6-18 hrs",
-            loss_physical_damage="0.2% theft incidents",
-            three_pl_reliability="UPS: 1.8% SLA breach",
-            weather="Monsoon delays: 8 events",
-            lane_complexity="2 carrier handovers",
-            geopolitical="High: Border restrictions",
-            digital_communication="Connectivity issues: 7.3%",
-            risk_level="Low"
+            risk_factor="Loss/Physical Damage",
+            risk_contributors=[
+                "Temperature Deviation - 5",
+                "Humidity Deviation - 0",
+                "-",
+                "-"
+            ],
+            risk_scale="--"
+        ),
+        LaneRiskAssessmentItem(
+            risk_factor="3PL Reliability",
+            risk_contributors=[
+                "Temperature Deviation - 5",
+                "Humidity Deviation - 0",
+                "-",
+                "-"
+            ],
+            risk_scale="--"
+        ),
+        LaneRiskAssessmentItem(
+            risk_factor="Weather",
+            risk_contributors=[
+                "Temperature Deviation - 5",
+                "Humidity Deviation - 0",
+                "-",
+                "-"
+            ],
+            risk_scale="--"
         )
     ]
     
     return LaneRiskAssessmentResponse(
-        total_lanes=len(lanes),
-        lanes=lanes,
+        total_risk_factors=len(factors),
+        factors=factors,
         last_updated=datetime.now(),
         status="success"
     )

@@ -86,26 +86,20 @@ def test_get_lane_risk_assessment_success(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert "total_lanes" in data
-    assert "lanes" in data
+    assert "total_risk_factors" in data
+    assert "factors" in data
     assert "last_updated" in data
     assert "status" in data
     assert data["status"] == "success"
-    assert isinstance(data["lanes"], list)
-    assert len(data["lanes"]) == 3  # Should have 3 mock lanes
+    assert isinstance(data["factors"], list)
+    assert len(data["factors"]) == 5  # Should have 5 risk factors
     
     # Verify lane structure
-    lane = data["lanes"][0]
-    assert "route" in lane
-    assert "quality_deviations" in lane
-    assert "returns_regulatory" in lane
-    assert "loss_physical_damage" in lane
-    assert "three_pl_reliability" in lane
-    assert "weather" in lane
-    assert "lane_complexity" in lane
-    assert "geopolitical" in lane
-    assert "digital_communication" in lane
-    assert "risk_level" in lane
+    row = data["factors"][0]
+    assert "risk_factor" in row
+    assert "risk_contributors" in row
+    assert isinstance(row["risk_contributors"], list)
+    assert "risk_scale" in row
 
 
 def test_get_lane_risk_assessment_lane_data(client):
@@ -116,22 +110,19 @@ def test_get_lane_risk_assessment_lane_data(client):
 
     assert response.status_code == 200
     data = response.json()
-    lanes = data["lanes"]
+    factors = data["factors"]
     
-    # Check Route A
-    route_a = next((lane for lane in lanes if lane["route"] == "A"), None)
-    assert route_a is not None
-    assert route_a["risk_level"] == "Medium"
+    # Check Quality Deviations row
+    quality_row = next((factor for factor in factors if factor["risk_factor"] == "Quality Deviations"), None)
+    assert quality_row is not None
+    assert quality_row["risk_contributors"][0] == "Temperature Deviation - 5"
+    assert quality_row["risk_scale"] == "0"
     
-    # Check Route B
-    route_b = next((lane for lane in lanes if lane["route"] == "B"), None)
-    assert route_b is not None
-    assert route_b["risk_level"] == "High"
-    
-    # Check Route C
-    route_c = next((lane for lane in lanes if lane["route"] == "C"), None)
-    assert route_c is not None
-    assert route_c["risk_level"] == "Low"
+    # Check Weather row
+    weather_row = next((factor for factor in factors if factor["risk_factor"] == "Weather"), None)
+    assert weather_row is not None
+    assert weather_row["risk_contributors"][1] == "Humidity Deviation - 0"
+    assert weather_row["risk_scale"] == "--"
 
 
 def test_get_lane_risk_assessment_response_structure(client):
@@ -144,8 +135,8 @@ def test_get_lane_risk_assessment_response_structure(client):
     data = response.json()
     
     # Verify response matches schema
-    assert data["total_lanes"] == 3
-    assert len(data["lanes"]) == 3
+    assert data["total_risk_factors"] == 5
+    assert len(data["factors"]) == 5
     assert data["status"] == "success"
     assert "last_updated" in data
     # Verify last_updated is a valid ISO format datetime string
