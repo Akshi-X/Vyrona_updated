@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface ModalProps {
   isOpen: boolean;
@@ -21,6 +22,9 @@ const Modal: React.FC<ModalProps> = ({
   containerClassName,
   headerAction
 }) => {
+  // Lock body scroll when modal is open
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
