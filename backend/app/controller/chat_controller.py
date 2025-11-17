@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 from typing import List
@@ -74,11 +75,12 @@ async def send_chat_message(
             db
         )
         
-        await broadcast_new_message(
-            result,
-            current_user.pharma_id,
-            chat_connection_manager,
-            db
+        asyncio.create_task(
+            broadcast_new_message(
+                result,
+                current_user.pharma_id,
+                chat_connection_manager
+            )
         )
         
         return result
