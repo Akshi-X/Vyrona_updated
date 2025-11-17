@@ -39,12 +39,6 @@ function parseDurationToHours(input: string): number {
   return days * 24 + hours + minutes / 60;
 }
 
-function niceMax(maxValue: number): number {
-  // Round up to the next multiple of the current magnitude (e.g., 24 -> 30, 67 -> 70)
-  if (maxValue <= 10) return 10;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
-  return Math.ceil(maxValue / magnitude) * magnitude;
-}
 
 export default function TransportTimeComparison() {
   const [data, setData] = useState<TransportItem[]>([]);
@@ -71,56 +65,107 @@ export default function TransportTimeComparison() {
     };
   }, [patientId]);
 
+  // Always show 3 routes (Route A, B, C), padding with empty data if needed
+  // Route A should be at the bottom
+  const totalRoutes = 3;
   const labels = useMemo(
-    () => data.map((_, idx) => `Route ${String.fromCharCode(65 + idx)}`),
+    () => {
+      const routeLabels: string[] = [];
+      for (let i = 0; i < totalRoutes; i++) {
+        if (i < data.length) {
+          routeLabels.push(`Route ${String.fromCharCode(65 + i)}`);
+        } else {
+          routeLabels.push('--');
+        }
+      }
+      return routeLabels;
+    },
     [data]
   );
 
-  const scheduled = useMemo(() => data.map((d) => parseDurationToHours(d.scheduled_time)), [data]);
-  const actual = useMemo(() => data.map((d) => parseDurationToHours(d.actual_time)), [data]);
+  const scheduled = useMemo(() => {
+    const scheduledData: number[] = [];
+    for (let i = 0; i < totalRoutes; i++) {
+      if (i < data.length) {
+        scheduledData.push(parseDurationToHours(data[i].scheduled_time));
+      } else {
+        scheduledData.push(0); // Empty route
+      }
+    }
+    return scheduledData;
+  }, [data]);
 
-  const maxY = useMemo(() => niceMax(Math.max(1, ...scheduled, ...actual)), [scheduled, actual]);
-  const stepY = useMemo(() => Math.max(1, Math.round(maxY / 5)), [maxY]);
+  const actual = useMemo(() => {
+    const actualData: number[] = [];
+    for (let i = 0; i < totalRoutes; i++) {
+      if (i < data.length) {
+        actualData.push(parseDurationToHours(data[i].actual_time));
+      } else {
+        actualData.push(0); // Empty route
+      }
+    }
+    return actualData;
+  }, [data]);
+
+  // Fixed scale to 100 as shown in the image
+  const maxScale = 100;
+  const stepSize = 20; // Steps of 20 (0, 20, 40, 60, 80, 100)
+
+  // Calculate remaining space for background segment
+  const remaining = useMemo(
+    () => {
+      // scheduled and actual are already reversed, so remaining will match
+      return scheduled.map((sched, idx) => Math.max(0, maxScale - sched - actual[idx]));
+    },
+    [scheduled, actual]
+  );
 
   const chartData = useMemo(
     () => ({
       labels,
       datasets: [
         {
-          label: 'Scheduled (hrs)'
-          , data: scheduled,
+          label: 'Scheduled',
+          data: scheduled,
           backgroundColor: '#6B1176',
-          borderRadius: 6,
-          borderSkipped: 'bottom' as any,
-          barThickness: 32,
-          categoryPercentage: 0.6 as any,
-          barPercentage: 0.7 as any,
+          borderRadius: 0,
+          borderSkipped: false as any,
+          maxBarThickness: 8,
         },
         {
-          label: 'Actual (hrs)'
-          , data: actual,
+          label: 'Actual',
+          data: actual,
           backgroundColor: '#9C3AA6',
-          borderRadius: 6,
-          borderSkipped: 'bottom' as any,
-          barThickness: 32,
-          categoryPercentage: 0.6 as any,
-          barPercentage: 0.7 as any,
+          borderRadius: 0,
+          borderSkipped: false as any,
+          maxBarThickness: 8,
+        },
+        {
+          label: '', // Empty label for background segment
+          data: remaining,
+          backgroundColor: '#EDEDED',
+          borderRadius: 5,
+          borderSkipped: false as any,
+          maxBarThickness: 8,
+          tooltip: {
+            enabled: false,
+          },
         },
       ],
     }),
-    [labels, scheduled, actual]
+    [labels, scheduled, actual, remaining]
   );
 
   const options = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
-      indexAxis: 'x' as const,
+      indexAxis: 'y' as const, // Horizontal bars
       plugins: {
         legend: {
           display: true,
           position: 'top' as const,
-          align: 'center' as const,
+          align: 'start' as const, // Left-aligned as shown in image
           labels: {
             usePointStyle: true,
             padding: 15,
@@ -130,33 +175,42 @@ export default function TransportTimeComparison() {
               size: 12,
             },
             color: '#4B4B4B',
+            filter: (item: any) => item.text !== '', // Hide empty label (background segment)
           },
         },
         tooltip: {
+          filter: (item: any) => {
+            // Hide tooltip for background segment and empty routes
+            if (item.datasetIndex === 2) return false;
+            const idx = item.dataIndex;
+            // Hide tooltip if this is an empty route (no data from backend)
+            if (idx >= data.length) return false;
+            return true;
+          },
           callbacks: {
             title: (items: any[]) => {
               if (!items?.length) return '';
               const idx = items[0].dataIndex;
+              // Only show tooltip for routes with actual data
+              if (idx >= data.length) return '';
               const route = data[idx];
               return route
                 ? `${route.source_location} -> ${route.destination_location}`
                 : '';
             },
-            label: (ctx: any) => `${ctx.dataset.label}: ${ctx.parsed.y}h`,
+            label: (ctx: any) => {
+              if (!ctx.dataset.label) return '';
+              return `${ctx.dataset.label}: ${ctx.parsed.x}h`;
+            },
           },
         },
       },
       scales: {
-        // For vertical bars, x is the category axis (Route A, Route B, ...)
+        // For horizontal bars, x is the value axis (0-100)
         x: {
-          grid: { display: false },
-          ticks: { color: '#4B4B4B', font: { size: 12 }, padding: 10 },
-          stacked: false,
-        },
-        // y is the value axis
-        y: {
           beginAtZero: true,
-          max: maxY,
+          max: maxScale,
+          stacked: true,
           grid: {
             color: '#EDEDED',
             drawBorder: false,
@@ -164,14 +218,35 @@ export default function TransportTimeComparison() {
           },
           ticks: {
             color: '#7C7C7C',
-            callback: (value: any) => `${value}`,
-            stepSize: stepY,
+            stepSize: stepSize,
             font: { size: 11 },
+            callback: (value: any) => `${value}`,
+          },
+        },
+        // y is the category axis (Route A, Route B, ...)
+        y: {
+          stacked: true,
+          reverse: true, // Reverse so Route A (first item) appears at the bottom
+          grid: { 
+            display: true,
+            color: '#EDEDED',
+            drawBorder: false,
+          },
+          categoryPercentage: 0.6,
+          barPercentage: 0.7,
+          ticks: { 
+            color: '#4B4B4B', 
+            font: { size: 12 }, 
+            padding: 10,
+            callback: (_value: any, index: number) => {
+              // Return the label for this index (will be "--" for empty routes)
+              return labels[index] || '--';
+            },
           },
         },
       },
     }),
-    [maxY, stepY, data]
+    [maxScale, stepSize, data, labels]
   );
 
   return (
