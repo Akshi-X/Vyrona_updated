@@ -159,6 +159,17 @@ class TaskListResponse(BaseModel):
         return result
 
 
+class PatientTaskListResponse(BaseModel):
+    """Response schema for tasks associated with a patient"""
+    message: str
+    patient_id: str
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+    tasks: List[TaskResponse]
+
+
 class CreateTaskResponse(BaseModel):
     """Response schema after creating a task"""
     message: str
