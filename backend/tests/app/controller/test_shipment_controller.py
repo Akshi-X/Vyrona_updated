@@ -2,13 +2,21 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from unittest.mock import MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.controller import shipment_controller
 from app.exceptions.patient_exceptions import PatientNotFoundException, ShipmentNotStartedException, PatientException
 from app.exceptions.custom_exceptions import AppException
 from app.constants.status_constants import STATUS_FAILED
+from app.middleware.rbac_middleware import RBACMiddleware
+from app.middleware.token_validation_middleware import TokenValidationMiddleware
+from app.middleware.request_validation_middleware import RequestValidationMiddleware
+from app.middleware.patient_validation_middleware import PatientValidationMiddleware
+from app.middleware.sanitization_middleware import SanitizationMiddleware
+from app.middleware.exception_handler import exception_handler_middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 def _create_test_client(monkeypatch):
@@ -24,7 +32,7 @@ def _create_test_client(monkeypatch):
                 "error_code": exc.error_code,
                 "message": exc.message,
                 "status": STATUS_FAILED,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 **exc.details
             }
         )
@@ -35,6 +43,44 @@ def _create_test_client(monkeypatch):
             status_code=exc.status_code,
             content=exc.to_dict()
         )
+
+    # Add CORS middleware (first, so it executes first)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Create a mock user for middleware
+    class MockUser:
+        def __init__(self):
+            self.id = 1
+            self.user_id = 1
+            self.pharma_id = 42
+            self.role = "pharma_admin"  # Role that can access shipment endpoints
+            self.email = "test@example.com"
+            self.is_approved = True
+
+    mock_user = MockUser()
+
+    # Create a mock TokenValidationMiddleware that always succeeds
+    class MockTokenValidationMiddleware(BaseHTTPMiddleware):
+        """Mock TokenValidationMiddleware that always succeeds and sets mock user"""
+        async def dispatch(self, request: Request, call_next):
+            # Set mock user in request.state (what TokenValidationMiddleware does)
+            request.state.current_user = mock_user
+            return await call_next(request)
+
+    # Add middleware in reverse order (last added executes first)
+    # Flow: CORS → Exception Handler → Sanitization → Patient Validation → Request Validation → Token → RBAC → Controller
+    app.add_middleware(RBACMiddleware)
+    app.add_middleware(MockTokenValidationMiddleware)  # Use mock instead of real TokenValidationMiddleware
+    app.add_middleware(RequestValidationMiddleware)
+    app.add_middleware(PatientValidationMiddleware)
+    app.add_middleware(SanitizationMiddleware)
+    app.add_middleware(BaseHTTPMiddleware, dispatch=exception_handler_middleware)
 
     db_mock = MagicMock(name="db_session")
 
