@@ -42,7 +42,7 @@ class ErrorMessages:
     RESET_ACCOUNT_LOCKED = "Your account is locked. Please contact support"
     
     # Registration
-    EMAIL_ALREADY_EXISTS = "This email is already registered"
+    EMAIL_ALREADY_EXISTS = "Account already exists; contact MyGrape support for further assistance."
     PASSWORD_MISMATCH = "Passwords do not match"
     WEAK_PASSWORD = "Password does not meet security requirements"
     INVALID_EMAIL = "Please provide a valid email address"
@@ -178,7 +178,7 @@ class SuccessMessages:
     
     # Registration
     REGISTRATION_SUCCESS = "Registration successful! Please wait for admin approval"
-    REGISTRATION_SENT_TO_ADMIN = "Registration successful! Your request has been sent to MyGrape Admin for approval."
+    REGISTRATION_SENT_TO_ADMIN = "Registration successful! Your request has been sent to Admin for approval."
     REGISTRATION_SENT_TO_MANAGER = "Registration successful! Your request has been sent to your company manager for approval"
     REGISTRATION_SENT_TO_ADMIN_NO_MANAGER = "Registration successful! Your request has been sent to MyGrape Admin for approval (no company manager found yet)"
     REGISTRATION_EMAIL_FAILED = "Registration successful! However, approval email could not be sent. Please contact support"
