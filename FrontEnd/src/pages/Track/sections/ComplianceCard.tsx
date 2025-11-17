@@ -20,14 +20,17 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
     if (item.missed > 0 && missingDocuments.length > 0) {
       // Show one row per missing document for this item
       // Take the next 'missed' number of documents from the array
-      for (let i = 0; i < item.missed && missingDocIndex < missingDocuments.length; i++) {
-        expandedRows.push({
+      const docsToUse = Math.min(item.missed, missingDocuments.length - missingDocIndex);
+      const rows = Array.from({ length: docsToUse }, (_, i) => {
+        const doc = missingDocuments[missingDocIndex + i];
+        return {
           stage: item.stage,
           needed: item.needed,
-          missedDoc: missingDocuments[missingDocIndex]
-        });
-        missingDocIndex++;
-      }
+          missedDoc: doc
+        };
+      });
+      expandedRows.push(...rows);
+      missingDocIndex += docsToUse;
     } else {
       // Show one row with empty missed column
       expandedRows.push({

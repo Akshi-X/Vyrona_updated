@@ -70,41 +70,23 @@ export default function TransportTimeComparison() {
   const totalRoutes = 3;
   const labels = useMemo(
     () => {
-      const routeLabels: string[] = [];
-      for (let i = 0; i < totalRoutes; i++) {
-        if (i < data.length) {
-          routeLabels.push(`Route ${String.fromCharCode(65 + i)}`);
-        } else {
-          routeLabels.push('--');
-        }
-      }
-      return routeLabels;
+      return Array.from({ length: totalRoutes }, (_, i) => {
+        return i < data.length ? `Route ${String.fromCharCode(65 + i)}` : '--';
+      });
     },
     [data]
   );
 
   const scheduled = useMemo(() => {
-    const scheduledData: number[] = [];
-    for (let i = 0; i < totalRoutes; i++) {
-      if (i < data.length) {
-        scheduledData.push(parseDurationToHours(data[i].scheduled_time));
-      } else {
-        scheduledData.push(0); // Empty route
-      }
-    }
-    return scheduledData;
+    return Array.from({ length: totalRoutes }, (_, i) => {
+      return i < data.length ? parseDurationToHours(data[i].scheduled_time) : 0;
+    });
   }, [data]);
 
   const actual = useMemo(() => {
-    const actualData: number[] = [];
-    for (let i = 0; i < totalRoutes; i++) {
-      if (i < data.length) {
-        actualData.push(parseDurationToHours(data[i].actual_time));
-      } else {
-        actualData.push(0); // Empty route
-      }
-    }
-    return actualData;
+    return Array.from({ length: totalRoutes }, (_, i) => {
+      return i < data.length ? parseDurationToHours(data[i].actual_time) : 0;
+    });
   }, [data]);
 
   // Fixed scale to 100 as shown in the image
