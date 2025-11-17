@@ -62,7 +62,7 @@ export default function RiskPanel() {
         {
           label: 'Gray Line',
           data: lightGrayData,
-          borderColor: '#D3D3D3',
+          borderColor: '#C9CBCD',
           backgroundColor: 'transparent',
           borderWidth: 2,
           pointRadius: 0,
@@ -73,7 +73,7 @@ export default function RiskPanel() {
         {
           label: 'Magenta Line',
           data: magentaData,
-          borderColor: '#9c3aa6',
+          borderColor: '#C7A0E8',
           backgroundColor: 'transparent',
           borderWidth: 2,
           pointRadius: 0,
