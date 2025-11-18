@@ -124,11 +124,13 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingTasks(true);
     try {
       const response = await tasksService.getMyTasks();
+      console.log('Tasks API response:', response);
       // Combine created_tasks and assigned_tasks into a single array
       const allTasks = [
         ...(response.created_tasks || []),
         ...(response.assigned_tasks || [])
       ];
+      console.log('Combined tasks:', allTasks);
       setMyTasks(allTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -202,17 +204,38 @@ export default function Dashboard({ }: DashboardProps) {
   }, [isAuthenticated]);
 
   // Transform API data to match component interface
-  const transformedTasks: MyTask[] = myTasks.map(task => ({
-    id: task.id.toString(),
-    patientId: task.patient_id || 'N/A',
-    taskName: task.task_name,
-    description: task.description || '',
-    assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
-    assignedTo: `${task.assignee.first_name} ${task.assignee.last_name}`,
-    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
-    priority: task.priority,
-    status: task.status
-  }));
+  const transformedTasks: MyTask[] = myTasks.map(task => {
+    try {
+      return {
+        id: task.id.toString(),
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name,
+        description: task.description || '',
+        assigneeBy: task.created_by 
+          ? `${task.created_by.first_name || ''} ${task.created_by.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        assignedTo: task.assignee
+          ? `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
+        priority: task.priority,
+        status: task.status
+      };
+    } catch (error) {
+      console.error('Error transforming task:', task, error);
+      return {
+        id: task.id?.toString() || 'unknown',
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name || 'Unknown Task',
+        description: task.description || '',
+        assigneeBy: 'Unknown',
+        assignedTo: 'Unknown',
+        dueDate: 'N/A',
+        priority: task.priority || 'Medium',
+        status: task.status || 'Not started'
+      };
+    }
+  });
 
   const transformedAlerts = criticalAlerts.map(alert => ({
     id: alert.id,
@@ -581,6 +604,7 @@ export default function Dashboard({ }: DashboardProps) {
                       src={MyTasksIcon}
                       onClick={() => {
                         fetchMyTasks();
+                        fetchMyTasks();
                         setShowMyTasks(true);
                       }}
                     />
@@ -612,7 +636,8 @@ export default function Dashboard({ }: DashboardProps) {
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
-                          setShowMyTasks(true);
+                          fetchMyTasks();
+                        setShowMyTasks(true);
                         } else if (card.alt === 'Track Shipment') {
                           setShowTrackShipment(true);
                         }
