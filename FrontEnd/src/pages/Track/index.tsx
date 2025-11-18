@@ -103,22 +103,17 @@ export default function TrackPage() {
       
       // If patientId is available, use patient-specific endpoint
       if (patientId) {
-        console.log('Fetching tasks for patient:', patientId);
         const patientResponse = await tasksService.getPatientTasks(patientId);
-        console.log('Patient tasks API response (raw):', patientResponse);
         // Patient tasks endpoint returns { tasks: Task[], total, page, page_size, has_next, message, patient_id }
         allTasks = Array.isArray(patientResponse.tasks) ? patientResponse.tasks : [];
-        console.log('Extracted patient tasks:', allTasks, 'Total:', patientResponse.total);
       } else {
         // Fallback to general tasks endpoint
         const response = await tasksService.getMyTasks();
-        console.log('Tasks API response:', response);
         // Combine created_tasks and assigned_tasks into a single array
         allTasks = [
           ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
           ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
         ];
-        console.log('Combined tasks:', allTasks);
       }
       
       // Ensure we always set an array
@@ -210,7 +205,7 @@ export default function TrackPage() {
 
   const transformedTasks: MyTask[] = (Array.isArray(myTasks) ? myTasks : []).map(task => {
     try {
-      const transformed = {
+      return {
         id: task.id.toString(),
         patientId: task.patient_id || 'N/A',
         taskName: task.task_name,
@@ -225,8 +220,6 @@ export default function TrackPage() {
         priority: task.priority,
         status: task.status
       };
-      console.log('Transformed task:', transformed);
-      return transformed;
     } catch (error) {
       console.error('Error transforming task:', task, error);
       return {
@@ -242,14 +235,6 @@ export default function TrackPage() {
       };
     }
   });
-
-  // Debug: Log tasks data
-  useEffect(() => {
-    console.log('Track Page - myTasks:', myTasks);
-    console.log('Track Page - myTasks.length:', myTasks.length);
-    console.log('Track Page - transformedTasks:', transformedTasks);
-    console.log('Track Page - transformedTasks.length:', transformedTasks.length);
-  }, [myTasks, transformedTasks]);
 
   useEffect(() => {
     let isMounted = true;
@@ -573,23 +558,17 @@ export default function TrackPage() {
             } else {
               // Assignee can only update status - use dedicated status update endpoint
               if (task.status) {
-                console.log('Updating task status only:', task.status);
                 await tasksService.updateTaskStatus(taskId, task.status);
                 // Refresh tasks after update
                 fetchMyTasks();
                 return; // Early return since we've handled the update
-              } else {
-                console.warn('No status to update for task:', taskId);
-                return;
               }
+              return;
             }
 
             // Call update API for full task updates (when creator edits)
             if (Object.keys(updateData).length > 0) {
-              console.log('Updating task with data:', updateData);
               await tasksService.updateTask(taskId, updateData);
-            } else {
-              console.warn('No update data to send for task:', taskId);
             }
 
             // Refresh tasks after update
