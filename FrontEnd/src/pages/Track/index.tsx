@@ -99,15 +99,30 @@ export default function TrackPage() {
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
-      const response = await tasksService.getMyTasks();
-      console.log('Tasks API response:', response);
-      // Combine created_tasks and assigned_tasks into a single array
-      const allTasks = [
-        ...(response.created_tasks || []),
-        ...(response.assigned_tasks || [])
-      ];
-      console.log('Combined tasks:', allTasks);
-      setMyTasks(allTasks);
+      let allTasks: Task[] = [];
+      
+      // If patientId is available, use patient-specific endpoint
+      if (patientId) {
+        console.log('Fetching tasks for patient:', patientId);
+        const patientResponse = await tasksService.getPatientTasks(patientId);
+        console.log('Patient tasks API response (raw):', patientResponse);
+        // Patient tasks endpoint returns { tasks: Task[], total, page, page_size, has_next, message, patient_id }
+        allTasks = Array.isArray(patientResponse.tasks) ? patientResponse.tasks : [];
+        console.log('Extracted patient tasks:', allTasks, 'Total:', patientResponse.total);
+      } else {
+        // Fallback to general tasks endpoint
+        const response = await tasksService.getMyTasks();
+        console.log('Tasks API response:', response);
+        // Combine created_tasks and assigned_tasks into a single array
+        allTasks = [
+          ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
+          ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
+        ];
+        console.log('Combined tasks:', allTasks);
+      }
+      
+      // Ensure we always set an array
+      setMyTasks(Array.isArray(allTasks) ? allTasks : []);
     } catch (e) {
       console.error('Error fetching tasks:', e);
       setMyTasks([]);
@@ -135,7 +150,7 @@ export default function TrackPage() {
     fetchMyTasks();
     fetchUnreadMessages();
     fetchCurrentUser();
-  }, []);
+  }, [patientId]); // Re-fetch tasks when patientId changes
 
   // Lightweight polling to keep unread chat badge updated when chat window is closed
   useEffect(() => {
@@ -193,9 +208,9 @@ export default function TrackPage() {
     steps.findIndex(s => s.key === (currentStage ?? ''))
   );
 
-  const transformedTasks: MyTask[] = myTasks.map(task => {
+  const transformedTasks: MyTask[] = (Array.isArray(myTasks) ? myTasks : []).map(task => {
     try {
-      return {
+      const transformed = {
         id: task.id.toString(),
         patientId: task.patient_id || 'N/A',
         taskName: task.task_name,
@@ -210,6 +225,8 @@ export default function TrackPage() {
         priority: task.priority,
         status: task.status
       };
+      console.log('Transformed task:', transformed);
+      return transformed;
     } catch (error) {
       console.error('Error transforming task:', task, error);
       return {
@@ -225,6 +242,14 @@ export default function TrackPage() {
       };
     }
   });
+
+  // Debug: Log tasks data
+  useEffect(() => {
+    console.log('Track Page - myTasks:', myTasks);
+    console.log('Track Page - myTasks.length:', myTasks.length);
+    console.log('Track Page - transformedTasks:', transformedTasks);
+    console.log('Track Page - transformedTasks.length:', transformedTasks.length);
+  }, [myTasks, transformedTasks]);
 
   useEffect(() => {
     let isMounted = true;

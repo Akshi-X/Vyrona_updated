@@ -296,7 +296,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   }, [isOpen, currentUserName, currentUserId]);
 
   // Filter out deleted tasks from display
-  const visibleTasks = tasks.filter(task => !deletedTaskIds.has(task.id));
+  // Ensure tasks is always an array
+  const tasksArray = Array.isArray(tasks) ? tasks : [];
+  const visibleTasks = tasksArray.filter(task => !deletedTaskIds.has(task.id));
 
   // Helper function to check if task is created by current user
   const isTaskCreatedByMe = (task: MyTask): boolean => {
@@ -328,15 +330,19 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   // Debug logging
   useEffect(() => {
     if (isOpen) {
-      console.log('MyTasksModal - isOpen:', isOpen);
-      console.log('MyTasksModal - tasks prop:', tasks);
-      console.log('MyTasksModal - tasks.length:', tasks.length);
-      console.log('MyTasksModal - visibleTasks:', visibleTasks);
-      console.log('MyTasksModal - visibleTasks.length:', visibleTasks.length);
-      console.log('MyTasksModal - loading:', loading);
-      console.log('MyTasksModal - deletedTaskIds:', Array.from(deletedTaskIds));
+      console.log('=== MyTasksModal Debug ===');
+      console.log('isOpen:', isOpen);
+      console.log('tasks prop:', tasks);
+      console.log('tasks.length:', tasks?.length || 0);
+      console.log('tasks is array?', Array.isArray(tasks));
+      console.log('deletedTaskIds:', Array.from(deletedTaskIds));
+      console.log('visibleTasks:', visibleTasks);
+      console.log('visibleTasks.length:', visibleTasks.length);
+      console.log('loading:', loading);
+      console.log('currentUserName:', currentUserName);
+      console.log('========================');
     }
-  }, [isOpen, tasks, visibleTasks, loading, deletedTaskIds]);
+  }, [isOpen, tasks, visibleTasks, loading, deletedTaskIds, currentUserName]);
 
   return (
     <AlertCard

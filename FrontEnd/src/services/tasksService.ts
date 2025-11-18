@@ -54,9 +54,10 @@ export class TasksService extends BaseApiService {
 
   /**
    * Get tasks for a specific patient
+   * Returns PatientTaskListResponse with tasks array inside
    */
-  async getPatientTasks(patientId: string): Promise<Task[]> {
-    return await this.request<Task[]>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
+  async getPatientTasks(patientId: string): Promise<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }> {
+    return await this.request<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
       method: 'GET',
     });
   }
