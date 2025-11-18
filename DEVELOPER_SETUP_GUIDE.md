@@ -31,10 +31,10 @@ This guide provides step-by-step instructions to set up the entire MyGrape devel
 |----------|---------|---------------|-------|
 | **Python** | **3.12+** | [python.org/downloads](https://www.python.org/downloads/) | Must be 3.12 or higher |
 | **Poetry** | Latest | [python-poetry.org](https://python-poetry.org/docs/#installation) | Python dependency manager |
-| **Node.js** | **18+** | [nodejs.org](https://nodejs.org/) | For frontend development |
+| **Node.js** | **20.19+ or 22.12+** | [nodejs.org](https://nodejs.org/) | For frontend development (Vite 7 requirement) |
 | **npm** | Comes with Node.js | - | Package manager for frontend |
 | **PostgreSQL** | **15+** | [postgresql.org/download](https://www.postgresql.org/download/) | Database server |
-| **Redis** | **7+** | [redis.io/download](https://redis.io/download/) | Caching & pub/sub |
+| **Redis** | **6.x or 7.x** | [redis.io/download](https://redis.io/download/) | Caching & pub/sub (Python redis client 5.x compatible) |
 | **Git** | Latest | [git-scm.com](https://git-scm.com/downloads) | Version control |
 
 ### Optional Software
@@ -67,11 +67,13 @@ All frontend dependencies are managed via npm. Key versions:
 
 - **React**: 19.1.1
 - **TypeScript**: ~5.8.3
-- **Vite**: ^7.1.7
+- **Vite**: ^7.1.7 (requires Node.js 20.19+ or 22.12+)
 - **Material-UI**: ^7.3.4
 - **Axios**: ^1.12.2
 - **React Router**: ^6.30.1
 - **Tailwind CSS**: ^4.1.14
+
+**Important:** Vite 7 requires Node.js version 20.19+ or 22.12+. Make sure you have the correct Node.js version installed.
 
 See `FrontEnd/package.json` for complete dependency list.
 
@@ -128,9 +130,10 @@ cd mygrape
 python --version
 # Expected: Python 3.12.x or higher
 
-# Check Node.js version (must be 18+)
+# Check Node.js version (must be 20.19+ or 22.12+)
 node --version
-# Expected: v18.x.x or higher
+# Expected: v20.19.x or higher, OR v22.12.x or higher
+# Note: Vite 7 requires Node.js 20.19+ or 22.12+
 
 # Check npm version
 npm --version
@@ -145,7 +148,7 @@ psql --version
 
 # Check Redis version
 redis-cli --version
-# Expected: redis-cli 7.x.x or higher
+# Expected: redis-cli 6.x.x or higher (6.x or 7.x recommended)
 ```
 
 ### Step 3: Install Poetry (if not installed)
@@ -231,7 +234,7 @@ psql -U postgres -d mygrape -c "SELECT version();"
 
 **Windows:**
 - Option 1: Use WSL (Windows Subsystem for Linux)
-- Option 2: Use Docker: `docker run --name redis -p 6379:6379 -d redis:7-alpine`
+- Option 2: Use Docker: `docker run --name redis -p 6379:6379 -d redis:7-alpine` (or `redis:6-alpine`)
 - Option 3: Download from [GitHub releases](https://github.com/microsoftarchive/redis/releases)
 
 **macOS:**
@@ -877,6 +880,22 @@ lsof -ti:8000 | xargs kill -9
 
 #### 2. Frontend Won't Start
 
+**Error: `Vite requires Node.js version 20.19+ or 22.12+`**
+
+```bash
+# Solution: Upgrade Node.js to required version
+# Check current version:
+node --version
+
+# Install Node.js 20.19+ or 22.12+ from:
+# https://nodejs.org/
+
+# After upgrading, reinstall dependencies:
+cd FrontEnd
+rm -rf node_modules package-lock.json
+npm install
+```
+
 **Error: `Port 5173 already in use`**
 
 ```bash
@@ -1164,9 +1183,9 @@ Use this checklist to verify your setup:
 
 - [ ] Python 3.12+ installed
 - [ ] Poetry installed and in PATH
-- [ ] Node.js 18+ installed
+- [ ] Node.js 20.19+ or 22.12+ installed (Vite 7 requirement)
 - [ ] PostgreSQL 15+ installed and running
-- [ ] Redis 7+ installed and running
+- [ ] Redis 6.x or 7.x installed and running
 - [ ] Database `mygrape` created
 - [ ] Backend dependencies installed (`poetry install`)
 - [ ] Frontend dependencies installed (`npm install`)
