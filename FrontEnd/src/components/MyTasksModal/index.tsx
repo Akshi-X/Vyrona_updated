@@ -41,7 +41,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   loading = false,
   onAdd,
   onEdit,
-  onDelete,
+  onDelete: _onDelete, // Reserved for future delete functionality
   variant = 'dashboard',
   currentUserName = '',
   currentUserId = '',
@@ -194,17 +194,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
 
   const handleEditInputChange = (field: keyof MyTask, value: string) => {
     if (editedTask) {
-      setEditedTask(prev => {
-        if (!prev) return null;
-        const updated = {
-          ...prev,
-          [field]: value
-        };
-        if (field === 'status') {
-          console.log('Status updated in handleEditInputChange:', value, 'Updated task:', updated);
-        }
-        return updated;
-      });
+      setEditedTask(prev => prev ? ({
+        ...prev,
+        [field]: value
+      }) : null);
     }
   };
 
@@ -222,7 +215,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       const taskToSave = assigneeId 
         ? { ...editedTask, ...({ assigneeId } as any), status: editedTask.status }
         : { ...editedTask, status: editedTask.status };
-      console.log('Saving task with status:', taskToSave.status, 'Full task:', taskToSave);
       onEdit(taskToSave);
     }
     setEditingTaskId(null);
@@ -327,22 +319,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     return new Set();
   };
 
-  // Debug logging
-  useEffect(() => {
-    if (isOpen) {
-      console.log('=== MyTasksModal Debug ===');
-      console.log('isOpen:', isOpen);
-      console.log('tasks prop:', tasks);
-      console.log('tasks.length:', tasks?.length || 0);
-      console.log('tasks is array?', Array.isArray(tasks));
-      console.log('deletedTaskIds:', Array.from(deletedTaskIds));
-      console.log('visibleTasks:', visibleTasks);
-      console.log('visibleTasks.length:', visibleTasks.length);
-      console.log('loading:', loading);
-      console.log('currentUserName:', currentUserName);
-      console.log('========================');
-    }
-  }, [isOpen, tasks, visibleTasks, loading, deletedTaskIds, currentUserName]);
 
   return (
     <AlertCard
@@ -885,7 +861,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </>
                     )}
               </td>
-              )}
+                )}
             </tr>
             );
           })}
