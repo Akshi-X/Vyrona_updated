@@ -22,14 +22,16 @@ import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg'
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import TreatmentsCountIcon from '../../assets/DashBoardIcons/Treatments_Count.svg';
 import PatientCountIcon from '../../assets/DashBoardIcons/Patient_Count.svg';
-import TrackingShipmentIcon from '../../assets/DashBoardIcons/Tracking_Shipment.svg';
-import AftercareIcon from '../../assets/DashBoardIcons/Atercare.svg';
+import TrackingShipmentIcon from '../../assets/DashBoardIcons/TrackShipment.svg';
+import AftercareIcon from '../../assets/DashBoardIcons/AfterCare.svg';
 import Header from '../../components/Header';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
 import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg';
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
+import FailuresIcon from '../../assets/DashBoardIcons/Failure.svg';
+import NextIcon from '../../assets/DashBoardIcons/NextIcon.svg';
 
 interface StakeholderChat {
   id: string;
@@ -320,18 +322,21 @@ export default function Dashboard({ }: DashboardProps) {
 
   const volumeCards = [
     {
-      label: "Track Shipment",
+      label: "Tracking Shipment",
+      description: "Track delivery status with live updates.",
       icon: TrackingShipmentIcon,
       alt: "Track Shipment",
     },
     {
       label: "Aftercare",
+      description: "Helping you even after the work is done.",
       icon: AftercareIcon,
       alt: "Aftercare",
     },
     {
-      label: "Failures",
-      icon: CriticalAlertsIcon,
+      label: "Failure",
+      description: "Spot failures early with real-time insights.",
+      icon: FailuresIcon,
       alt: "Failures",
     },
   ];
@@ -632,7 +637,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {volumeCards.map((card, index) => (
                     <div
                       key={index}
-                      className={`flex-1 bg-white border h-[125px] border-[#E7E1E1] rounded-lg ${(card.label === 'Track Shipment' || card.label === 'Aftercare' || card.label === 'Failures') ? 'cursor-pointer transition-all  drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)]' : ''}`}
+                      className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
@@ -643,16 +648,53 @@ export default function Dashboard({ }: DashboardProps) {
                         }
                       }}
                     >
-                      <div className="flex flex-col items-center justify-center pt-7 pb-6 px-4">
-                        <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center mb-3">
+                      {/* Background Graphic - Subtle Icon */}
+                      <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
+                        <img
+                          className="w-24 h-24"
+                          alt={`${card.alt} background`}
+                          src={card.icon}
+                        />
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="relative h-full px-3 py-4">
+                        {/* Icon at Top Left */}
+                        <div className="absolute top-4 left-4">
                           <img
                             className="w-[18px] h-[18px]"
                             alt={card.alt}
                             src={card.icon}
                           />
                         </div>
-                        <div className="h-4 flex items-center justify-center font-semibold text-black text-xs font-[12px]">
+                        
+                        {/* Title - Centered */}
+                        <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                           {card.label}
+                        </div>
+                        
+                        {/* Description - Centered */}
+                        <div className="text-white opacity-90 text-[11px] text-left w-[120px]">
+                          {card.description}
+                        </div>
+                        
+                        {/* Arrow Button at Bottom Right */}
+                        <div className="absolute bottom-0 right-0">
+                          <button
+                            className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (card.alt === 'Track Shipment') {
+                                setShowTrackShipment(true);
+                              }
+                            }}
+                          >
+                            <img
+                              className="w-[14px] h-[14px]"
+                              alt="Next"
+                              src={NextIcon}
+                            />
+                          </button>
                         </div>
                       </div>
                     </div>

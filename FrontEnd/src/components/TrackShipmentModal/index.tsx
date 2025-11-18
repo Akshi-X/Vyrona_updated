@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Modal from '../Modal';
-import TrackingShipmentIcon from '../../assets/DashBoardIcons/Tracking_Shipment.svg';
+import TrackingShipmentIcon from '../../assets/DashBoardIcons/Tracking_ShipmentDark.svg';
 
 interface TrackShipmentModalProps {
   isOpen: boolean;

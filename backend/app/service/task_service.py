@@ -3,9 +3,10 @@ from typing import Optional
 
 from sqlalchemy import or_, and_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.constants.enums import TaskStatus
+from app.constants.app_constants import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from app.constants.enums import TaskStatus, TaskPriority
 from app.constants.messages import ErrorMessages, SuccessMessages
 from app.exceptions import (
     TaskCreateFailedException,
@@ -34,7 +35,8 @@ from app.schemas.task_schema import (
     DeleteTaskResponse,
     TaskAssigneeInfo,
     TaskCreatorInfo,
-    TaskPermissions
+    TaskPermissions,
+    PatientTaskListResponse
 )
 from app.utils.utils import get_user_by_id
 
@@ -215,6 +217,87 @@ def get_all_tasks(current_user: User, db: Session) -> TaskListResponse:
         
     except Exception as e:
         raise DatabaseQueryException(operation="list tasks", reason=str(e))
+
+
+def get_tasks_by_patient(
+    patient_id: str,
+    current_user: User,
+    db: Session,
+    *,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE
+) -> PatientTaskListResponse:
+    """
+    Retrieve tasks associated with a specific patient with pagination/filtering.
+
+    Managers and pharma admins in the same pharma can see all patient tasks.
+    Other roles are limited to tasks they created or are assigned to.
+    """
+    try:
+        if not patient_id:
+            raise TaskInvalidPatientException(patient_id=patient_id)
+
+        patient_query = db.query(Patient).filter(Patient.id == patient_id)
+        if current_user.pharma_id is not None:
+            patient_query = patient_query.filter(Patient.pharma_id == current_user.pharma_id)
+
+        patient = patient_query.first()
+        if not patient:
+            raise TaskInvalidPatientException(patient_id=patient_id)
+
+        sanitized_page = max(page, 1)
+        sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
+
+        query = (
+            db.query(Tasks)
+            .options(
+                selectinload(Tasks.assignee),
+                selectinload(Tasks.created_by)
+            )
+            .filter(Tasks.patient_id == patient_id)
+        )
+
+        privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
+        if current_user.role not in privileged_roles:
+            query = query.filter(
+                or_(
+                    Tasks.created_by_id == current_user.user_id,
+                    Tasks.assignee_id == current_user.user_id
+                )
+            )
+
+        if status:
+            query = query.filter(Tasks.status == status)
+        if priority:
+            query = query.filter(Tasks.priority == priority)
+
+        total = query.count()
+
+        tasks = (
+            query.order_by(Tasks.created_at.desc())
+            .offset((sanitized_page - 1) * sanitized_page_size)
+            .limit(sanitized_page_size)
+            .all()
+        )
+
+        task_responses = [_build_task_response(task, current_user) for task in tasks]
+
+        return PatientTaskListResponse(
+            message=SuccessMessages.TASKS_RETRIEVED,
+            patient_id=patient_id,
+            total=total,
+            page=sanitized_page,
+            page_size=sanitized_page_size,
+            has_next=((sanitized_page - 1) * sanitized_page_size + len(task_responses)) < total,
+            tasks=task_responses
+        )
+
+    except TaskInvalidPatientException:
+        raise
+    except Exception as e:
+        raise DatabaseQueryException(operation="get patient tasks", reason=str(e))
 
 
 def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskResponse:

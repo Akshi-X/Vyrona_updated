@@ -1,21 +1,14 @@
 import { BaseApiService } from './baseApiService';
 
-export interface LaneRiskItem {
-  route: string;
-  quality_deviations: string;
-  returns_regulatory: string;
-  loss_physical_damage: string;
-  three_pl_reliability: string;
-  weather: string;
-  lane_complexity?: string;
-  geopolitical?: string;
-  digital_communication?: string;
-  risk_level?: string;
+export interface RiskFactor {
+  risk_factor: string;
+  risk_contributors: string[];
+  risk_scale: string;
 }
 
 export interface LaneRiskAssessmentResponse {
-  total_lanes: number;
-  lanes: LaneRiskItem[];
+  total_risk_factors: number;
+  factors: RiskFactor[];
   last_updated: string;
   status: string;
 }

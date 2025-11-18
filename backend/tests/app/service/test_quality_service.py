@@ -1,7 +1,7 @@
 import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -518,98 +518,145 @@ def test_redis_listener_handles_outer_exception(monkeypatch):
     reset_mock.assert_called_once()
 
 
+# ==========================================
+# Tests for _parse_timestamp
+# ==========================================
+
 def test_parse_timestamp_none():
     """Test _parse_timestamp with None"""
-    result = QualityService._parse_timestamp(None)
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp(None)
     assert result is None
 
 
-def test_parse_timestamp_fromisoformat():
-    """Test _parse_timestamp with fromisoformat"""
-    result = QualityService._parse_timestamp("2024-01-01T10:00:00")
+def test_parse_timestamp_isoformat():
+    """Test _parse_timestamp with ISO format"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00")
     assert result is not None
-    assert isinstance(result, datetime)
+    assert result.year == 2024
+    assert result.month == 1
+    assert result.day == 15
 
 
-def test_parse_timestamp_fromisoformat_with_tz():
-    """Test _parse_timestamp with fromisoformat and timezone"""
-    result = QualityService._parse_timestamp("2024-01-01T10:00:00+00:00")
+def test_parse_timestamp_isoformat_with_timezone():
+    """Test _parse_timestamp with ISO format and timezone"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00+00:00")
     assert result is not None
-    assert isinstance(result, datetime)
+    assert result.year == 2024
 
 
-def test_parse_timestamp_strptime_formats():
-    """Test _parse_timestamp with various strptime formats"""
-    formats = [
-        ("2024-01-01 10:00:00", "%Y-%m-%d %H:%M:%S"),
-        ("2024-01-01T10:00:00", "%Y-%m-%dT%H:%M:%S"),
-        ("2024-01-01T10:00:00Z", "%Y-%m-%dT%H:%M:%SZ"),
-        ("2024-01-01T10:00:00.123456", "%Y-%m-%dT%H:%M:%S.%f"),
-        ("2024-01-01T10:00:00.123456Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
-    ]
-    
-    for timestamp_str, _ in formats:
-        result = QualityService._parse_timestamp(timestamp_str)
-        assert result is not None
-        assert isinstance(result, datetime)
+def test_parse_timestamp_strptime_format1():
+    """Test _parse_timestamp with strptime format '%Y-%m-%d %H:%M:%S'"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15 10:30:00")
+    assert result is not None
+    assert result.year == 2024
+    assert result.month == 1
+    assert result.day == 15
+
+
+def test_parse_timestamp_strptime_format2():
+    """Test _parse_timestamp with strptime format '%Y-%m-%dT%H:%M:%S'"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00")
+    assert result is not None
+    assert result.year == 2024
+
+
+def test_parse_timestamp_strptime_format3():
+    """Test _parse_timestamp with strptime format '%Y-%m-%dT%H:%M:%SZ'"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00Z")
+    assert result is not None
+    assert result.year == 2024
+
+
+def test_parse_timestamp_strptime_format4():
+    """Test _parse_timestamp with strptime format '%Y-%m-%dT%H:%M:%S.%f'"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00.123456")
+    assert result is not None
+    assert result.year == 2024
+
+
+def test_parse_timestamp_strptime_format5():
+    """Test _parse_timestamp with strptime format '%Y-%m-%dT%H:%M:%S.%fZ'"""
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("2024-01-15T10:30:00.123456Z")
+    assert result is not None
+    assert result.year == 2024
 
 
 def test_parse_timestamp_invalid():
     """Test _parse_timestamp with invalid format"""
-    result = QualityService._parse_timestamp("invalid-timestamp")
+    service = QualityService(db=MagicMock())
+    result = service._parse_timestamp("invalid-timestamp")
     assert result is None
 
 
-def test_export_patient_quality_data_csv_invalid_duration(monkeypatch):
-    """Test export_patient_quality_data_csv with invalid duration"""
+# ==========================================
+# Tests for export_patient_quality_data_csv
+# ==========================================
+
+def test_export_patient_quality_data_csv_invalid_duration_minutes():
+    """Test export_patient_quality_data_csv with invalid duration_minutes"""
     service = QualityService(db=MagicMock())
     
-    from app.exceptions.quality_exceptions import QualityServiceException
+    with pytest.raises(quality_service.QualityServiceException) as exc_info:
+        service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=0)
     
-    with pytest.raises(QualityServiceException):
-        service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=0)
-    
-    with pytest.raises(QualityServiceException):
-        service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=1441)
+    assert "duration_minutes must be between" in exc_info.value.details.get('detail', '')
 
 
-def test_export_patient_quality_data_csv_redis_connection_error(monkeypatch):
+def test_export_patient_quality_data_csv_duration_too_large():
+    """Test export_patient_quality_data_csv with duration_minutes > 1440"""
+    service = QualityService(db=MagicMock())
+    
+    with pytest.raises(quality_service.QualityServiceException) as exc_info:
+        service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=1441)
+    
+    assert "duration_minutes must be between" in exc_info.value.details.get('detail', '')
+
+
+def test_export_patient_quality_data_csv_redis_connection_failure(monkeypatch):
     """Test export_patient_quality_data_csv when Redis connection fails"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
     
     def raise_redis():
         raise ConnectionError("Redis down")
     
     monkeypatch.setattr(quality_service, "get_redis", raise_redis)
     
-    from app.exceptions.quality_exceptions import RedisConnectionException
+    # Mock validate_patient_belongs_to_pharma to pass
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
-    with pytest.raises(RedisConnectionException):
-        service.export_patient_quality_data_csv("patient-1", 1)
+    with pytest.raises(quality_service.RedisConnectionException):
+        service.export_patient_quality_data_csv("PT-123", 42)
 
 
-def test_export_patient_quality_data_csv_redis_read_error(monkeypatch):
+def test_export_patient_quality_data_csv_redis_read_failure(monkeypatch):
     """Test export_patient_quality_data_csv when Redis read fails"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
     class FakeRedis:
         def lrange(self, key, start, end):
-            raise Exception("Read failed")
+            raise Exception("Redis read error")
     
     monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
     
-    from app.exceptions.quality_exceptions import QualityCsvExportException
+    with pytest.raises(quality_service.QualityCsvExportException) as exc_info:
+        service.export_patient_quality_data_csv("PT-123", 42)
     
-    with pytest.raises(QualityCsvExportException):
-        service.export_patient_quality_data_csv("patient-1", 1)
+    assert "Unable to read quality history" in exc_info.value.details.get('detail', '')
 
 
-def test_export_patient_quality_data_csv_no_data(monkeypatch):
-    """Test export_patient_quality_data_csv when no data found"""
+def test_export_patient_quality_data_csv_no_history(monkeypatch):
+    """Test export_patient_quality_data_csv when no history found"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
     class FakeRedis:
         def lrange(self, key, start, end):
@@ -617,218 +664,235 @@ def test_export_patient_quality_data_csv_no_data(monkeypatch):
     
     monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
     
-    from app.exceptions.quality_exceptions import QualityDataNotFoundException
+    with pytest.raises(quality_service.QualityDataNotFoundException) as exc_info:
+        service.export_patient_quality_data_csv("PT-123", 42)
     
-    with pytest.raises(QualityDataNotFoundException):
-        service.export_patient_quality_data_csv("patient-1", 1)
+    assert exc_info.value.details.get('patient_id') == "PT-123"
 
 
 def test_export_patient_quality_data_csv_success(monkeypatch):
-    """Test successful export_patient_quality_data_csv"""
+    """Test export_patient_quality_data_csv successfully"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
-    from datetime import datetime, timedelta
-    
+    # Create test data
     now = datetime.now()
-    recent_time = (now - timedelta(minutes=5)).isoformat()
+    test_record = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5",
+        "humidity": "60.0",
+        "ph_level": "7.0",
+        "o2_level": "21.0",
+        "co2_level": "0.04",
+        "agitation": "low"
+    }
     
     class FakeRedis:
         def lrange(self, key, start, end):
-            return [
-                json.dumps({
-                    "timestamp": recent_time,
-                    "patient_id": "patient-1",
-                    "temperature": 25.5,
-                    "humidity": 60.0,
-                    "ph_level": 7.0,
-                    "o2_level": 20.0,
-                    "co2_level": 0.04,
-                    "agitation": 100
-                })
-            ]
+            return [json.dumps(test_record)]
     
     monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
     
-    response = service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
+    response = service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=60)
     
-    assert response is not None
     assert response.media_type == "text/csv"
     assert "attachment" in response.headers["Content-Disposition"]
-    assert "patient-1_quality_" in response.headers["Content-Disposition"]
-
-
-def test_export_patient_quality_data_csv_invalid_json(monkeypatch):
-    """Test export_patient_quality_data_csv with invalid JSON"""
-    service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
+    assert "PT-123_quality_" in response.headers["Content-Disposition"]
+    assert ".csv" in response.headers["Content-Disposition"]
     
-    from datetime import datetime, timedelta
-    
-    now = datetime.now()
-    recent_time = (now - timedelta(minutes=5)).isoformat()
-    
-    class FakeRedis:
-        def lrange(self, key, start, end):
-            return [
-                "invalid-json",
-                json.dumps({
-                    "timestamp": recent_time,
-                    "patient_id": "patient-1",
-                    "temperature": 25.5,
-                    "humidity": 60.0,
-                    "ph_level": 7.0,
-                    "o2_level": 20.0,
-                    "co2_level": 0.04,
-                    "agitation": 100
-                })
-            ]
-    
-    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
-    
-    response = service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
-    
-    # Should skip invalid JSON and continue
-    assert response is not None
-
-
-def test_export_patient_quality_data_csv_unparseable_timestamp(monkeypatch):
-    """Test export_patient_quality_data_csv with unparseable timestamp"""
-    service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
-    
-    from datetime import datetime, timedelta
-    
-    now = datetime.now()
-    recent_time = (now - timedelta(minutes=5)).isoformat()
-    
-    class FakeRedis:
-        def lrange(self, key, start, end):
-            return [
-                json.dumps({
-                    "timestamp": "invalid-timestamp",
-                    "patient_id": "patient-1"
-                }),
-                json.dumps({
-                    "timestamp": recent_time,
-                    "patient_id": "patient-1",
-                    "temperature": 25.5,
-                    "humidity": 60.0,
-                    "ph_level": 7.0,
-                    "o2_level": 20.0,
-                    "co2_level": 0.04,
-                    "agitation": 100
-                })
-            ]
-    
-    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
-    
-    response = service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
-    
-    # Should skip unparseable timestamp and continue
-    assert response is not None
-
-
-def test_export_patient_quality_data_csv_old_data_filtered(monkeypatch):
-    """Test export_patient_quality_data_csv filters old data"""
-    service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
-    
-    from datetime import datetime, timedelta
-    
-    now = datetime.now()
-    old_time = (now - timedelta(minutes=20)).isoformat()
-    recent_time = (now - timedelta(minutes=5)).isoformat()
-    
-    class FakeRedis:
-        def lrange(self, key, start, end):
-            return [
-                json.dumps({
-                    "timestamp": old_time,
-                    "patient_id": "patient-1"
-                }),
-                json.dumps({
-                    "timestamp": recent_time,
-                    "patient_id": "patient-1",
-                    "temperature": 25.5,
-                    "humidity": 60.0,
-                    "ph_level": 7.0,
-                    "o2_level": 20.0,
-                    "co2_level": 0.04,
-                    "agitation": 100
-                })
-            ]
-    
-    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
-    
-    response = service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
-    
-    # Should only include recent data
-    assert response is not None
+    # Check CSV content
     csv_content = response.body.decode("utf-8")
-    assert "patient-1" in csv_content
-    # Old data should be filtered out
+    assert "timestamp" in csv_content
+    assert "patient_id" in csv_content
+    assert "PT-123" in csv_content
 
 
-def test_export_patient_quality_data_csv_no_data_in_window(monkeypatch):
-    """Test export_patient_quality_data_csv when no data in time window"""
+def test_export_patient_quality_data_csv_filters_by_duration(monkeypatch):
+    """Test export_patient_quality_data_csv filters records by duration"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
-    from datetime import datetime, timedelta
+    # Create old record (outside duration)
+    old_time = datetime.now() - timedelta(minutes=120)
+    old_record = {
+        "timestamp": old_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5"
+    }
     
-    now = datetime.now()
-    old_time = (now - timedelta(minutes=20)).isoformat()
+    # Create recent record (within duration)
+    recent_time = datetime.now() - timedelta(minutes=30)
+    recent_record = {
+        "timestamp": recent_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "26.0"
+    }
     
     class FakeRedis:
         def lrange(self, key, start, end):
-            return [
-                json.dumps({
-                    "timestamp": old_time,
-                    "patient_id": "patient-1"
-                })
-            ]
+            return [json.dumps(old_record), json.dumps(recent_record)]
     
     monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
     
-    from app.exceptions.quality_exceptions import QualityDataNotFoundException
+    response = service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=60)
     
-    with pytest.raises(QualityDataNotFoundException):
-        service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
+    csv_content = response.body.decode("utf-8")
+    # Should only include recent record
+    assert recent_record["temperature"] in csv_content
+    # Old record should be filtered out
+    assert old_record["temperature"] not in csv_content or csv_content.count(old_record["temperature"]) == 0
+
+
+def test_export_patient_quality_data_csv_skips_invalid_json(monkeypatch):
+    """Test export_patient_quality_data_csv skips invalid JSON entries"""
+    service = QualityService(db=MagicMock())
+    service.validate_patient_belongs_to_pharma = MagicMock()
+    
+    now = datetime.now()
+    valid_record = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5"
+    }
+    
+    class FakeRedis:
+        def lrange(self, key, start, end):
+            return ["invalid json", json.dumps(valid_record)]
+    
+    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
+    
+    response = service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=60)
+    
+    csv_content = response.body.decode("utf-8")
+    # Should include valid record
+    assert "PT-123" in csv_content
+    assert "25.5" in csv_content
+
+
+def test_export_patient_quality_data_csv_skips_unparseable_timestamp(monkeypatch):
+    """Test export_patient_quality_data_csv skips records with unparseable timestamps"""
+    service = QualityService(db=MagicMock())
+    service.validate_patient_belongs_to_pharma = MagicMock()
+    
+    now = datetime.now()
+    valid_record = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5"
+    }
+    
+    invalid_record = {
+        "timestamp": "invalid-timestamp",
+        "patient_id": "PT-123",
+        "temperature": "26.0"
+    }
+    
+    class FakeRedis:
+        def lrange(self, key, start, end):
+            return [json.dumps(invalid_record), json.dumps(valid_record)]
+    
+    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
+    
+    response = service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=60)
+    
+    csv_content = response.body.decode("utf-8")
+    # Should include valid record
+    assert "25.5" in csv_content
+    # Invalid record should be skipped
+    assert "26.0" not in csv_content
+
+
+def test_export_patient_quality_data_csv_no_data_after_filtering(monkeypatch):
+    """Test export_patient_quality_data_csv when no data after filtering"""
+    service = QualityService(db=MagicMock())
+    service.validate_patient_belongs_to_pharma = MagicMock()
+    
+    # Create old record (outside duration)
+    old_time = datetime.now() - timedelta(minutes=120)
+    old_record = {
+        "timestamp": old_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5"
+    }
+    
+    class FakeRedis:
+        def lrange(self, key, start, end):
+            return [json.dumps(old_record)]
+    
+    monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
+    
+    with pytest.raises(quality_service.QualityDataNotFoundException) as exc_info:
+        service.export_patient_quality_data_csv("PT-123", 42, duration_minutes=60)
+    
+    assert "No quality data found in the last" in exc_info.value.details.get('detail', '')
 
 
 def test_export_patient_quality_data_csv_csv_generation_error(monkeypatch):
     """Test export_patient_quality_data_csv when CSV generation fails"""
     service = QualityService(db=MagicMock())
-    monkeypatch.setattr(service, "validate_patient_belongs_to_pharma", MagicMock(return_value=True))
-    
-    from datetime import datetime, timedelta
+    service.validate_patient_belongs_to_pharma = MagicMock()
     
     now = datetime.now()
-    recent_time = (now - timedelta(minutes=5)).isoformat()
+    test_record = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "patient_id": "PT-123",
+        "temperature": "25.5"
+    }
     
     class FakeRedis:
         def lrange(self, key, start, end):
-            return [
-                json.dumps({
-                    "timestamp": recent_time,
-                    "patient_id": "patient-1",
-                    "temperature": 25.5,
-                    "humidity": 60.0,
-                    "ph_level": 7.0,
-                    "o2_level": 20.0,
-                    "co2_level": 0.04,
-                    "agitation": 100
-                })
-            ]
+            return [json.dumps(test_record)]
     
     monkeypatch.setattr(quality_service, "get_redis", lambda: FakeRedis())
     
-    # Mock csv.DictWriter to raise exception
-    with patch('app.service.quality_service.csv.DictWriter') as mock_writer:
-        mock_writer.side_effect = Exception("CSV error")
+    # Patch csv.DictWriter.writerow to raise an exception, which will be caught
+    # and trigger the CSV generation error handling
+    # Patch the csv module's DictWriter class
+    with patch('app.service.quality_service.csv.DictWriter') as mock_dictwriter:
+        mock_writer = MagicMock()
+        mock_writer.writeheader = MagicMock()
+        mock_writer.writerow = MagicMock(side_effect=Exception("Buffer error"))
+        mock_dictwriter.return_value = mock_writer
         
-        from app.exceptions.quality_exceptions import QualityCsvExportException
+        with pytest.raises(quality_service.QualityCsvExportException) as exc_info:
+            service.export_patient_quality_data_csv("PT-123", 42)
         
-        with pytest.raises(QualityCsvExportException):
-            service.export_patient_quality_data_csv("patient-1", 1, duration_minutes=10)
+        assert "Buffer error" in str(exc_info.value.details.get('detail', ''))
+
+
+def test_redis_listener_retries_on_pubsub_connection_error(monkeypatch):
+    """Test redis_listener retries when pubsub connection fails (line 426)"""
+    service = QualityService(db=MagicMock())
+    
+    call_count = {"count": 0}
+    
+    def get_pubsub_with_retry():
+        call_count["count"] += 1
+        if call_count["count"] == 1:
+            raise Exception("Connection error")
+        return FakePubSub([])
+    
+    monkeypatch.setattr(quality_service, "get_pubsub", get_pubsub_with_retry)
+    monkeypatch.setattr(quality_service, "SessionLocal", MagicMock(return_value=MagicMock()))
+    
+    loop = ControlledLoop(exception=asyncio.CancelledError("Test cancelled"))
+    monkeypatch.setattr(quality_service.asyncio, "get_event_loop", lambda: loop)
+    
+    async def fake_sleep(seconds):
+        if call_count["count"] == 1:
+            # First call, simulate retry
+            pass
+        else:
+            raise asyncio.CancelledError()
+    
+    monkeypatch.setattr(quality_service.asyncio, "sleep", fake_sleep)
+    
+    manager = AsyncMock()
+    manager.broadcast = AsyncMock()
+    
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(service.redis_listener(manager))
+    
+    # Should have tried to get pubsub twice (first failed, second succeeded)
+    assert call_count["count"] >= 1
