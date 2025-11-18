@@ -30,8 +30,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
   const navigationItems = [
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
-    { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
-    // { icon: SupportIcon, label: "Support", path: "/support" },
+    { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" }
   ];
 
   const handleNavigation = (path: string) => {
