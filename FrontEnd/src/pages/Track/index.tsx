@@ -265,7 +265,11 @@ export default function TrackPage() {
         {/* Top Black Bar */}
         <header className="h-[63px] bg-black flex items-center justify-end px-6 gap-6 flex-shrink-0">
           {/* Avatar only on the black bar */}
-          <div className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center">
+          <div 
+            className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
+            onClick={() => navigate('/user-profile')}
+            title="Go to User Profile"
+          >
             <span className="text-white text-xs font-semibold">{userInitials}</span>
           </div>
         </header>
@@ -291,6 +295,13 @@ export default function TrackPage() {
                   <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
                 </div>
               )}
+              {/* Tooltip */}
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="font-semibold text-black text-xs whitespace-nowrap">
+                  Critical Alerts
+                </div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+              </div>
             </div>
             {/* Stakeholder Chats */}
             <div className="relative group">
@@ -305,6 +316,13 @@ export default function TrackPage() {
                   <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
                 </div>
               )}
+              {/* Tooltip */}
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="font-semibold text-black text-xs whitespace-nowrap">
+                  Stakeholder Chats
+                </div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+              </div>
             </div>
             {/* My Tasks */}
             <div className="relative group">
@@ -319,6 +337,13 @@ export default function TrackPage() {
                   <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
                 </div>
               )}
+              {/* Tooltip */}
+              <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="font-semibold text-black text-xs whitespace-nowrap">
+                  My Tasks
+                </div>
+                <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+              </div>
             </div>
              {/* Patient Summary */}
              <div className="relative group">
@@ -332,6 +357,13 @@ export default function TrackPage() {
                   }
                 }}
               />
+              {/* Tooltip */}
+              <div className="absolute top-full -left-20 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="font-semibold text-black text-xs whitespace-nowrap">
+                  Patient Summary
+                </div>
+                <div className="absolute bottom-full left-[95px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+              </div>
             </div>
           </div>
         </div>
