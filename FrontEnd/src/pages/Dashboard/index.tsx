@@ -126,13 +126,11 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingTasks(true);
     try {
       const response = await tasksService.getMyTasks();
-      console.log('Tasks API response:', response);
       // Combine created_tasks and assigned_tasks into a single array
       const allTasks = [
         ...(response.created_tasks || []),
         ...(response.assigned_tasks || [])
       ];
-      console.log('Combined tasks:', allTasks);
       setMyTasks(allTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -609,7 +607,6 @@ export default function Dashboard({ }: DashboardProps) {
                       src={MyTasksIcon}
                       onClick={() => {
                         fetchMyTasks();
-                        fetchMyTasks();
                         setShowMyTasks(true);
                       }}
                     />
@@ -641,8 +638,7 @@ export default function Dashboard({ }: DashboardProps) {
                       onClick={() => {
                         if (card.alt === 'My Tasks') {
                           fetchMyTasks();
-                          fetchMyTasks();
-                        setShowMyTasks(true);
+                          setShowMyTasks(true);
                         } else if (card.alt === 'Track Shipment') {
                           setShowTrackShipment(true);
                         }
