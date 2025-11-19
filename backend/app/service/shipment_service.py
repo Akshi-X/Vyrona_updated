@@ -254,7 +254,7 @@ class ShipmentService:
     def get_real_time_metrics(
         self, 
         pharma_id: Optional[int] = None,
-        regions: Optional[List[str]] = None
+        regions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get real-time metrics for shipment tracking dashboard.
@@ -262,6 +262,7 @@ class ShipmentService:
         
         Args:
             pharma_id: Optional pharma ID to filter routes
+            regions: Optional region name to filter by. If None, includes all regions.
             
         Returns:
             Dict containing real-time metrics:
@@ -273,6 +274,8 @@ class ShipmentService:
             - last_updated: ISO timestamp of calculation
         """
         try:
+            regions_list = [regions] if regions else None
+
             # Base query for shipments with join to PatientStage to check active TRANSPORTATION stage
             # Use join to get active stage info in single query (optimize N+1)
             query = self.db.query(
@@ -291,7 +294,7 @@ class ShipmentService:
                 query = query.filter(Shipment.pharma_id == pharma_id)
             
             # Apply region-based filtering
-            query = apply_region_filter(query, regions=regions)
+            query = apply_region_filter(query, regions=regions_list)
             
             results = query.all()
             
@@ -345,8 +348,8 @@ class ShipmentService:
         self, 
         pharma_id: Optional[int] = None,
         route_status: Optional[str] = None,
-        carriers: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None
+        carriers: Optional[str] = None,
+        regions: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Get detailed list of active routes (shipments in TRANSPORTATION stage).
@@ -354,7 +357,8 @@ class ShipmentService:
         Args:
             pharma_id: Optional pharma ID to filter routes
             route_status: Optional route status filter (safe, delayed, high_risk). If None, returns all statuses.
-            carriers: Optional list of carrier names to filter by. If None, returns all carriers.
+            carriers: Optional carrier name to filter by. If None, returns all carriers.
+            regions: Optional region name to filter by. If None, returns all regions.
             
         Returns:
             List of dictionaries containing route details:
@@ -367,11 +371,14 @@ class ShipmentService:
             - updated_at: Last update timestamp
         """
         try:
+            carriers_list = [carriers] if carriers else None
+            regions_list = [regions] if regions else None
+
             # Build filtered query using shared method
             query = self._build_filtered_active_routes_query(
                 pharma_id=pharma_id,
                 route_status=route_status,
-                regions=regions
+                regions=regions_list
             )
             
             results = query.all()
@@ -398,7 +405,7 @@ class ShipmentService:
                 route_carrier = carriers_map.get(shipment.id, fallback_carrier)
                 
                 # Filter by carriers if provided
-                if carriers and not carrier_matches_filter(route_carrier, carriers):
+                if carriers_list and not carrier_matches_filter(route_carrier, carriers_list):
                     continue
                 
                 route_data = {
@@ -771,8 +778,8 @@ class ShipmentService:
         self,
         pharma_id: Optional[int] = None,
         route_status: Optional[str] = None,
-        carriers: Optional[List[str]] = None,
-        regions: Optional[List[str]] = None
+        carriers: Optional[str] = None,
+        regions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get control tower map data with source and destination locations including coordinates.
@@ -781,8 +788,8 @@ class ShipmentService:
         Args:
             pharma_id: Optional pharma ID to filter routes
             route_status: Optional route status filter (safe, delayed, high_risk). If None, returns all statuses.
-            carriers: Optional list of carrier names to filter by. If None, returns all carriers.
-            regions: Optional list of regions to filter by. Matches if either source or destination is in the specified regions.
+            carriers: Optional carrier name to filter by. If None, returns all carriers.
+            regions: Optional region name to filter by. Matches if either source or destination is in the specified region.
             
         Returns:
             Dictionary containing:
@@ -790,11 +797,14 @@ class ShipmentService:
             - total_routes: Total count of routes
         """
         try:
+            carriers_list = [carriers] if carriers else None
+            regions_list = [regions] if regions else None
+
             # Build filtered query using shared method
             query = self._build_filtered_active_routes_query(
                 pharma_id=pharma_id,
                 route_status=route_status,
-                regions=regions
+                regions=regions_list
             )
             
             results = query.all()
@@ -812,7 +822,7 @@ class ShipmentService:
                 route_carrier = carriers_map.get(shipment.id, fallback_carrier)
                 
                 # Filter by carriers if provided
-                if carriers and not carrier_matches_filter(route_carrier, carriers):
+                if carriers_list and not carrier_matches_filter(route_carrier, carriers_list):
                     continue
                 
                 route_data = {
@@ -842,7 +852,7 @@ class ShipmentService:
             
             # Check if filters are applied and no routes found
             message = None
-            if has_filters_applied(route_status, carriers, regions) and len(routes) == 0:
+            if has_filters_applied(route_status, carriers_list, regions_list) and len(routes) == 0:
                 message = InfoMessages.SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE
             
             return {
