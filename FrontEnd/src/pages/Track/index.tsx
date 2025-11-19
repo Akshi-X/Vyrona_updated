@@ -99,14 +99,27 @@ export default function TrackPage() {
   const fetchMyTasks = async () => {
     setLoadingTasks(true);
     try {
-      const response = await tasksService.getMyTasks();
-      // Combine created_tasks and assigned_tasks into a single array
-      const allTasks = [
-        ...(response.created_tasks || []),
-        ...(response.assigned_tasks || [])
-      ];
-      setMyTasks(allTasks);
+      let allTasks: Task[] = [];
+      
+      // If patientId is available, use patient-specific endpoint
+      if (patientId) {
+        const patientResponse = await tasksService.getPatientTasks(patientId);
+        // Patient tasks endpoint returns { tasks: Task[], total, page, page_size, has_next, message, patient_id }
+        allTasks = Array.isArray(patientResponse.tasks) ? patientResponse.tasks : [];
+      } else {
+        // Fallback to general tasks endpoint
+        const response = await tasksService.getMyTasks();
+        // Combine created_tasks and assigned_tasks into a single array
+        allTasks = [
+          ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
+          ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
+        ];
+      }
+      
+      // Ensure we always set an array
+      setMyTasks(Array.isArray(allTasks) ? allTasks : []);
     } catch (e) {
+      console.error('Error fetching tasks:', e);
       setMyTasks([]);
     } finally {
       setLoadingTasks(false);
@@ -132,7 +145,7 @@ export default function TrackPage() {
     fetchMyTasks();
     fetchUnreadMessages();
     fetchCurrentUser();
-  }, []);
+  }, [patientId]); // Re-fetch tasks when patientId changes
 
   // Lightweight polling to keep unread chat badge updated when chat window is closed
   useEffect(() => {
@@ -190,17 +203,38 @@ export default function TrackPage() {
     steps.findIndex(s => s.key === (currentStage ?? ''))
   );
 
-  const transformedTasks: MyTask[] = myTasks.map(task => ({
-    id: task.id.toString(),
-    patientId: task.patient_id || 'N/A',
-    taskName: task.task_name,
-    description: task.description || '',
-    assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
-    assignedTo: `${task.assignee.first_name} ${task.assignee.last_name}`,
-    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
-    priority: task.priority,
-    status: task.status
-  }));
+  const transformedTasks: MyTask[] = (Array.isArray(myTasks) ? myTasks : []).map(task => {
+    try {
+      return {
+        id: task.id.toString(),
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name,
+        description: task.description || '',
+        assigneeBy: task.created_by 
+          ? `${task.created_by.first_name || ''} ${task.created_by.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        assignedTo: task.assignee
+          ? `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
+        priority: task.priority,
+        status: task.status
+      };
+    } catch (error) {
+      console.error('Error transforming task:', task, error);
+      return {
+        id: task.id?.toString() || 'unknown',
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name || 'Unknown Task',
+        description: task.description || '',
+        assigneeBy: 'Unknown',
+        assignedTo: 'Unknown',
+        dueDate: 'N/A',
+        priority: task.priority || 'Medium',
+        status: task.status || 'Not started'
+      };
+    }
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -505,8 +539,75 @@ export default function TrackPage() {
         onAdd={() => {
           // Task creation handled by onTaskCreated callback
         }}
-        onEdit={(_task) => {
-          // TODO: Implement edit task functionality
+        onEdit={async (task: MyTask) => {
+          try {
+            const taskId = parseInt(task.id);
+            if (isNaN(taskId)) {
+              console.error('Invalid task ID:', task.id);
+              return;
+            }
+
+            // Get assigneeId from the task (it should be stored when user selects from dropdown)
+            const assigneeId = (task as any).assigneeId;
+            
+            // Prepare update data
+            const updateData: {
+              task_name?: string;
+              description?: string;
+              assignee_id?: string;
+              patient_id?: string;
+              due_date?: string;
+              priority?: 'Low' | 'Medium' | 'High';
+              status?: 'Not started' | 'In progress' | 'Done';
+            } = {};
+
+            // Check if task was created by current user - they can edit all fields
+            const isCreatedByMe = task.assigneeBy?.trim().toLowerCase() === 
+              (currentUser ? `${currentUser.first_name} ${currentUser.last_name}`.trim().toLowerCase() : '');
+
+            if (isCreatedByMe) {
+              // Creator can update all fields
+              updateData.task_name = task.taskName;
+              updateData.description = task.description;
+              if (assigneeId) {
+                // assignee_id should be a string (user_id)
+                updateData.assignee_id = String(assigneeId);
+              }
+              updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;
+              // Parse date - handle both ISO format and locale date string
+              if (task.dueDate && task.dueDate !== 'N/A') {
+                try {
+                  const date = new Date(task.dueDate);
+                  if (!isNaN(date.getTime())) {
+                    updateData.due_date = date.toISOString();
+                  }
+                } catch (e) {
+                  console.error('Error parsing date:', task.dueDate, e);
+                }
+              }
+              updateData.priority = task.priority;
+              updateData.status = task.status;
+            } else {
+              // Assignee can only update status - use dedicated status update endpoint
+              if (task.status) {
+                await tasksService.updateTaskStatus(taskId, task.status);
+                // Refresh tasks after update
+                fetchMyTasks();
+                return; // Early return since we've handled the update
+              }
+              return;
+            }
+
+            // Call update API for full task updates (when creator edits)
+            if (Object.keys(updateData).length > 0) {
+              await tasksService.updateTask(taskId, updateData);
+            }
+
+            // Refresh tasks after update
+            fetchMyTasks();
+          } catch (error) {
+            console.error('Error updating task:', error);
+          }
         }}
         onDelete={(_taskId) => {
           // TODO: Implement delete task functionality

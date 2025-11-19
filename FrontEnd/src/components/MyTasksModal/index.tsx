@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AlertCard from '../AlertCard';
 import { tasksService } from '../../services/tasksService';
+import { userService } from '../../services/userService';
+import type { UserListItem } from '../../services/userService';
 import { TASK_FIELD_ERRORS } from '../../constants/validation';
 
 // MyTasksModal component with API integration
@@ -11,6 +13,7 @@ export interface MyTask {
   taskName: string;
   description: string;
   assigneeBy: string;
+  assignedTo: string;
   dueDate: string;
   priority: 'Low' | 'Medium' | 'High';
   status: 'Not started' | 'In progress' | 'Done';
@@ -38,7 +41,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   loading = false,
   onAdd,
   onEdit,
-  onDelete,
+  onDelete: _onDelete, // Reserved for future delete functionality
   variant = 'dashboard',
   currentUserName = '',
   currentUserId = '',
@@ -54,6 +57,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     taskName: '',
     description: '',
     assigneeBy: currentUserName || '',
+    assignedTo: '',
     assigneeId: '', // User ID for API
     dueDate: '',
     priority: 'Medium' as 'Low' | 'Medium' | 'High',
@@ -62,6 +66,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const [editedTask, setEditedTask] = useState<MyTask | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const statusCellRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const handleAddClick = () => {
     setShowInputRow(true);
@@ -72,6 +80,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       taskName: '',
       description: '',
       assigneeBy: currentUserName || '',
+      assignedTo: '',
       assigneeId: currentUserId || '',
       dueDate: '',
       priority: 'Medium',
@@ -145,6 +154,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         taskName: '',
         description: '',
         assigneeBy: currentUserName || '',
+        assignedTo: '',
         assigneeId: currentUserId || '',
         dueDate: '',
         priority: 'Medium',
@@ -167,6 +177,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       taskName: '',
       description: '',
       assigneeBy: currentUserName || '',
+      assignedTo: '',
       assigneeId: currentUserId || '',
       dueDate: '',
       priority: 'Medium',
@@ -192,7 +203,19 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
 
   const handleSaveEdit = () => {
     if (editedTask && onEdit) {
-      onEdit(editedTask);
+      // Find assigneeId from the selected user name if not already stored
+      let assigneeId = (editedTask as any).assigneeId;
+      if (!assigneeId && editedTask.assignedTo) {
+        const user = findUserByName(editedTask.assignedTo);
+        if (user) {
+          assigneeId = user.user_id;
+        }
+      }
+      // Pass the task with assigneeId if available, ensuring status is included
+      const taskToSave = assigneeId 
+        ? { ...editedTask, ...({ assigneeId } as any), status: editedTask.status }
+        : { ...editedTask, status: editedTask.status };
+      onEdit(taskToSave);
     }
     setEditingTaskId(null);
     setEditedTask(null);
@@ -201,6 +224,34 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const handleCancelEdit = () => {
     setEditingTaskId(null);
     setEditedTask(null);
+  };
+
+  // Fetch users list when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchUsers();
+    }
+  }, [isOpen]);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await userService.getAllUsersInCompany();
+      setUsers(response.users || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Helper function to find user by full name
+  const findUserByName = (fullName: string): UserListItem | undefined => {
+    return users.find(u => {
+      const userFullName = `${u.first_name} ${u.last_name}`.trim();
+      return userFullName.toLowerCase() === fullName.toLowerCase();
+    });
   };
 
   // Update form when user info changes
@@ -227,6 +278,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         taskName: '',
         description: '',
         assigneeBy: currentUserName || '',
+        assignedTo: '',
         assigneeId: currentUserId || '',
         dueDate: '',
         priority: 'Medium',
@@ -236,7 +288,37 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   }, [isOpen, currentUserName, currentUserId]);
 
   // Filter out deleted tasks from display
-  const visibleTasks = tasks.filter(task => !deletedTaskIds.has(task.id));
+  // Ensure tasks is always an array
+  const tasksArray = Array.isArray(tasks) ? tasks : [];
+  const visibleTasks = tasksArray.filter(task => !deletedTaskIds.has(task.id));
+
+  // Helper function to check if task is created by current user
+  const isTaskCreatedByMe = (task: MyTask): boolean => {
+    return task.assigneeBy?.trim().toLowerCase() === currentUserName?.trim().toLowerCase();
+  };
+
+  // Helper function to check if task is assigned to current user
+  const isTaskAssignedToMe = (task: MyTask): boolean => {
+    return task.assignedTo?.trim().toLowerCase() === currentUserName?.trim().toLowerCase();
+  };
+
+  // Helper function to check if user can edit this task
+  const canEditTask = (task: MyTask): boolean => {
+    return isTaskCreatedByMe(task) || isTaskAssignedToMe(task);
+  };
+
+  // Helper function to get editable fields for a task
+  const getEditableFields = (task: MyTask): Set<string> => {
+    if (isTaskCreatedByMe(task)) {
+      // Creator can edit all fields except "Assigned by"
+      return new Set(['patientId', 'taskName', 'description', 'assignedTo', 'dueDate', 'priority', 'status']);
+    } else if (isTaskAssignedToMe(task)) {
+      // Assignee can only edit status
+      return new Set(['status']);
+    }
+    return new Set();
+  };
+
 
   return (
     <AlertCard
@@ -253,7 +335,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         onAdd && !isUserRole ? (
           <button
             onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
+            className="px-4 py-2 bg-[#6b1176] hover:bg-[#8b2a96] text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -272,36 +354,77 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           {validationErrors.submit}
         </div>
       )}
-      <table className="alert-card-table w-full divide-y divide-gray-200 table-fixed">
+      <div className="relative" ref={scrollContainerRef}>
+        <style>{`
+          .alert-card-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+          }
+          .alert-card-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background-color: rgb(250 245 255);
+          }
+          .alert-card-table th.sticky,
+          .alert-card-table td.sticky {
+            position: sticky;
+            right: 0;
+            background-color: inherit;
+          }
+          .alert-card-table thead th.sticky {
+            background-color: rgb(250 245 255) !important;
+            z-index: 31;
+          }
+          .alert-card-table tbody td.sticky {
+            background-color: white !important;
+            z-index: 1010;
+          }
+          .alert-card-table tbody tr:hover td.sticky {
+            background-color: white !important;
+          }
+          .alert-card-table tbody tr.bg-gray-50 td.sticky {
+            background-color: rgb(249 250 251) !important;
+          }
+          .alert-card-table th,
+          .alert-card-table td {
+            display: table-cell !important;
+            visibility: visible !important;
+            overflow: visible !important;
+          }
+          .alert-card-table th:not(:last-child):not(.sticky),
+          .alert-card-table td:not(:last-child):not(.sticky) {
+            padding-right: 20px !important;
+          }
+          .alert-card-table th:not(:first-child):not(.sticky),
+          .alert-card-table td:not(:first-child):not(.sticky) {
+            padding-left: 15px !important;
+          }
+        `}</style>
+        <table className="alert-card-table divide-y divide-gray-200" style={{ width: '100%', tableLayout: 'auto' }}>
         <colgroup>
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '15%' }} />
-          <col style={{ width: '25%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '10%' }} />
-          {variant === 'track' && (
-            <>
-              <col style={{ width: '6%' }} />
-            </>
-          )}
+          <col style={{ width: 'auto', minWidth: '100px' }} />
+          <col style={{ width: 'auto', minWidth: '150px' }} />
+          <col style={{ width: 'auto', minWidth: '80px' }} />
+          <col style={{ width: 'auto', minWidth: '130px' }} />
+          <col style={{ width: 'auto', minWidth: '150px' }} />
+          <col style={{ width: 'auto', minWidth: '130px' }} />
+          <col style={{ width: 'auto', minWidth: '100px' }} />
+          <col style={{ width: 'auto', minWidth: '100px' }} />
+          {variant === 'track' && <col style={{ width: '80px', minWidth: '80px' }} />}
         </colgroup>
         <thead className="bg-[#fdeeff]">
           <tr className="border-b border-[#eeeeee]">
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Patient ID</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Task Name</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Description</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Assigned by</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Due date</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Priority</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Status</th>
-            {variant === 'track' && (
-              <>
-                <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-right"></th>
-                <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-right"></th>
-              </>
-            )}
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Patient ID</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Task Name</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Description</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Assigned by</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Assigned to</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Due date</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Priority</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Status</th>
+            {variant === 'track' && <th className="p-[15px] sticky right-0 bg-[#fdeeff] z-20"></th>}
           </tr>
         </thead>
         <tbody>
@@ -316,7 +439,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     onChange={(e) => handleInputChange('patientId', e.target.value)}
                     placeholder="Patient ID"
                     required
-                    className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
+                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.patientId 
                         ? 'border-red-500 focus:ring-red-200' 
                         : 'border-gray-300 focus:ring-purple-200'
@@ -335,7 +458,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     onChange={(e) => handleInputChange('taskName', e.target.value)}
                     placeholder="Task Name"
                     required
-                    className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
+                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.taskName 
                         ? 'border-red-500 focus:ring-red-200' 
                         : 'border-gray-300 focus:ring-purple-200'
@@ -354,7 +477,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     placeholder="Description"
                     required
-                    className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
+                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.description 
                         ? 'border-red-500 focus:ring-red-200' 
                         : 'border-gray-300 focus:ring-purple-200'
@@ -372,6 +495,36 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   readOnly
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-700 cursor-not-allowed"
                 />
+              </td>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                <div>
+                  <select
+                    value={newTask.assigneeId || ''}
+                    onChange={(e) => {
+                      const selectedUserId = e.target.value;
+                      const selectedUser = users.find(u => u.user_id === selectedUserId);
+                      handleInputChange('assigneeId', selectedUserId);
+                      handleInputChange('assignedTo', selectedUser ? `${selectedUser.first_name} ${selectedUser.last_name}`.trim() : '');
+                    }}
+                    required
+                    disabled={loadingUsers}
+                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
+                      validationErrors.assignedTo 
+                        ? 'border-red-500 focus:ring-red-200' 
+                        : 'border-gray-300 focus:ring-purple-200'
+                    } ${loadingUsers ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  >
+                    <option value="">Select a user</option>
+                    {users.map((user) => (
+                      <option key={user.user_id} value={user.user_id}>
+                        {user.first_name} {user.last_name}
+                      </option>
+                    ))}
+                  </select>
+                  {validationErrors.assignedTo && (
+                    <div className="text-xs text-red-500 mt-1">{validationErrors.assignedTo}</div>
+                  )}
+                </div>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <div>
@@ -442,8 +595,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </div>
               </td>
               {variant === 'track' && (
-                <>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-center">
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-center sticky z-10">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={handleSaveAdd}
@@ -470,24 +622,25 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       </button>
                     </div>
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm"></td>
-                </>
               )}
             </tr>
           )}
           {visibleTasks.map((task) => {
             const isEditing = editingTaskId === task.id;
             const displayTask = isEditing && editedTask ? editedTask : task;
+            const canEdit = canEditTask(task);
+            const editableFields = getEditableFields(task);
+            const isCreatedByMe = isTaskCreatedByMe(task);
             
             return (
               <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && !isUserRole ? (
+                  {isEditing && editableFields.has('patientId') ? (
                     <input
                       type="text"
                       value={displayTask.patientId || ''}
                       onChange={(e) => handleEditInputChange('patientId', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200 font-mono"
+                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200 font-mono"
                     />
                   ) : (
                     <div className="font-mono truncate">
@@ -496,56 +649,83 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   )}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && !isUserRole ? (
+                  {isEditing && editableFields.has('taskName') ? (
                     <input
                       type="text"
                       value={displayTask.taskName || ''}
                       onChange={(e) => handleEditInputChange('taskName', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
+                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                <div className="truncate" title={task.taskName}>{task.taskName}</div>
+                    <div className="truncate overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }} title={task.taskName}>{task.taskName}</div>
                   )}
               </td>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && !isUserRole ? (
+                  {isEditing && editableFields.has('description') ? (
                     <input
                       type="text"
                       value={displayTask.description || ''}
                       onChange={(e) => handleEditInputChange('description', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
+                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="truncate" title={task.description}>{task.description}</div>
+                    <div className="truncate overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }} title={task.description}>{task.description}</div>
                   )}
               </td>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && !isUserRole ? (
-                    <input
-                      type="text"
-                      value={displayTask.assigneeBy || ''}
-                      onChange={(e) => handleEditInputChange('assigneeBy', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    />
+                  {/* Assigned by is always read-only, even when editing */}
+                  <div className="whitespace-nowrap" title={task.assigneeBy}>{task.assigneeBy}</div>
+              </td>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  {isEditing && editableFields.has('assignedTo') ? (
+                    <select
+                      value={(() => {
+                        // Find user ID from assignedTo name
+                        const user = findUserByName(displayTask.assignedTo || '');
+                        return user?.user_id || '';
+                      })()}
+                      onChange={(e) => {
+                        const selectedUserId = e.target.value;
+                        const selectedUser = users.find(u => u.user_id === selectedUserId);
+                        if (selectedUser && editedTask) {
+                          const fullName = `${selectedUser.first_name} ${selectedUser.last_name}`.trim();
+                          // Update both assignedTo name and store assigneeId in a way we can access it
+                          setEditedTask({ 
+                            ...editedTask, 
+                            assignedTo: fullName,
+                            // Store assigneeId as a property we can access later
+                            ...({ assigneeId: selectedUserId } as any)
+                          });
+                        }
+                      }}
+                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
+                    >
+                      <option value="">Select a user</option>
+                      {users.map((user) => (
+                        <option key={user.user_id} value={user.user_id}>
+                          {user.first_name} {user.last_name}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
-                    <div className="truncate">{task.assigneeBy}</div>
+                    <div className="whitespace-nowrap" title={task.assignedTo || 'N/A'}>{task.assignedTo || 'N/A'}</div>
                   )}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && !isUserRole ? (
+                  {isEditing && editableFields.has('dueDate') ? (
                     <input
                       type="date"
                       value={displayTask.dueDate || ''}
                       onChange={(e) => handleEditInputChange('dueDate', e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
+                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
-                    <div className="truncate">{task.dueDate}</div>
+                    <div className="whitespace-nowrap" title={task.dueDate}>{task.dueDate}</div>
                   )}
                 </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
-                  {isEditing && !isUserRole ? (
-                    <div className="relative" style={{ zIndex: 1000 }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'hidden' }}>
+                  {isEditing && editableFields.has('priority') ? (
+                    <div className="relative" style={{ zIndex: 1 }}>
                       <select
                         value={displayTask.priority}
                         onChange={(e) => handleEditInputChange('priority', e.target.value)}
@@ -557,7 +737,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         style={{ 
                           minHeight: '32px', 
                           position: 'relative', 
-                          zIndex: 1000,
+                          zIndex: 1,
                           backgroundColor: displayTask.priority === 'High' ? '#fee2e2' :
                                           displayTask.priority === 'Medium' ? '#fed7aa' :
                                           '#dcfce7'
@@ -578,12 +758,19 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </span>
                   )}
               </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" style={{ overflow: 'visible' }}>
-                  {isEditing ? (
-                    <div className="relative" style={{ zIndex: 1000 }}>
+              <td 
+                ref={(el) => { statusCellRefs.current[task.id] = el; }}
+                className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" 
+                style={{ overflow: 'hidden' }}
+              >
+                  {isEditing && editableFields.has('status') ? (
+                    <div className="relative" style={{ zIndex: 1 }}>
                       <select
                         value={displayTask.status}
-                        onChange={(e) => handleEditInputChange('status', e.target.value)}
+                        onChange={(e) => {
+                          const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done';
+                          handleEditInputChange('status', newStatus);
+                        }}
                         className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.status === 'Done' ? 'bg-green-100 text-green-800' :
                           displayTask.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
@@ -592,7 +779,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         style={{ 
                           minHeight: '32px', 
                           position: 'relative', 
-                          zIndex: 1000,
+                          zIndex: 1,
                           backgroundColor: displayTask.status === 'Done' ? '#dcfce7' :
                                           displayTask.status === 'In progress' ? '#dbeafe' :
                                           '#f3f4f6'
@@ -613,9 +800,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </span>
                   )}
               </td>
-                {variant === 'track' && !isUserRole && (
+              {variant === 'track' && (
+                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right sticky" style={{ zIndex: 1010 }}>
+                  {canEdit && (
                   <>
-                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
                       {isEditing ? (
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -642,72 +830,35 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                           onClick={() => {
                             setEditingTaskId(task.id);
                             setEditedTask({ ...task });
+                            // If user is not the creator (only status is editable), scroll to status column
+                            if (!isCreatedByMe) {
+                              setTimeout(() => {
+                                const statusCell = statusCellRefs.current[task.id];
+                                if (statusCell) {
+                                  // Find the scrollable container (parent with overflow-x-auto)
+                                  let container: HTMLElement | null = statusCell.parentElement;
+                                  while (container && !container.classList.contains('overflow-x-auto')) {
+                                    container = container.parentElement;
+                                  }
+                                  if (container) {
+                                    const cellRect = statusCell.getBoundingClientRect();
+                                    const containerRect = container.getBoundingClientRect();
+                                    const scrollLeft = container.scrollLeft + (cellRect.left - containerRect.left) - (containerRect.width / 2) + (cellRect.width / 2);
+                                    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+                                  }
+                                }
+                              }, 100);
+                            }
                           }}
                           className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
-                          title="Edit task"
+                          title={isCreatedByMe ? "Edit task" : "Edit status"}
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                           </svg>
                         </button>
                       )}
-                    </td>
-                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
-                      {!isEditing && (
-                        <button
-                          onClick={() => {
-                            setDeletedTaskIds(prev => new Set([...prev, task.id]));
-                            if (onDelete) {
-                              onDelete(task.id);
-                            }
-                          }}
-                          className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
-                          title="Delete task"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                          </svg>
-                        </button>
-                      )}
-                    </td>
-                  </>
-                )}
-                {variant === 'track' && isUserRole && (
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right">
-                    {isEditing ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={handleSaveEdit}
-                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
-                          title="Save changes"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded transition-colors"
-                          title="Cancel editing"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditingTaskId(task.id);
-                          setEditedTask({ ...task });
-                        }}
-                        className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
-                        title="Edit status"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                        </svg>
-                      </button>
+                    </>
                     )}
               </td>
                 )}
@@ -716,6 +867,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           })}
         </tbody>
       </table>
+      </div>
     </AlertCard>
   );
 };

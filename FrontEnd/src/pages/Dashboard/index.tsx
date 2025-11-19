@@ -204,17 +204,38 @@ export default function Dashboard({ }: DashboardProps) {
   }, [isAuthenticated]);
 
   // Transform API data to match component interface
-  const transformedTasks: MyTask[] = myTasks.map(task => ({
-    id: task.id.toString(),
-    patientId: task.patient_id || 'N/A',
-    taskName: task.task_name,
-    description: task.description || '',
-    assigneeBy: `${task.created_by.first_name} ${task.created_by.last_name}`,
-    assignedTo: `${task.assignee.first_name} ${task.assignee.last_name}`,
-    dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
-    priority: task.priority,
-    status: task.status
-  }));
+  const transformedTasks: MyTask[] = myTasks.map(task => {
+    try {
+      return {
+        id: task.id.toString(),
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name,
+        description: task.description || '',
+        assigneeBy: task.created_by 
+          ? `${task.created_by.first_name || ''} ${task.created_by.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        assignedTo: task.assignee
+          ? `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown',
+        dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
+        priority: task.priority,
+        status: task.status
+      };
+    } catch (error) {
+      console.error('Error transforming task:', task, error);
+      return {
+        id: task.id?.toString() || 'unknown',
+        patientId: task.patient_id || 'N/A',
+        taskName: task.task_name || 'Unknown Task',
+        description: task.description || '',
+        assigneeBy: 'Unknown',
+        assignedTo: 'Unknown',
+        dueDate: 'N/A',
+        priority: task.priority || 'Medium',
+        status: task.status || 'Not started'
+      };
+    }
+  });
 
   const transformedAlerts = criticalAlerts.map(alert => ({
     id: alert.id,
@@ -615,7 +636,10 @@ export default function Dashboard({ }: DashboardProps) {
                       key={index}
                       className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                       onClick={() => {
-                        if (card.alt === 'Track Shipment') {
+                        if (card.alt === 'My Tasks') {
+                          fetchMyTasks();
+                          setShowMyTasks(true);
+                        } else if (card.alt === 'Track Shipment') {
                           setShowTrackShipment(true);
                         }
                       }}

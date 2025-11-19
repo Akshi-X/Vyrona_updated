@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface ModalProps {
   isOpen: boolean;
@@ -23,6 +24,9 @@ const Modal: React.FC<ModalProps> = ({
   headerAction,
   scrollableContainerClassName
 }) => {
+  // Lock body scroll when modal is open
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
@@ -32,7 +36,7 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div className="flex items-center justify-center min-h-screen p-4">
         <div 
-          className={`relative mx-auto border ${containerClassName ?? 'w-4/5'} shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto ${scrollableContainerClassName ?? ''}`}
+          className={`relative mx-auto border ${containerClassName ?? 'w-4/5'} shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">

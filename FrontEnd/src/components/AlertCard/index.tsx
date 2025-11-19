@@ -86,18 +86,8 @@ const AlertCard: React.FC<AlertCardProps> = ({
             {children}
           </div>
         ) : (
-          <div className={`w-full ${contentHeightClassName} overflow-x-hidden relative`}>
-            <div className="overflow-y-auto overflow-x-visible h-full" style={{ overflowX: 'visible' }}>
-              <style>{`
-                .alert-card-table thead {
-                  position: sticky;
-                  top: 0;
-                  z-index: 10;
-                  background-color: rgb(250 245 255);
-                }
-              `}</style>
-              {children}
-            </div>
+          <div className={`w-full ${contentHeightClassName} overflow-x-auto overflow-y-auto relative`}>
+            {children}
           </div>
         )}
       </div>

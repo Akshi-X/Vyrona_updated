@@ -53,6 +53,16 @@ export class TasksService extends BaseApiService {
   }
 
   /**
+   * Get tasks for a specific patient
+   * Returns PatientTaskListResponse with tasks array inside
+   */
+  async getPatientTasks(patientId: string): Promise<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }> {
+    return await this.request<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
+      method: 'GET',
+    });
+  }
+
+  /**
    * Get task by ID
    */
   async getTask(taskId: number): Promise<Task> {
@@ -85,10 +95,11 @@ export class TasksService extends BaseApiService {
   async updateTask(taskId: number, taskData: {
     task_name?: string;
     description?: string;
-    assignee_id?: number;
+    assignee_id?: string;
     patient_id?: string;
     due_date?: string;
     priority?: 'Low' | 'Medium' | 'High';
+    status?: 'Not started' | 'In progress' | 'Done';
   }): Promise<{ message: string; task_id: number }> {
     return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}`, {
       method: 'PUT',
