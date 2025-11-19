@@ -567,7 +567,7 @@ export default function Dashboard({ }: DashboardProps) {
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         Critical Alerts
                       </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
                   </div>
 
@@ -594,7 +594,7 @@ export default function Dashboard({ }: DashboardProps) {
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         Stakeholder Chats
                       </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
                   </div>
 
@@ -622,7 +622,7 @@ export default function Dashboard({ }: DashboardProps) {
                       <div className="font-semibold text-black text-xs whitespace-nowrap">
                         My Tasks
                       </div>
-                      <div className="absolute bottom-full left-8 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                      <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
                     </div>
                   </div>
                 </div>
