@@ -220,6 +220,14 @@ class ShipmentService extends BaseApiService {
       `/api/shipment/document-checklist/${encodeURIComponent(patientId)}`
     );
   }
+
+  /**
+   * Get available regions
+   * GET /api/shipment/regions
+   */
+  async getAvailableRegions(): Promise<string[]> {
+    return this.get<string[]>('/api/shipment/regions');
+  }
 }
 
 export interface ShipmentLegDetail {
