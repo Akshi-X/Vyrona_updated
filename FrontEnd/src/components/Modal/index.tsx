@@ -9,6 +9,7 @@ interface ModalProps {
   children: React.ReactNode;
   containerClassName?: string;
   headerAction?: React.ReactNode;
+  scrollableContainerClassName?: string; // allows custom scrollbar styling
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -19,7 +20,8 @@ const Modal: React.FC<ModalProps> = ({
   icon,
   children,
   containerClassName,
-  headerAction
+  headerAction,
+  scrollableContainerClassName
 }) => {
   if (!isOpen) return null;
 
@@ -30,19 +32,19 @@ const Modal: React.FC<ModalProps> = ({
     >
       <div className="flex items-center justify-center min-h-screen p-4">
         <div 
-          className={`relative mx-auto border ${containerClassName ?? 'w-4/5'} shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto`}
+          className={`relative mx-auto border ${containerClassName ?? 'w-4/5'} shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto ${scrollableContainerClassName ?? ''}`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center mr-3">
+                <div className="w-8 h-8 flex items-center justify-center mr-3">
                   {icon}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-                  <p className="text-sm text-gray-500">{description}</p>
+                  <h3 className="text-[16px] font-semibold text-black mt-5">{title}</h3>
+                  <p className="text-[12px] text-[#969696]">{description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

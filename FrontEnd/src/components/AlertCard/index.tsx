@@ -15,6 +15,8 @@ interface AlertCardProps {
   containerClassName?: string;
   contentHeightClassName?: string; // allows per-modal height control
   headerAction?: React.ReactNode;
+  disableInnerScroll?: boolean; // allows disabling inner scroll for specific modals
+  thinScrollbar?: boolean; // allows thin scrollbar styling for specific modals
 }
 
 const AlertCard: React.FC<AlertCardProps> = ({
@@ -30,18 +32,32 @@ const AlertCard: React.FC<AlertCardProps> = ({
   dataLength = 0,
   containerClassName,
   contentHeightClassName = 'h-[300px]',
-  headerAction
+  headerAction,
+  disableInnerScroll = false,
+  thinScrollbar = false
 }) => {
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      description={description}
-      icon={icon}
-      containerClassName={containerClassName}
-      headerAction={headerAction}
-    >
+    <>
+      {thinScrollbar && (
+        <style>{`
+          .alert-card-thin-scrollbar {
+            scrollbar-width: thin;
+          }
+          .alert-card-thin-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
+        `}</style>
+      )}
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={title}
+        description={description}
+        icon={icon}
+        containerClassName={containerClassName}
+        headerAction={headerAction}
+        scrollableContainerClassName={thinScrollbar ? 'alert-card-thin-scrollbar' : ''}
+      >
       <div className="w-full">
         {loading ? (
           <div className={`flex items-center justify-center py-12 ${contentHeightClassName}`}>
@@ -56,6 +72,18 @@ const AlertCard: React.FC<AlertCardProps> = ({
               </svg>
             </div>
             <p className="text-gray-500 text-lg">{emptyText}</p>
+          </div>
+        ) : disableInnerScroll ? (
+          <div className="w-full">
+            <style>{`
+              .alert-card-table thead {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background-color: rgb(250 245 255);
+              }
+            `}</style>
+            {children}
           </div>
         ) : (
           <div className={`w-full ${contentHeightClassName} overflow-x-hidden relative`}>
@@ -74,6 +102,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
         )}
       </div>
     </Modal>
+    </>
   );
 };
 

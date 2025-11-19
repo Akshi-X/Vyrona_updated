@@ -505,7 +505,7 @@ export default function QualityTrackingChart() {
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px]">
       <div className="flex items-center justify-between mb-1">
         <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         {isConnected && (
@@ -525,7 +525,7 @@ export default function QualityTrackingChart() {
         </div>
       )}
 
-      <div className="h-[220px]">
+      <div className="h-[380px]">
         {dataPoints.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
             {isConnected ? 'Waiting for data...' : 'Connecting...'}
