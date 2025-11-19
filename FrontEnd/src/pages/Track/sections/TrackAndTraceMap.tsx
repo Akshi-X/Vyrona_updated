@@ -266,7 +266,7 @@ const TrackAndTraceMap = () => {
   }
 
   return (
-    <div className="w-full h-[290px] rounded overflow-hidden border border-[#E7E1E1] relative">
+    <div className="w-full h-[460px] rounded overflow-hidden border border-[#E7E1E1] relative">
       {/* Map */}
       <div ref={mapRef} className="w-full h-full" />
 

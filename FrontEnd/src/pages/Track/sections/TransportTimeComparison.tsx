@@ -110,7 +110,7 @@ export default function TransportTimeComparison() {
           label: 'Scheduled',
           data: scheduled,
           backgroundColor: '#6B1176',
-          borderRadius: 0,
+          borderRadius: { topLeft: 5, bottomLeft: 5,topRight: 0, bottomRight: 0 },
           borderSkipped: false as any,
           maxBarThickness: 8,
         },
@@ -126,7 +126,7 @@ export default function TransportTimeComparison() {
           label: '', // Empty label for background segment
           data: remaining,
           backgroundColor: '#EDEDED',
-          borderRadius: 5,
+          borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 5, bottomRight: 5 },
           borderSkipped: false as any,
           maxBarThickness: 8,
           tooltip: {
