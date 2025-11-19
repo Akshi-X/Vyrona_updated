@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { chatService } from '../../services/chatService';
 import { userService, type UserListItem, type UserProfileDto } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 type ChatMessage = { 
   id: string; 
@@ -496,10 +497,13 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     }
   };
 
+  // Lock body scroll when chat box is open
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={onClose}>
       <div className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b">
