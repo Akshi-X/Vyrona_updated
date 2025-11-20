@@ -15,11 +15,21 @@ from datetime import datetime
 class PerformanceMetrics(BaseModel):
     """Performance metrics response"""
     on_time_percentage: float
-    avg_lead_time_days: int
+    avg_lead_time_days: float
     failure_cost_million: float
     total_shipments: int
     completed_shipments: int
     pending_shipments: int
+    last_updated: datetime
+
+
+class AvgLeadTimeResponse(BaseModel):
+    """Average lead time response for a pharma"""
+    avg_lead_time_days: float
+    total_shipments: int
+    completed_shipments: int
+    pending_shipments: int
+    status: str
     last_updated: datetime
 
 
