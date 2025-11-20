@@ -25,11 +25,6 @@ const ControlTower = () => {
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [routesError, setRoutesError] = useState<string | null>(null);
 
-  // Regions via API
-  const [regions, setRegions] = useState<string[]>([]);
-  const [_loadingRegions, setLoadingRegions] = useState(false);
-  const [_regionsError, setRegionsError] = useState<string | null>(null);
-
   useEffect(() => {
     const fetchRoutes = async () => {
       setLoadingRoutes(true);
@@ -47,37 +42,15 @@ const ControlTower = () => {
     if (isAuthenticated) fetchRoutes();
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    const fetchRegions = async () => {
-      setLoadingRegions(true);
-      setRegionsError(null);
-      try {
-        const data = await shipmentService.getAvailableRegions();
-        setRegions(data);
-      } catch (e: any) {
-        setRegionsError(e?.message || 'Failed to load regions');
-        setRegions([]);
-      } finally {
-        setLoadingRegions(false);
-      }
-    };
-    if (isAuthenticated) fetchRegions();
-  }, [isAuthenticated]);
-
-  // Build filter option lists from API data
+  // Build filter option lists from routes data
   const regionOptions = useMemo(() => {
-    // Use regions from API endpoint
-    if (regions && regions.length > 0) {
-      return ['All', ...regions.sort()];
-    }
-    // Fallback to building from routes if API fails
     const set = new Set<string>();
     routes.forEach(r => {
-      if (r?.origin && r.origin.trim()) set.add(r.origin.trim());
-      if (r?.destination && r.destination.trim()) set.add(r.destination.trim());
+      if (r?.sourceRegion && r.sourceRegion.trim()) set.add(r.sourceRegion.trim());
+      if (r?.destinationRegion && r.destinationRegion.trim()) set.add(r.destinationRegion.trim());
     });
     return ['All', ...Array.from(set).sort()];
-  }, [regions, routes]);
+  }, [routes]);
 
   const statusOptions = useMemo(() => {
     const set = new Set<string>();
@@ -94,7 +67,9 @@ const ControlTower = () => {
   // Apply filters to routes
   const filteredRoutes = useMemo(() => {
     return (routes || []).filter(r => {
-      const matchRegion = selectedRegion === 'All' || r.origin === selectedRegion || r.destination === selectedRegion;
+      const matchRegion = selectedRegion === 'All' || 
+        r.sourceRegion === selectedRegion || 
+        r.destinationRegion === selectedRegion;
       const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
       const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
       return matchRegion && matchStatus && matchCarrier;
