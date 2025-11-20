@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <div 
-      className={`w-full fixed top-0 left-0 right-0 z-[100] pointer-events-auto bg-white h-[63px] flex items-center justify-between px-6 gap-6 flex-shrink-0 border-b border-gray-200 shadow-sm ${className || ''}`}
+      className={`w-full fixed top-0 left-0 right-0 z-40 pointer-events-auto bg-white h-[63px] flex items-center justify-between px-6 gap-6 flex-shrink-0 border-b border-gray-200 shadow-sm ${className || ''}`}
       style={{ left: leftOffset, width: `calc(100% - ${leftOffset})` }}
     >
       <div className="flex items-center">
