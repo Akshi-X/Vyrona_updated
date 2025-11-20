@@ -276,6 +276,13 @@ requirepass your_redis_password
 
 Then restart Redis service.
 
+**Important:** If you set a Redis password, you must also add it to your `.env` file:
+```
+REDIS_PASSWORD=your_redis_password
+```
+
+If Redis doesn't require a password (default for local development), you can omit this variable or leave it empty.
+
 ---
 
 ## 🔧 Backend Setup
@@ -356,6 +363,7 @@ DB_NAME=mygrape
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
+REDIS_PASSWORD=  # Optional: Set if Redis requires authentication (leave empty if no password)
 REDIS_SOCKET_CONNECT_TIMEOUT=5
 REDIS_SOCKET_TIMEOUT=5
 
@@ -538,6 +546,7 @@ Edit `publisher/.publisher.env`:
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
+REDIS_PASSWORD=  # Optional: Set if Redis requires authentication (leave empty if no password)
 REDIS_SOCKET_CONNECT_TIMEOUT=5
 REDIS_SOCKET_TIMEOUT=5
 
