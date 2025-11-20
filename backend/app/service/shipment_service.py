@@ -31,7 +31,8 @@ from ..utils.shipment_utils import (
     apply_region_filter,
     format_duration,
     get_start_date_from_shipment,
-    format_time_12hour
+    format_time_12hour,
+    resolve_route_regions
 )
 
 logger = logging.getLogger(__name__)
@@ -362,13 +363,17 @@ class ShipmentService:
             
         Returns:
             List of dictionaries containing route details:
-            - route: Source → Destination
-            - status: Route status (Safe, Delayed, Risk)
-            - date: Departure date
-            - company: Pharma company name
+            - patient_id: Patient ID
+            - source: Source location
+            - destination: Destination location
+            - route_status: Route status (safe, delayed, high_risk)
+            - start_date: Departure date
             - transit_days: Days in transit
             - carrier: Provider/Carrier name
             - updated_at: Last update timestamp
+            - region: Combined region (e.g., "Europe" or "Europe → Asia" if different)
+            - source_region: Region of source location
+            - destination_region: Region of destination location
         """
         try:
             carriers_list = [carriers] if carriers else None
@@ -408,6 +413,12 @@ class ShipmentService:
                 if carriers_list and not carrier_matches_filter(route_carrier, carriers_list):
                     continue
                 
+                # Resolve route regions
+                route_region, source_region, destination_region = resolve_route_regions(
+                    shipment.source_country,
+                    shipment.destination_country
+                )
+                
                 route_data = {
                     "patient_id": shipment.patient_id,
                     "source": shipment.source_location,
@@ -416,7 +427,10 @@ class ShipmentService:
                     "start_date": start_date,
                     "transit_days": transit_days,
                     "carrier": route_carrier,
-                    "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None
+                    "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
+                    "region": route_region,
+                    "source_region": source_region,
+                    "destination_region": destination_region
                 }
                 
                 active_routes.append(route_data)
@@ -793,8 +807,18 @@ class ShipmentService:
             
         Returns:
             Dictionary containing:
-            - routes: List of route dictionaries with source/destination and coordinates
+            - routes: List of route dictionaries with source/destination, coordinates, carrier, route_status, and region
             - total_routes: Total count of routes
+            Each route includes:
+            - shipment_id, patient_id
+            - source_location, destination_location
+            - source_latitude, source_longitude, destination_latitude, destination_longitude
+            - route_status: Route status (safe, delayed, high_risk)
+            - carrier: Carrier name
+            - region: Combined region (e.g., "Europe" or "Europe → Asia" if different)
+            - source_region: Region of source location
+            - destination_region: Region of destination location
+            - last_updated: Last update time
         """
         try:
             carriers_list = [carriers] if carriers else None
@@ -825,6 +849,12 @@ class ShipmentService:
                 if carriers_list and not carrier_matches_filter(route_carrier, carriers_list):
                     continue
                 
+                # Resolve route regions
+                route_region, source_region, destination_region = resolve_route_regions(
+                    shipment.source_country,
+                    shipment.destination_country
+                )
+                
                 route_data = {
                     "shipment_id": shipment.id,
                     "patient_id": shipment.patient_id,
@@ -837,6 +867,10 @@ class ShipmentService:
                     "destination_latitude": shipment.destination_latitude,
                     "destination_longitude": shipment.destination_longitude,
                     "route_status": shipment.routes_status.value if shipment.routes_status else "unknown",
+                    "carrier": route_carrier,
+                    "region": route_region,
+                    "source_region": source_region,
+                    "destination_region": destination_region,
                     "last_updated": format_time_12hour(shipment.updated_at)
                 }
                 
