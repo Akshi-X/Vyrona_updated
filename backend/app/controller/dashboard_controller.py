@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime
+from sqlalchemy.orm import Session
 
 from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     CriticalAlert,
-    CriticalAlertsResponse
+    CriticalAlertsResponse,
+    AvgLeadTimeResponse
 )
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
+from app.config.database import get_db
+from app.service.dashboard_service import DashboardService
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -15,7 +19,10 @@ router = APIRouter(tags=["Dashboard"])
 # 1. Get Performance Metrics
 # ---------------------------
 @router.get("/performance", response_model=DashboardCategoryResponse)
-def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
+def get_performance_metrics(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
     """
     Get performance metrics only.
     
@@ -29,20 +36,18 @@ def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)
     - Avg Lead Time: 23d
     """
     
-    metrics = {
-        "on_time_percentage": 87.0,
-        "avg_lead_time_days": 8,
-        "total_shipments": 30,
-        "completed_shipments": 18,
-        "pending_shipments": 12
-    }
-    
-    return DashboardCategoryResponse(
-        category="performance",
-        metrics=metrics,
-        last_updated=datetime.now(),
-        status="success"
-    )
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_performance_metrics(pharma_id)
+
+
+@router.get("/performance/avg-lead-time", response_model=AvgLeadTimeResponse)
+def get_average_lead_time(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """Return only the average lead time metrics for the authenticated pharma."""
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_average_lead_time(pharma_id)
 
 
 # ---------------------------
