@@ -50,7 +50,19 @@ def get_active_routes(
     Response:
         {
           "routes": [
-             { "route": "A → B", "status": "Safe", "date": "YYYY-MM-DD", "company": "...", "transit_days": 3, "carrier": "...", "updated_at": "..." },
+             { 
+               "patient_id": "...", 
+               "source": "A", 
+               "destination": "B", 
+               "route_status": "safe", 
+               "start_date": "YYYY-MM-DD", 
+               "transit_days": 3, 
+               "carrier": "...", 
+               "updated_at": "...",
+               "region": "Europe" or "Europe → Asia",
+               "source_region": "Europe",
+               "destination_region": "Asia"
+             },
              ...
           ],
           "metrics": {
@@ -169,6 +181,10 @@ def get_control_tower_map(
                     "destination_latitude": 34.0522,
                     "destination_longitude": -118.2437,
                     "route_status": "safe",
+                    "carrier": "Carrier Name",
+                    "region": "Europe" or "Europe → Asia",
+                    "source_region": "Europe",
+                    "destination_region": "Asia",
                     "last_updated": "16:25:17"
                 },
                 ...
