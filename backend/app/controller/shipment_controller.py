@@ -35,8 +35,8 @@ def get_three_pl_players(
 def get_active_routes(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
-    carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
-    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
+    carriers: Optional[str] = Query(None, description="Filter by a single carrier name"),
+    regions: Optional[str] = Query(None, description="Filter by a single region (matches source or destination)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -44,8 +44,8 @@ def get_active_routes(
     
     Optional filters:
     - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
-    - carriers: Filter by carrier names (can specify multiple). If not provided, returns all carriers.
-    - regions: Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'
+    - carriers: Filter by a single carrier name. If not provided, returns all carriers.
+    - regions: Filter by a single region - matches if either source or destination is in that region. Examples: 'Europe', 'North America', 'Asia'
     
     Response:
         {
@@ -141,8 +141,8 @@ def get_patient_journey_summary(
 def get_control_tower_map(
     pharma_id: Optional[int] = Depends(get_current_user_pharma_id),
     route_status: Optional[str] = Query(None, description="Filter by route status: safe, delayed, high_risk"),
-    carriers: Optional[List[str]] = Query(None, description="Filter by carrier names (can specify multiple)"),
-    regions: Optional[List[str]] = Query(None, description="Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'"),
+    carriers: Optional[str] = Query(None, description="Filter by a single carrier name"),
+    regions: Optional[str] = Query(None, description="Filter by a single region (matches source or destination, e.g., 'Europe')"),
     db: Session = Depends(get_db)
 ):
     """
@@ -153,8 +153,8 @@ def get_control_tower_map(
     
     Optional filters:
     - route_status: Filter by route status (safe, delayed, high_risk). If not provided, returns all statuses.
-    - carriers: Filter by carrier names (can specify multiple). If not provided, returns all carriers.
-    - regions: Filter by regions - matches if either source or destination is in the specified regions. Examples: 'Europe', 'North America', 'Asia'
+    - carriers: Filter by a single carrier name. If not provided, returns all carriers.
+    - regions: Filter by a single region - matches if either source or destination is in that region. Examples: 'Europe', 'North America', 'Asia'
     
     Response:
         {

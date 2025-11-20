@@ -184,8 +184,8 @@ def test_get_active_routes_with_filters(service):
     result = service.get_active_routes(
         pharma_id=42,
         route_status="safe",
-        carriers=["Test Carrier"],
-        regions=["Europe"]
+        carriers="Test Carrier",
+        regions="Europe"
     )
     
     assert isinstance(result, list)
@@ -695,7 +695,7 @@ def test_get_active_routes_carrier_filter_excludes(service):
     # Filter by carriers that don't match
     result = service.get_active_routes(
         pharma_id=42,
-        carriers=["Test Carrier"]  # Doesn't match "Other Carrier"
+        carriers="Test Carrier"  # Doesn't match "Other Carrier"
     )
     
     assert len(result) == 0
@@ -1274,7 +1274,7 @@ def test_get_control_tower_map_data_carrier_filter_excludes(service):
     
     result = service.get_control_tower_map_data(
         pharma_id=42,
-        carriers=["Test Carrier"]  # Doesn't match
+        carriers="Test Carrier"  # Doesn't match
     )
     
     assert result["total_routes"] == 0

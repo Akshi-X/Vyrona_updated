@@ -208,8 +208,8 @@ def test_get_active_routes_with_filters(client):
         "/shipment/active-routes",
         params={
             "route_status": "safe",
-            "carriers": ["Carrier A", "Carrier B"],
-            "regions": ["Europe", "North America"]
+            "carriers": "Carrier A",
+            "regions": "Europe"
         }
     )
 
@@ -217,12 +217,12 @@ def test_get_active_routes_with_filters(client):
     service_mock.get_active_routes.assert_called_once_with(
         42,
         route_status="safe",
-        carriers=["Carrier A", "Carrier B"],
-        regions=["Europe", "North America"]
+        carriers="Carrier A",
+        regions="Europe"
     )
     service_mock.get_real_time_metrics.assert_called_once_with(
         42,
-        regions=["Europe", "North America"]
+        regions="Europe"
     )
 
 
@@ -400,8 +400,8 @@ def test_get_control_tower_map_with_filters(client):
         "/shipment/control-tower-map",
         params={
             "route_status": "delayed",
-            "carriers": ["Carrier A"],
-            "regions": ["Asia"]
+            "carriers": "Carrier A",
+            "regions": "Asia"
         }
     )
 
@@ -409,8 +409,8 @@ def test_get_control_tower_map_with_filters(client):
     service_mock.get_control_tower_map_data.assert_called_once_with(
         pharma_id=42,
         route_status="delayed",
-        carriers=["Carrier A"],
-        regions=["Asia"]
+        carriers="Carrier A",
+        regions="Asia"
     )
 
 
