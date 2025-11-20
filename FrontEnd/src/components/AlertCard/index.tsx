@@ -86,7 +86,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
             {children}
           </div>
         ) : (
-          <div className={`w-full ${contentHeightClassName} overflow-x-auto overflow-y-auto relative`}>
+            <div className={`w-full ${contentHeightClassName} overflow-x-auto overflow-y-auto relative ${thinScrollbar ? 'alert-card-thin-scrollbar' : ''}`}>
             {children}
           </div>
         )}

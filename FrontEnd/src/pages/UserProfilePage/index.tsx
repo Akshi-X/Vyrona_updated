@@ -31,7 +31,8 @@ const UserProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled } = useAuth();
+  const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
 
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -92,8 +93,30 @@ const UserProfilePage: React.FC = () => {
   };
   /* eslint-enable @typescript-eslint/no-unused-vars */
 
-  // Load profile once on mount
+  // Check authentication before rendering
   useEffect(() => {
+    // Wait for auth context to finish loading
+    if (isLoading) {
+      return;
+    }
+
+    // If not authenticated, redirect immediately without showing content
+    if (!isAuthenticated || !token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    // Mark auth as checked and allow rendering
+    setIsAuthChecked(true);
+  }, [isLoading, isAuthenticated, token, navigate]);
+
+  // Load profile once on mount (only if authenticated)
+  useEffect(() => {
+    // Don't load profile if auth check hasn't passed
+    if (!isAuthChecked || !isAuthenticated) {
+      return;
+    }
+
     let isMounted = true;
     (async () => {
       try {
@@ -113,7 +136,7 @@ const UserProfilePage: React.FC = () => {
       }
     })();
     return () => { isMounted = false; };
-  }, []);
+  }, [isAuthChecked, isAuthenticated]);
 
   // Load tickets when role is known
   useEffect(() => {
@@ -293,11 +316,33 @@ const UserProfilePage: React.FC = () => {
     navigate('/login');
   };
 
+  const handleBackNavigation = () => {
+    // Check if there's history to go back to
+    // If history length is 1, we're on the first page (no history to go back)
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // No history available, navigate to dashboard
+      navigate('/dashboard');
+    }
+  };
+
+  // Don't render anything until auth is verified
+  // This prevents the UI flicker when redirecting to login
+  if (isLoading || !isAuthChecked || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header 
         title="User Profile" 
         showBackButton={!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin')}
+        onBackClick={handleBackNavigation}
         rightContent={
           (role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
             <button
