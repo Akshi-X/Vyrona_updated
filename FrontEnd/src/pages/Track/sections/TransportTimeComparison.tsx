@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,16 +42,17 @@ function parseDurationToHours(input: string): number {
 
 
 export default function TransportTimeComparison() {
+  const { patientId } = useParams<{ patientId: string }>();
   const [data, setData] = useState<TransportItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO: wire patient id from route/context; using the sample here
-  const patientId = 'PAT013';
-
   useEffect(() => {
+    if (!patientId) return;
+    
     let mounted = true;
     setLoading(true);
+    setError(null);
     shipmentService
       .getTransportTimeComparison(patientId)
       .then((res) => {
@@ -59,7 +61,9 @@ export default function TransportTimeComparison() {
       .catch((e: any) => {
         if (mounted) setError(e?.message || 'Failed to load chart');
       })
-      .finally(() => mounted && setLoading(false));
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
       mounted = false;
     };

@@ -49,6 +49,14 @@ const Login: React.FC = () => {
     // Redirect if already authenticated
     useEffect(() => {
         if (!isLoading && isAuthenticated) {
+            // Check if user came from a specific page (e.g., approval screen)
+            const from = (location.state as any)?.from;
+            if (from) {
+                const fromPath = `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`;
+                navigate(fromPath, { replace: true });
+                return;
+            }
+            
             // If user is mygrape_admin, redirect to user-profile or support
             if (userRole === 'mygrape_admin') {
                 navigate('/user-profile', { replace: true });
@@ -57,7 +65,7 @@ const Login: React.FC = () => {
                 navigate('/dashboard', { replace: true });
             }
         }
-    }, [isAuthenticated, isLoading, userRole, navigate]);
+    }, [isAuthenticated, isLoading, userRole, navigate, location.state]);
 
     // Show loading spinner while checking authentication
     if (isLoading) {
@@ -70,6 +78,13 @@ const Login: React.FC = () => {
 
     // Redirect if authenticated (this handles the case where useEffect hasn't run yet)
     if (isAuthenticated) {
+        // Check if user came from a specific page (e.g., approval screen)
+        const from = (location.state as any)?.from;
+        if (from) {
+            const fromPath = `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`;
+            return <Navigate to={fromPath} replace />;
+        }
+        
         if (userRole === 'mygrape_admin') {
             return <Navigate to="/user-profile" replace />;
         }
@@ -110,11 +125,41 @@ const Login: React.FC = () => {
 
             if (response.status === "OTP Sent") {
                 // Preserve original destination (if any) to return after OTP login
-                const from = (location.state as any)?.from;
-                const fromPath = from
-                    ? `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`
-                    : undefined;
-                // Example: navigate to OTP page
+                // Check multiple sources: state.fromPath, state.from object, and sessionStorage
+                const state = location.state as any;
+                
+                let fromPath: string | undefined = state?.fromPath;
+                
+                if (!fromPath) {
+                    // Fallback 1: construct from 'from' object
+                    const from = state?.from;
+                    if (from) {
+                        const pathname = from.pathname || "";
+                        const search = from.search || "";
+                        const hash = from.hash || "";
+                        if (pathname) {
+                            fromPath = `${pathname}${search}${hash}`;
+                        } else if (search) {
+                            fromPath = `/approval-screen${search}${hash}`;
+                        }
+                    }
+                }
+                
+                // Fallback 2: check sessionStorage
+                if (!fromPath) {
+                    try {
+                        const storedPath = sessionStorage.getItem('approval_redirect_path');
+                        if (storedPath) {
+                            fromPath = storedPath;
+                            // Clear it after use
+                            sessionStorage.removeItem('approval_redirect_path');
+                        }
+                    } catch (e) {
+                        // Silently handle sessionStorage errors
+                    }
+                }
+                
+                // Navigate to OTP page with preserved redirect path
                 navigate("/verify-otp", {
                     state: {
                         userId: response.user_id,

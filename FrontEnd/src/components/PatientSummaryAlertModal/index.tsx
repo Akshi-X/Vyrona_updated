@@ -282,8 +282,9 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       loading={loading}
       dataLength={summary ? 1 : 0}
       emptyText={error || "No summary available for this patient"}
-      disableInnerScroll={true}
+      disableInnerScroll={false}
       thinScrollbar={true}
+      contentHeightClassName="max-h-[60vh]"
     >
       {error && (
         <div className="text-center text-red-600 py-4">

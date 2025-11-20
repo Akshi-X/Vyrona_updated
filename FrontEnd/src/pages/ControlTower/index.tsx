@@ -6,6 +6,7 @@ import Header from '../../components/Header';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
+import { userService } from '../../services/userService';
 
 const ControlTower = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -14,6 +15,7 @@ const ControlTower = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
+  const [userInitials, setUserInitials] = useState<string>('');
 
   const handleLogout = () => {
     logout();
@@ -40,6 +42,24 @@ const ControlTower = () => {
       }
     };
     if (isAuthenticated) fetchRoutes();
+  }, [isAuthenticated]);
+
+  // Fetch user profile to compute initials
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const first = profile.first_name?.trim?.() || '';
+        const last = profile.last_name?.trim?.() || '';
+        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+        setUserInitials(initials);
+      } catch {
+        setUserInitials('U');
+      }
+    };
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
   }, [isAuthenticated]);
 
   // Add 5 more rows based on present values (for demo/population)
@@ -115,7 +135,7 @@ const ControlTower = () => {
               onClick={() => navigate('/user-profile')}
               title="Go to User Profile"
             >
-              <span className="text-white text-xs font-semibold">MV</span>
+              <span className="text-white text-xs font-semibold">{userInitials}</span>
             </div>
           )}
         />
