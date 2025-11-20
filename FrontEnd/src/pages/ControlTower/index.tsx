@@ -181,7 +181,12 @@ const ControlTower = () => {
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
-                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100">
+                <div 
+                  className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
+                  style={{
+                    scrollbarWidth: 'thin'
+                  }}
+                >
                   {loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">Loading routes...</div>
                   )}
