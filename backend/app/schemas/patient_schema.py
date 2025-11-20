@@ -205,6 +205,10 @@ class ControlTowerMapRoute(BaseModel):
     destination_latitude: Optional[float] = Field(None, description="Latitude of destination location")
     destination_longitude: Optional[float] = Field(None, description="Longitude of destination location")
     route_status: str = Field(..., description="Route status: safe, delayed, high_risk, or failed")
+    carrier: Optional[str] = Field(None, description="Carrier name")
+    region: Optional[str] = Field(None, description="Combined region (e.g., 'Europe' or 'Europe → Asia' if different)")
+    source_region: Optional[str] = Field(None, description="Region of source location")
+    destination_region: Optional[str] = Field(None, description="Region of destination location")
     last_updated: Optional[str] = Field(None, description="Last updated time in 24-hour format (e.g., '16:25:17')")
     
     class Config:
