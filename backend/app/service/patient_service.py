@@ -148,14 +148,19 @@ class PatientService:
             else:
                 next_month_start = current_date.replace(month=current_date.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            # Get current month patient count for this pharma
-            current_month_patient_count = self.db.query(Patient).filter(
-                and_(
-                    Patient.pharma_id == pharma_id,
-                    Patient.created_at >= current_month_start,
-                    Patient.created_at < next_month_start
+            # Get current month patient count for this pharma (unique patient IDs)
+            current_month_patient_count = (
+                self.db.query(Patient.id)
+                .filter(
+                    and_(
+                        Patient.pharma_id == pharma_id,
+                        Patient.created_at >= current_month_start,
+                        Patient.created_at < next_month_start
+                    )
                 )
-            ).count()
+                .distinct()
+                .count()
+            )
             
             statistics_data = {
                 "pharma_id": pharma_id,
