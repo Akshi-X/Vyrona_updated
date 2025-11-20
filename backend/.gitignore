@@ -62,7 +62,7 @@ migration/versions/*.pyc
 
 # Pharma Admins
 pharma_admins.json
-# Publisher script
-publisher.py
+# Publisher folder
+publisher/
 # Uploads
 uploads/feedback/
