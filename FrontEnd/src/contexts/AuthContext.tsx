@@ -73,6 +73,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setSessionTimeoutHandler(false);
     }
     setIsLoading(false);
+
+    // Function to check and sync authentication state
+    const checkAndSyncAuth = () => {
+      const currentToken = authUtils.getToken();
+      const currentRole = localStorage.getItem('user_role');
+      
+      if (currentToken) {
+        // If we have a token, ensure we're authenticated
+        setToken(currentToken);
+        setIsAuthenticated(true);
+        if (currentRole) {
+          setUserRole(currentRole);
+        }
+      } else {
+        // If we don't have a token, ensure we're not authenticated
+        setToken(undefined);
+        setIsAuthenticated(false);
+        setUserRole(undefined);
+      }
+    };
+
+    // Listen for storage changes (for user_role in localStorage)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user_role') {
+        const newRole = e.newValue;
+        if (newRole) {
+          setUserRole(newRole);
+        } else {
+          setUserRole(undefined);
+        }
+      }
+      // Check auth state when storage changes (cookies are shared, so check token)
+      checkAndSyncAuth();
+    };
+
+    // Listen for window focus to check authentication state
+    // This handles the case where user logs in on another tab
+    const handleFocus = () => {
+      checkAndSyncAuth();
+    };
+
+    // Listen for visibility changes (when tab becomes visible)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndSyncAuth();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Persist email notification preference

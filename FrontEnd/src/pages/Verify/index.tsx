@@ -9,9 +9,43 @@ import { authUtils } from "../../utils/auth";
 const VerifyOtp: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, isAuthenticated } = useAuth();
 
-    const { userId, otpExpiry, fromPath } = location.state || {};
+    const { userId, otpExpiry, fromPath: fromPathFromState } = location.state || {};
+    
+    // Get fromPath from state or sessionStorage
+    const getFromPath = () => {
+        if (fromPathFromState) {
+            return fromPathFromState;
+        }
+        // Fallback to sessionStorage
+        try {
+            const storedPath = sessionStorage.getItem('approval_redirect_path');
+            if (storedPath) {
+                return storedPath;
+            }
+        } catch (e) {
+            // Silently handle sessionStorage errors
+        }
+        return undefined;
+    };
+    
+    const fromPath = getFromPath();
+    
+    // Store fromPath in a ref to ensure it persists
+    const fromPathRef = useRef<string | undefined>(fromPath);
+    
+    // Update ref when fromPath changes
+    useEffect(() => {
+        const currentPath = getFromPath();
+        if (currentPath) {
+            fromPathRef.current = currentPath;
+        }
+    }, [fromPathFromState, location.state, isAuthenticated]);
+    
+    // State to track if OTP was successfully verified
+    const [otpVerified, setOtpVerified] = useState(false);
+    const [verifiedRole, setVerifiedRole] = useState<string | undefined>(undefined);
 
     const [otp, setOtp] = useState("");
     const [error, setError] = useState("");
@@ -71,6 +105,25 @@ const VerifyOtp: React.FC = () => {
             };
         }
     }, [otpExpiry]);
+    
+    // Handle redirect after OTP verification
+    useEffect(() => {
+        if (otpVerified && isAuthenticated) {
+            // Use the ref value to ensure we have the correct fromPath
+            const targetPath = fromPathRef.current;
+            
+            setTimeout(() => {
+                if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
+                    // Always redirect back to original page if it exists (e.g., approval screen)
+                    navigate(targetPath, { replace: true });
+                } else if (verifiedRole === "mygrape_admin") {
+                    navigate("/user-profile", { replace: true });
+                } else {
+                    navigate("/dashboard", { replace: true });
+                }
+            }, 500);
+        }
+    }, [otpVerified, isAuthenticated, verifiedRole, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -104,16 +157,9 @@ const VerifyOtp: React.FC = () => {
                     localStorage.setItem('user_id', response.user_id);
                 } catch { }
 
-                // Check if user role is admin and redirect accordingly
-                let target;
-                if (response.role === "mygrape_admin") {
-                    target = "/user-profile";
-                } else {
-                    // Redirect back to original page if provided, else dashboard
-                    target = fromPath && typeof fromPath === "string" ? fromPath : "/dashboard";
-                }
-
-                setTimeout(() => navigate(target, { replace: true }), 500);
+                // Set flags to trigger redirect in useEffect
+                setOtpVerified(true);
+                setVerifiedRole(response.role);
             } else {
                 setError(response.message || "Invalid OTP");
             }

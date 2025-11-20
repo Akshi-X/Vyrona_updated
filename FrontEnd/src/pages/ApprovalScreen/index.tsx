@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useSearchParams, Navigate } from "react-router-dom";
+import { useLocation, useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
@@ -26,6 +26,7 @@ const ApprovalScreen: React.FC = () => {
 
   const apiService = new BaseApiService();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Allow context time to mount, but don't show an auth error if a cookie token exists
   useEffect(() => {
@@ -111,9 +112,9 @@ const ApprovalScreen: React.FC = () => {
         // Ignore error, user info will be stale but that's okay
       }
 
-      // Navigate to dashboard after 3 seconds
+      // Navigate to dashboard after 1 second
       setTimeout(() => {
-        window.location.href = "/dashboard";
+        navigate("/dashboard", { replace: true });
       }, 1000);
     } catch (err: any) {
       if (err.message?.includes('401')) {
@@ -148,9 +149,20 @@ const ApprovalScreen: React.FC = () => {
     );
   }
 
-  // If there is no auth token at all, redirect to login
+  // If there is no auth token at all, redirect to login with approval URL preserved
   if (!isAuthenticated && !cookieToken) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    // Preserve the full approval URL (pathname + search params) for redirect after login
+    // Construct the full path as a string to ensure it's preserved correctly
+    const approvalPath = `${location.pathname}${location.search}${location.hash || ""}`;
+    
+    // Store in sessionStorage as backup in case state doesn't persist
+    try {
+      sessionStorage.setItem('approval_redirect_path', approvalPath);
+    } catch (e) {
+      // Silently handle sessionStorage errors
+    }
+    
+    return <Navigate to="/login" replace state={{ from: { pathname: location.pathname, search: location.search, hash: location.hash }, fromPath: approvalPath } } />;
   }
 
   return (
