@@ -33,6 +33,15 @@ class AvgLeadTimeResponse(BaseModel):
     last_updated: datetime
 
 
+class OnTimePercentageResponse(BaseModel):
+    """On-time percentage response for a pharma"""
+    on_time_percentage: float
+    on_time_deliveries: int
+    total_deliveries: int
+    status: str
+    last_updated: datetime
+
+
 # ==========================================
 # RISK SCHEMAS
 # ==========================================
