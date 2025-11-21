@@ -12,6 +12,9 @@ export interface ActiveRouteApiItem {
   start_date?: string;
   date?: string;
   last_updated?: string;
+  region?: string;
+  source_region?: string;
+  destination_region?: string;
 }
 
 export interface ActiveRouteItem {
@@ -23,6 +26,9 @@ export interface ActiveRouteItem {
   supplyChain: string;
   status: 'Safe' | 'Risk' | 'Delayed' | string;
   date: string;
+  region?: string;
+  sourceRegion?: string;
+  destinationRegion?: string;
 }
 
 export interface ThreePLPlayer {
@@ -151,7 +157,24 @@ class ShipmentService extends BaseApiService {
         else statusText = 'Safe';
       }
 
-      return { id, patientId, origin, destination, routeText, supplyChain, status: statusText, date };
+      // Extract region data from API response
+      const region = (r as any).region;
+      const sourceRegion = (r as any).source_region;
+      const destinationRegion = (r as any).destination_region;
+
+      return { 
+        id, 
+        patientId, 
+        origin, 
+        destination, 
+        routeText, 
+        supplyChain, 
+        status: statusText, 
+        date,
+        region,
+        sourceRegion,
+        destinationRegion
+      };
     });
   }
 
@@ -219,6 +242,14 @@ class ShipmentService extends BaseApiService {
     return this.get(
       `/api/shipment/document-checklist/${encodeURIComponent(patientId)}`
     );
+  }
+
+  /**
+   * Get available regions
+   * GET /api/shipment/regions
+   */
+  async getAvailableRegions(): Promise<string[]> {
+    return this.get<string[]>('/api/shipment/regions');
   }
 }
 
