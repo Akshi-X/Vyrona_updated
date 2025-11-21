@@ -86,7 +86,6 @@ export default function Dashboard({ }: DashboardProps) {
       }));
       setStakeholderChats(transformedChats);
     } catch (error) {
-      console.error('Error fetching stakeholder chats:', error);
       setStakeholderChats([]);
     } finally {
       setLoadingChats(false);
@@ -109,7 +108,6 @@ export default function Dashboard({ }: DashboardProps) {
       const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
       setCriticalAlerts(response.alerts || []);
     } catch (error) {
-      console.error('Error fetching critical alerts:', error);
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
@@ -133,7 +131,6 @@ export default function Dashboard({ }: DashboardProps) {
       ];
       setMyTasks(allTasks);
     } catch (error) {
-      console.error('Error fetching tasks:', error);
       setMyTasks([]);
     } finally {
       setLoadingTasks(false);
@@ -222,7 +219,6 @@ export default function Dashboard({ }: DashboardProps) {
         status: task.status
       };
     } catch (error) {
-      console.error('Error transforming task:', task, error);
       return {
         id: task.id?.toString() || 'unknown',
         patientId: task.patient_id || 'N/A',

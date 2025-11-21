@@ -16,6 +16,7 @@ const ResetPassword: React.FC = () => {
     const [passwordError, setPasswordError] = useState("");
     const [confirmError, setConfirmError] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
@@ -165,20 +166,32 @@ const ResetPassword: React.FC = () => {
 
                         {/* Confirm Password Field */}
                         <div className="relative w-full my-4">
-                            <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                placeholder="Confirm new password"
-                                className={`peer w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmError ? "border-red-500" : "border-gray-300"}`}
-                            />
-                            <label
-                                className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
-                                ${confirmError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
-                            >
-                                Confirm Password
-                            </label>
-
+                            <div className="relative">
+                                <input
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="Confirm new password"
+                                    className={`peer w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmError ? "border-red-500" : "border-gray-300"}`}
+                                />
+                                <label
+                                    className={`absolute -top-3 left-2 bg-white px-1 text-sm font-medium tracking-wide transition-opacity
+                                    ${confirmError ? "text-red-500 opacity-100" : "text-[#8b2a96] opacity-0 peer-focus:opacity-100"}`}
+                                >
+                                    Confirm Password
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                                >
+                                    <img
+                                        src={showConfirmPassword ? EyeOpenIcon : EyeOffIcon}
+                                        alt="toggle password visibility"
+                                        className="w-5 h-5"
+                                    />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Submit Button */}
