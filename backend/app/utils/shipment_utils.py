@@ -6,13 +6,13 @@ These are pure functions that don't require database access.
 """
 
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from sqlalchemy.orm import Query
 
 from ..models.shipment_model import Shipment
 from ..constants.enums import RouteStatus
 from ..constants.messages import InfoMessages
-from ..utils.utils import get_countries_by_regions
+from ..utils.utils import get_countries_by_regions, country_to_region
 
 
 def has_filters_applied(
@@ -133,6 +133,34 @@ def apply_region_filter(query: Query, regions: Optional[List[str]] = None) -> Qu
     )
     
     return query
+
+
+def resolve_route_regions(
+    source_country: Optional[str],
+    destination_country: Optional[str]
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Determine route, source, and destination regions from country codes.
+
+    Returns:
+        Tuple of (route_region, source_region, destination_region)
+    """
+    source_region = country_to_region(source_country) if source_country else None
+    destination_region = country_to_region(destination_country) if destination_country else None
+
+    if source_region and destination_region:
+        if source_region == destination_region:
+            route_region = source_region
+        else:
+            route_region = f"{source_region} → {destination_region}"
+    elif source_region:
+        route_region = source_region
+    elif destination_region:
+        route_region = destination_region
+    else:
+        route_region = None
+
+    return route_region, source_region, destination_region
 
 
 def format_duration(start_dt: Optional[datetime], end_dt: Optional[datetime]) -> Optional[str]:

@@ -62,6 +62,23 @@ const ControlTower = () => {
     }
   }, [isAuthenticated]);
 
+  // Fetch user profile to compute initials
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        const first = profile.first_name?.trim?.() || '';
+        const last = profile.last_name?.trim?.() || '';
+        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+        setUserInitials(initials);
+      } catch {
+        setUserInitials('U');
+      }
+    };
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
+  }, [isAuthenticated]);
   // Add 5 more rows based on present values (for demo/population)
   const augmentedRoutes = useMemo(() => {
     if (!routes || routes.length === 0) return [] as ActiveRouteItem[];
@@ -76,37 +93,39 @@ const ControlTower = () => {
     return result;
   }, [routes]);
 
-  // Build filter option lists from API data
+  // Build filter option lists from routes data
   const regionOptions = useMemo(() => {
     const set = new Set<string>();
-    augmentedRoutes.forEach(r => {
-      if (r?.origin && r.origin.trim()) set.add(r.origin.trim());
-      if (r?.destination && r.destination.trim()) set.add(r.destination.trim());
+    routes.forEach(r => {
+      if (r?.sourceRegion && r.sourceRegion.trim()) set.add(r.sourceRegion.trim());
+      if (r?.destinationRegion && r.destinationRegion.trim()) set.add(r.destinationRegion.trim());
     });
     return ['All', ...Array.from(set).sort()];
-  }, [augmentedRoutes]);
+  }, [routes]);
 
   const statusOptions = useMemo(() => {
     const set = new Set<string>();
-    augmentedRoutes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
+    routes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
     return ['All', ...Array.from(set).sort()];
-  }, [augmentedRoutes]);
+  }, [routes]);
 
   const carrierOptions = useMemo(() => {
     const set = new Set<string>();
-    augmentedRoutes.forEach(r => { if (r?.supplyChain && r.supplyChain.trim()) set.add(r.supplyChain.trim()); });
+    routes.forEach(r => { if (r?.supplyChain && r.supplyChain.trim()) set.add(r.supplyChain.trim()); });
     return ['All', ...Array.from(set).sort()];
-  }, [augmentedRoutes]);
+  }, [routes]);
 
   // Apply filters to routes
   const filteredRoutes = useMemo(() => {
-    return (augmentedRoutes || []).filter(r => {
-      const matchRegion = selectedRegion === 'All' || r.origin === selectedRegion || r.destination === selectedRegion;
+    return (routes || []).filter(r => {
+      const matchRegion = selectedRegion === 'All' || 
+        r.sourceRegion === selectedRegion || 
+        r.destinationRegion === selectedRegion;
       const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
       const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
       return matchRegion && matchStatus && matchCarrier;
     });
-  }, [augmentedRoutes, selectedRegion, selectedStatus, selectedCarrier]);
+  }, [routes, selectedRegion, selectedStatus, selectedCarrier]);
 
 
   if (!isAuthenticated) {
@@ -208,12 +227,17 @@ const ControlTower = () => {
               {/* Active Routes List */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
                 <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
-                <div className="grid grid-cols-[180px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-gray-900">
+                <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-gray-900 gap-3">
                   <div className="text-left">Route</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
-                <div className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100">
+                <div 
+                  className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
+                  style={{
+                    scrollbarWidth: 'thin'
+                  }}
+                >
                   {loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">Loading routes...</div>
                   )}
@@ -231,7 +255,7 @@ const ControlTower = () => {
                             ? 'text-[#FFA500]'
                             : 'text-gray-500';
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[180px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden">
+                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3">
                           <div className="min-w-0 text-left overflow-hidden">
                             {route?.patientId ? (
                               <Link 
@@ -243,7 +267,12 @@ const ControlTower = () => {
                             ) : (
                               <span className="text-[#6b1176] text-xs font-bold">N/A</span>
                             )}
-                            <div className="text-xs text-gray-900 leading-snug">
+                            <div 
+                              className="text-xs text-gray-900 leading-snug"
+                              title={(route?.origin && route?.destination) 
+                                ? `${route.origin} → ${route.destination}` 
+                                : (route?.routeText || '')}
+                            >
                               {(route?.origin && route?.destination) ? (
                                 <>
                                   <div className="truncate">{route?.origin || '-'}</div>
