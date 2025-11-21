@@ -1,10 +1,17 @@
 from datetime import datetime
 from typing import Tuple, Dict
 
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from app.models.shipment_model import Shipment
-from app.schemas.dashboard_schema import DashboardCategoryResponse, AvgLeadTimeResponse
+from app.models.patient_model import Patient
+from app.models.patient_stage_model import PatientStage
+from app.schemas.dashboard_schema import (
+    DashboardCategoryResponse,
+    AvgLeadTimeResponse,
+    SuccessRateResponse
+)
 
 
 class DashboardService:
@@ -159,4 +166,45 @@ class DashboardService:
             "status": "success",
             "last_updated": datetime.now()
         }
+
+    def get_success_rate(self, pharma_id: int) -> SuccessRateResponse:
+        """Calculate treatment success rate for completed stages belonging to a pharma."""
+
+        successful_outcomes_expr = func.coalesce(
+            func.sum(
+                case((PatientStage.is_success.is_(True), 1), else_=0)
+            ),
+            0
+        ).label("successful_outcomes")
+
+        total_outcomes_expr = func.coalesce(
+            func.sum(
+                case((PatientStage.is_success.isnot(None), 1), else_=0)
+            ),
+            0
+        ).label("total_outcomes")
+
+        result = (
+            self.db.query(successful_outcomes_expr, total_outcomes_expr)
+            .join(Patient, PatientStage.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                PatientStage.is_active == False
+            )
+            .one_or_none()
+        )
+
+        successful_outcomes = (result.successful_outcomes if result else 0) or 0
+        total_outcomes = (result.total_outcomes if result else 0) or 0
+
+        success_rate = round((successful_outcomes / total_outcomes) * 100, 2) if total_outcomes else 0.0
+
+        return SuccessRateResponse(
+            pharma_id=pharma_id,
+            success_rate=success_rate,
+            successful_outcomes=successful_outcomes,
+            total_outcomes=total_outcomes,
+            status="success",
+            last_updated=datetime.now()
+        )
 

@@ -96,3 +96,47 @@ def test_get_average_lead_time_response(dashboard_service, db_session):
     assert response.pending_shipments == 0
     assert response.status == "success"
 
+
+def test_get_success_rate_with_results(dashboard_service, db_session):
+    """Success rate uses completed patient stages."""
+    result_row = MagicMock()
+    result_row.successful_outcomes = 8
+    result_row.total_outcomes = 10
+
+    filter_mock = MagicMock()
+    filter_mock.one_or_none.return_value = result_row
+
+    join_mock = MagicMock()
+    join_mock.filter.return_value = filter_mock
+
+    query_mock = MagicMock()
+    query_mock.join.return_value = join_mock
+
+    db_session.query.return_value = query_mock
+
+    response = dashboard_service.get_success_rate(pharma_id=7)
+
+    assert response.success_rate == 80.0
+    assert response.successful_outcomes == 8
+    assert response.total_outcomes == 10
+    assert response.status == "success"
+
+
+def test_get_success_rate_no_data(dashboard_service, db_session):
+    """Gracefully handles when no completed outcomes exist."""
+    filter_mock = MagicMock()
+    filter_mock.one_or_none.return_value = None
+
+    join_mock = MagicMock()
+    join_mock.filter.return_value = filter_mock
+
+    query_mock = MagicMock()
+    query_mock.join.return_value = join_mock
+
+    db_session.query.return_value = query_mock
+
+    response = dashboard_service.get_success_rate(pharma_id=11)
+
+    assert response.success_rate == 0.0
+    assert response.successful_outcomes == 0
+    assert response.total_outcomes == 0

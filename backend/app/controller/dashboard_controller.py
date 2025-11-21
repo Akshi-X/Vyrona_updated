@@ -7,7 +7,8 @@ from app.schemas.dashboard_schema import (
     CriticalAlert,
     CriticalAlertsResponse,
     AvgLeadTimeResponse,
-    OnTimePercentageResponse
+    OnTimePercentageResponse,
+    SuccessRateResponse
 )
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
 from app.config.database import get_db
@@ -73,6 +74,20 @@ def get_on_time_percentage(
     dashboard_service = DashboardService(db)
     result = dashboard_service.get_on_time_percentage(pharma_id)
     return OnTimePercentageResponse(**result)
+
+
+@router.get("/performance/success-rate", response_model=SuccessRateResponse)
+def get_success_rate(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return treatment success rate:
+    Success Rate = (Successful Outcomes ÷ Total Outcomes) × 100
+    Counts completed patient stages (non-active) scoped to the authenticated pharma.
+    """
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_success_rate(pharma_id)
 
 
 # ---------------------------
