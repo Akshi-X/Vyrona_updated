@@ -6,7 +6,8 @@ from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     CriticalAlert,
     CriticalAlertsResponse,
-    AvgLeadTimeResponse
+    AvgLeadTimeResponse,
+    OnTimePercentageResponse
 )
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
 from app.config.database import get_db
@@ -48,6 +49,30 @@ def get_average_lead_time(
     """Return only the average lead time metrics for the authenticated pharma."""
     dashboard_service = DashboardService(db)
     return dashboard_service.get_average_lead_time(pharma_id)
+
+
+@router.get("/performance/on-time-percentage", response_model=OnTimePercentageResponse)
+def get_on_time_percentage(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return only the on-time percentage metrics for the authenticated pharma.
+    
+    Calculates On-Time Percentage for current month:
+    - On-Time % = (On-Time Deliveries ÷ Total Deliveries) × 100
+    - On-Time Deliveries = Sum(Is Actual Handover Time ≤ Estimated Handover Time ? YES → On-Time)
+    
+    Protected endpoint. Auth token required; pharma_id taken from token.
+    
+    Returns:
+        - on_time_percentage: Percentage of on-time deliveries
+        - on_time_deliveries: Count of on-time deliveries
+        - total_deliveries: Total deliveries with both handover_time and scheduled_time
+    """
+    dashboard_service = DashboardService(db)
+    result = dashboard_service.get_on_time_percentage(pharma_id)
+    return OnTimePercentageResponse(**result)
 
 
 # ---------------------------

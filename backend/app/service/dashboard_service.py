@@ -59,6 +59,45 @@ class DashboardService:
         pending_shipments = max(total_shipments - completed_shipments, 0)
         return avg_lead_time_days, completed_shipments, pending_shipments
 
+    def _calculate_on_time_percentage(self, pharma_id: int) -> Tuple[float, int, int]:
+        """
+        Calculate on-time percentage for current month.
+        
+        On-Time % = (On-Time Deliveries ÷ Total Deliveries) × 100
+        On-Time Deliveries = Sum(Is Actual Handover Time ≤ Estimated Handover Time ? YES → On-Time)
+        
+        Returns:
+            Tuple of (on_time_percentage, on_time_deliveries, total_deliveries)
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+
+        # Query shipments with both handover_time and scheduled_time for current month
+        shipments = (
+            self.db.query(Shipment.handover_time, Shipment.scheduled_time)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.handover_time.isnot(None),
+                Shipment.scheduled_time.isnot(None),
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .all()
+        )
+
+        total_deliveries = len(shipments)
+        on_time_deliveries = 0
+
+        for handover_time, scheduled_time in shipments:
+            # On-time if actual handover time <= estimated handover time
+            if handover_time <= scheduled_time:
+                on_time_deliveries += 1
+
+        # Calculate percentage: (On-Time Deliveries ÷ Total Deliveries) × 100
+        on_time_percentage = round((on_time_deliveries / total_deliveries * 100), 2) if total_deliveries > 0 else 0.0
+
+        return on_time_percentage, on_time_deliveries, total_deliveries
+
     def _build_performance_metrics(self, pharma_id: int) -> Dict:
         """Assemble metrics for the performance dashboard category."""
         current_month_start, next_month_start = self._get_current_month_bounds()
@@ -75,13 +114,16 @@ class DashboardService:
         )
 
         avg_lead_time_days, completed_shipments, pending_shipments = self._calculate_average_lead_time(monthly_shipments)
+        on_time_percentage, on_time_deliveries, total_deliveries = self._calculate_on_time_percentage(pharma_id)
 
         metrics = {
-            "on_time_percentage": 87.0,
+            "on_time_percentage": on_time_percentage,
             "avg_lead_time_days": avg_lead_time_days,
             "total_shipments": len(monthly_shipments),
             "completed_shipments": completed_shipments,
-            "pending_shipments": pending_shipments
+            "pending_shipments": pending_shipments,
+            "on_time_deliveries": on_time_deliveries,
+            "total_deliveries": total_deliveries
         }
         return metrics
 
@@ -106,4 +148,15 @@ class DashboardService:
             status="success",
             last_updated=datetime.now()
         )
+
+    def get_on_time_percentage(self, pharma_id: int) -> Dict:
+        """Return only on-time percentage stats for the provided pharma for current month."""
+        on_time_percentage, on_time_deliveries, total_deliveries = self._calculate_on_time_percentage(pharma_id)
+        return {
+            "on_time_percentage": on_time_percentage,
+            "on_time_deliveries": on_time_deliveries,
+            "total_deliveries": total_deliveries,
+            "status": "success",
+            "last_updated": datetime.now()
+        }
 
