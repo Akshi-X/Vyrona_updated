@@ -42,6 +42,16 @@ class OnTimePercentageResponse(BaseModel):
     last_updated: datetime
 
 
+class SuccessRateResponse(BaseModel):
+    """Treatment success rate response for a pharma"""
+    pharma_id: int
+    success_rate: float
+    successful_outcomes: int
+    total_outcomes: int
+    status: str
+    last_updated: datetime
+
+
 # ==========================================
 # RISK SCHEMAS
 # ==========================================

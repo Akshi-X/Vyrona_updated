@@ -16,7 +16,11 @@ if "country_converter" not in sys.modules:
     )
 
 from app.controller import dashboard_controller
-from app.schemas.dashboard_schema import DashboardCategoryResponse, AvgLeadTimeResponse
+from app.schemas.dashboard_schema import (
+    DashboardCategoryResponse,
+    AvgLeadTimeResponse,
+    SuccessRateResponse
+)
 
 
 def _create_test_client(monkeypatch, service_mock):
@@ -74,4 +78,27 @@ def test_average_lead_time_endpoint(monkeypatch):
     body = response.json()
     assert body["avg_lead_time_days"] == 2.5
     service_mock.get_average_lead_time.assert_called_once_with(42)
+
+
+def test_success_rate_endpoint(monkeypatch):
+    """Verify success rate endpoint delegates to dashboard service."""
+    service_mock = MagicMock()
+    expected_response = SuccessRateResponse(
+        pharma_id=42,
+        success_rate=75.0,
+        successful_outcomes=15,
+        total_outcomes=20,
+        status="success",
+        last_updated=datetime.now()
+    )
+    service_mock.get_success_rate.return_value = expected_response
+
+    with _create_test_client(monkeypatch, service_mock) as client:
+        response = client.get("/performance/success-rate")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success_rate"] == 75.0
+    assert body["successful_outcomes"] == 15
+    service_mock.get_success_rate.assert_called_once_with(42)
 
