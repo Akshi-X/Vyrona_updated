@@ -3,12 +3,12 @@ Role Constants
 Define all user roles in one place to avoid hardcoded strings.
 """
 
-# Role definitions
-ROLE_ADMIN = "admin"
-ROLE_PHARMA_ADMIN = "pharma_admin"
-ROLE_MYGRAPE_ADMIN = "mygrape_admin"
-ROLE_MANAGER = "manager"
-ROLE_USER = "user"
+# Role definitions (title case - first letter capital)
+ROLE_ADMIN = "Admin"
+ROLE_PHARMA_ADMIN = "Pharma_admin"
+ROLE_MYGRAPE_ADMIN = "Mygrape_admin"
+ROLE_MANAGER = "Manager"
+ROLE_USER = "User"
 
 # Role lists for validation
 ALL_ROLES = [ROLE_ADMIN, ROLE_PHARMA_ADMIN, ROLE_MYGRAPE_ADMIN, ROLE_MANAGER, ROLE_USER]

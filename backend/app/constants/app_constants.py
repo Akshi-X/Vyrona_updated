@@ -70,9 +70,9 @@ REGISTRATION_ID_PREFIX = "REG"
 ID_LENGTH = 6
 
 # User Roles
-ROLE_ADMIN = "admin"
-ROLE_MANAGER = "manager"
-ROLE_USER = "user"
+ROLE_ADMIN = "Admin"
+ROLE_MANAGER = "Manager"
+ROLE_USER = "User"
 
 # ============================================
 # FILE UPLOAD
