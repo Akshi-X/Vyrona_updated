@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, UploadFile, File, Query, HTTPException
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Query, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
@@ -149,6 +149,7 @@ def get_feedback_by_id_endpoint(
 def add_comment_endpoint(
     feedback_id: str,
     request: CommentCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
@@ -158,7 +159,8 @@ def add_comment_endpoint(
         db=db,
         feedback_id=feedback_id,
         request=request,
-        commented_by=current_user.user_id
+        commented_by=current_user.user_id,
+        background_tasks=background_tasks
     )
 
 
@@ -177,6 +179,7 @@ def get_feedback_comments_endpoint(
 def update_feedback_status_endpoint(
     feedback_id: str,
     request: FeedbackStatusUpdateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
@@ -186,5 +189,6 @@ def update_feedback_status_endpoint(
         db=db,
         feedback_id=feedback_id,
         request=request,
-        updated_by=current_user.user_id
+        updated_by=current_user.user_id,
+        background_tasks=background_tasks
     )
