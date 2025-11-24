@@ -1,5 +1,7 @@
-from datetime import datetime
-from typing import Tuple, Dict
+from datetime import datetime, timezone
+from typing import Tuple, Dict, Optional
+import json
+import logging
 
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
@@ -10,8 +12,12 @@ from app.models.patient_stage_model import PatientStage
 from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     AvgLeadTimeResponse,
-    SuccessRateResponse
+    SuccessRateResponse,
+    AvgQualityDeviationsResponse
 )
+from app.service.redis_service import get_redis
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardService:
@@ -207,4 +213,199 @@ class DashboardService:
             status="success",
             last_updated=datetime.now()
         )
+
+    def get_avg_quality_deviations(self, pharma_id: int) -> AvgQualityDeviationsResponse:
+        """
+        Calculate average quality deviations flagged per shipment for current month.
+        
+        Formula: Quality Deviations Flagged = monthly total (total deviation per shipment) / monthly total treatment
+        Represents the average number of quality issues detected per shipment or treatment process.
+        
+        Args:
+            pharma_id: Pharmaceutical company ID
+            
+        Returns:
+            AvgQualityDeviationsResponse with average deviations, total deviations, and total treatments
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get all unique patients (treatments) that have shipments in the current month for this pharma
+        monthly_patients = (
+            self.db.query(Shipment.patient_id)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .distinct()
+            .all()
+        )
+        
+        patient_ids = [patient_id[0] for patient_id in monthly_patients]
+        total_treatments = len(patient_ids)
+        
+        if total_treatments == 0:
+            return AvgQualityDeviationsResponse(
+                pharma_id=pharma_id,
+                avg_quality_deviations=0.0,
+                total_deviations=0,
+                total_treatments=0,
+                status="success",
+                last_updated=datetime.now()
+            )
+        
+        # Get quality deviations from Redis for these patients
+        total_deviations = 0
+        patients_with_data = 0
+        patients_without_data = 0
+        records_processed = 0
+        records_in_month = 0
+        records_out_of_month = 0
+        
+        try:
+            redis_client = get_redis()
+            logger.info(f"Calculating quality deviations for pharma_id={pharma_id}, total_treatments={total_treatments}, month={current_month_start.strftime('%Y-%m')}")
+            
+            for patient_id in patient_ids:
+                history_key = f'quality_history:{patient_id}'
+                try:
+                    # Get all quality history records for this patient
+                    history = redis_client.lrange(history_key, 0, -1)
+                    
+                    if not history:
+                        patients_without_data += 1
+                        logger.debug(f"No quality data found in Redis for patient {patient_id}")
+                        continue
+                    
+                    patients_with_data += 1
+                    patient_deviations = 0
+                    
+                    for item in history:
+                        try:
+                            quality_data = json.loads(item)
+                            records_processed += 1
+                            timestamp_str = quality_data.get('timestamp')
+                            
+                            # Parse timestamp and filter for current month
+                            if timestamp_str:
+                                # Try to parse timestamp
+                                parsed_timestamp = self._parse_quality_timestamp(timestamp_str)
+                                
+                                if parsed_timestamp:
+                                    if current_month_start <= parsed_timestamp < next_month_start:
+                                        records_in_month += 1
+                                        # Count violations/deviations
+                                        # Prefer violated_parameters list if available, otherwise use threshold_violations dict
+                                        violated_parameters = quality_data.get('violated_parameters', [])
+                                        threshold_violations = quality_data.get('threshold_violations', {})
+                                        
+                                        record_deviations = 0
+                                        if isinstance(violated_parameters, list) and len(violated_parameters) > 0:
+                                            # Use violated_parameters list (count of parameters that violated thresholds)
+                                            record_deviations = len(violated_parameters)
+                                        elif isinstance(threshold_violations, dict):
+                                            # Fallback to threshold_violations dict (count True values)
+                                            record_deviations = sum(1 for v in threshold_violations.values() if v)
+                                        elif isinstance(violated_parameters, dict):
+                                            # If violated_parameters is a dict, count True values
+                                            record_deviations = sum(1 for v in violated_parameters.values() if v)
+                                        
+                                        if record_deviations > 0:
+                                            total_deviations += record_deviations
+                                            patient_deviations += record_deviations
+                                            logger.debug(f"Patient {patient_id}: Found {record_deviations} deviations at {timestamp_str}")
+                                    else:
+                                        records_out_of_month += 1
+                                        logger.debug(f"Patient {patient_id}: Record timestamp {timestamp_str} is outside current month")
+                                else:
+                                    logger.warning(f"Patient {patient_id}: Could not parse timestamp: {timestamp_str}")
+                            else:
+                                logger.warning(f"Patient {patient_id}: Quality data missing timestamp field")
+                                            
+                        except (json.JSONDecodeError, KeyError, ValueError) as e:
+                            logger.warning(f"Error parsing quality data for patient {patient_id}: {e}")
+                            continue
+                    
+                    if patient_deviations == 0:
+                        logger.debug(f"Patient {patient_id}: Has {len(history)} quality records but no deviations found")
+                            
+                except Exception as e:
+                    logger.warning(f"Error reading Redis history for patient {patient_id}: {e}")
+                    patients_without_data += 1
+                    continue
+            
+            logger.info(f"Quality deviations calculation complete: total_deviations={total_deviations}, "
+                       f"patients_with_data={patients_with_data}, patients_without_data={patients_without_data}, "
+                       f"records_processed={records_processed}, records_in_month={records_in_month}, "
+                       f"records_out_of_month={records_out_of_month}")
+                    
+        except Exception as e:
+            logger.error(f"Error connecting to Redis for quality deviations: {e}", exc_info=True)
+            # Return zero if Redis is unavailable
+            return AvgQualityDeviationsResponse(
+                pharma_id=pharma_id,
+                avg_quality_deviations=0.0,
+                total_deviations=0,
+                total_treatments=total_treatments,
+                status="success",
+                last_updated=datetime.now()
+            )
+        
+        # Calculate average: total deviations / total treatments
+        avg_deviations = round(total_deviations / total_treatments, 2) if total_treatments > 0 else 0.0
+        
+        return AvgQualityDeviationsResponse(
+            pharma_id=pharma_id,
+            avg_quality_deviations=avg_deviations,
+            total_deviations=total_deviations,
+            total_treatments=total_treatments,
+            status="success",
+            last_updated=datetime.now()
+        )
+    
+    @staticmethod
+    def _parse_quality_timestamp(value: Optional[str]) -> Optional[datetime]:
+        """
+        Parse timestamp strings from quality data into naive UTC datetime objects.
+        Matches the parsing logic used in QualityService.
+        
+        Args:
+            value: Timestamp string from quality data
+            
+        Returns:
+            Parsed datetime object or None if parsing fails
+        """
+        if not value:
+            return None
+
+        parse_attempts = [
+            datetime.fromisoformat,
+        ]
+
+        formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        ]
+
+        for parser in parse_attempts:
+            try:
+                parsed = parser(value)
+                if parsed.tzinfo:
+                    parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+                return parsed
+            except ValueError:
+                continue
+
+        for fmt in formats:
+            try:
+                parsed = datetime.strptime(value, fmt)
+                return parsed
+            except ValueError:
+                continue
+
+        return None
 

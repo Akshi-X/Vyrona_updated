@@ -52,6 +52,16 @@ class SuccessRateResponse(BaseModel):
     last_updated: datetime
 
 
+class AvgQualityDeviationsResponse(BaseModel):
+    """Average quality deviations flagged per shipment response for a pharma"""
+    pharma_id: int
+    avg_quality_deviations: float
+    total_deviations: int
+    total_treatments: int
+    status: str
+    last_updated: datetime
+
+
 # ==========================================
 # RISK SCHEMAS
 # ==========================================

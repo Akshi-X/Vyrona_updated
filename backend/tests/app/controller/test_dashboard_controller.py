@@ -19,7 +19,8 @@ from app.controller import dashboard_controller
 from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     AvgLeadTimeResponse,
-    SuccessRateResponse
+    SuccessRateResponse,
+    AvgQualityDeviationsResponse
 )
 
 
@@ -101,4 +102,29 @@ def test_success_rate_endpoint(monkeypatch):
     assert body["success_rate"] == 75.0
     assert body["successful_outcomes"] == 15
     service_mock.get_success_rate.assert_called_once_with(42)
+
+
+def test_avg_quality_deviations_endpoint(monkeypatch):
+    """Verify avg quality deviations endpoint delegates to dashboard service."""
+    service_mock = MagicMock()
+    expected_response = AvgQualityDeviationsResponse(
+        pharma_id=42,
+        avg_quality_deviations=2.5,
+        total_deviations=10,
+        total_treatments=4,
+        status="success",
+        last_updated=datetime.now()
+    )
+    service_mock.get_avg_quality_deviations.return_value = expected_response
+
+    with _create_test_client(monkeypatch, service_mock) as client:
+        response = client.get("/performance/avg-quality-deviations")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["avg_quality_deviations"] == 2.5
+    assert body["total_deviations"] == 10
+    assert body["total_treatments"] == 4
+    assert body["pharma_id"] == 42
+    service_mock.get_avg_quality_deviations.assert_called_once_with(42)
 
