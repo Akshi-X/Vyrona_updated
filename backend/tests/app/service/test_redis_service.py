@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, Mock, patch
 import redis
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import AuthenticationError as RedisAuthenticationError
 
 from app.service import redis_service
 
@@ -29,6 +30,7 @@ def test_get_redis_success(mock_redis_class, mock_settings, reset_redis_globals)
     mock_settings.REDIS_HOST = "localhost"
     mock_settings.REDIS_PORT = 6379
     mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = ""  # No password
     mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
     mock_settings.REDIS_SOCKET_TIMEOUT = 5
     
@@ -54,12 +56,72 @@ def test_get_redis_success(mock_redis_class, mock_settings, reset_redis_globals)
 
 @patch('app.service.redis_service.settings')
 @patch('app.service.redis_service.redis.Redis')
+def test_get_redis_success_with_password(mock_redis_class, mock_settings, reset_redis_globals):
+    """Test get_redis successfully creates and returns Redis client with password"""
+    # Setup mocks
+    mock_settings.REDIS_HOST = "localhost"
+    mock_settings.REDIS_PORT = 6379
+    mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = "Suriya@2002"  # With password
+    mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
+    mock_settings.REDIS_SOCKET_TIMEOUT = 5
+    
+    mock_client = MagicMock()
+    mock_client.ping.return_value = True
+    mock_redis_class.return_value = mock_client
+    
+    # Call function
+    result = redis_service.get_redis()
+    
+    # Verify
+    assert result == mock_client
+    mock_redis_class.assert_called_once_with(
+        host="localhost",
+        port=6379,
+        db=0,
+        decode_responses=True,
+        password="Suriya@2002",
+        socket_connect_timeout=5,
+        socket_timeout=5
+    )
+    mock_client.ping.assert_called_once()
+
+
+@patch('app.service.redis_service.settings')
+@patch('app.service.redis_service.redis.Redis')
+def test_get_redis_authentication_error(mock_redis_class, mock_settings, reset_redis_globals):
+    """Test get_redis raises AuthenticationError when password is incorrect"""
+    # Setup mocks
+    mock_settings.REDIS_HOST = "localhost"
+    mock_settings.REDIS_PORT = 6379
+    mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = "wrong_password"
+    mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
+    mock_settings.REDIS_SOCKET_TIMEOUT = 5
+    
+    mock_client = MagicMock()
+    mock_client.ping.side_effect = redis.exceptions.AuthenticationError("Authentication required.")
+    mock_redis_class.return_value = mock_client
+    
+    # Call function and verify exception
+    with pytest.raises(redis.exceptions.AuthenticationError):
+        redis_service.get_redis()
+    
+    # Verify password was included in connection params
+    mock_redis_class.assert_called_once()
+    call_kwargs = mock_redis_class.call_args[1]
+    assert call_kwargs["password"] == "wrong_password"
+
+
+@patch('app.service.redis_service.settings')
+@patch('app.service.redis_service.redis.Redis')
 def test_get_redis_connection_error(mock_redis_class, mock_settings, reset_redis_globals):
     """Test get_redis raises ConnectionError when Redis connection fails"""
     # Setup mocks
     mock_settings.REDIS_HOST = "localhost"
     mock_settings.REDIS_PORT = 6379
     mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = ""
     mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
     mock_settings.REDIS_SOCKET_TIMEOUT = 5
     
@@ -80,6 +142,7 @@ def test_get_redis_unexpected_error(mock_redis_class, mock_settings, reset_redis
     mock_settings.REDIS_HOST = "localhost"
     mock_settings.REDIS_PORT = 6379
     mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = ""
     mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
     mock_settings.REDIS_SOCKET_TIMEOUT = 5
     
@@ -247,6 +310,7 @@ def test_get_pubsub_calls_get_redis(mock_redis_class, mock_settings, reset_redis
     mock_settings.REDIS_HOST = "localhost"
     mock_settings.REDIS_PORT = 6379
     mock_settings.REDIS_DB = 0
+    mock_settings.REDIS_PASSWORD = ""
     mock_settings.REDIS_SOCKET_CONNECT_TIMEOUT = 5
     mock_settings.REDIS_SOCKET_TIMEOUT = 5
     
