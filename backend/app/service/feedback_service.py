@@ -6,7 +6,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile, HTTPException, BackgroundTasks
 from ..config.config import settings
 from ..exceptions.custom_exceptions import (
     FeedbackCreateFailedException, FeedbackInvalidDataException,
@@ -231,14 +231,25 @@ def add_comment(
     db: Session, 
     feedback_id: str, 
     request: CommentCreateRequest, 
-    commented_by: str
+    commented_by: str,
+    background_tasks: Optional[BackgroundTasks] = None
 ) -> CommentCreateResponse:
     """Add a comment to a feedback ticket"""
     
-    # Check if feedback exists
-    feedback = db.query(Feedback).filter(Feedback.ticket_id == feedback_id).first()
-    if not feedback:
+    # Optimize: Get feedback and submitter in one query using join
+    feedback_with_submitter = db.query(Feedback, User).join(
+        User, Feedback.submitted_by == User.user_id
+    ).filter(Feedback.ticket_id == feedback_id).first()
+    
+    if not feedback_with_submitter:
         raise FeedbackNotFoundException(feedback_id=feedback_id)
+    
+    feedback, submitter = feedback_with_submitter
+    
+    # Get user details for email (commented_by user)
+    user = db.query(User).filter(User.user_id == commented_by).first()
+    if not user:
+        raise FeedbackUserNotFoundException(user_id=commented_by)
     
     # Create comment
     comment = Comment(
@@ -259,34 +270,43 @@ def add_comment(
         db.rollback()
         raise FeedbackCommentCreateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
     
-    # Get user details for email
-    user = db.query(User).filter(User.user_id == commented_by).first()
-    if not user:
-        raise FeedbackUserNotFoundException(user_id=commented_by)
-    
-    # Get submitter details for email
-    submitter = db.query(User).filter(User.user_id == feedback.submitted_by).first()
-    if not submitter:
-        raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
-    
-    # Send email notifications - always send to admin, conditionally to user
-    try:
-        # Get common MyGrape admin email
+    # Send email notifications in background - always send to admin, conditionally to user
+    if background_tasks:
+        # Get common MyGrape admin email (cache this if possible, but for now keep it simple)
         mygrape_admin_email = get_mygrape_admin_email()
         
-        send_feedback_new_comment_email(
+        # Prepare email data
+        commented_by_name = f"{user.first_name} {user.last_name}"
+        
+        # Add background task for email sending
+        background_tasks.add_task(
+            send_feedback_new_comment_email,
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
             comment=request.comment,
-            commented_by_name=f"{user.first_name} {user.last_name}",
+            commented_by_name=commented_by_name,
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
-    except Exception as e:
-        # Log error but don't fail the request
-        logger.error(f"Failed to send email notification for comment on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
+    else:
+        # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
+        try:
+            mygrape_admin_email = get_mygrape_admin_email()
+            send_feedback_new_comment_email(
+                ticket_id=feedback.ticket_id,
+                subject=feedback.subject,
+                comment=request.comment,
+                commented_by_name=f"{user.first_name} {user.last_name}",
+                submitted_by_email=submitter.email,
+                feedback_id=feedback.ticket_id,
+                mygrape_admin_email=mygrape_admin_email,
+                send_to_user=request.send_email
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            logger.error(f"Failed to send email notification for comment on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
     
     return CommentCreateResponse(
         message="Comment added successfully",
@@ -299,14 +319,25 @@ def update_feedback_status(
     db: Session, 
     feedback_id: str, 
     request: FeedbackStatusUpdateRequest, 
-    updated_by: str
+    updated_by: str,
+    background_tasks: Optional[BackgroundTasks] = None
 ) -> FeedbackStatusUpdateResponse:
     """Update feedback ticket status"""
     
-    # Check if feedback exists
-    feedback = db.query(Feedback).filter(Feedback.ticket_id == feedback_id).first()
-    if not feedback:
+    # Optimize: Get feedback and submitter in one query using join
+    feedback_with_submitter = db.query(Feedback, User).join(
+        User, Feedback.submitted_by == User.user_id
+    ).filter(Feedback.ticket_id == feedback_id).first()
+    
+    if not feedback_with_submitter:
         raise FeedbackNotFoundException(feedback_id=feedback_id)
+    
+    feedback, submitter = feedback_with_submitter
+    
+    # Get user details for email (updated_by user)
+    user = db.query(User).filter(User.user_id == updated_by).first()
+    if not user:
+        raise FeedbackUserNotFoundException(user_id=updated_by)
     
     old_status = feedback.status.value
     feedback.status = request.status
@@ -322,35 +353,45 @@ def update_feedback_status(
         db.rollback()
         raise FeedbackStatusUpdateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
     
-    # Get user details for email
-    user = db.query(User).filter(User.user_id == updated_by).first()
-    if not user:
-        raise FeedbackUserNotFoundException(user_id=updated_by)
-    
-    # Get submitter details for email
-    submitter = db.query(User).filter(User.user_id == feedback.submitted_by).first()
-    if not submitter:
-        raise FeedbackUserNotFoundException(user_id=feedback.submitted_by)
-    
-    # Send email notifications - always send to admin, conditionally to user
-    try:
+    # Send email notifications in background - always send to admin, conditionally to user
+    if background_tasks:
         # Get common MyGrape admin email
         mygrape_admin_email = get_mygrape_admin_email()
         
-        send_feedback_status_update_email(
+        # Prepare email data
+        updated_by_name = f"{user.first_name} {user.last_name}"
+        
+        # Add background task for email sending
+        background_tasks.add_task(
+            send_feedback_status_update_email,
             ticket_id=feedback.ticket_id,
             subject=feedback.subject,
             old_status=old_status,
             new_status=request.status.value,
-            updated_by_name=f"{user.first_name} {user.last_name}",
+            updated_by_name=updated_by_name,
             submitted_by_email=submitter.email,
             feedback_id=feedback.ticket_id,
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
-    except Exception as e:
-        # Log error but don't fail the request
-        logger.error(f"Failed to send email notification for status update on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
+    else:
+        # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
+        try:
+            mygrape_admin_email = get_mygrape_admin_email()
+            send_feedback_status_update_email(
+                ticket_id=feedback.ticket_id,
+                subject=feedback.subject,
+                old_status=old_status,
+                new_status=request.status.value,
+                updated_by_name=f"{user.first_name} {user.last_name}",
+                submitted_by_email=submitter.email,
+                feedback_id=feedback.ticket_id,
+                mygrape_admin_email=mygrape_admin_email,
+                send_to_user=request.send_email
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            logger.error(f"Failed to send email notification for status update on ticket {feedback.ticket_id}: {str(e)}", exc_info=True)
     
     return FeedbackStatusUpdateResponse(
         message="Feedback status updated successfully",
