@@ -8,7 +8,8 @@ from app.schemas.dashboard_schema import (
     CriticalAlertsResponse,
     AvgLeadTimeResponse,
     OnTimePercentageResponse,
-    SuccessRateResponse
+    SuccessRateResponse,
+    AvgQualityDeviationsResponse
 )
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
 from app.config.database import get_db
@@ -88,6 +89,32 @@ def get_success_rate(
     """
     dashboard_service = DashboardService(db)
     return dashboard_service.get_success_rate(pharma_id)
+
+
+@router.get("/performance/avg-quality-deviations", response_model=AvgQualityDeviationsResponse)
+def get_avg_quality_deviations(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return average quality deviations flagged per shipment for current month.
+    
+    This metric replaces the Treatments count widget.
+    Represents the average number of quality issues detected per shipment or treatment process,
+    such as temperature excursions, humidity spikes, shock events, seal breaks, or location-based deviations.
+    These are captured directly from IoT sensors or stakeholder inputs.
+    
+    Formula: Quality Deviations Flagged = monthly total (total deviation per shipment) / monthly total treatment
+    
+    Protected endpoint. Auth token required; pharma_id taken from token.
+    
+    Returns:
+        - avg_quality_deviations: Average count of all deviations recorded per treatment per month
+        - total_deviations: Total number of quality deviations in the current month
+        - total_treatments: Total number of treatments (patients with shipments) in the current month
+    """
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_avg_quality_deviations(pharma_id)
 
 
 # ---------------------------
