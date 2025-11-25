@@ -4,8 +4,7 @@ from sqlalchemy import Enum as SQLEnum, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ..config.database import Base
-from ..constants.enums import ApprovalStatus
-from ..utils.db_types import RoleType
+from ..constants.enums import ApprovalStatus, UserRole
 
 
 class User(Base):
@@ -21,9 +20,9 @@ class User(Base):
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     
     # Role and Company
-    # RoleType automatically normalizes to title case (Admin, Manager, User, etc.)
-    # Accepts any case input but stores in title case
-    role = sqlalchemy.Column(RoleType(), nullable=False, index=True)
+    # Schema validator normalizes any case input to title case before reaching database
+    # ENUM ensures database-level validation (Admin, Manager, User, Pharma_admin, Mygrape_admin)
+    role = sqlalchemy.Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj], name='user_role'), nullable=False, index=True)
     pharma_id = sqlalchemy.Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
     # Account Status
