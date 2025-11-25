@@ -273,12 +273,12 @@ export default function QualityParametersTable() {
             <col className="w-1/6" />
             <col className="w-2/6" />
           </colgroup>
-          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] h-[56px] sticky top-0">
+          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left font-normal">Parameter</th>
-              <th className="px-3 py-2 text-left font-normal">Current Value</th>
-              <th className="px-3 py-2 text-left font-normal">Status</th>
-              <th className="px-3 py-2 text-left font-normal">Acceptable Range</th>
+              <th className="px-3 py-2 text-left">Parameter</th>
+              <th className="px-3 py-2 text-left">Current Value</th>
+              <th className="px-3 py-2 text-left">Status</th>
+              <th className="px-3 py-2 text-left">Acceptable Range</th>
             </tr>
           </thead>
           <tbody>
