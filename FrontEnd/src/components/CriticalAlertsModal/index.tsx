@@ -61,7 +61,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 {alert.type}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
                   alert.severity === 'Critical' ? 'bg-red-100 text-red-800' :
                   alert.severity === 'High' ? 'bg-orange-100 text-orange-800' :
                   alert.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
@@ -77,7 +77,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 {alert.timestamp}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
                   alert.status === 'Active' ? 'bg-red-100 text-red-800' :
                   alert.status === 'Acknowledged' ? 'bg-yellow-100 text-yellow-800' :
                   alert.status === 'Resolved' ? 'bg-green-100 text-green-800' :

@@ -42,7 +42,7 @@ export default function Database() {
   }
 
   return (
-    <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
+    <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>
       {/* Left Sidebar */}
       <Sidebar onLogout={handleLogout} />
 
