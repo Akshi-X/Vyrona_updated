@@ -51,21 +51,33 @@ class RBACMiddleware(BaseHTTPMiddleware):
         user_role = current_user.role.lower()
         
         # Check if endpoint requires specific role
+        # Note: Check overlapping permissions first (endpoints in multiple sets)
+        requires_manager = self._requires_manager(method, path)
+        requires_pharma_admin = self._requires_pharma_admin(method, path)
+        
         if self._requires_admin(method, path):
             if user_role != 'admin':
                 raise AdminRoleRequiredException(user_role=user_role)
         
-        elif self._requires_pharma_admin(method, path):
-            if user_role not in ['admin', 'pharma_admin']:  # Admin can access pharma admin endpoints
+        elif requires_manager and requires_pharma_admin:
+            # Endpoint is in both manager and pharma_admin sets (e.g., task creation)
+            # Allow admin, manager, or pharma_admin
+            if user_role not in ['admin', 'manager', 'pharma_admin']:
+                raise ManagerRoleRequiredException(user_role=user_role)
+        
+        elif requires_manager:
+            # Manager-only endpoint
+            if user_role not in ['admin', 'manager']:
+                raise ManagerRoleRequiredException(user_role=user_role)
+        
+        elif requires_pharma_admin:
+            # Pharma admin-only endpoint
+            if user_role not in ['admin', 'pharma_admin']:
                 raise ManagerRoleRequiredException(user_role=user_role)
         
         elif self._requires_mygrape_admin(method, path):
             if user_role not in ['admin', 'mygrape_admin']:  # Admin can access MyGrape admin endpoints
                 raise AdminRoleRequiredException(user_role=user_role)
-        
-        elif self._requires_manager(method, path):
-            if user_role not in ['admin', 'manager']:  # Admin can access manager endpoints
-                raise ManagerRoleRequiredException(user_role=user_role)
         
         elif self._requires_user(method, path):
             if user_role != 'user':
@@ -107,7 +119,13 @@ class RBACMiddleware(BaseHTTPMiddleware):
         - Wildcard methods: ("*", "/api/login")
         - Path parameters: ("GET", "/api/user/{id}") matches "/api/user/123"
         """
+        # Normalize path (remove trailing slash for consistent matching)
+        path = path.rstrip('/')
+        
         for endpoint_method, endpoint_path in endpoint_set:
+            # Normalize endpoint path too
+            endpoint_path = endpoint_path.rstrip('/')
+            
             # Check if methods match (or wildcard)
             if endpoint_method != "*" and endpoint_method != method:
                 continue
