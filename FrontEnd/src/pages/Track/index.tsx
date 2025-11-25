@@ -297,7 +297,7 @@ export default function TrackPage() {
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
-        <header className="h-[63px] bg-black flex items-center justify-end px-6 gap-6 flex-shrink-0">
+        <header className="h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 flex-shrink-0">
           {/* Avatar only on the black bar */}
           <div 
             className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
@@ -422,10 +422,11 @@ export default function TrackPage() {
                   <div className="flex items-center gap-0 w-full">
                     {steps.map((s, idx) => {
                       const isCompleted = idx < currentIndex;
+                      const isActive = idx === currentIndex;
                       const isCurrentOrUpcoming = idx >= currentIndex;
-                      const circleBg = isCompleted ? '#8d2b8f' : '#f6e9f8';
-                      const labelColor = isCompleted ? 'text-gray-700' : 'text-gray-500';
-                      const icon = isCompleted ? s.dark : s.light;
+                      const circleBg = (isCompleted || isActive) ? '#8d2b8f' : '#f6e9f8';
+                      const labelColor = (isCompleted || isActive) ? 'text-gray-700' : 'text-gray-500';
+                      const icon = (isCompleted || isActive) ? s.dark : s.light;
                       const connector = (() => {
                         if (idx === steps.length - 1) return null;
                         if (idx < currentIndex - 1) return <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />;
@@ -447,7 +448,7 @@ export default function TrackPage() {
                             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: circleBg }}>
                               <img src={icon} alt={s.key} className={`w-4 h-4 ${isCurrentOrUpcoming ? 'opacity-80' : ''}`} />
                   </div>
-                            <div className={`absolute top-full font-medium mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
+                            <div className={`absolute top-full font-semibold mt-2 text-[12px] ${labelColor} text-center whitespace-nowrap`}>{s.key}</div>
                 </div>
                           {connector}
                   </div>

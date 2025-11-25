@@ -46,31 +46,47 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
       <h3 className="font-semibold text-black text-base mb-1 text-[16px]">Compliance</h3>
       <div className="text-xs text-gray-400 mb-3 text-[12px]">Logistic Document Checklist</div>
 
-      {/* Header row */}
-      <div className="bg-[#FDF4FF] rounded-md px-4 py-2 grid grid-cols-3 text-xs font-medium text-[#6B1176]">
-        <div>Transport Route</div>
-        <div className="text-center">Documents Required</div>
-        <div className="text-left px-2">Documents Missed</div>
-      </div>
-
-      {/* Data rows */}
-      <div className="mt-3 text-[14px] h-[120px] overflow-y-auto [scrollbar-width:thin]">
-        {loading && (
-          <div className="px-4 py-3 text-sm text-gray-500">Loading...</div>
-        )}
-        {!loading && error && (
-          <div className="px-4 py-3 text-sm text-red-600">{error}</div>
-        )}
-        {!loading && !error && expandedRows.length === 0 && (
-          <div className="px-4 py-3 text-sm text-gray-500">No checklist items</div>
-        )}
-        {!loading && !error && expandedRows.map((row, idx) => (
-          <div key={`${row.stage}-${idx}`} className="grid grid-cols-3 items-center px-4 py-3 text-sm">
-            <div className="text-left text-black py-2">{row.stage}</div>
-            <div className="text-center text-black py-2">{row.needed}</div>
-            <div className="text-left text-black-600 py-2 px-4">{row.missedDoc || '-'}</div>
-          </div>
-        ))}
+      {/* Table with proper semantic HTML */}
+      <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin]">
+        <table className="w-full text-[12px]">
+          <thead className="bg-[#FDF4FF] text-[#6B1176] font-medium sticky top-0">
+            <tr>
+              <th className="px-4 py-2 text-left w-[154px] h-[56px]">Transport Route</th>
+              <th className="px-4 py-2 text-center w-[154px] whitespace-nowrap h-[56px]">Documents Required</th>
+              <th className="px-4 py-2 text-left px-2 w-[154px] whitespace-nowrap h-[56px]">Documents Missed</th>
+            </tr>
+          </thead>
+          <tbody className="text-[14px]">
+            {loading && (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-sm text-gray-500">
+                  Loading...
+                </td>
+              </tr>
+            )}
+            {!loading && error && (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-sm text-red-600">
+                  {error}
+                </td>
+              </tr>
+            )}
+            {!loading && !error && expandedRows.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-sm text-gray-500">
+                  No checklist items
+                </td>
+              </tr>
+            )}
+            {!loading && !error && expandedRows.map((row, idx) => (
+              <tr key={`${row.stage}-${idx}`} className="text-black">
+                <td className="px-4 py-3 text-left">{row.stage}</td>
+                <td className="px-4 py-3 text-center">{row.needed}</td>
+                <td className="px-4 py-3 text-left px-4">{row.missedDoc || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

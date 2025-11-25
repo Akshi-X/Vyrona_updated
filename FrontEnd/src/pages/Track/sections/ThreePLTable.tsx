@@ -98,16 +98,16 @@ export default function ThreePLTable() {
         ) : (
           <div className="w-full">
             <table className="w-full table-fixed text-xs min-w-[760px]">
-              <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] h-[56px] sticky top-0">
+              <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">3PL Player Name</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Mode of Transport</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Transport Route</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Departure Time</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Arrival Time</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Handover Time</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">LN2 Refill</th>
-                  <th className="px-3 py-2 text-left font-normal whitespace-nowrap w-[140px]">Warehouse</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">3PL Player Name</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Mode of Transport</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Transport Route</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Departure Time</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Arrival Time</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Handover Time</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">LN2 Refill</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Warehouse</th>
                 </tr>
               </thead>
               <tbody>
