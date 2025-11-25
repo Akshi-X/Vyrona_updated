@@ -20,19 +20,28 @@ def get_redis() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
         try:
-            _redis_client = redis.Redis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                db=settings.REDIS_DB,
-                decode_responses=True,  # Redis returns bytes by default that can be converted to strings
-                socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT,
-                socket_timeout=settings.REDIS_SOCKET_TIMEOUT
-            )
+            # Build connection parameters
+            connection_params = {
+                "host": settings.REDIS_HOST,
+                "port": settings.REDIS_PORT,
+                "db": settings.REDIS_DB,
+                "decode_responses": True,  # Redis returns bytes by default that can be converted to strings
+                "socket_connect_timeout": settings.REDIS_SOCKET_CONNECT_TIMEOUT,
+                "socket_timeout": settings.REDIS_SOCKET_TIMEOUT
+            }
+            # Add password if provided
+            if settings.REDIS_PASSWORD:
+                connection_params["password"] = settings.REDIS_PASSWORD
+            
+            _redis_client = redis.Redis(**connection_params)
             # Test connection
             _redis_client.ping()
             logger.info(f"Redis connection established successfully: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
         except redis.exceptions.ConnectionError as e:
             logger.error(f"Failed to connect to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT}: {e}")
+            raise
+        except redis.exceptions.AuthenticationError as e:
+            logger.error(f"Redis authentication failed: {e}")
             raise
         except Exception as e:
             logger.error(f"Unexpected error connecting to Redis: {e}")
