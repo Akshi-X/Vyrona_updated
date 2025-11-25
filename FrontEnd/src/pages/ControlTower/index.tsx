@@ -1,6 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
@@ -16,6 +16,12 @@ const ControlTower = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
   const [userInitials, setUserInitials] = useState<string>('');
+  const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
+  const regionDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const carrierDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
@@ -127,6 +133,26 @@ const ControlTower = () => {
     });
   }, [routes, selectedRegion, selectedStatus, selectedCarrier]);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (regionDropdownRef.current && !regionDropdownRef.current.contains(event.target as Node)) {
+        setIsRegionDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+      if (carrierDropdownRef.current && !carrierDropdownRef.current.contains(event.target as Node)) {
+        setIsCarrierDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
 
   if (!isAuthenticated) {
     return (
@@ -177,15 +203,48 @@ const ControlTower = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Region
                     </label>
-                     <select
-                      value={selectedRegion}
-                      onChange={(e) => setSelectedRegion(e.target.value)}
-                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
-                    >
-                      {regionOptions.map(o => (
-                        <option key={o} value={o}>{o === 'All' ? 'All Regions' : o}</option>
-                      ))}
-                    </select>
+                    <div className="relative" ref={regionDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsRegionDropdownOpen(!isRegionDropdownOpen);
+                        }}
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      >
+                        <span className={selectedRegion !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {selectedRegion === 'All' ? 'All Regions' : selectedRegion}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isRegionDropdownOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isRegionDropdownOpen && (
+                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          {regionOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRegion(option);
+                                setIsRegionDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                selectedRegion === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                              }`}
+                            >
+                              {option === 'All' ? 'All Regions' : option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status Filter */}
@@ -193,15 +252,48 @@ const ControlTower = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Status
                     </label>
-                     <select
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
-                    >
-                      {statusOptions.map(o => (
-                        <option key={o} value={o}>{o === 'All' ? 'All Status' : o}</option>
-                      ))}
-                    </select>
+                    <div className="relative" ref={statusDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                        }}
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      >
+                        <span className={selectedStatus !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {selectedStatus === 'All' ? 'All Status' : selectedStatus}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isStatusDropdownOpen && (
+                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          {statusOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStatus(option);
+                                setIsStatusDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                selectedStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                              }`}
+                            >
+                              {option === 'All' ? 'All Status' : option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Carrier Filter */}
@@ -209,15 +301,48 @@ const ControlTower = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Carrier
                     </label>
-                     <select
-                      value={selectedCarrier}
-                      onChange={(e) => setSelectedCarrier(e.target.value)}
-                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent"
-                    >
-                      {carrierOptions.map(o => (
-                        <option key={o} value={o}>{o === 'All' ? 'All Carriers' : o}</option>
-                      ))}
-                    </select>
+                    <div className="relative" ref={carrierDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCarrierDropdownOpen(!isCarrierDropdownOpen);
+                        }}
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      >
+                        <span className={selectedCarrier !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {selectedCarrier === 'All' ? 'All Carriers' : selectedCarrier}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isCarrierDropdownOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isCarrierDropdownOpen && (
+                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          {carrierOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCarrier(option);
+                                setIsCarrierDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                selectedCarrier === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                              }`}
+                            >
+                              {option === 'All' ? 'All Carriers' : option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Network Hubs removed per request */}
@@ -227,7 +352,7 @@ const ControlTower = () => {
               {/* Active Routes List */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
                 <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
-                <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-gray-900 gap-3">
+                <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                   <div className="text-left">Route</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
