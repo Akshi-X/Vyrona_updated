@@ -161,7 +161,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         status: 'Not started'
       });
     } catch (error) {
-      console.error('Error creating task:', error);
       setValidationErrors({ submit: 'Failed to create task. Please try again.' });
     } finally {
       setIsSaving(false);
@@ -239,7 +238,6 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       const response = await userService.getAllUsersInCompany();
       setUsers(response.users || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       setUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -749,7 +747,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       </select>
                     </div>
                   ) : (
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
                   task.priority === 'High' ? 'bg-red-100 text-red-800' :
                   task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' :
                   'bg-green-100 text-green-800'
@@ -791,7 +789,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       </select>
                     </div>
                   ) : (
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
                   task.status === 'Done' ? 'bg-green-100 text-green-800' :
                   task.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
                   'bg-gray-100 text-gray-800'

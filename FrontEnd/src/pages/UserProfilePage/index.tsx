@@ -589,7 +589,7 @@ const UserProfilePage: React.FC = () => {
                       {ticket.type}
                     </td>
                     <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusBadgeColor(ticket.status)}`}>
                         {ticket.status}
                       </span>
                     </td>

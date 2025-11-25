@@ -293,7 +293,7 @@ export default function TrackPage() {
   }, [patientId]);
 
   return (
-    <div className="bg-[#fcfaff] flex w-full h-full">
+    <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
