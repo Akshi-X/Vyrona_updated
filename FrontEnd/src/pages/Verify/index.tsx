@@ -246,7 +246,7 @@ const VerifyOtp: React.FC = () => {
                             </p>
                         ) : (
                             <p className="text-sm text-red-500 text-center mb-3">
-                                OTP expired. Please resend.
+                                OTP expired.
                             </p>
                         )}
 
