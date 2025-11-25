@@ -87,8 +87,9 @@ MYGRAPE_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
 # MANAGER-ONLY ENDPOINTS
 # ============================================
 MANAGER_ONLY_ENDPOINTS: Set[EndpointPermission] = {
-    # Note: Task management endpoints are shared with PHARMA_ADMIN_ENDPOINTS
-    # Add manager-only endpoints here when needed
+    ("POST", "/api/tasks"),                    # Create task
+    ("PUT", "/api/tasks/{task_id}"),           # Update task (full update)
+    ("DELETE", "/api/tasks/{task_id}")
 }
 
 
