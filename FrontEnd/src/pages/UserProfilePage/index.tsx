@@ -431,11 +431,11 @@ const UserProfilePage: React.FC = () => {
                 }}
                 maxLength={NAME_MAX}
                 disabled={!isEditingProfile}
-                className={`w-full px-3 py-2 border rounded-lg ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   isEditingProfile 
                     ? firstNameError 
-                      ? 'border-red-500 bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
                 placeholder="Enter your first name"
@@ -460,11 +460,11 @@ const UserProfilePage: React.FC = () => {
                 }}
                 maxLength={NAME_MAX}
                 disabled={!isEditingProfile}
-                className={`w-full px-3 py-2 border rounded-lg ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   isEditingProfile 
                     ? lastNameError 
-                      ? 'border-red-500 bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
                 }`}
                 placeholder="Enter your last name"
@@ -477,7 +477,7 @@ const UserProfilePage: React.FC = () => {
                 type="email"
                 value={workEmail}
                 disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
               />
             </div>
             <div>

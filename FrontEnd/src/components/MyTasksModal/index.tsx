@@ -32,6 +32,7 @@ interface MyTasksModalProps {
   currentUserId?: string; // Current user's ID
   onTaskCreated?: () => void; // Callback to refresh tasks after creation
   userRole?: string; // User's role for role-based access control
+  defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -46,7 +47,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   currentUserName = '',
   currentUserId = '',
   onTaskCreated,
-  userRole = ''
+  userRole = '',
+  defaultPatientId = ''
 }) => {
   const isUserRole = userRole?.toLowerCase() === 'user';
   const [showInputRow, setShowInputRow] = useState(false);
@@ -74,9 +76,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const handleAddClick = () => {
     setShowInputRow(true);
     setValidationErrors({});
-    // Reset form with current user as default
+    // Reset form with current user as default and pre-fill patientId if provided
     setNewTask({
-      patientId: '',
+      patientId: defaultPatientId || '',
       taskName: '',
       description: '',
       assigneeBy: currentUserName || '',
@@ -308,8 +310,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   // Helper function to get editable fields for a task
   const getEditableFields = (task: MyTask): Set<string> => {
     if (isTaskCreatedByMe(task)) {
-      // Creator can edit all fields except "Assigned by"
-      return new Set(['patientId', 'taskName', 'description', 'assignedTo', 'dueDate', 'priority', 'status']);
+      // Creator can edit all fields except "Assigned by" and "Patient ID"
+      return new Set(['taskName', 'description', 'assignedTo', 'dueDate', 'priority', 'status']);
     } else if (isTaskAssignedToMe(task)) {
       // Assignee can only edit status
       return new Set(['status']);
@@ -345,7 +347,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       loading={loading}
       loadingText="Loading tasks..."
       emptyText="No tasks found"
-      dataLength={visibleTasks.length}
+      dataLength={showInputRow ? Math.max(visibleTasks.length, 1) : visibleTasks.length}
     >
       {validationErrors.submit && (
         <div className="px-4 py-2 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm mb-4">
@@ -362,7 +364,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           .alert-card-table thead {
             position: sticky;
             top: 0;
-            z-index: 30;
+            z-index: 1020;
             background-color: rgb(250 245 255);
           }
           .alert-card-table th.sticky,
@@ -373,7 +375,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           }
           .alert-card-table thead th.sticky {
             background-color: rgb(250 245 255) !important;
-            z-index: 31;
+            z-index: 1020;
+            position: sticky;
+            right: 0;
+            top: 0;
           }
           .alert-card-table tbody td.sticky {
             background-color: white !important;
@@ -422,7 +427,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Due date</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Priority</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Status</th>
-            {variant === 'track' && <th className="p-[15px] sticky right-0 bg-[#fdeeff] z-20"></th>}
+            {variant === 'track' && <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>}
           </tr>
         </thead>
         <tbody>
@@ -437,7 +442,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     onChange={(e) => handleInputChange('patientId', e.target.value)}
                     placeholder="Patient ID"
                     required
-                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
+                    readOnly
+                    className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-gray-50 text-gray-700 cursor-not-allowed ${
                       validationErrors.patientId 
                         ? 'border-red-500 focus:ring-red-200' 
                         : 'border-gray-300 focus:ring-purple-200'
@@ -633,18 +639,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             return (
               <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                  {isEditing && editableFields.has('patientId') ? (
-                    <input
-                      type="text"
-                      value={displayTask.patientId || ''}
-                      onChange={(e) => handleEditInputChange('patientId', e.target.value)}
-                      className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200 font-mono"
-                    />
-                  ) : (
-                    <div className="font-mono truncate">
-                {task.patientId}
-                    </div>
-                  )}
+                  <div className="font-mono truncate">
+                    {task.patientId}
+                  </div>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   {isEditing && editableFields.has('taskName') ? (
