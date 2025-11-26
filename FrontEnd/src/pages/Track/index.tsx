@@ -297,7 +297,7 @@ export default function TrackPage() {
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
-        <header className="h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 flex-shrink-0">
+        <header className="h-[63px] bg-black border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 flex-shrink-0" style={{ backgroundColor: '#000000' }}>
           {/* Avatar only on the black bar */}
           <div 
             className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
@@ -533,6 +533,7 @@ export default function TrackPage() {
         currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
         currentUserId={currentUserId}
         userRole={userRole || currentUser?.role || ''}
+        defaultPatientId={patientId || ''}
         onTaskCreated={() => {
           // Refresh tasks after creation
           fetchMyTasks();
