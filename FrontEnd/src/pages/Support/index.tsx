@@ -738,7 +738,7 @@ const Support: React.FC = () => {
                   <h3 className="text-sm font-semibold text-gray-900">Optional: Schedule a Call</h3>
                   <p className="mt-2 text-[13px] text-gray-800">
                     Schedule 15-min Call: {" "}
-                    <a href="https://mygrape.org/contact/" className="text-purple-700 underline">https://mygrape.org/contact/</a>
+                    <a href="https://mygrape.org/contact/" target="_blank" rel="noopener noreferrer" className="text-[#6b1176] underline hover:text-[#8b2a96] font-bold">https://mygrape.org/contact/</a>
                   </p>
                   <label className="mt-4 flex items-center gap-2">
                     <input 
