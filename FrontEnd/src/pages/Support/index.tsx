@@ -459,12 +459,18 @@ const Support: React.FC = () => {
 
                   {/* Type of Feedback */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Type of Feedback<span className="text-red-500"> *</span></label>
+                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">
+                      Type of Feedback<span className="text-red-500"> *</span>
+                    </label>
                     <select
                       value={feedbackType}
                       onChange={(e) => setFeedbackType(e.target.value)}
                       disabled={readonly}
-                      className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
+                      className={`w-full min-w-0 px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-200 ${
+                        readonly
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200'
+                          : 'border-gray-300 bg-white text-gray-900'
+                      }`}
                     >
                       <option value="">Select</option>
                       <option value="bug">Bug / Technical Issue</option>
@@ -590,12 +596,18 @@ const Support: React.FC = () => {
                 <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Priority */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Priority<span className="text-red-500"> *</span></label>
+                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">
+                      Priority<span className="text-red-500"> *</span>
+                    </label>
                     <select
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       disabled={readonly}
-                      className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
+                      className={`w-full min-w-0 px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-200 ${
+                        readonly
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200'
+                          : 'border-gray-300 bg-white text-gray-900'
+                      }`}
                     >
                       <option value="">Select priority level</option>
                       <option value="low">Low</option>

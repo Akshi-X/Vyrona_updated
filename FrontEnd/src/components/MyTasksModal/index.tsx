@@ -356,6 +356,37 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       )}
       <div className="relative" ref={scrollContainerRef}>
         <style>{`
+          /* Date picker styling - purple selected date */
+          input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          input[type="date"]::-webkit-datetime-edit-text {
+            color: #333;
+          }
+          input[type="date"]::-webkit-datetime-edit-month-field,
+          input[type="date"]::-webkit-datetime-edit-day-field,
+          input[type="date"]::-webkit-datetime-edit-year-field {
+            color: #333;
+          }
+          input[type="date"]:focus::-webkit-datetime-edit-month-field,
+          input[type="date"]:focus::-webkit-datetime-edit-day-field,
+          input[type="date"]:focus::-webkit-datetime-edit-year-field {
+            color: #6b1176;
+          }
+          /* Style the calendar popup - selected date purple */
+          input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          /* For Firefox */
+          input[type="date"] {
+            color-scheme: light;
+          }
+          /* Additional styling for date input value */
+          input[type="date"]:not(:placeholder-shown) {
+            color: #6b1176;
+            font-weight: 500;
+          }
           .alert-card-table {
             width: 100%;
             border-collapse: separate;
@@ -532,6 +563,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     type="date"
                     value={newTask.dueDate}
                     onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
                     required
                     className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.dueDate 
@@ -717,6 +749,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       type="date"
                       value={displayTask.dueDate || ''}
                       onChange={(e) => handleEditInputChange('dueDate', e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                       className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
@@ -829,7 +862,25 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         <button
                           onClick={() => {
                             setEditingTaskId(task.id);
-                            setEditedTask({ ...task });
+                            // Convert dueDate to YYYY-MM-DD format for date input
+                            const formattedTask = { ...task };
+                            if (task.dueDate && task.dueDate !== 'N/A') {
+                              try {
+                                // Try to parse the date - handle both locale format and ISO format
+                                const dateObj = new Date(task.dueDate);
+                                if (!isNaN(dateObj.getTime())) {
+                                  // Format as YYYY-MM-DD for HTML date input
+                                  const year = dateObj.getFullYear();
+                                  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                  const day = String(dateObj.getDate()).padStart(2, '0');
+                                  formattedTask.dueDate = `${year}-${month}-${day}`;
+                                }
+                              } catch (e) {
+                                // If parsing fails, keep original value
+                                formattedTask.dueDate = task.dueDate;
+                              }
+                            }
+                            setEditedTask(formattedTask);
                             // If user is not the creator (only status is editable), scroll to status column
                             if (!isCreatedByMe) {
                               setTimeout(() => {
