@@ -497,6 +497,7 @@ class ShipmentService:
                     "transit_days": transit_days,
                     "carrier": route_carrier,
                     "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
+                    "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
                     "region": route_region,
                     "source_region": source_region,
                     "destination_region": destination_region
@@ -504,8 +505,8 @@ class ShipmentService:
                 
                 active_routes.append(route_data)
             
-            # Sort by updated_at descending (most recent first)
-            active_routes.sort(key=lambda x: x['updated_at'] or '', reverse=True)
+            # Sort by created_at descending (most recently created first)
+            active_routes.sort(key=lambda x: x['created_at'] or '', reverse=True)
             
             return active_routes
             
