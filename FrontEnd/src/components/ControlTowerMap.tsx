@@ -91,7 +91,7 @@ const ControlTowerMap: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[400px] lg:min-w-[674px] lg:h-[868px]">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[400px] lg:h-[868px]">
       <div className="absolute inset-0 bg-[#272626]">
         <div className="w-full h-full relative">
           {/* Network Status overlay (top-right) */}

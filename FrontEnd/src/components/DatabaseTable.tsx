@@ -235,7 +235,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                     </button>
                     
                     {isDropdownOpen && (
-                      <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden">
+                      <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] font-normal overflow-hidden">
                         {['all', ...allStages, ...statusOptions].map((item) => {
                           const isAll = item === 'all';
                           const isStatus = typeof item === 'string' && statusOptions.includes((item as string).toLowerCase());
