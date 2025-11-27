@@ -8,16 +8,25 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     confirm_password: str
-    role: Literal['admin', 'manager', 'user']
+    role: str
     company_name: str
     
     @field_validator('role')
     @classmethod
     def validate_role(cls, v):
-        """Validate role is lowercase."""
-        if v not in ['admin', 'manager', 'user']:
-            raise ValueError("Role must be 'admin', 'manager', or 'user'")
-        return v.lower()
+        """Validate role and convert to title case (first letter capital)."""
+        role_lower = v.lower()
+        valid_roles = {
+            'admin': 'Admin',
+            'pharma_admin': 'Pharma_admin',
+            'mygrape_admin': 'Mygrape_admin',
+            'manager': 'Manager',
+            'user': 'User'
+        }
+        if role_lower not in valid_roles:
+            raise ValueError("Role must be one of: admin, pharma_admin, mygrape_admin, manager, user")
+        # Convert to title case: admin -> Admin, pharma_admin -> Pharma_admin, etc.
+        return valid_roles[role_lower]
 
 class UserResponse(BaseModel):
     user_id: str

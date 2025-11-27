@@ -5,7 +5,10 @@ from passlib.context import CryptContext
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import bcrypt
-import country_converter as coco
+try:
+    import country_converter as coco
+except ImportError:
+    coco = None  # Optional dependency
 from ..models.pharma_model import Pharma
 from ..models.user_model import User
 from ..constants.status_constants import STATUS_FAILED
@@ -174,7 +177,7 @@ def get_pharma_id_by_company_name(company_name: str, db: Session) -> Optional[in
 # ============================================
 
 # Initialize country converter instance (singleton pattern for performance)
-_cc = coco.CountryConverter()
+_cc = coco.CountryConverter() if coco else None
 
 def country_to_region(country_code: Optional[str]) -> Optional[str]:
     """
@@ -187,7 +190,7 @@ def country_to_region(country_code: Optional[str]) -> Optional[str]:
     Returns:
         Region name (e.g., 'North America', 'Europe', 'Asia') or None if conversion fails
     """
-    if not country_code:
+    if not country_code or not _cc:
         return None
     
     try:
@@ -198,6 +201,32 @@ def country_to_region(country_code: Optional[str]) -> Optional[str]:
     except Exception:
         # If conversion fails, return None
         return None
+
+
+def normalize_role_to_title_case(role: str) -> str:
+    """
+    Normalize role string to title case (first letter capital).
+    Ensures consistent role formatting in API responses.
+    
+    Args:
+        role: Role string (can be any case)
+        
+    Returns:
+        Role string in title case: Admin, Manager, User, Pharma_admin, Mygrape_admin
+    """
+    if not role:
+        return role
+    
+    role_lower = role.lower()
+    role_mapping = {
+        'admin': 'Admin',
+        'pharma_admin': 'Pharma_admin',
+        'mygrape_admin': 'Mygrape_admin',
+        'manager': 'Manager',
+        'user': 'User'
+    }
+    
+    return role_mapping.get(role_lower, role.capitalize())
 
 
 def get_countries_by_regions(regions: List[str]) -> Set[str]:
@@ -218,7 +247,10 @@ def get_countries_by_regions(regions: List[str]) -> Set[str]:
     try:
         # Get all available countries from country_converter
         # Using the data attribute which contains a pandas DataFrame
-        if hasattr(_cc, 'data') and hasattr(_cc.data, 'ISO2'):
+        if not _cc:
+            # Fallback: use a predefined list of common countries
+            all_countries = []
+        elif hasattr(_cc, 'data') and hasattr(_cc.data, 'ISO2'):
             all_countries = _cc.data['ISO2'].dropna().unique().tolist()
         else:
             # Fallback: use a predefined list of common countries
