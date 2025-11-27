@@ -232,6 +232,7 @@ class PatientStageResponse(BaseModel):
     """Schema for current stage of a patient"""
     patient_id: str
     stage: Optional[PatientStage] = None
+    reengineering_status: Optional[bool] = Field(False, description="True if reengineering completed and 2nd shipment started, else False")
 
 
 # ============================================
