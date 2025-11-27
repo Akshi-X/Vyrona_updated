@@ -59,8 +59,8 @@ def create_pharma_admins():
                 if existing_admin.pharma_id != pharma_id:
                     existing_admin.pharma_id = pharma_id
                     needs_update = True
-                if existing_admin.role != 'pharma_admin':
-                    existing_admin.role = 'pharma_admin'
+                if existing_admin.role != 'Pharma_admin':
+                    existing_admin.role = 'Pharma_admin'
                     needs_update = True
                     
                 if needs_update:
@@ -81,7 +81,7 @@ def create_pharma_admins():
                 password_hash=get_password_hash(pharma_admin['password']),
                 first_name=pharma_admin['first_name'],
                 last_name=pharma_admin['last_name'],
-                role="pharma_admin",
+                role="Pharma_admin",
                 pharma_id=pharma_id,
                 approved_status="approved",
                 status=True,
@@ -202,7 +202,7 @@ def create_mygrape_admin():
             last_name="Admin",
             email=settings.MYGRAPE_ADMIN_EMAIL,
             password_hash=get_password_hash(settings.MYGRAPE_ADMIN_PASSWORD),
-            role="mygrape_admin",
+            role="Mygrape_admin",
             pharma_id=None,  # MyGrape admin doesn't belong to any pharma company
             status=True,
             approved_status="approved",

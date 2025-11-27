@@ -202,13 +202,15 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
         expires_at = datetime.now(timezone.utc) + access_token_expires
         logger.debug(f"Token expires at: {expires_at}")
 
+        from ..utils.utils import normalize_role_to_title_case
+        
         result = {
             "user_id": str(user.user_id),
             "email": user.email,
             "auth_token": access_token,
             "expires_at": expires_at,
             "pharma_id": pharma_id,
-            "role": user.role
+            "role": normalize_role_to_title_case(user.role)
         }
         logger.debug(f"Returning result: {result}")
         return result
