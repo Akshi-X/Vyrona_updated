@@ -63,7 +63,7 @@ def get_pharma_admin_email(pharma_id: int, db: Session) -> Optional[str]:
         # Look for pharma admin users by pharma_id instead of using pharma.user_id
         pharma_admin = db.query(user_model.User).filter(
             user_model.User.pharma_id == pharma_id,
-            user_model.User.role == 'pharma_admin',
+            user_model.User.role == 'Pharma_admin',
             user_model.User.approved_status == 'approved',
             user_model.User.status == True
         ).first()
@@ -106,7 +106,7 @@ def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
     """
     manager = db.query(user_model.User).filter(
         user_model.User.pharma_id == pharma_id,
-        user_model.User.role == 'manager',
+        user_model.User.role == 'Manager',
         user_model.User.approved_status == 'approved',
         user_model.User.status == True
     ).first()
@@ -121,8 +121,8 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
     """
-    # Normalize role to lowercase (database enum is lowercase)
-    role_lower = request.role.lower()
+    # Role is already validated and in title case from schema
+    role = request.role
     
     # Generate custom user ID (USR-XXXXXX format)
     user_id = utils.generate_user_id()
@@ -160,11 +160,12 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         last_name=request.last_name,
         email=request.email,
         password_hash=utils.hash_password(request.password),
-        role=role_lower,
+        role=role,
         pharma_id=pharma_id,
     )
     
     # Set session timeout based on role (from constants)
+    role_lower = role.lower()
     if role_lower == 'admin':
         user.session_timeout = ADMIN_SESSION_TIMEOUT_MINUTES
     elif role_lower == 'manager':
@@ -250,12 +251,14 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Both manager and user registrations go to pharma admin
     message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
     
+    from ..utils.utils import normalize_role_to_title_case
+    
     # Build structured response
     response = UserRegistrationResponse(
         message=message,
         user_id=user.user_id,
         email=user.email,
-        role=user.role,
+        role=normalize_role_to_title_case(user.role),
         pharma_id=user.pharma_id,
         company_name=existing_pharma.pharma_name,
         approval_status=user.approved_status,
@@ -291,7 +294,7 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         raise UserApproveNotFoundException(registration_id=approved_by_user_id)
     
     # Validate that approver is a pharma admin for the same pharma
-    if approver.role != 'pharma_admin' or approver.pharma_id != user.pharma_id:
+    if approver.role.lower() != 'pharma_admin' or approver.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
             company_name=f"pharma_id_{user.pharma_id}",
             reason=ErrorMessages.PHARMA_ADMIN_APPROVE_ONLY
@@ -347,13 +350,15 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
     company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
     
+    from ..utils.utils import normalize_role_to_title_case
+    
     response = UserApprovalResponse(
         detail=f"{SuccessMessages.USER_APPROVED}: {user.first_name}",
         user_id=user.user_id,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
-        role=user.role,
+        role=normalize_role_to_title_case(user.role),
         company_name=company_name,
         approved_by=user.approved_by,
         approved_on=user.approved_on.isoformat()
@@ -388,7 +393,7 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
         raise UserRejectNotFoundException(registration_id=rejected_by_user_id)
     
     # Validate that rejector is a pharma admin for the same pharma
-    if rejector.role != 'pharma_admin' or rejector.pharma_id != user.pharma_id:
+    if rejector.role.lower() != 'pharma_admin' or rejector.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
             company_name=f"pharma_id_{user.pharma_id}",
             reason=ErrorMessages.PHARMA_ADMIN_REJECT_ONLY
@@ -443,6 +448,7 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
     
     # Get company name from pharma table
     from app.models.pharma_model import Pharma
+    from ..utils.utils import normalize_role_to_title_case
     pharma = db.query(Pharma).filter(Pharma.id == target_user.pharma_id).first()
     company_name = pharma.pharma_name if pharma else None
     
@@ -452,7 +458,7 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
         first_name=target_user.first_name,
         last_name=target_user.last_name,
         email=target_user.email,
-        role=target_user.role,
+        role=normalize_role_to_title_case(target_user.role),
         pharma_id=target_user.pharma_id,
         company_name=company_name,
         approved_status=target_user.approved_status,
@@ -481,13 +487,15 @@ def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
     pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
     company_name = pharma.pharma_name if pharma else None
     
+    from ..utils.utils import normalize_role_to_title_case
+    
     # Build response object
     response = UserProfileResponse(
         user_id=user.user_id,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
-        role=user.role,
+        role=normalize_role_to_title_case(user.role),
         pharma_id=user.pharma_id,
         company_name=company_name,
         approved_status=user.approved_status,
@@ -526,6 +534,8 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
         company_name = pharma.pharma_name if pharma else None
         
+        from ..utils.utils import normalize_role_to_title_case
+        
         # Convert to UserListItem
         user_items = [
             UserListItem(
@@ -533,7 +543,7 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
                 first_name=user.first_name,
                 last_name=user.last_name,
                 email=user.email,
-                role=user.role,
+                role=normalize_role_to_title_case(user.role),
                 pharma_id=user.pharma_id,
                 company_name=company_name
             )

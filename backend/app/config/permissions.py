@@ -140,7 +140,7 @@ def get_role_permissions(role: str) -> dict:
             "can_reject_users": True,
             "can_view_all_users": True,
             "can_manage_system": True,
-            "role": "admin"
+            "role": "Admin"
         }
     elif role_lower == "pharma_admin":
         return {
@@ -148,7 +148,7 @@ def get_role_permissions(role: str) -> dict:
             "can_reject_users": True,
             "can_view_all_users": True,
             "can_manage_system": False,
-            "role": "pharma_admin"
+            "role": "Pharma_admin"
         }
     elif role_lower == "mygrape_admin":
         return {
@@ -158,7 +158,7 @@ def get_role_permissions(role: str) -> dict:
             "can_manage_feedback": True,
             "can_view_all_feedback": True,
             "can_manage_system": False,
-            "role": "mygrape_admin"
+            "role": "Mygrape_admin"
         }
     elif role_lower == "manager":
         return {
@@ -166,7 +166,7 @@ def get_role_permissions(role: str) -> dict:
             "can_reject_users": False,
             "can_view_all_users": False,
             "can_manage_system": False,
-            "role": "manager"
+            "role": "Manager"
         }
     elif role_lower == "user":
         return {
@@ -174,7 +174,7 @@ def get_role_permissions(role: str) -> dict:
             "can_reject_users": False,
             "can_view_all_users": False,
             "can_manage_system": False,
-            "role": "user"
+            "role": "User"
         }
     else:
         return {"role": "unknown"}
