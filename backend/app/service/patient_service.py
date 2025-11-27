@@ -412,6 +412,13 @@ class PatientService:
                     PatientStage.patient_id == patient_id
                 ).order_by(desc(PatientStage.start_time)).first()
 
+            def _stage_to_str(stage_value: Optional[PatientStageEnum]) -> Optional[str]:
+                if stage_value is None:
+                    return None
+                if isinstance(stage_value, PatientStageEnum):
+                    return stage_value.value
+                return str(stage_value)
+
             # Check reengineering status: reengineering completed
             reengineering_status = False
             
@@ -427,9 +434,19 @@ class PatientService:
             if reengineering_stage:
                 reengineering_status = True
 
+            # Determine display stage (handle Reinfusion completion)
+            stage_display = None
+            if stage_row:
+                stage_display = _stage_to_str(stage_row.stage)
+                if stage_display == PatientStageEnum.REINFUSION.value:
+                    if stage_row.is_success:
+                        stage_display = "Completed"
+                    else:
+                        stage_display = PatientStageEnum.REINFUSION.value
+
             return PatientStageResponse(
                 patient_id=patient_id,
-                stage=stage_row.stage if stage_row else None,
+                stage=stage_display,
                 reengineering_status=reengineering_status
             )
         except PatientNotFoundError:
