@@ -275,12 +275,12 @@ class ShipmentService:
         # Apply region-based filtering
         query = apply_region_filter(query, regions=regions)
         
-        # Filter only active routes (where PatientStage exists OR shipment has departure_time set)
-        # This allows showing shipments that are in transit even if PatientStage record doesn't exist yet
+        # Filter only active routes where patient is actively in TRANSPORTATION stage.
+        # Requires an active PatientStage record and ensures shipment has not arrived yet.
         query = query.filter(
-            or_(
+            and_(
                 PatientStageModel.id.isnot(None),
-                Shipment.departure_time.isnot(None)
+                Shipment.handover_time.is_(None)
             )
         )
         
