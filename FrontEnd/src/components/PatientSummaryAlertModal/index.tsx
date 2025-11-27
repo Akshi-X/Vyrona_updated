@@ -72,28 +72,6 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     return text.substring(0, 2).toUpperCase();
   };
 
-  const getStatusBadge = (status: string): { label: string; className: string; icon?: React.ReactElement } => {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('completed') || statusLower.includes('complete')) {
-      return { 
-        label: 'Completed', 
-        className: 'text-[#00990A] bg-[#F3FFF2] font-bold rounded-lg px-3 py-1.5 flex items-center gap-2',
-        icon: (
-          <div className="w-[12px] h-[12px] bg-[#00990A] rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-            <svg className="w-[8px] h-[8px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        )
-      };
-    } else if (statusLower.includes('ongoing') || statusLower.includes('in_progress') || statusLower.includes('in progress')) {
-      return { label: 'In Progress', className: 'bg-orange-100 text-orange-700' };
-    } else if (statusLower.includes('upcoming') || statusLower.includes('scheduled')) {
-      return { label: 'Upcoming', className: 'bg-orange-100 text-orange-700' };
-    }
-    return { label: status, className: 'bg-gray-100 text-gray-700' };
-  };
-
   const getStatusColors = (status: string): { borderColor: string; bgColor: string; textColor: string } | null => {
     if (!status) return null;
     
@@ -335,8 +313,8 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       
       {summary && (
         <div className="space-y-6">
-          {/* Patient Information Card */}
-          <div className="rounded-lg bg-purple-50 p-4">
+          {/* Patient Information Card - sticky, does not scroll */}
+          <div className="rounded-lg bg-purple-50 p-4 sticky top-0 z-10">
             <div className="flex items-center gap-4">
               {/* Circular Avatar */}
               <div className="w-12 h-12 bg-[#6B1176] rounded-full flex items-center justify-center flex-shrink-0">

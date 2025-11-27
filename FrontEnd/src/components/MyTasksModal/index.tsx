@@ -440,9 +440,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           <col style={{ width: 'auto', minWidth: '80px' }} />
           <col style={{ width: 'auto', minWidth: '130px' }} />
           <col style={{ width: 'auto', minWidth: '150px' }} />
-          <col style={{ width: 'auto', minWidth: '130px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
+          {/* Due date */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Priority */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Status */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
           {variant === 'track' && <col style={{ width: '80px', minWidth: '80px' }} />}
         </colgroup>
         <thead className="bg-[#fdeeff]">
@@ -756,13 +759,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     <div className="whitespace-nowrap" title={task.dueDate}>{task.dueDate}</div>
                   )}
                 </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'hidden' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                   {isEditing && editableFields.has('priority') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
                       <select
                         value={displayTask.priority}
                         onChange={(e) => handleEditInputChange('priority', e.target.value)}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.priority === 'High' ? 'bg-red-100 text-red-800' :
                           displayTask.priority === 'Medium' ? 'bg-orange-100 text-orange-800' :
                           'bg-green-100 text-green-800'
@@ -794,7 +797,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <td 
                 ref={(el) => { statusCellRefs.current[task.id] = el; }}
                 className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" 
-                style={{ overflow: 'hidden' }}
+                style={{ overflow: 'visible' }}
               >
                   {isEditing && editableFields.has('status') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
@@ -804,7 +807,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                           const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done';
                           handleEditInputChange('status', newStatus);
                         }}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.status === 'Done' ? 'bg-green-100 text-green-800' :
                           displayTask.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-800'
