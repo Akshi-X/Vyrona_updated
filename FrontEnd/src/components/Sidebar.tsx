@@ -4,7 +4,7 @@ import MyGrapeLogo from "../assets/logo.svg";
 import IsolationModeBanner from "../assets/Isolation_Mode.svg";
 
 // Dashboard Icons
-import DashboardIconWhite from "../assets/DashBoardIcons/DashBoardWhite.svg";
+import DashboardIconWhite from "../assets/DashBoardIcons/DashboardWhite.svg";
 import DashboardIconDark from "../assets/DashBoardIcons/DashBoardDark.svg";
 import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
 import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";

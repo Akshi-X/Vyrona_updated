@@ -297,12 +297,6 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
           {/* Patient Information Card */}
           <div className="rounded-lg bg-purple-50 p-4">
             <div className="flex items-center gap-4">
-              {/* Circular Avatar */}
-              <div className="w-12 h-12 bg-[#6B1176] rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-semibold">
-                  {getInitials(summary.hospital_name || summary.patient_id)}
-                </span>
-              </div>
               
               {/* Patient Details */}
               <div className="flex-1 min-w-0">

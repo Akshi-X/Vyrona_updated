@@ -209,7 +209,7 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
                         </button>
                         
                         {isDropdownOpen && (
-                          <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden">
+                          <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg font-normal shadow-lg min-w-[180px] overflow-hidden">
                             {['all', ...allStages, ...statusOptions].map((item) => {
                               const isAll = item === 'all';
                               const isStatus = typeof item === 'string' && statusOptions.includes((item as string).toLowerCase());
@@ -300,26 +300,26 @@ export const OngoingTreatments = ({}: OngoingTreatmentsProps) => {
               return filteredTreatments.map((treatment) => (
                 <tr
                   key={treatment.patient_id}
-                  className="border-b border-[#eeeeee] hover:bg-white/50"
+                  className="border-b border-[#eeeeee] bg-white hover:bg-gray-50"
                 >
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.patient_id}
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.condition}
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.hospital}
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getTreatmentStatusColor(treatment.treatment_status, treatment.stage)}`}>
                       {treatment.stage || 'N/A'}
                     </span>
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.provider_name}
                   </td>
-                  <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  <td className="p-[15px] font-normal text-[#333333] text-sm">
                     {treatment.location}
                   </td>
                 </tr>

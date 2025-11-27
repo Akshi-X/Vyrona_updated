@@ -319,7 +319,7 @@ export default function TrackPage() {
             {/* Critical Alerts */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Critical Alerts"
                 src={CriticalAlertsIcon}
                 onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
@@ -340,7 +340,7 @@ export default function TrackPage() {
             {/* Stakeholder Chats */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Stakeholder Chats"
                 src={StakeholderChatsIcon}
                 onClick={() => setShowStakeholderChatScreen(true)}
@@ -361,7 +361,7 @@ export default function TrackPage() {
             {/* My Tasks */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="My Tasks"
                 src={MyTasksIcon}
                 onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
@@ -382,7 +382,7 @@ export default function TrackPage() {
              {/* Patient Summary */}
              <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Patient Summary"
                 src={PatientSummaryIcon}
                 onClick={() => {

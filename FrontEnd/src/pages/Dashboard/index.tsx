@@ -543,7 +543,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Critical Alerts */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="Critical Alerts"
                       src={CriticalAlertsIcon}
                       onClick={() => {
@@ -570,7 +570,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Stakeholder Chats */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => {
@@ -598,7 +598,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* My Tasks */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="My Tasks"
                       src={MyTasksIcon}
                       onClick={() => {

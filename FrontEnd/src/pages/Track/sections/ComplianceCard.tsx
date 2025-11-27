@@ -51,9 +51,9 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
         <table className="w-full text-[12px]">
           <thead className="bg-[#FDF4FF] text-[#6B1176] font-medium sticky top-0">
             <tr>
-              <th className="px-4 py-2 text-left w-[154px] h-[56px]">Transport Route</th>
+              <th className="px-4 py-2 text-left w-[154px] h-[56px] rounded-tl-[10px]">Transport Route</th>
               <th className="px-4 py-2 text-center w-[154px] whitespace-nowrap h-[56px]">Documents Required</th>
-              <th className="px-4 py-2 text-left px-2 w-[154px] whitespace-nowrap h-[56px]">Documents Missed</th>
+              <th className="px-4 py-2 text-left px-2 w-[154px] whitespace-nowrap h-[56px] rounded-tr-[10px]">Documents Missed</th>
             </tr>
           </thead>
           <tbody className="text-[14px]">
@@ -79,7 +79,7 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
               </tr>
             )}
             {!loading && !error && expandedRows.map((row, idx) => (
-              <tr key={`${row.stage}-${idx}`} className="text-black">
+              <tr key={`${row.stage}-${idx}`} className="text-black hover:bg-gray-50">
                 <td className="px-4 py-3 text-left">{row.stage}</td>
                 <td className="px-4 py-3 text-center">{row.needed}</td>
                 <td className="px-4 py-3 text-left px-4">{row.missedDoc || '-'}</td>
