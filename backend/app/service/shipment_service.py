@@ -100,6 +100,68 @@ class ShipmentService:
         
         return patient
     
+    def _get_target_shipment_id(
+        self, 
+        patient_id: str, 
+        pharma_id: Optional[int] = None
+    ) -> Optional[int]:
+        """
+        Determine which shipment ID to show based on business rules.
+        
+        Business Logic:
+        - Every patient has 2 shipments: Shipment 1 (Hospital to Pharma) and Shipment 2 (Pharma to Hospital)
+        - Workflow order: Shipment 1 → Reengineering → Shipment 2 → Reinfusion
+        - Rules:
+          1. If shipment 2 doesn't exist → return shipment 1 ID
+          2. If shipment 2 has started AND shipment 1 is completed → return shipment 2 ID
+          3. If both shipments are completed → return shipment 2 ID
+        
+        Args:
+            patient_id: Patient ID
+            pharma_id: Optional pharma ID to filter shipments
+            
+        Returns:
+            Target shipment ID to show, or None if no shipment should be filtered
+        """
+        # Get all shipments for this patient, ordered chronologically
+        shipment_query = self.db.query(Shipment)
+        if pharma_id:
+            shipment_query = shipment_query.filter(Shipment.pharma_id == pharma_id)
+        shipment_query = shipment_query.filter(Shipment.patient_id == patient_id).order_by(
+            Shipment.departure_time.asc().nulls_last(),
+            Shipment.created_at.asc()
+        )
+        
+        all_shipments = shipment_query.all()
+        
+        # Identify shipment 1 (first) and shipment 2 (second) based on chronological order
+        shipment1 = all_shipments[0] if len(all_shipments) > 0 else None
+        shipment2 = all_shipments[1] if len(all_shipments) > 1 else None
+        
+        # Check shipment statuses
+        shipment1_completed = shipment1 and shipment1.transportation_success is True
+        shipment2_exists = shipment2 is not None
+        # Shipment 2 is "started" if it exists and transportation_success is not True (None or False)
+        shipment2_started = shipment2_exists and shipment2.transportation_success is not True
+        shipment2_completed = shipment2 and shipment2.transportation_success is True
+        
+        # Apply business rules to determine which shipment to show
+        if not shipment2_exists:
+            # Rule 1: Shipment 2 doesn't exist → show shipment 1
+            if shipment1:
+                return shipment1.id
+        elif shipment2_started and shipment1_completed:
+            # Rule 2: Shipment 2 has started AND shipment 1 is completed → show shipment 2
+            return shipment2.id
+        elif shipment1_completed and shipment2_completed:
+            # Rule 3: Both shipments completed → show shipment 2
+            return shipment2.id
+        else:
+            # Default: show shipment 1 if it exists
+            if shipment1:
+                return shipment1.id
+        
+        return None
     
     def _get_shipment_carrier(self, shipment_id: int, fallback_carrier: Optional[str] = None) -> Optional[str]:
         """Get the primary carrier name from the first leg (leg_order = 1) of a shipment, with fallback."""
@@ -455,6 +517,14 @@ class ShipmentService:
         """
         Fetch 3PL player operational details from shipment legs.
 
+        Business Logic:
+        - Every patient has 2 shipments: Shipment 1 (Hospital to Pharma) and Shipment 2 (Pharma to Hospital)
+        - Workflow order: Shipment 1 → Reengineering → Shipment 2 → Reinfusion
+        - Rules for which shipment to show:
+          1. If shipment 2 doesn't exist → show shipment 1 details
+          2. If shipment 2 has started AND shipment 1 is completed → show shipment 2 details
+          3. If both shipments are completed → show shipment 2 details
+
         Returns list of rows with:
         - player_name: Carrier.name if present else Provider.name
         - modes: ShipmentLeg.mode_of_transport as string (single mode per leg)
@@ -470,6 +540,11 @@ class ShipmentService:
             # Validate patient if patient_id is provided
             if patient_id:
                 self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
+            
+            # Determine which shipment to show based on business rules
+            target_shipment_id = None
+            if patient_id:
+                target_shipment_id = self._get_target_shipment_id(patient_id, pharma_id)
             
             query = self.db.query(
                 ShipmentLeg,
@@ -490,6 +565,10 @@ class ShipmentService:
                 query = query.filter(Shipment.pharma_id == pharma_id)
             if patient_id:
                 query = query.filter(Shipment.patient_id == patient_id)
+            
+            # Filter to target shipment if determined
+            if target_shipment_id:
+                query = query.filter(Shipment.id == target_shipment_id)
 
             rows = query.order_by(ShipmentLeg.departure_time.asc().nulls_last()).all()
 
@@ -520,11 +599,19 @@ class ShipmentService:
         """
         Get transport time comparison data for a particular patient's shipment legs.
         
+        Business Logic:
+        - Every patient has 2 shipments: Shipment 1 (Hospital to Pharma) and Shipment 2 (Pharma to Hospital)
+        - Workflow order: Shipment 1 → Reengineering → Shipment 2 → Reinfusion
+        - Rules for which shipment to show:
+          1. If shipment 2 doesn't exist → show shipment 1 details
+          2. If shipment 2 has started AND shipment 1 is completed → show shipment 2 details
+          3. If both shipments are completed → show shipment 2 details
+        
         Args:
             patient_id: Patient ID to filter shipment legs
             pharma_id: Optional pharma ID to filter routes
             
-            Returns:
+        Returns:
             List of dictionaries containing:
             - source_location: Source location of the leg
             - destination_location: Destination location of the leg
@@ -534,6 +621,9 @@ class ShipmentService:
         try:
             # Validate patient and shipment status
             self._validate_patient_for_shipment_operations(patient_id, pharma_id, require_shipment=True)
+            
+            # Determine which shipment to show based on business rules
+            target_shipment_id = self._get_target_shipment_id(patient_id, pharma_id)
             
             query = self.db.query(
                 ShipmentLeg,
@@ -547,6 +637,10 @@ class ShipmentService:
             
             if pharma_id:
                 query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Filter to target shipment if determined
+            if target_shipment_id:
+                query = query.filter(Shipment.id == target_shipment_id)
             
             # Order by leg_order to maintain sequence
             rows = query.order_by(ShipmentLeg.leg_order.asc()).all()
@@ -1020,6 +1114,14 @@ class ShipmentService:
         """
         Get document checklist from shipment legs for a specific patient.
         
+        Business Logic:
+        - Every patient has 2 shipments: Shipment 1 (Hospital to Pharma) and Shipment 2 (Pharma to Hospital)
+        - Workflow order: Shipment 1 → Reengineering → Shipment 2 → Reinfusion
+        - Rules for which shipment to show:
+          1. If shipment 2 doesn't exist → show shipment 1 details
+          2. If shipment 2 has started AND shipment 1 is completed → show shipment 2 details
+          3. If both shipments are completed → show shipment 2 details
+        
         Args:
             patient_id: Patient ID to get document checklist for
             pharma_id: Optional pharma ID to validate patient belongs to pharma (required for security)
@@ -1028,6 +1130,8 @@ class ShipmentService:
             Dict containing:
             - items: List of document checklist items with stage, actual, needed
             - total_items: Total number of items
+            - missing_documents: List of missing document names
+            - non_compliance_percentage: Percentage of non-compliance
             
         Raises:
             PatientNotFoundException: If patient doesn't exist or doesn't belong to pharma
@@ -1041,6 +1145,9 @@ class ShipmentService:
                 if patient.pharma_id != pharma_id:
                     raise PatientNotFoundException(patient_id=patient_id)
             
+            # Determine which shipment to show based on business rules
+            target_shipment_id = self._get_target_shipment_id(patient_id, pharma_id)
+            
             # Query shipment legs with join to shipment to filter by patient_id and pharma_id
             query = self.db.query(ShipmentLeg).join(
                 Shipment,
@@ -1050,6 +1157,10 @@ class ShipmentService:
             # Additional filter by pharma_id if provided (double check for security)
             if pharma_id:
                 query = query.filter(Shipment.pharma_id == pharma_id)
+            
+            # Filter to target shipment if determined
+            if target_shipment_id:
+                query = query.filter(Shipment.id == target_shipment_id)
             
             # Get all matching shipment legs ordered by leg_order for logical sequence
             legs = query.order_by(ShipmentLeg.leg_order.asc(), ShipmentLeg.id.asc()).all()
