@@ -17,6 +17,7 @@ from app.schemas.patient_schema import (
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
 from app.utils.patient_utils import generate_patient_id
+from app.constants.enums import PatientStage as PatientStageEnum
 from app.exceptions.patient_exceptions import (
     PatientNotFoundError,
     PatientValidationError,
@@ -385,6 +386,9 @@ class PatientService:
         Verifies the patient belongs to the provided pharma_id, then fetches
         the active stage. If no active stage exists, returns the latest stage
         by start_time. If no stages exist, stage is None.
+        
+        Also checks if reengineering is completed (is_success = True) and includes
+        reengineering_status flag in the response.
         """
         try:
             # Ensure patient exists and belongs to pharma
@@ -408,9 +412,25 @@ class PatientService:
                     PatientStage.patient_id == patient_id
                 ).order_by(desc(PatientStage.start_time)).first()
 
+            # Check reengineering status: reengineering completed
+            reengineering_status = False
+            
+            # Check if reengineering stage exists with is_success = True
+            reengineering_stage = self.db.query(PatientStage).filter(
+                and_(
+                    PatientStage.patient_id == patient_id,
+                    PatientStage.stage == PatientStageEnum.REENGINEERING,
+                    PatientStage.is_success == True
+                )
+            ).first()
+            
+            if reengineering_stage:
+                reengineering_status = True
+
             return PatientStageResponse(
                 patient_id=patient_id,
-                stage=stage_row.stage if stage_row else None
+                stage=stage_row.stage if stage_row else None,
+                reengineering_status=reengineering_status
             )
         except PatientNotFoundError:
             raise
