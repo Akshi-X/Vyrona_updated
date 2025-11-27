@@ -7,11 +7,11 @@ from enum import Enum
 
 
 class UserRole(str, Enum):
-    ADMIN = "admin"
-    PHARMA_ADMIN = "pharma_admin"
-    MYGRAPE_ADMIN = "mygrape_admin"
-    MANAGER = "manager"
-    USER = "user"
+    ADMIN = "Admin"
+    PHARMA_ADMIN = "Pharma_admin"
+    MYGRAPE_ADMIN = "Mygrape_admin"
+    MANAGER = "Manager"
+    USER = "User"
     
     @classmethod
     def list(cls):

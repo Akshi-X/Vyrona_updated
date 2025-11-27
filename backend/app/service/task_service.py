@@ -53,13 +53,15 @@ def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
     Returns:
         TaskResponse with all task details and permissions
     """
+    from ..utils.utils import normalize_role_to_title_case
+    
     # Build assignee info
     assignee_info = TaskAssigneeInfo(
         user_id=task.assignee.user_id,
         first_name=task.assignee.first_name,
         last_name=task.assignee.last_name,
         email=task.assignee.email,
-        role=task.assignee.role
+        role=normalize_role_to_title_case(task.assignee.role)
     )
     
     # Build creator info
@@ -68,7 +70,7 @@ def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
         first_name=task.created_by.first_name,
         last_name=task.created_by.last_name,
         email=task.created_by.email,
-        role=task.created_by.role
+        role=normalize_role_to_title_case(task.created_by.role)
     )
     
     # Calculate permissions
@@ -120,7 +122,7 @@ def create_task(
     """
     try:
         # Check if user has permission to create tasks (manager or pharma_admin)
-        if current_user.role not in ("manager", "pharma_admin"):
+        if current_user.role.lower() not in ("manager", "pharma_admin"):
             raise TaskManagerOnlyException(user_role=current_user.role)
         
         # Validate assignee exists and is from same company
@@ -260,7 +262,7 @@ def get_tasks_by_patient(
         )
 
         privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
-        if current_user.role not in privileged_roles:
+        if current_user.role.lower() not in privileged_roles:
             query = query.filter(
                 or_(
                     Tasks.created_by_id == current_user.user_id,
