@@ -15,11 +15,50 @@ from datetime import datetime
 class PerformanceMetrics(BaseModel):
     """Performance metrics response"""
     on_time_percentage: float
-    avg_lead_time_days: int
+    avg_lead_time_days: float
     failure_cost_million: float
     total_shipments: int
     completed_shipments: int
     pending_shipments: int
+    last_updated: datetime
+
+
+class AvgLeadTimeResponse(BaseModel):
+    """Average lead time response for a pharma"""
+    avg_lead_time_days: float
+    total_shipments: int
+    completed_shipments: int
+    pending_shipments: int
+    status: str
+    last_updated: datetime
+
+
+class OnTimePercentageResponse(BaseModel):
+    """On-time percentage response for a pharma"""
+    on_time_percentage: float
+    on_time_deliveries: int
+    total_deliveries: int
+    status: str
+    last_updated: datetime
+
+
+class SuccessRateResponse(BaseModel):
+    """Treatment success rate response for a pharma"""
+    pharma_id: int
+    success_rate: float
+    successful_outcomes: int
+    total_outcomes: int
+    status: str
+    last_updated: datetime
+
+
+class AvgQualityDeviationsResponse(BaseModel):
+    """Average quality deviations flagged per shipment response for a pharma"""
+    pharma_id: int
+    avg_quality_deviations: float
+    total_deviations: int
+    total_treatments: int
+    status: str
     last_updated: datetime
 
 
