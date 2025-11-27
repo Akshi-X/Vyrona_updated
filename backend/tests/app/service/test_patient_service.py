@@ -397,11 +397,17 @@ def test_create_multiple_patients_exception_rollback(service, monkeypatch):
 
 def test_get_pharma_statistics_success(service):
     """Test getting pharma statistics"""
-    # Mock current month queries
-    query_mock1 = MagicMock()
-    query_mock1.filter.return_value.count.return_value = 10
+    # Mock current month unique patient count
+    distinct_mock = MagicMock()
+    distinct_mock.count.return_value = 10
     
-    service.db.query.return_value = query_mock1
+    filter_mock = MagicMock()
+    filter_mock.distinct.return_value = distinct_mock
+    
+    query_mock = MagicMock()
+    query_mock.filter.return_value = filter_mock
+    
+    service.db.query.return_value = query_mock
     
     result = service.get_pharma_statistics(pharma_id=42)
     
@@ -414,13 +420,16 @@ def test_get_pharma_statistics_december_month(service, monkeypatch):
     # Mock datetime.now to return December
     mock_now = datetime(2024, 12, 15, 10, 0, 0, tzinfo=timezone.utc)
     
-    query_mock1 = MagicMock()
-    query_mock1.filter.return_value.count.return_value = 5
+    distinct_mock = MagicMock()
+    distinct_mock.count.return_value = 5
     
-    query_mock2 = MagicMock()
-    query_mock2.filter.return_value.scalar.return_value = 3
+    filter_mock = MagicMock()
+    filter_mock.distinct.return_value = distinct_mock
     
-    service.db.query.side_effect = [query_mock1, query_mock2]
+    query_mock = MagicMock()
+    query_mock.filter.return_value = filter_mock
+    
+    service.db.query.return_value = query_mock
     
     # Mock datetime.now using monkeypatch - patch it at the module level
     from app.service import patient_service
