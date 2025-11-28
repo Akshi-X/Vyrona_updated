@@ -926,12 +926,15 @@ def test_get_patient_current_stage_success_with_active(service):
     stage_query = MagicMock()
     stage_query.filter.return_value.order_by.return_value.first.return_value = active_stage
     
-    service.db.query.side_effect = [patient_query, stage_query]
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+
+    service.db.query.side_effect = [patient_query, stage_query, reengineering_query]
     
     result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
     
     assert result.patient_id == "PT-123"
-    assert result.stage == PatientStageEnum.TRANSPORTATION
+    assert result.stage == PatientStageEnum.TRANSPORTATION.value
 
 
 def test_get_patient_current_stage_success_with_latest(service):
@@ -953,12 +956,15 @@ def test_get_patient_current_stage_success_with_latest(service):
     latest_stage_query = MagicMock()
     latest_stage_query.filter.return_value.order_by.return_value.first.return_value = latest_stage
     
-    service.db.query.side_effect = [patient_query, active_stage_query, latest_stage_query]
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+
+    service.db.query.side_effect = [patient_query, active_stage_query, latest_stage_query, reengineering_query]
     
     result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
     
     assert result.patient_id == "PT-123"
-    assert result.stage == PatientStageEnum.REENGINEERING
+    assert result.stage == PatientStageEnum.REENGINEERING.value
 
 
 def test_get_patient_current_stage_no_stage(service):
@@ -983,6 +989,32 @@ def test_get_patient_current_stage_no_stage(service):
     
     assert result.patient_id == "PT-123"
     assert result.stage is None
+
+
+def test_get_patient_current_stage_reinfusion_completed(service):
+    """Reinfusion stage returns Completed when successful"""
+    patient = Mock(spec=Patient)
+    patient.id = "PT-123"
+    patient.pharma_id = 42
+    
+    reinfusion_stage = Mock(spec=PatientStage)
+    reinfusion_stage.stage = PatientStageEnum.REINFUSION
+    reinfusion_stage.is_success = True
+    
+    patient_query = MagicMock()
+    patient_query.filter.return_value.first.return_value = patient
+    
+    active_stage_query = MagicMock()
+    active_stage_query.filter.return_value.order_by.return_value.first.return_value = reinfusion_stage
+    
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+    
+    service.db.query.side_effect = [patient_query, active_stage_query, reengineering_query]
+    
+    result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
+    
+    assert result.stage == "Completed"
 
 
 def test_get_patient_current_stage_patient_not_found(service):
