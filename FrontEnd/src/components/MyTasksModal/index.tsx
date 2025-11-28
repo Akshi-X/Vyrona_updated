@@ -358,6 +358,37 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       )}
       <div className="relative" ref={scrollContainerRef}>
         <style>{`
+          /* Date picker styling - purple selected date */
+          input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          input[type="date"]::-webkit-datetime-edit-text {
+            color: #333;
+          }
+          input[type="date"]::-webkit-datetime-edit-month-field,
+          input[type="date"]::-webkit-datetime-edit-day-field,
+          input[type="date"]::-webkit-datetime-edit-year-field {
+            color: #333;
+          }
+          input[type="date"]:focus::-webkit-datetime-edit-month-field,
+          input[type="date"]:focus::-webkit-datetime-edit-day-field,
+          input[type="date"]:focus::-webkit-datetime-edit-year-field {
+            color: #6b1176;
+          }
+          /* Style the calendar popup - selected date purple */
+          input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          /* For Firefox */
+          input[type="date"] {
+            color-scheme: light;
+          }
+          /* Additional styling for date input value */
+          input[type="date"]:not(:placeholder-shown) {
+            color: #6b1176;
+            font-weight: 500;
+          }
           .alert-card-table {
             width: 100%;
             border-collapse: separate;
@@ -414,9 +445,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           <col style={{ width: 'auto', minWidth: '80px' }} />
           <col style={{ width: 'auto', minWidth: '130px' }} />
           <col style={{ width: 'auto', minWidth: '150px' }} />
-          <col style={{ width: 'auto', minWidth: '130px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
+          {/* Due date */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Priority */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Status */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
           {variant === 'track' && <col style={{ width: '80px', minWidth: '80px' }} />}
         </colgroup>
         <thead className="bg-[#fdeeff]">
@@ -538,6 +572,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     type="date"
                     value={newTask.dueDate}
                     onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
                     required
                     className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.dueDate 
@@ -714,19 +749,20 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       type="date"
                       value={displayTask.dueDate || ''}
                       onChange={(e) => handleEditInputChange('dueDate', e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                       className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
                     <div className="whitespace-nowrap" title={task.dueDate}>{task.dueDate}</div>
                   )}
                 </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'hidden' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                   {isEditing && editableFields.has('priority') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
                       <select
                         value={displayTask.priority}
                         onChange={(e) => handleEditInputChange('priority', e.target.value)}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.priority === 'High' ? 'bg-red-100 text-red-800' :
                           displayTask.priority === 'Medium' ? 'bg-orange-100 text-orange-800' :
                           'bg-green-100 text-green-800'
@@ -758,7 +794,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <td 
                 ref={(el) => { statusCellRefs.current[task.id] = el; }}
                 className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" 
-                style={{ overflow: 'hidden' }}
+                style={{ overflow: 'visible' }}
               >
                   {isEditing && editableFields.has('status') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
@@ -768,7 +804,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                           const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done';
                           handleEditInputChange('status', newStatus);
                         }}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.status === 'Done' ? 'bg-green-100 text-green-800' :
                           displayTask.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-800'
@@ -826,7 +862,25 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         <button
                           onClick={() => {
                             setEditingTaskId(task.id);
-                            setEditedTask({ ...task });
+                            // Convert dueDate to YYYY-MM-DD format for date input
+                            const formattedTask = { ...task };
+                            if (task.dueDate && task.dueDate !== 'N/A') {
+                              try {
+                                // Try to parse the date - handle both locale format and ISO format
+                                const dateObj = new Date(task.dueDate);
+                                if (!isNaN(dateObj.getTime())) {
+                                  // Format as YYYY-MM-DD for HTML date input
+                                  const year = dateObj.getFullYear();
+                                  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                  const day = String(dateObj.getDate()).padStart(2, '0');
+                                  formattedTask.dueDate = `${year}-${month}-${day}`;
+                                }
+                              } catch (e) {
+                                // If parsing fails, keep original value
+                                formattedTask.dueDate = task.dueDate;
+                              }
+                            }
+                            setEditedTask(formattedTask);
                             // If user is not the creator (only status is editable), scroll to status column
                             if (!isCreatedByMe) {
                               setTimeout(() => {

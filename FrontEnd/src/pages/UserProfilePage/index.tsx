@@ -528,7 +528,7 @@ const UserProfilePage: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-4 pl-2">
-              <h3 className="text-lg font-medium text-gray-700">
+              <h3 className="text-lg font-bold text-gray-700">
                 {role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin' 
                   ? 'All Tickets & Feedback' 
                   : 'My Tickets & Feedback'
@@ -544,22 +544,29 @@ const UserProfilePage: React.FC = () => {
               )}
             </div>
             <div className={tickets.length > 5 ? "max-h-[400px] overflow-y-auto" : ""}>
-              <table className="w-full divide-y divide-gray-200 table-fixed">
+              <table className="w-full divide-y divide-gray-200 table-fixed border-collapse">
+              <colgroup>
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '25%' }} />
+              </colgroup>
               <thead className="bg-white sticky top-0 z-10">
                 <tr className="border-b border-[#eeeeee]">
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
+                  <th className="bg-white p-[10px] pr-4 font-semibold text-[#6b1176] text-xs text-left whitespace-nowrap">
                     Ticket ID
                   </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[35%] whitespace-nowrap">
+                  <th className="bg-white p-[10px] px-4 font-semibold text-[#6b1176] text-xs text-left whitespace-nowrap">
                     Title
                   </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
+                  <th className="bg-white p-[10px] px-4 font-semibold text-[#6b1176] text-xs text-left whitespace-nowrap">
                     Type
                   </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
+                  <th className="bg-white p-[10px] px-4 font-semibold text-[#6b1176] text-xs text-left whitespace-nowrap">
                     Status
                   </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[20%] whitespace-nowrap">
+                  <th className="bg-white p-[10px] pl-4 font-semibold text-[#6b1176] text-xs text-left whitespace-nowrap">
                     Submitted On
                   </th>
                 </tr>
@@ -567,7 +574,7 @@ const UserProfilePage: React.FC = () => {
               <tbody className="bg-white">
                 {tickets.map((ticket) => (
                   <tr key={ticket.id} className="border-b border-[#eeeeee] hover:bg-white/50">
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
+                    <td className="bg-white p-[10px] pr-4 font-normal text-[#333333] text-xs whitespace-nowrap">
                       <a
                         href="#"
                         className="font-medium hover:opacity-80"
@@ -580,20 +587,24 @@ const UserProfilePage: React.FC = () => {
                         {ticket.id}
                       </a>
                     </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs">
-                      <div className="truncate break-words max-w-[220px]">
+                    <td className="bg-white p-[10px] px-4 font-normal text-[#333333] text-xs">
+                      <div 
+                        className="truncate" 
+                        style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={ticket.title}
+                      >
                       {ticket.title}
                       </div>
                     </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
+                    <td className="bg-white p-[10px] px-4 font-normal text-[#333333] text-xs whitespace-nowrap">
                       {ticket.type}
                     </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
+                    <td className="bg-white p-[10px] px-4 font-normal text-[#333333] text-xs whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
                         {ticket.status}
                       </span>
                     </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
+                    <td className="bg-white p-[10px] pl-4 font-normal text-[#333333] text-xs whitespace-nowrap">
                       {ticket.submittedOn.replace(/\./g, '-')}
                     </td>
                   </tr>
@@ -624,7 +635,7 @@ const UserProfilePage: React.FC = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-900">Email me when my ticket is updated</h3>
+                <h3 className="text-sm font-bold text-gray-900">Email me when my ticket is updated</h3>
                 <p className="text-sm text-gray-500 mt-1">Get notifications about ticket status changes</p>
               </div>
               <button
@@ -643,7 +654,7 @@ const UserProfilePage: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-900">Include me in myGrape feature update emails</h3>
+                <h3 className="text-sm font-bold text-gray-900">Include me in myGrape feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>
                 <p className="text-xs text-gray-400 mt-1">Coming soon</p>
               </div>
