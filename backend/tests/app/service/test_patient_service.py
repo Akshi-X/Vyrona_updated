@@ -397,11 +397,17 @@ def test_create_multiple_patients_exception_rollback(service, monkeypatch):
 
 def test_get_pharma_statistics_success(service):
     """Test getting pharma statistics"""
-    # Mock current month queries
-    query_mock1 = MagicMock()
-    query_mock1.filter.return_value.count.return_value = 10
+    # Mock current month unique patient count
+    distinct_mock = MagicMock()
+    distinct_mock.count.return_value = 10
     
-    service.db.query.return_value = query_mock1
+    filter_mock = MagicMock()
+    filter_mock.distinct.return_value = distinct_mock
+    
+    query_mock = MagicMock()
+    query_mock.filter.return_value = filter_mock
+    
+    service.db.query.return_value = query_mock
     
     result = service.get_pharma_statistics(pharma_id=42)
     
@@ -414,13 +420,16 @@ def test_get_pharma_statistics_december_month(service, monkeypatch):
     # Mock datetime.now to return December
     mock_now = datetime(2024, 12, 15, 10, 0, 0, tzinfo=timezone.utc)
     
-    query_mock1 = MagicMock()
-    query_mock1.filter.return_value.count.return_value = 5
+    distinct_mock = MagicMock()
+    distinct_mock.count.return_value = 5
     
-    query_mock2 = MagicMock()
-    query_mock2.filter.return_value.scalar.return_value = 3
+    filter_mock = MagicMock()
+    filter_mock.distinct.return_value = distinct_mock
     
-    service.db.query.side_effect = [query_mock1, query_mock2]
+    query_mock = MagicMock()
+    query_mock.filter.return_value = filter_mock
+    
+    service.db.query.return_value = query_mock
     
     # Mock datetime.now using monkeypatch - patch it at the module level
     from app.service import patient_service
@@ -917,12 +926,15 @@ def test_get_patient_current_stage_success_with_active(service):
     stage_query = MagicMock()
     stage_query.filter.return_value.order_by.return_value.first.return_value = active_stage
     
-    service.db.query.side_effect = [patient_query, stage_query]
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+
+    service.db.query.side_effect = [patient_query, stage_query, reengineering_query]
     
     result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
     
     assert result.patient_id == "PT-123"
-    assert result.stage == PatientStageEnum.TRANSPORTATION
+    assert result.stage == PatientStageEnum.TRANSPORTATION.value
 
 
 def test_get_patient_current_stage_success_with_latest(service):
@@ -944,12 +956,15 @@ def test_get_patient_current_stage_success_with_latest(service):
     latest_stage_query = MagicMock()
     latest_stage_query.filter.return_value.order_by.return_value.first.return_value = latest_stage
     
-    service.db.query.side_effect = [patient_query, active_stage_query, latest_stage_query]
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+
+    service.db.query.side_effect = [patient_query, active_stage_query, latest_stage_query, reengineering_query]
     
     result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
     
     assert result.patient_id == "PT-123"
-    assert result.stage == PatientStageEnum.REENGINEERING
+    assert result.stage == PatientStageEnum.REENGINEERING.value
 
 
 def test_get_patient_current_stage_no_stage(service):
@@ -974,6 +989,32 @@ def test_get_patient_current_stage_no_stage(service):
     
     assert result.patient_id == "PT-123"
     assert result.stage is None
+
+
+def test_get_patient_current_stage_reinfusion_completed(service):
+    """Reinfusion stage returns Completed when successful"""
+    patient = Mock(spec=Patient)
+    patient.id = "PT-123"
+    patient.pharma_id = 42
+    
+    reinfusion_stage = Mock(spec=PatientStage)
+    reinfusion_stage.stage = PatientStageEnum.REINFUSION
+    reinfusion_stage.is_success = True
+    
+    patient_query = MagicMock()
+    patient_query.filter.return_value.first.return_value = patient
+    
+    active_stage_query = MagicMock()
+    active_stage_query.filter.return_value.order_by.return_value.first.return_value = reinfusion_stage
+    
+    reengineering_query = MagicMock()
+    reengineering_query.filter.return_value.first.return_value = None
+    
+    service.db.query.side_effect = [patient_query, active_stage_query, reengineering_query]
+    
+    result = service.get_patient_current_stage(patient_id="PT-123", pharma_id=42)
+    
+    assert result.stage == "Completed"
 
 
 def test_get_patient_current_stage_patient_not_found(service):

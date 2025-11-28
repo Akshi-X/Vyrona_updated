@@ -1,12 +1,19 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime
+from sqlalchemy.orm import Session
 
 from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     CriticalAlert,
-    CriticalAlertsResponse
+    CriticalAlertsResponse,
+    AvgLeadTimeResponse,
+    OnTimePercentageResponse,
+    SuccessRateResponse,
+    AvgQualityDeviationsResponse
 )
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
+from app.config.database import get_db
+from app.service.dashboard_service import DashboardService
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -15,7 +22,10 @@ router = APIRouter(tags=["Dashboard"])
 # 1. Get Performance Metrics
 # ---------------------------
 @router.get("/performance", response_model=DashboardCategoryResponse)
-def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
+def get_performance_metrics(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
     """
     Get performance metrics only.
     
@@ -29,20 +39,82 @@ def get_performance_metrics(pharma_id: int = Depends(get_pharma_id_from_request)
     - Avg Lead Time: 23d
     """
     
-    metrics = {
-        "on_time_percentage": 87.0,
-        "avg_lead_time_days": 8,
-        "total_shipments": 30,
-        "completed_shipments": 18,
-        "pending_shipments": 12
-    }
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_performance_metrics(pharma_id)
+
+
+@router.get("/performance/avg-lead-time", response_model=AvgLeadTimeResponse)
+def get_average_lead_time(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """Return only the average lead time metrics for the authenticated pharma."""
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_average_lead_time(pharma_id)
+
+
+@router.get("/performance/on-time-percentage", response_model=OnTimePercentageResponse)
+def get_on_time_percentage(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return only the on-time percentage metrics for the authenticated pharma.
     
-    return DashboardCategoryResponse(
-        category="performance",
-        metrics=metrics,
-        last_updated=datetime.now(),
-        status="success"
-    )
+    Calculates On-Time Percentage for current month:
+    - On-Time % = (On-Time Deliveries ÷ Total Deliveries) × 100
+    - On-Time Deliveries = Sum(Is Actual Handover Time ≤ Estimated Handover Time ? YES → On-Time)
+    
+    Protected endpoint. Auth token required; pharma_id taken from token.
+    
+    Returns:
+        - on_time_percentage: Percentage of on-time deliveries
+        - on_time_deliveries: Count of on-time deliveries
+        - total_deliveries: Total deliveries with both handover_time and scheduled_time
+    """
+    dashboard_service = DashboardService(db)
+    result = dashboard_service.get_on_time_percentage(pharma_id)
+    return OnTimePercentageResponse(**result)
+
+
+@router.get("/performance/success-rate", response_model=SuccessRateResponse)
+def get_success_rate(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return treatment success rate:
+    Success Rate = (Successful Outcomes ÷ Total Outcomes) × 100
+    Counts completed patient stages (non-active) scoped to the authenticated pharma.
+    """
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_success_rate(pharma_id)
+
+
+@router.get("/performance/avg-quality-deviations", response_model=AvgQualityDeviationsResponse)
+def get_avg_quality_deviations(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
+    """
+    Return average quality deviations flagged per shipment for current month.
+    
+    This metric replaces the Treatments count widget.
+    Represents the average number of quality issues detected per shipment or treatment process,
+    such as temperature excursions, humidity spikes, shock events, seal breaks, or location-based deviations.
+    These are captured directly from IoT sensors or stakeholder inputs.
+    
+    Formula: Quality Deviations Flagged = monthly total (total deviation per shipment) / monthly total treatment
+    
+    Protected endpoint. Auth token required; pharma_id taken from token.
+    
+    Returns:
+        - avg_quality_deviations: Average count of all deviations recorded per treatment per month
+        - total_deviations: Total number of quality deviations in the current month
+        - total_treatments: Total number of treatments (patients with shipments) in the current month
+    """
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_avg_quality_deviations(pharma_id)
 
 
 # ---------------------------
