@@ -231,7 +231,8 @@ class ControlTowerMapResponse(BaseModel):
 class PatientStageResponse(BaseModel):
     """Schema for current stage of a patient"""
     patient_id: str
-    stage: Optional[PatientStage] = None
+    stage: Optional[str] = None
+    reengineering_status: Optional[bool] = Field(False, description="True if reengineering completed, else False")
 
 
 # ============================================
