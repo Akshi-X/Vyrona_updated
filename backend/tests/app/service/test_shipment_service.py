@@ -742,8 +742,10 @@ def test_build_filtered_active_routes_query_with_route_status(service, monkeypat
     monkeypatch.setattr(shipment_service, "parse_route_status_filter", mock_parse_route_status_filter)
     
     query_mock = MagicMock()
+    query_mock.join.return_value = query_mock
+    query_mock.outerjoin.return_value = query_mock
     query_mock.filter.return_value = query_mock
-    service.db.query.return_value.join.return_value.outerjoin.return_value.outerjoin.return_value.outerjoin.return_value = query_mock
+    service.db.query.return_value = query_mock
     
     result = service._build_filtered_active_routes_query(
         pharma_id=42,
@@ -764,8 +766,10 @@ def test_build_filtered_active_routes_query_with_regions(service, monkeypatch):
     monkeypatch.setattr(shipment_service, "apply_region_filter", mock_apply_region_filter)
     
     query_mock = MagicMock()
+    query_mock.join.return_value = query_mock
+    query_mock.outerjoin.return_value = query_mock
     query_mock.filter.return_value = query_mock
-    service.db.query.return_value.join.return_value.outerjoin.return_value.outerjoin.return_value.outerjoin.return_value = query_mock
+    service.db.query.return_value = query_mock
     
     result = service._build_filtered_active_routes_query(
         pharma_id=42,
@@ -774,6 +778,30 @@ def test_build_filtered_active_routes_query_with_regions(service, monkeypatch):
     )
     
     assert result is not None
+
+
+def test_build_filtered_active_routes_query_excludes_completed_shipments(service, monkeypatch):
+    """Ensure completed shipments without active TRANSPORTATION stage are filtered out."""
+    from app.service import shipment_service
+
+    def mock_apply_region_filter(query, regions):
+        return query
+
+    monkeypatch.setattr(shipment_service, "apply_region_filter", mock_apply_region_filter)
+
+    query_mock = MagicMock()
+    query_mock.join.return_value = query_mock
+    query_mock.outerjoin.return_value = query_mock
+    query_mock.filter.return_value = query_mock
+    service.db.query.return_value = query_mock
+
+    service._build_filtered_active_routes_query()
+
+    condition = query_mock.filter.call_args[0][0]
+    condition_str = str(condition).lower()
+
+    assert "process_phase" in condition_str or "patient_stage" in condition_str
+    assert "handover_time" in condition_str and "is null" in condition_str
 
 
 def test_update_patient_stage_on_shipment_leg_failure_leg_not_found(service):
