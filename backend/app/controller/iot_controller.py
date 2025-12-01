@@ -86,9 +86,9 @@ def get_device(
 
 
 @router.put("/devices/{device_id}")
-async def update_device(
+def update_device(
     device_id: str = Path(..., description="Device ID"),
-    http_request: Request = None,
+    request: Optional[DeviceUpdateRequest] = None,
     service: IoTService = Depends(get_iot_service)
 ):
     """
@@ -108,28 +108,9 @@ async def update_device(
     try:
         update_data = {}
         
-        # Parse request body manually to handle empty bodies
-        try:
-            body_bytes = await http_request.body()
-            if body_bytes:
-                body_str = body_bytes.decode('utf-8')
-                if body_str.strip():  # Not empty string
-                    body_dict = json.loads(body_str)
-                    if isinstance(body_dict, dict) and body_dict:
-                        # Validate using schema
-                        try:
-                            request_obj = DeviceUpdateRequest(**body_dict)
-                            update_data = request_obj.dict(exclude_unset=True, exclude_none=True)
-                        except Exception as e:
-                            logger.debug(f"Schema validation failed, using raw dict: {e}")
-                            # If validation fails, use raw dict (filter None values)
-                            update_data = {k: v for k, v in body_dict.items() if v is not None}
-        except json.JSONDecodeError:
-            # Empty or invalid JSON - treat as empty body (no updates)
-            pass
-        except Exception as e:
-            logger.debug(f"Error parsing request body: {e}")
-            # Treat as empty body if parsing fails
+        if request:
+            # Use Pydantic model's dict method to get only set fields
+            update_data = request.dict(exclude_unset=True, exclude_none=True)
         
         return service.update_device(device_id, **update_data)
     except HTTPException:
@@ -189,9 +170,9 @@ def remove_device_alert_presets(
 
 
 @router.post("/devices/{device_id}/generate-report")
-async def generate_device_report(
+def generate_device_report(
     device_id: str = Path(..., description="Device ID"),
-    http_request: Request = None,
+    request: DeviceGenerateReportRequest = ...,
     service: IoTService = Depends(get_iot_service)
 ):
     """
@@ -225,65 +206,9 @@ async def generate_device_report(
     Returns the raw response from IoT API to preserve all fields
     """
     try:
-        report_params = {}
-        
-        # Parse request body - required fields must be present
-        try:
-            body_bytes = await http_request.body()
-            if not body_bytes:
-                raise HTTPException(
-                    status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-                    detail="Request body is required with Format, TimeZone, SensorData, and DateTimeStart fields"
-                )
-            
-            body_str = body_bytes.decode('utf-8')
-            if not body_str.strip():
-                raise HTTPException(
-                    status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-                    detail="Request body is required with Format, TimeZone, SensorData, and DateTimeStart fields"
-                )
-            
-            body_dict = json.loads(body_str)
-            if not isinstance(body_dict, dict):
-                raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Request body must be a JSON object")
-            
-            # Extract fields from 'request' object if present, otherwise use top-level fields
-            if 'request' in body_dict and isinstance(body_dict['request'], dict):
-                # Fields are nested inside 'request' object
-                report_fields = body_dict['request']
-            else:
-                # Fields are at top level
-                report_fields = {k: v for k, v in body_dict.items() if k != 'request'}
-            
-            if not report_fields:
-                raise HTTPException(
-                    status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-                    detail="Request body must contain Format, TimeZone, SensorData, and DateTimeStart fields"
-                )
-            
-            # Validate with schema (required fields will be validated)
-            try:
-                request_schema = DeviceGenerateReportRequest(**report_fields)
-                # Use by_alias=False to ensure PascalCase field names (what API expects)
-                report_params = request_schema.dict(exclude_unset=True, exclude_none=True, by_alias=False)
-                logger.info(f"Parsed report parameters: {json.dumps(report_params, indent=2)}")
-            except Exception as e:
-                logger.error(f"Schema validation failed: {e}")
-                raise HTTPException(
-                    status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-                    detail=f"Invalid request body: {str(e)}"
-                )
-            
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail=f"Invalid JSON in request body: {str(e)}")
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error parsing request body: {e}")
-            raise HTTPException(
-                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-                detail=f"Error parsing request body: {str(e)}"
-            )
+        # Use by_alias=False to ensure PascalCase field names (what Tive API expects)
+        report_params = request.dict(exclude_unset=True, exclude_none=True, by_alias=False)
+        logger.info(f"Parsed report parameters: {json.dumps(report_params, indent=2)}")
         
         report_result = service.generate_device_report(device_id, **report_params)
         
@@ -494,7 +419,7 @@ def update_alert_preset(
         update_data = {}
         if request:
             # Convert request to dict, preserving all fields exactly as IoT API expects
-            update_data = request.dict(exclude_unset=True)
+            update_data = request.dict(exclude_unset=True, exclude_none=True)
             
             # Convert nested trigger schemas to dicts if needed
             trigger_fields = [
@@ -503,12 +428,33 @@ def update_alert_preset(
                 'shipmentInboundTriggers', 'booleanTriggers', 'tiltTriggers'
             ]
             
+            has_triggers = False
             for field in trigger_fields:
                 if field in update_data and update_data[field] is not None:
-                    update_data[field] = [
-                        trigger.dict(exclude_unset=True) if hasattr(trigger, 'dict') else trigger
-                        for trigger in update_data[field]
-                    ]
+                    # Filter out empty arrays
+                    if isinstance(update_data[field], list) and len(update_data[field]) > 0:
+                        has_triggers = True
+                        update_data[field] = [
+                            trigger.dict(exclude_unset=True, exclude_none=True) if hasattr(trigger, 'dict') else trigger
+                            for trigger in update_data[field]
+                        ]
+                    else:
+                        # Remove empty arrays
+                        update_data.pop(field, None)
+            
+            # Tive API requires at least one trigger when updating alert presets
+            if not has_triggers:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="At least one trigger must be specified when updating an alert preset. Include at least one of: temperatureTriggers, percentTriggers, arriveDepartTriggers, intervalTriggers, shockLightTriggers, geofenceTriggers, shipmentInboundTriggers, booleanTriggers, or tiltTriggers"
+                )
+        
+        # Ensure at least one field is being updated
+        if not update_data:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="At least one field must be provided for update"
+            )
         
         return service.update_alert_preset(preset_id, **update_data)
     except Exception as e:
