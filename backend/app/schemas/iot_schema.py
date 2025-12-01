@@ -312,26 +312,35 @@ class ShockLightTriggerSchema(BaseModel):
 
 
 class GeofenceTriggerSchema(BaseModel):
-    """Geofence trigger schema - matches IoT API exactly"""
-    type: str = Field(..., description="Trigger type")
+    """Geofence trigger schema - matches IoT API exactly
+    
+    Note:
+    - type must be "LocationPerimeter" (only allowed value)
+    - alertOn must be "Inside" or "Outside" (only allowed values)
+    """
+    type: str = Field(..., description="Trigger type (must be 'LocationPerimeter')")
     isActiveAtOrigin: bool = Field(..., description="Active at origin")
     isActiveInTransit: bool = Field(..., description="Active in transit")
     isActiveAtDestination: bool = Field(..., description="Active at destination")
     locationId: int = Field(..., description="Location ID")
-    alertOn: str = Field(..., description="Alert on event")
+    alertOn: str = Field(..., description="Alert on event (must be 'Inside' or 'Outside')")
     # Allow additional fields
     class Config:
         extra = "allow"
 
 
 class ShipmentInboundTriggerSchema(BaseModel):
-    """Shipment inbound trigger schema - matches IoT API exactly"""
+    """Shipment inbound trigger schema - matches IoT API exactly
+    
+    Note:
+    - triggerUnit must be "Kilometers" or "Miles" (only allowed values)
+    """
     type: str = Field(..., description="Trigger type")
     isActiveAtOrigin: bool = Field(..., description="Active at origin")
     isActiveInTransit: bool = Field(..., description="Active in transit")
     isActiveAtDestination: bool = Field(..., description="Active at destination")
     triggerValue: float = Field(..., description="Trigger value")
-    triggerUnit: str = Field(..., description="Trigger unit")
+    triggerUnit: str = Field(..., description="Trigger unit (must be 'Kilometers' or 'Miles')")
     # Allow additional fields
     class Config:
         extra = "allow"

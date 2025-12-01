@@ -48,6 +48,11 @@ from ..constants.app_constants import (
     IOT_USER_AGENT
 )
 from ..constants.http_status import HTTPStatus
+from ..utils.iot_response_utils import (
+    format_alert_preset_create_response,
+    format_alert_preset_update_response,
+    format_empty_response
+)
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +214,8 @@ class IoTService:
             logger.debug(f"Request Body: {body_preview}")
             if ('/shipments' in url or '/generateReport' in url) and method == 'POST':
                 logger.info(f"Request Body: {json.dumps(kwargs['json'], indent=2)}")
+            elif '/alertpresets' in url and method == 'PUT':
+                logger.info(f"Update Alert Preset Request Body: {json.dumps(kwargs['json'], indent=2)}")
     
     def _log_response_details(self, response: requests.Response, method: str) -> None:
         """Log response details for debugging (DEBUG level to reduce overhead)"""
@@ -299,6 +306,34 @@ class IoTService:
             logger.debug(f"Failed to parse JSON error response: {e}")
             return self._extract_text_error(response)
     
+    def _parse_nested_error_message(self, error_value: str) -> Optional[str]:
+        """
+        Parse nested JSON error message from string.
+        
+        Args:
+            error_value: String that may contain JSON with 'message' field
+            
+        Returns:
+            Extracted message if found, None otherwise
+        """
+        if not isinstance(error_value, str) or not error_value.strip().startswith('{'):
+            return None
+        
+        try:
+            nested_error = json.loads(error_value)
+            if isinstance(nested_error, dict) and 'message' in nested_error:
+                return str(nested_error['message'])
+        except (json.JSONDecodeError, ValueError):
+            pass
+        
+        return None
+    
+    def _add_trace_id_to_message(self, message: str, error_data: Dict[str, Any]) -> str:
+        """Add trace ID to error message if available"""
+        if IOT_ERROR_FIELD_TRACE_ID in error_data and error_data[IOT_ERROR_FIELD_TRACE_ID]:
+            return f"{message} (TraceId: {error_data[IOT_ERROR_FIELD_TRACE_ID]})"
+        return message
+    
     def _parse_error_data(self, error_data: Any, response: requests.Response) -> str:
         """Parse error data dictionary"""
         if not isinstance(error_data, dict):
@@ -306,7 +341,14 @@ class IoTService:
         
         validation_errors = self._extract_validation_errors(error_data)
         if validation_errors:
-            return f"Validation errors: {', '.join(validation_errors)}"
+            error_msg = f"Validation errors: {', '.join(validation_errors)}"
+            return self._add_trace_id_to_message(error_msg, error_data)
+        
+        # Check if 'error' field contains nested JSON string
+        if 'error' in error_data and isinstance(error_data['error'], str):
+            nested_msg = self._parse_nested_error_message(error_data['error'])
+            if nested_msg:
+                return self._add_trace_id_to_message(nested_msg, error_data)
         
         priority_fields = ['error', 'message', 'errorMessage', 'detail', 'description']
         ordered_fields = priority_fields + [f for f in IOT_ERROR_FIELDS if f not in priority_fields]
@@ -314,17 +356,45 @@ class IoTService:
         for field in ordered_fields:
             if field in error_data and error_data[field]:
                 error_msg = str(error_data[field])
-                if IOT_ERROR_FIELD_TRACE_ID in error_data and error_data[IOT_ERROR_FIELD_TRACE_ID]:
-                    error_msg += f" (TraceId: {error_data[IOT_ERROR_FIELD_TRACE_ID]})"
-                return error_msg
+                # Try to parse if it's a JSON string (for 'error' field)
+                if field == 'error':
+                    nested_msg = self._parse_nested_error_message(error_msg)
+                    if nested_msg:
+                        error_msg = nested_msg
+                
+                return self._add_trace_id_to_message(error_msg, error_data)
         
         if 'title' in error_data:
             title = str(error_data['title'])
-            if IOT_ERROR_FIELD_TRACE_ID in error_data:
-                title += f" (TraceId: {error_data[IOT_ERROR_FIELD_TRACE_ID]})"
-            return title
+            return self._add_trace_id_to_message(title, error_data)
         
         return str(error_data)
+    
+    def _extract_error_type_from_nested_error(self, error_data: Dict[str, Any], default_status: int) -> int:
+        """
+        Extract errorType from nested JSON error if available.
+        
+        Args:
+            error_data: Error data dictionary
+            default_status: Default HTTP status code
+            
+        Returns:
+            Extracted errorType if valid (400-599), otherwise default_status
+        """
+        if 'error' not in error_data or not isinstance(error_data['error'], str):
+            return default_status
+        
+        try:
+            nested_error = json.loads(error_data['error'])
+            if isinstance(nested_error, dict) and 'errorType' in nested_error:
+                error_type = nested_error.get('errorType')
+                # Valid HTTP error status codes are 400-599
+                if isinstance(error_type, int) and HTTPStatus.BAD_REQUEST <= error_type < 600:
+                    return error_type
+        except (json.JSONDecodeError, ValueError):
+            pass
+        
+        return default_status
     
     def _extract_validation_errors(self, error_data: Dict[str, Any]) -> List[str]:
         """Extract validation errors from RFC 9110 format"""
@@ -425,10 +495,13 @@ class IoTService:
         error_message = self._parse_error_data(error_data, response) if error_data else ""
         reason = error_message or default_message
         
+        # Extract errorType from nested JSON if available for better status code
+        status_code = self._extract_error_type_from_nested_error(error_data, response.status_code)
+        
         logger.error(f"{default_message}: HTTP {response.status_code} - {reason}")
         
         error_details = self._build_error_details_from_data(error_data, details, response_text_preview)
-        self._raise_iot_exception(error_code_key, reason, error_details, response.status_code)
+        self._raise_iot_exception(error_code_key, reason, error_details, status_code)
     
     def _build_error_details_from_data(
         self,
@@ -462,10 +535,20 @@ class IoTService:
             kwargs['device_id'] = error_details.get('device_id', '')
         elif error_code_key == "IOT_UPDATE_DEVICE_FAILED":
             kwargs['device_id'] = error_details.get('device_id', '')
+        elif error_code_key == "IOT_CREATE_SHIPMENT_FAILED":
+            # IoTCreateShipmentFailedException only accepts reason, response_body, iot_trace_id
+            pass
         elif error_code_key == "IOT_GET_SHIPMENT_FAILED":
             kwargs['shipment_id'] = error_details.get('shipment_id', '')
-        elif error_code_key in ("IOT_GET_ALERT_PRESET_FAILED", "IOT_UPDATE_ALERT_PRESET_FAILED"):
-            kwargs['preset_id'] = error_details.get('preset_id', '')
+        elif error_code_key == "IOT_GET_ALERT_PRESET_FAILED":
+            # IoTGetAlertPresetFailedException only accepts preset_id and reason
+            kwargs = {'preset_id': error_details.get('preset_id', ''), 'reason': reason}
+        elif error_code_key == "IOT_CREATE_ALERT_PRESET_FAILED":
+            # IoTCreateAlertPresetFailedException only accepts reason, response_body, iot_trace_id
+            kwargs = {'reason': reason, 'response_body': error_details.get('response_body', ''), 'iot_trace_id': error_details.get('iot_trace_id')}
+        elif error_code_key == "IOT_UPDATE_ALERT_PRESET_FAILED":
+            # IoTUpdateAlertPresetFailedException only accepts preset_id and reason
+            kwargs = {'preset_id': error_details.get('preset_id', ''), 'reason': reason}
         elif error_code_key in ("IOT_ADD_DEVICE_ALERT_PRESETS_FAILED", "IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED"):
             kwargs.update({'device_id': error_details.get('device_id', ''), 'alert_preset_ids': error_details.get('alert_preset_ids', [])})
         elif error_code_key == "IOT_GENERATE_DEVICE_REPORT_FAILED":
@@ -601,8 +684,23 @@ class IoTService:
         )
     
     def get_shipment_status(self, shipment_id: str) -> Dict[str, Any]:
-        """Get shipment status - returns raw response from IoT API"""
-        return self.get_shipment(shipment_id)
+        """Get shipment status with latest sensor measurements and key metrics
+        
+        Reference: https://developers.tive.com/reference/get_public-v3-shipments-shipmentid-status
+        Endpoint: GET /public/v3/shipments/{shipmentId}/status
+        
+        Returns latest sensor measurements and status updates including:
+        - Current temperature, humidity, pressure, light levels
+        - Distance metrics (total, traveled, remaining)
+        - Key dates (start, departure, delivery, completion)
+        """
+        return self._handle_api_request(
+            'GET',
+            f'/shipments/{shipment_id}/status',
+            "IOT_GET_SHIPMENT_FAILED",
+            f"Failed to get shipment status for {shipment_id}",
+            details={"shipment_id": shipment_id}
+        )
     
     def get_all_shipments(self) -> List[Dict[str, Any]]:
         """Get all shipments"""
@@ -633,14 +731,126 @@ class IoTService:
     
     def create_alert_preset(self, **kwargs) -> Dict[str, Any]:
         """Create a new alert preset"""
-        return self._handle_api_request('POST', '/alertpresets', "IOT_CREATE_ALERT_PRESET_FAILED",
-                                       "Failed to create alert preset", payload=kwargs.copy())
+        try:
+            payload = kwargs.copy()
+            response = self._make_request('POST', '/alertpresets', json=payload)
+            
+            if response.status_code >= HTTPStatus.BAD_REQUEST:
+                self._handle_error_response(
+                    response,
+                    "IOT_CREATE_ALERT_PRESET_FAILED",
+                    "Failed to create alert preset",
+                    None
+                )
+            
+            response.raise_for_status()
+            
+            # Parse response - Tive API might return preset ID as text/plain or JSON
+            # Check for text/plain response first (even if status is 200, not just 201)
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'text/plain' in content_type and response.text:
+                # Direct text/plain response with preset ID
+                preset_id = response.text.strip()
+                result = {"id": preset_id, "raw_response": preset_id}
+            else:
+                # Try parsing as JSON
+                result = self._parse_json_response(response)
+            
+            # Always format the response for consistency
+            # Tive API may return:
+            # - text/plain: "283259" -> parsed as {"id": "283259", ...}
+            # - JSON: {"preset_id": "283259"} or empty {}
+            # - Empty: {}
+            return format_alert_preset_create_response(result, payload)
+            
+        except AppException:
+            raise
+        except requests.exceptions.HTTPError as e:
+            self._handle_http_error(
+                e,
+                "IOT_CREATE_ALERT_PRESET_FAILED",
+                "Failed to create alert preset",
+                None
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error creating alert preset: {e}", exc_info=True)
+            self._raise_iot_exception(
+                "IOT_CREATE_ALERT_PRESET_FAILED",
+                str(e),
+                {},
+                HTTPStatus.INTERNAL_SERVER_ERROR
+            )
     
     def update_alert_preset(self, preset_id: str, **kwargs) -> Dict[str, Any]:
         """Update an alert preset"""
-        return self._handle_api_request('PUT', f'/alertpresets/{preset_id}', "IOT_UPDATE_ALERT_PRESET_FAILED",
-                                       f"Failed to update alert preset {preset_id}", payload=kwargs.copy(),
-                                       details={"preset_id": preset_id})
+        # Filter out None values and empty dicts, but keep empty arrays (they might be used to clear triggers)
+        payload = {}
+        for k, v in kwargs.items():
+            if v is None:
+                continue
+            if v == {}:
+                continue
+            # Keep empty arrays - they might be intentional to clear existing triggers
+            payload[k] = v
+        
+        # Ensure payload is not empty
+        if not payload:
+            raise ValueError("At least one field must be provided for update")
+        
+        logger.info(f"Updating alert preset {preset_id} with fields: {list(payload.keys())}")
+        
+        try:
+            # First verify the preset exists by attempting to get it
+            # This will raise an exception if the preset doesn't exist (404)
+            try:
+                self.get_alert_preset(preset_id)
+                logger.debug(f"Preset {preset_id} exists, proceeding with update")
+            except AppException:
+                # Re-raise IoT exceptions (preset not found, etc.)
+                raise
+            except Exception as e:
+                # If get fails for unexpected reasons, log warning but continue with update attempt
+                logger.warning(f"Could not verify preset {preset_id} existence: {e}. Proceeding with update attempt.")
+            
+            kwargs_request = {'json': payload}
+            response = self._make_request('PUT', f'/alertpresets/{preset_id}', **kwargs_request)
+            
+            if response.status_code >= HTTPStatus.BAD_REQUEST:
+                self._handle_error_response(
+                    response,
+                    "IOT_UPDATE_ALERT_PRESET_FAILED",
+                    f"Failed to update alert preset {preset_id}",
+                    details={"preset_id": preset_id}
+                )
+            
+            response.raise_for_status()
+            
+            # Parse response, but if empty, return a success message
+            result = self._parse_json_response(response)
+            if not result or result == {}:
+                # Return meaningful response instead of empty dict
+                return format_alert_preset_update_response(preset_id, payload, result)
+            
+            return result
+            
+        except AppException:
+            raise
+        except requests.exceptions.HTTPError as e:
+            self._handle_http_error(
+                e,
+                "IOT_UPDATE_ALERT_PRESET_FAILED",
+                f"Failed to update alert preset {preset_id}",
+                details={"preset_id": preset_id}
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error updating alert preset: {e}", exc_info=True)
+            self._raise_iot_exception(
+                "IOT_UPDATE_ALERT_PRESET_FAILED",
+                str(e),
+                {"preset_id": preset_id},
+                HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
     
     def add_device_alert_presets(self, device_id: str, alert_preset_ids: List[int]) -> Dict[str, Any]:
         """Add alert presets to a device"""
@@ -686,7 +896,28 @@ class IoTService:
         
         Returns: Dict with download URL or file content
         """
-        payload = {'request': {}, **kwargs}
+        # Use fields directly as Tive API expects Format, TimeZone, SensorData
+        # Required fields
+        if 'Format' not in kwargs or not kwargs['Format']:
+            raise ValueError("Format is required")
+        if 'TimeZone' not in kwargs or not kwargs['TimeZone']:
+            raise ValueError("TimeZone is required")
+        if 'SensorData' not in kwargs or not kwargs['SensorData']:
+            raise ValueError("SensorData is required")
+        if 'DateTimeStart' not in kwargs or not kwargs['DateTimeStart']:
+            raise ValueError("DateTimeStart is required")
+        
+        payload = {
+            'Format': kwargs['Format'],
+            'TimeZone': kwargs['TimeZone'],
+            'SensorData': kwargs['SensorData'],
+            'DateTimeStart': kwargs['DateTimeStart'],
+        }
+        
+        # Add optional DateTimeEnd if provided
+        if 'DateTimeEnd' in kwargs and kwargs['DateTimeEnd']:
+            payload['DateTimeEnd'] = kwargs['DateTimeEnd']
+        
         self._log_report_request(device_id, kwargs, payload)
         
         try:
@@ -728,18 +959,41 @@ class IoTService:
                    f"Location: {response.headers.get('Location', 'N/A')}")
     
     def _handle_accepted_report(self, response: requests.Response, device_id: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle 202 Accepted response with Location header"""
+        """Handle 202 Accepted response with Location header - return response as-is"""
         location_header = response.headers.get('Location', '')
-        return (self._download_report_file(location_header, device_id, kwargs) or 
-                self._build_download_url_response(location_header)) if location_header else self._build_download_url_response('')
+        
+        # Try to download once, but return whatever we get
+        if location_header:
+            file_result = self._download_report_file(location_header, device_id, kwargs)
+            if file_result:
+                return file_result
+        
+        # Return download URL response with full response details
+        return {
+            'download_url': location_header,
+            'message': 'Report generation accepted. Use the download_url to access the report.',
+            'status': 'accepted',
+            'status_code': response.status_code,
+            'location': location_header,
+            'response_headers': dict(response.headers)
+        }
     
     def _download_report_file(self, location_header: str, device_id: str, kwargs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Attempt to download report file from Location URL"""
         if location_header.startswith('http'):
+            # Ensure account_id is available (extract from token if needed)
+            if not self.account_id and self.access_token:
+                self._extract_account_id_from_token()
+            
+            # Prepare headers with authentication (account_id is required for platform URLs)
+            download_headers = self._prepare_download_headers()
+            
+            # Try downloading with authentication (account_id header is required)
             try:
-                file_response = self._try_download_with_auth(location_header, self._prepare_download_headers())
+                file_response = self._try_download_with_auth(location_header, download_headers)
                 return self._build_file_response(file_response, device_id, kwargs) if file_response else None
-            except requests.exceptions.HTTPError:
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"Failed to download report: {e}")
                 return None
         try:
             file_response = self._make_request('GET', location_header.lstrip('/'))
@@ -751,41 +1005,79 @@ class IoTService:
     def _prepare_download_headers(self) -> Dict[str, str]:
         """Prepare download headers with authentication"""
         headers = {'User-Agent': IOT_USER_AGENT, 'Accept': '*/*'}
+        
+        # Always include Authorization header if token is available
         if self.access_token:
             headers['Authorization'] = f'Bearer {self.access_token}'
-            if self.account_id:
-                headers['x-tive-account-id'] = self.account_id
+        
+        # Account ID is REQUIRED for Tive API requests - always include if available
+        # Extract from token if not already set
+        if not self.account_id and self.access_token:
+            self._extract_account_id_from_token()
+        
+        if self.account_id:
+            # Ensure account_id is a string and trimmed
+            account_id_str = str(self.account_id).strip()
+            if account_id_str:
+                headers['x-tive-account-id'] = account_id_str
+            else:
+                logger.warning("Account ID is empty after trimming")
+        else:
+            logger.warning("Account ID is missing - this may cause 401 errors. Ensure IOT_ACCOUNT_ID is set in .env or extractable from token.")
+        
         return headers
     
     def _try_download_with_auth(self, location_header: str, download_headers: Dict[str, str]) -> Optional[requests.Response]:
-        """Try downloading with authentication, fallback to API path if 401"""
-        logger.info(f"Fetching from report URL with authentication: {location_header}")
-        file_response = requests.get(
-            location_header,
-            headers=download_headers,
-            timeout=IOT_API_TIMEOUT_SECONDS,
-            allow_redirects=True
-        )
-        
-        if file_response.status_code == HTTPStatus.UNAUTHORIZED:
+        """Try downloading with authentication - return response as-is"""
+        try:
+            file_response = requests.get(
+                location_header,
+                headers=download_headers,
+                timeout=IOT_API_TIMEOUT_SECONDS,
+                allow_redirects=True
+            )
+            
+            # Return response if successful
+            if file_response.status_code == HTTPStatus.OK:
+                return file_response
+            
+            # For non-200 responses, try API path once
+            logger.debug(f"Platform URL returned {file_response.status_code}, trying API path...")
             return self._try_api_path_download(location_header)
-        
-        file_response.raise_for_status()
-        return file_response
+            
+        except Exception as e:
+            logger.debug(f"Error downloading from platform URL: {e}")
+            # Try API path as fallback
+            return self._try_api_path_download(location_header)
     
     def _try_api_path_download(self, location_header: str) -> Optional[requests.Response]:
-        """Try downloading via API path with authenticated session"""
-        report_id = location_header.split('/')[-1]
-        api_report_path = f"customer-reports/{report_id}"
+        """Try downloading via API path with authenticated session
         
-        try:
-            logger.info(f"Trying API path with authenticated session: {api_report_path}")
-            file_response = self._make_request('GET', api_report_path)
-            file_response.raise_for_status()
-            return file_response
-        except Exception as e:
-            logger.warning(f"API path download failed: {e}")
-            return None
+        Note: platform.tive.com URLs are web URLs that require browser/cookie authentication.
+        They cannot be accessed with API Bearer tokens. We try the API endpoint instead.
+        """
+        report_id = location_header.split('/')[-1]
+        # Try different possible API paths
+        possible_paths = [
+            f"customer-reports/{report_id}",
+            f"api/customer-reports/{report_id}",
+            f"reports/{report_id}",
+            f"devices/reports/{report_id}",
+        ]
+        
+        for api_report_path in possible_paths:
+            try:
+                file_response = self._make_request('GET', api_report_path)
+                file_response.raise_for_status()
+                logger.info(f"Successfully downloaded report from API path: {api_report_path}")
+                return file_response
+            except requests.exceptions.HTTPError:
+                continue
+            except Exception:
+                continue
+        
+        logger.debug(f"All API paths failed for report ID: {report_id}")
+        return None
     
     
     def _build_file_response(self, file_response: requests.Response, device_id: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -842,6 +1134,19 @@ class IoTService:
                 return content_disposition.split('filename=')[1].strip('"\'')
             except Exception:
                 pass
-        extension = 'xlsx' if format_type and format_type.lower() == 'excel' else (format_type or 'csv').lower()
+        # Handle both ReportType and Format for backward compatibility
+        report_type = format_type or 'csv'
+        if isinstance(report_type, str):
+            report_type_lower = report_type.lower()
+            if report_type_lower == 'excel':
+                extension = 'xlsx'
+            elif report_type_lower in ['pdf', 'pdfwithrawdata']:
+                extension = 'pdf'
+            elif report_type_lower == 'json':
+                extension = 'json'
+            else:
+                extension = 'csv'
+        else:
+            extension = 'csv'
         return f'report_{device_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{extension}'
 
