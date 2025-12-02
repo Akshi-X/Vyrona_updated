@@ -292,7 +292,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       description={summary ? `Supply Chain Summary for Patient ${summary.patient_id}` : `Loading summary for ${patientId}...`}
       icon={
         <img
-          className="w-6 h-6"
+          className="w-[24px] h-[24px]"
           alt="Patient Summary"
           src={PatientSummaryIcon}
         />
