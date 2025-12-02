@@ -48,9 +48,9 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
           <tr className="border-b border-[#eeeeee]">
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Patient ID</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Type</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Severity</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Message</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Timestamp</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Priority</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Status</th>
           </tr>
         </thead>
@@ -64,6 +64,12 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 {alert.type}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                <div className="truncate" title={alert.message}>{alert.message}</div>
+              </td>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm truncate">
+                {alert.timestamp}
+              </td>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                   alert.severity === 'Critical' ? 'bg-red-100 text-red-800' :
                   alert.severity === 'High' ? 'bg-orange-100 text-orange-800' :
@@ -72,12 +78,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 }`}>
                   {alert.severity}
                 </span>
-              </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                <div className="truncate" title={alert.message}>{alert.message}</div>
-              </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm truncate">
-                {alert.timestamp}
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
