@@ -425,7 +425,13 @@ const ControlTower = () => {
 
             {/* Right Panel - Map Visualization */}
             <div className="flex flex-col gap-6 min-w-0 w-full row-span-2">
-              <ControlTowerMap />
+              <ControlTowerMap 
+                filters={{
+                  selectedRegion,
+                  selectedStatus,
+                  selectedCarrier,
+                }}
+              />
             </div>
           </div>
         </div>
@@ -435,5 +441,9 @@ const ControlTower = () => {
 };
 
 export default ControlTower;
+
+
+
+
 
 

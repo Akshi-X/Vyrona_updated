@@ -30,13 +30,11 @@ export interface RiskApiResponse {
 
 export class RiskService extends BaseApiService {
   /**
-   * Get risk metrics for a specific pharma
+   * Get risk metrics
    */
-  async getRiskMetrics(pharmaId: string): Promise<RiskMetrics> {
+  async getRiskMetrics(): Promise<RiskMetrics> {
     try {
-      const response = await this.request<RiskApiResponse>(
-        `/api/risk?pharma_id=${pharmaId}`
-      );
+      const response = await this.request<RiskApiResponse>(`/api/risk`);
       
       if (response.status === 'success') {
         return response.metrics;
