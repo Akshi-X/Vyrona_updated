@@ -388,9 +388,6 @@ const Support: React.FC = () => {
     if (!readonly) fileInputRef.current?.click();
   };
 
-  const controlBase = 'w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200';
-  const controlBg = 'bg-slate-50';
-  const disabledCls = 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200';
 
   // Jira-style status colors and icons
   const getStatusColor = (status: string): string => {
@@ -415,56 +412,70 @@ const Support: React.FC = () => {
   }, [status]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <Header title="Support & Feedback" />
 
-      {/* Page body */}
-      <div className="flex-1 w-full" style={{ paddingTop: '63px' }}>
-        <div className="w-full" style={{ background: 'linear-gradient(180deg, #f3f4f6 0%, #f8f9fa 100%)' }}>
-          <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-0 py-6 sm:py-8">
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-5 sm:px-6 pt-5 sm:pt-6">
-                <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">myGrape Support & Feedback</h1>
-                <p className="text-sm sm:text-base text-gray-500 mt-2">This form is built for our partner teams using myGrape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
-              </div>
+      <div className="pt-[calc(63px+1rem)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">myGrape Support & Feedback</h1>
+              <p className="text-sm text-gray-500 mt-2">This form is built for our partner teams using myGrape. Whether you've encountered an issue or want to request a feature, please fill out the details below. Our team will respond within 24 hours.</p>
+            </div>
 
-              <form onSubmit={onSubmit} className="px-5 sm:px-6 pb-6">
-                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={onSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Full Name */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Full Name<span className="text-red-500"> *</span></label>
+                    <label className="block text-sm font-bold text-black mb-2">Full Name<span className="text-red-500"> *</span></label>
                     <input
                       type="text"
                       value={fullName}
                       onChange={(e) => { setFullName(e.target.value); if (fullNameError) setFullNameError(null); }}
                       maxLength={NAME_MAX}
                       disabled={identityDisabled}
-                      className={`${controlBase} ${identityDisabled ? disabledCls : controlBg}`}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        identityDisabled
+                          ? 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : fullNameError
+                          ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      }`}
                       placeholder="Enter your full name"
                     />
                     {fullNameError && (<p className="mt-1 text-xs text-red-600">{fullNameError}</p>)}
                   </div>
                   {/* Work Email */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Work Email<span className="text-red-500"> *</span></label>
+                    <label className="block text-sm font-bold text-black mb-2">Work Email<span className="text-red-500"> *</span></label>
                     <input
                       type="email"
                       value={workEmail}
                       onChange={(e) => setWorkEmail(e.target.value)}
                       disabled={identityDisabled}
-                      className={`${controlBase} ${identityDisabled ? disabledCls : controlBg}`}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        identityDisabled
+                          ? 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      }`}
                       placeholder="Enter your work email"
                     />
                   </div>
 
                   {/* Type of Feedback */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Type of Feedback<span className="text-red-500"> *</span></label>
+                    <label className="block text-sm font-bold text-black mb-2">
+                      Type of Feedback<span className="text-red-500"> *</span>
+                    </label>
                     <select
                       value={feedbackType}
                       onChange={(e) => setFeedbackType(e.target.value)}
                       disabled={readonly}
-                      className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        readonly
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200'
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      }`}
                     >
                       <option value="">Select</option>
                       <option value="bug">Bug / Technical Issue</option>
@@ -478,28 +489,36 @@ const Support: React.FC = () => {
                   </div>
 
                   {/* Subject */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Subject / Title<span className="text-red-500"> *</span></label>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-black mb-2">Subject / Title<span className="text-red-500"> *</span></label>
                     <input
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       disabled={readonly}
-                      className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        readonly
+                          ? 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      }`}
                       placeholder="e.g., 'No alert on excursion during shipment #5238'"
                     />
                   </div>
                 </div>
 
                 {/* Description */}
-                <div className="mt-4">
-                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Detailed Description<span className="text-red-500"> *</span></label>
+                <div className="mt-8">
+                  <label className="block text-sm font-bold text-black mb-2">Detailed Description<span className="text-red-500"> *</span></label>
                   <textarea
                     rows={5}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     disabled={readonly}
-                    className={`w-full rounded-md border ${readonly ? 'border-gray-200' : 'border-gray-300'} ${readonly ? 'bg-gray-100 text-gray-600' : 'bg-slate-50'} px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 ${readonly ? 'cursor-not-allowed opacity-70' : ''}`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      readonly
+                        ? 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                    }`}
                     placeholder="Explain what happened, what you expected, and any relevant shipment/device ID."
                   />
                 </div>
@@ -534,8 +553,8 @@ const Support: React.FC = () => {
 
                 {/* Attach: full width (conditional) */}
                 {!readonly && !hideAttach && (
-                    <div className="mt-4">
-                      <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Attach Supporting Files (Optional)</label>
+                    <div className="mt-8">
+                      <label className="block text-sm font-bold text-black mb-2">Attach Supporting Files (Optional)</label>
                       
                       {/* File Upload Area */}
                       <div
@@ -587,15 +606,21 @@ const Support: React.FC = () => {
                 )}
 
                 {/* Priority and Modules in one alignment (same row) */}
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Priority */}
                   <div>
-                    <label className="block text-[12px] font-medium text-gray-900 mb-1.5">Priority<span className="text-red-500"> *</span></label>
+                    <label className="block text-sm font-bold text-black mb-2">
+                      Priority<span className="text-red-500"> *</span>
+                    </label>
                     <select
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       disabled={readonly}
-                      className={`${controlBase} ${readonly ? disabledCls : controlBg}`}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        readonly
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-600 border-gray-200'
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                      }`}
                     >
                       <option value="">Select priority level</option>
                       <option value="low">Low</option>
@@ -607,10 +632,9 @@ const Support: React.FC = () => {
 
                   {/* Affected Modules */}
                   <div>
-                    {/* Title outside of container */}
-                    <p className="text-[12px] font-medium text-gray-900 mb-2">Affected Modules<span className="text-red-500"> *</span></p>
-                    <div className="rounded-md border border-gray-200 p-3 h-full">
-                      <div className="grid grid-cols-1 gap-2">
+                    <label className="block text-sm font-bold text-black mb-2">Affected Modules<span className="text-red-500"> *</span></label>
+                    <div className="rounded-md border border-gray-300 p-4 bg-white">
+                      <div className="grid grid-cols-1 gap-3">
                         {modules.map((label, index) => (
                           <label key={label} className="flex items-center gap-2">
                             <input 
@@ -618,10 +642,10 @@ const Support: React.FC = () => {
                               disabled={readonly} 
                               checked={selectedModuleIndices.includes(index)}
                               onChange={(e) => handleModuleChange(index, e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-gray-300 focus:outline-none focus:ring-0"
+                              className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
                               style={{ accentColor: COLORS.primary.purple }}
                             />
-                            <span className="text-[12px] text-gray-800">{label}</span>
+                            <span className="text-sm text-gray-900">{label}</span>
                           </label>
                         ))}
                       </div>
@@ -631,8 +655,8 @@ const Support: React.FC = () => {
 
                 {/* Status (Integrated Jira-style component) */}
                 {readonly && (
-                <div className="mt-4">
-                  <label className="block text-[12px] font-medium text-gray-900 mb-1.5">
+                <div className="mt-8">
+                  <label className="block text-sm font-bold text-black mb-2">
                     Status {isUpdatingStatus && <span className="text-xs text-gray-500">(Updating...)</span>}
                   </label>
                   
@@ -683,7 +707,7 @@ const Support: React.FC = () => {
 
                 {/* Comments Section */}
                 {readonly && (
-                <div className="mt-6">
+                <div className="mt-8">
                     <div className="pt-4">
                       {/* Add comment */}
                       <div className="flex items-start gap-3">
@@ -693,7 +717,7 @@ const Support: React.FC = () => {
                             rows={3}
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
-                            className={`w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200`}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
                             placeholder={'Add a comment...'}
                           />
                           <div className="mt-2 flex justify-end">
@@ -701,7 +725,11 @@ const Support: React.FC = () => {
                             type="button"
                             onClick={addComment}
                             disabled={!canAddComment}
-                            className={`px-3 py-1.5 text-sm rounded-md text-white ${!canAddComment ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-700 hover:bg-purple-800'}`}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors duration-200 ${
+                              !canAddComment 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-[#6b1176] hover:bg-[#8a2a95]'
+                            }`}
                             aria-disabled={!canAddComment}
                           >
                             Add Comment
@@ -734,11 +762,11 @@ const Support: React.FC = () => {
 
                 {/* Optional schedule call (full width, below row) */}
                 {!readonly && !hideAttach && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-semibold text-gray-900">Optional: Schedule a Call</h3>
-                  <p className="mt-2 text-[13px] text-gray-800">
+                <div className="mt-8">
+                  <h3 className="text-sm font-bold text-black">Optional: Schedule a Call</h3>
+                  <p className="mt-2 text-sm text-gray-700">
                     Schedule 15-min Call: {" "}
-                    <a href="https://mygrape.org/contact/" target="_blank" rel="noopener noreferrer" className="text-[#6b1176] underline hover:text-[#8b2a96] font-bold">https://mygrape.org/contact/</a>
+                    <a href="https://mygrape.org/contact/" target="_blank" rel="noopener noreferrer" className="text-[#6b1176] underline hover:text-[#8b2a96] font-semibold">https://mygrape.org/contact/</a>
                   </p>
                   <label className="mt-4 flex items-center gap-2">
                     <input 
@@ -746,35 +774,34 @@ const Support: React.FC = () => {
                       checked={agreementChecked}
                       onChange={(e) => setAgreementChecked(e.target.checked)}
                       disabled={readonly} 
-                      className="h-4 w-4 rounded border-gray-300 text-purple-700 focus:ring-purple-200" 
+                      className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]" 
+                      style={{ accentColor: COLORS.primary.purple }}
                     />
-                    <span className="text-[14px] text-gray-900">I agree to be contacted regarding this issue. <span className="text-purple-700">*</span></span>
+                    <span className="text-sm text-gray-900">I agree to be contacted regarding this issue. <span className="text-red-500">*</span></span>
                   </label>
                 </div>
                 )}
 
                 {/* Submit Message */}
                 {submitMessage && (
-                  <div className={`mt-4 p-3 rounded-md text-sm ${submitMessage.startsWith('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                  <div className={`mt-4 p-3 rounded-lg text-sm ${submitMessage.startsWith('✅') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
                     {submitMessage}
                   </div>
                 )}
 
                 {/* Footer actions */}
                 {!readonly && (
-                <div className="mt-6 flex flex-col items-end space-y-2">
+                <div className="mt-8 flex flex-col items-end">
                   <button 
                     type="submit" 
                     disabled={isSubmitting || !agreementChecked}
-                    className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-50`} 
-                    style={{ backgroundColor: COLORS.primary.purple }}
+                    className={`inline-flex items-center px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium`}
                   >
                     {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                   </button>
                 </div>
                 )}
               </form>
-            </div>
           </div>
         </div>
       </div>
