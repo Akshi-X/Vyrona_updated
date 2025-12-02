@@ -51,7 +51,7 @@ export default function QualityParametersTable() {
 
   const getApiBaseUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    return envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    return envBaseUrl;
   };
 
   const getWebSocketUrl = () => {

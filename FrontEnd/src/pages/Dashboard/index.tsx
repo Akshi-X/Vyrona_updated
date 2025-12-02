@@ -257,9 +257,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
-  // Static pharma ID - in future this will come from verify OTP
-  const PHARMA_ID = 1;
-
   // Fetch patient statistics and logistics metrics on component mount
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -269,11 +266,11 @@ export default function Dashboard({ }: DashboardProps) {
 
         // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
         const [stats, logistics, performance, risk, compliance] = await Promise.all([
-          logisticsService.getPatientStatistics(), // Call without pharma_id
-          logisticsService.getLogisticsMetrics(PHARMA_ID.toString()),
-          performanceService.getPerformanceMetrics(PHARMA_ID.toString()),
-          riskService.getRiskMetrics(PHARMA_ID.toString()),
-          complianceService.getComplianceMetrics(PHARMA_ID.toString())
+          logisticsService.getPatientStatistics(), // /api/patients/statistics
+          logisticsService.getLogisticsMetrics(),  // /api/logistics
+          performanceService.getPerformanceMetrics(), // /api/performance
+          riskService.getRiskMetrics(), // /api/risk
+          complianceService.getComplianceMetrics() // /api/compliance
         ]);
 
         setPatientStats(stats);

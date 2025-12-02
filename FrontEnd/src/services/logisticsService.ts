@@ -35,13 +35,11 @@ export interface LogisticsApiResponse {
 
 export class LogisticsService extends BaseApiService {
   /**
-   * Get logistics metrics for a specific pharma
+   * Get logistics metrics
    */
-  async getLogisticsMetrics(pharmaId: string): Promise<LogisticsMetrics> {
+  async getLogisticsMetrics(): Promise<LogisticsMetrics> {
     try {
-      const response = await this.request<LogisticsApiResponse>(
-        `/api/logistics?pharma_id=${pharmaId}`
-      );
+      const response = await this.request<LogisticsApiResponse>(`/api/logistics`);
       
       if (response.status === 'success') {
         return response.metrics;
@@ -56,11 +54,9 @@ export class LogisticsService extends BaseApiService {
   /**
    * Get patient statistics for a specific pharma
    */
-  async getPatientStatistics(pharmaId?: number): Promise<PatientStatistics> {
+  async getPatientStatistics(): Promise<PatientStatistics> {
     try {
-      const endpoint = pharmaId 
-        ? `/api/patients/statistics/pharma/${pharmaId}`
-        : `/api/patients/statistics`;
+      const endpoint =`/api/patients/statistics`;
       
       const response = await this.request<PatientStatistics>(endpoint);
       
