@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AlertCard from '../AlertCard';
+import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import { tasksService } from '../../services/tasksService';
 import { userService } from '../../services/userService';
 import type { UserListItem } from '../../services/userService';
@@ -72,6 +73,24 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const statusCellRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Filter states
+  const [assignedByFilter, setAssignedByFilter] = useState<string>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Dropdown open states
+  const [isAssignedByFilterOpen, setIsAssignedByFilterOpen] = useState(false);
+  const [isAssignedToFilterOpen, setIsAssignedToFilterOpen] = useState(false);
+  const [isPriorityFilterOpen, setIsPriorityFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  
+  // Refs for dropdowns
+  const assignedByFilterRef = useRef<HTMLDivElement | null>(null);
+  const assignedToFilterRef = useRef<HTMLDivElement | null>(null);
+  const priorityFilterRef = useRef<HTMLDivElement | null>(null);
+  const statusFilterRef = useRef<HTMLDivElement | null>(null);
 
   const handleAddClick = () => {
     setShowInputRow(true);
@@ -273,6 +292,14 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       setEditedTask(null);
       setDeletedTaskIds(new Set());
       setValidationErrors({});
+      setAssignedByFilter('all');
+      setAssignedToFilter('all');
+      setPriorityFilter('all');
+      setStatusFilter('all');
+      setIsAssignedByFilterOpen(false);
+      setIsAssignedToFilterOpen(false);
+      setIsPriorityFilterOpen(false);
+      setIsStatusFilterOpen(false);
       setNewTask({
         patientId: '',
         taskName: '',
@@ -287,10 +314,63 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     }
   }, [isOpen, currentUserName, currentUserId]);
 
-  // Filter out deleted tasks from display
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (assignedByFilterRef.current && !assignedByFilterRef.current.contains(event.target as Node)) {
+        setIsAssignedByFilterOpen(false);
+      }
+      if (assignedToFilterRef.current && !assignedToFilterRef.current.contains(event.target as Node)) {
+        setIsAssignedToFilterOpen(false);
+      }
+      if (priorityFilterRef.current && !priorityFilterRef.current.contains(event.target as Node)) {
+        setIsPriorityFilterOpen(false);
+      }
+      if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) {
+        setIsStatusFilterOpen(false);
+      }
+    };
+
+    if (isAssignedByFilterOpen || isAssignedToFilterOpen || isPriorityFilterOpen || isStatusFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isAssignedByFilterOpen, isAssignedToFilterOpen, isPriorityFilterOpen, isStatusFilterOpen]);
+
+  // Filter out deleted tasks and apply filters
   // Ensure tasks is always an array
   const tasksArray = Array.isArray(tasks) ? tasks : [];
-  const visibleTasks = tasksArray.filter(task => !deletedTaskIds.has(task.id));
+  const visibleTasks = tasksArray.filter(task => {
+    // Filter out deleted tasks
+    if (deletedTaskIds.has(task.id)) {
+      return false;
+    }
+    // Apply assignedBy filter
+    if (assignedByFilter !== 'all' && task.assigneeBy !== assignedByFilter) {
+      return false;
+    }
+    // Apply assignedTo filter
+    if (assignedToFilter !== 'all' && task.assignedTo !== assignedToFilter) {
+      return false;
+    }
+    // Apply priority filter
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) {
+      return false;
+    }
+    // Apply status filter
+    if (statusFilter !== 'all' && task.status !== statusFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  // Get unique values for filters
+  const uniqueAssignedBy = Array.from(new Set(tasksArray.map(t => t.assigneeBy).filter(Boolean))).sort();
+  const uniqueAssignedTo = Array.from(new Set(tasksArray.map(t => t.assignedTo).filter(Boolean))).sort();
+  const priorities: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
+  const statuses: ('Not started' | 'In progress' | 'Done')[] = ['Not started', 'In progress', 'Done'];
 
   // Helper function to check if task is created by current user
   const isTaskCreatedByMe = (task: MyTask): boolean => {
@@ -327,9 +407,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       title={variant === 'track' ? 'My Tasks (Track & Trace)' : 'My Tasks (Dashboard)'}
       description="Manage and track your assigned tasks"
       icon={
-        <svg className="w-[18px] h-[18px] text-[#6b1176]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
+        <img
+          src={MyTasksIcon}
+          alt="My Tasks"
+          className="w-[24px] h-[24px]"
+        />
       }
       headerAction={
         onAdd && !isUserRole ? (
@@ -347,7 +429,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       loading={loading}
       loadingText="Loading tasks..."
       emptyText="No tasks found"
-      dataLength={showInputRow ? Math.max(visibleTasks.length, 1) : visibleTasks.length}
+      dataLength={showInputRow ? Math.max(visibleTasks.length, 1) : Math.max(visibleTasks.length, 1)}
     >
       {validationErrors.submit && (
         <div className="px-4 py-2 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm mb-4">
@@ -356,6 +438,37 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       )}
       <div className="relative" ref={scrollContainerRef}>
         <style>{`
+          /* Date picker styling - purple selected date */
+          input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          input[type="date"]::-webkit-datetime-edit-text {
+            color: #333;
+          }
+          input[type="date"]::-webkit-datetime-edit-month-field,
+          input[type="date"]::-webkit-datetime-edit-day-field,
+          input[type="date"]::-webkit-datetime-edit-year-field {
+            color: #333;
+          }
+          input[type="date"]:focus::-webkit-datetime-edit-month-field,
+          input[type="date"]:focus::-webkit-datetime-edit-day-field,
+          input[type="date"]:focus::-webkit-datetime-edit-year-field {
+            color: #6b1176;
+          }
+          /* Style the calendar popup - selected date purple */
+          input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+          }
+          /* For Firefox */
+          input[type="date"] {
+            color-scheme: light;
+          }
+          /* Additional styling for date input value */
+          input[type="date"]:not(:placeholder-shown) {
+            color: #6b1176;
+            font-weight: 500;
+          }
           .alert-card-table {
             width: 100%;
             border-collapse: separate;
@@ -412,9 +525,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           <col style={{ width: 'auto', minWidth: '80px' }} />
           <col style={{ width: 'auto', minWidth: '130px' }} />
           <col style={{ width: 'auto', minWidth: '150px' }} />
-          <col style={{ width: 'auto', minWidth: '130px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
-          <col style={{ width: 'auto', minWidth: '100px' }} />
+          {/* Due date */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Priority */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
+          {/* Status */}
+          <col style={{ width: 'auto', minWidth: '120px' }} />
           {variant === 'track' && <col style={{ width: '80px', minWidth: '80px' }} />}
         </colgroup>
         <thead className="bg-[#fdeeff]">
@@ -422,11 +538,215 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Patient ID</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Task Name</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Description</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Assigned by</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Assigned to</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+              <div className="flex items-center gap-2">
+                <span>Assigned by</span>
+                <div className="relative" ref={assignedByFilterRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAssignedByFilterOpen(!isAssignedByFilterOpen);
+                    }}
+                    className={`p-1 rounded hover:bg-purple-100 transition-colors ${
+                      assignedByFilter !== 'all' ? 'text-[#6b1176]' : 'text-gray-400'
+                    }`}
+                    title="Filter by assigned by"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </button>
+                  {isAssignedByFilterOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                      <div className="py-1 flex flex-col">
+                        <button
+                          onClick={() => {
+                            setAssignedByFilter('all');
+                            setIsAssignedByFilterOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                            assignedByFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          All
+                        </button>
+                        {uniqueAssignedBy.map((name) => (
+                          <button
+                            key={name}
+                            onClick={() => {
+                              setAssignedByFilter(name);
+                              setIsAssignedByFilterOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                              assignedByFilter === name ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+              <div className="flex items-center gap-2">
+                <span>Assigned to</span>
+                <div className="relative" ref={assignedToFilterRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAssignedToFilterOpen(!isAssignedToFilterOpen);
+                    }}
+                    className={`p-1 rounded hover:bg-purple-100 transition-colors ${
+                      assignedToFilter !== 'all' ? 'text-[#6b1176]' : 'text-gray-400'
+                    }`}
+                    title="Filter by assigned to"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </button>
+                  {isAssignedToFilterOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                      <div className="py-1 flex flex-col">
+                        <button
+                          onClick={() => {
+                            setAssignedToFilter('all');
+                            setIsAssignedToFilterOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                            assignedToFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          All
+                        </button>
+                        {uniqueAssignedTo.map((name) => (
+                          <button
+                            key={name}
+                            onClick={() => {
+                              setAssignedToFilter(name);
+                              setIsAssignedToFilterOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                              assignedToFilter === name ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Due date</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Priority</th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Status</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+              <div className="flex items-center gap-2">
+                <span>Priority</span>
+                <div className="relative" ref={priorityFilterRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPriorityFilterOpen(!isPriorityFilterOpen);
+                    }}
+                    className={`p-1 rounded hover:bg-purple-100 transition-colors ${
+                      priorityFilter !== 'all' ? 'text-[#6b1176]' : 'text-gray-400'
+                    }`}
+                    title="Filter by priority"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </button>
+                  {isPriorityFilterOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                      <div className="py-1 flex flex-col">
+                        <button
+                          onClick={() => {
+                            setPriorityFilter('all');
+                            setIsPriorityFilterOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                            priorityFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          All
+                        </button>
+                        {priorities.map((priority) => (
+                          <button
+                            key={priority}
+                            onClick={() => {
+                              setPriorityFilter(priority);
+                              setIsPriorityFilterOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                              priorityFilter === priority ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {priority}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+              <div className="flex items-center gap-2">
+                <span>Status</span>
+                <div className="relative" ref={statusFilterRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsStatusFilterOpen(!isStatusFilterOpen);
+                    }}
+                    className={`p-1 rounded hover:bg-purple-100 transition-colors ${
+                      statusFilter !== 'all' ? 'text-[#6b1176]' : 'text-gray-400'
+                    }`}
+                    title="Filter by status"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </button>
+                  {isStatusFilterOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                      <div className="py-1 flex flex-col">
+                        <button
+                          onClick={() => {
+                            setStatusFilter('all');
+                            setIsStatusFilterOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                            statusFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          }`}
+                        >
+                          All
+                        </button>
+                        {statuses.map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => {
+                              setStatusFilter(status);
+                              setIsStatusFilterOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
+                              statusFilter === status ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </th>
             {variant === 'track' && <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>}
           </tr>
         </thead>
@@ -536,6 +856,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     type="date"
                     value={newTask.dueDate}
                     onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
                     required
                     className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
                       validationErrors.dueDate 
@@ -629,6 +950,13 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               )}
             </tr>
           )}
+          {visibleTasks.length === 0 && !showInputRow && (
+            <tr>
+              <td colSpan={variant === 'track' ? 9 : 8} className="bg-white p-[15px] text-center text-gray-500 text-sm">
+                No tasks match the current filters
+              </td>
+            </tr>
+          )}
           {visibleTasks.map((task) => {
             const isEditing = editingTaskId === task.id;
             const displayTask = isEditing && editedTask ? editedTask : task;
@@ -712,19 +1040,20 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       type="date"
                       value={displayTask.dueDate || ''}
                       onChange={(e) => handleEditInputChange('dueDate', e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                       className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
                     />
                   ) : (
                     <div className="whitespace-nowrap" title={task.dueDate}>{task.dueDate}</div>
                   )}
                 </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'hidden' }}>
+              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm relative" style={{ overflow: 'visible' }}>
                   {isEditing && editableFields.has('priority') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
                       <select
                         value={displayTask.priority}
                         onChange={(e) => handleEditInputChange('priority', e.target.value)}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.priority === 'High' ? 'bg-red-100 text-red-800' :
                           displayTask.priority === 'Medium' ? 'bg-orange-100 text-orange-800' :
                           'bg-green-100 text-green-800'
@@ -756,7 +1085,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <td 
                 ref={(el) => { statusCellRefs.current[task.id] = el; }}
                 className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative" 
-                style={{ overflow: 'hidden' }}
+                style={{ overflow: 'visible' }}
               >
                   {isEditing && editableFields.has('status') ? (
                     <div className="relative" style={{ zIndex: 1 }}>
@@ -766,7 +1095,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                           const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done';
                           handleEditInputChange('status', newStatus);
                         }}
-                        className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
+                        className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
                           displayTask.status === 'Done' ? 'bg-green-100 text-green-800' :
                           displayTask.status === 'In progress' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-800'
@@ -824,7 +1153,25 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         <button
                           onClick={() => {
                             setEditingTaskId(task.id);
-                            setEditedTask({ ...task });
+                            // Convert dueDate to YYYY-MM-DD format for date input
+                            const formattedTask = { ...task };
+                            if (task.dueDate && task.dueDate !== 'N/A') {
+                              try {
+                                // Try to parse the date - handle both locale format and ISO format
+                                const dateObj = new Date(task.dueDate);
+                                if (!isNaN(dateObj.getTime())) {
+                                  // Format as YYYY-MM-DD for HTML date input
+                                  const year = dateObj.getFullYear();
+                                  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                  const day = String(dateObj.getDate()).padStart(2, '0');
+                                  formattedTask.dueDate = `${year}-${month}-${day}`;
+                                }
+                              } catch (e) {
+                                // If parsing fails, keep original value
+                                formattedTask.dueDate = task.dueDate;
+                              }
+                            }
+                            setEditedTask(formattedTask);
                             // If user is not the creator (only status is editable), scroll to status column
                             if (!isCreatedByMe) {
                               setTimeout(() => {
