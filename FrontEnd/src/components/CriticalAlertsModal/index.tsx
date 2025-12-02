@@ -80,12 +80,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 </span>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                <div className="truncate" title={alert.message}>{alert.message}</div>
-              </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm truncate">
-                {alert.timestamp}
-              </td>
-              <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                   alert.status === 'Active' ? 'bg-red-100 text-red-800' :
                   alert.status === 'Acknowledged' ? 'bg-yellow-100 text-yellow-800' :
