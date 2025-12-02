@@ -1,5 +1,6 @@
 import React from 'react';
 import AlertCard from '../AlertCard';
+import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 
 interface CriticalAlert {
   id: string;
@@ -31,9 +32,11 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
       title="Critical Alerts"
       description="Review critical alerts that require immediate attention"
       icon={
-        <svg className="w-[18px] h-[18px] text-[#6b1176]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
+        <img
+          src={CriticalAlertsIcon}
+          alt="Critical Alerts"
+          className="w-[24px] h-[24px]"
+        />
       }
       loading={loading}
       loadingText="Loading alerts..."
