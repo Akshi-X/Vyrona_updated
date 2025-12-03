@@ -127,6 +127,34 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
     let mounted = true;
 
+    // Clear existing markers and polylines when filters change
+    markersRef.current.forEach((marker) => {
+      try {
+        google.maps.event.clearInstanceListeners(marker);
+        marker.setMap(null);
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+    polylinesRef.current.forEach((polyline) => {
+      try {
+        google.maps.event.clearInstanceListeners(polyline);
+        polyline.setMap(null);
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+    markersRef.current.clear();
+    polylinesRef.current.clear();
+
+    // Immediately clear routes state to prevent old routes from being rendered
+    setRoutes([]);
+    // Clear tooltip state to prevent stale tooltips
+    setActiveTooltip(null);
+    setTooltipPosition(new Map());
+    // Clear any previous errors
+    setError(null);
+
     (async () => {
 
       try {
