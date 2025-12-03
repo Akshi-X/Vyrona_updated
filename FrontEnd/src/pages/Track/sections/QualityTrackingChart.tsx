@@ -170,7 +170,6 @@ export default function QualityTrackingChart() {
             return;
           }
           
-          console.log('Quality WebSocket connected');
           setIsConnected(true);
           setError(null);
           reconnectAttemptsRef.current = 0;
@@ -192,7 +191,6 @@ export default function QualityTrackingChart() {
 
             // Check if this is a subscription confirmation
             if (data.type === 'subscription_confirmed') {
-              console.log('Subscribed to patient:', data.patient_id);
               return;
             }
 
