@@ -263,16 +263,16 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
         try {
           google.maps.event.clearInstanceListeners(marker);
           marker.setMap(null);
-        } catch {
-          // ignore cleanup errors
+        } catch (error) {
+          return;
         }
       });
       polylinesRef.current.forEach((polyline) => {
         try {
           google.maps.event.clearInstanceListeners(polyline);
           polyline.setMap(null);
-        } catch {
-          // ignore cleanup errors
+        } catch (error) {
+          return;
         }
       });
       markersRef.current.clear();
