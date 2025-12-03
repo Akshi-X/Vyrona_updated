@@ -252,9 +252,14 @@ class ShipmentService extends BaseApiService {
   async getDocumentChecklist(
     patientId: string
   ): Promise<{
-    items: Array<{ stage: string; actual: number; needed: number; missed: number }>;
+    items: Array<{
+      stage: string;
+      actual: number;
+      needed: number;
+      missed: number;
+      missing_documents?: string[];
+    }>;
     total_items?: number;
-    missing_documents?: string[];
     non_compliance_percentage?: number;
   }> {
     return this.get(

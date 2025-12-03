@@ -71,8 +71,13 @@ export default function TrackPage() {
   const [patientData, setPatientData] = useState<PatientResponse | null>(null);
   const [loadingPatient, setLoadingPatient] = useState(false);
   const [checklistData, setChecklistData] = useState<{
-    items: Array<{ stage: string; actual: number; needed: number; missed: number }>;
-    missing_documents?: string[];
+    items: Array<{
+      stage: string;
+      actual: number;
+      needed: number;
+      missed: number;
+      missing_documents?: string[];
+    }>;
     non_compliance_percentage?: number;
   } | null>(null);
   const [loadingChecklist, setLoadingChecklist] = useState(false);
@@ -305,7 +310,6 @@ export default function TrackPage() {
         if (isMounted) {
           setChecklistData({
             items: res.items || [],
-            missing_documents: res.missing_documents,
             non_compliance_percentage: res.non_compliance_percentage,
           });
         }
@@ -522,7 +526,6 @@ export default function TrackPage() {
             <div className="min-w-0 h-full">
               <ComplianceCard 
                 items={checklistData?.items || []}
-                missingDocuments={checklistData?.missing_documents || []}
                 loading={loadingChecklist}
                 error={checklistError}
               />
@@ -539,7 +542,12 @@ export default function TrackPage() {
             <div className="h-full">
               <NonComplianceCard 
                 percentage={checklistData?.non_compliance_percentage ?? 0}
-                missedDocsCount={checklistData?.missing_documents?.length ?? 0}
+              missedDocsCount={
+                (checklistData?.items || []).reduce(
+                  (sum, item) => sum + (item.missing_documents?.length ?? 0),
+                  0
+                )
+              }
                 loading={loadingChecklist}
                 error={checklistError}
               />
