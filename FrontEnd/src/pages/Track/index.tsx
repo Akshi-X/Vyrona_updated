@@ -205,32 +205,32 @@ export default function TrackPage() {
     
     const stage = currentStage;
     
-    // Special case: "Completed" - all stages are completed
-    if (stage === 'Completed') {
-      return steps.length; // This makes all stages appear as completed (idx < steps.length for all)
+    switch (stage) {
+      // Special case: "Completed" - all stages are completed
+      case 'Completed':
+        return steps.length; // This makes all stages appear as completed (idx < steps.length for all)
+      
+      // Special case: "Scheduled" - nothing has started yet
+      case 'Scheduled':
+        return -1; // This makes all stages appear as not started (idx >= -1 is always true, but we'll handle it differently)
+      
+      // For Cryopreservation, use reengineering_status to determine which occurrence
+      case 'Cryopreservation':
+        // If reengineering_status is true, use the second occurrence (index 4)
+        // If false, use the first occurrence (index 1)
+        return reengineeringStatus ? 4 : 1;
+      
+      // For Transportation, use reengineering_status to determine which occurrence
+      case 'Transportation':
+        // If reengineering_status is true, use the second occurrence (index 5)
+        // If false, use the first occurrence (index 2)
+        return reengineeringStatus ? 5 : 2;
+      
+      // For other stages, find the first matching index
+      default:
+        const foundIndex = steps.findIndex(s => s.key === stage);
+        return foundIndex >= 0 ? foundIndex : -1;
     }
-    
-    // Special case: "Scheduled" - nothing has started yet
-    if (stage === 'Scheduled') {
-      return -1; // This makes all stages appear as not started (idx >= -1 is always true, but we'll handle it differently)
-    }
-    
-    // For Cryopreservation and Transportation, use reengineering_status to determine which occurrence
-    if (stage === 'Cryopreservation') {
-      // If reengineering_status is true, use the second occurrence (index 4)
-      // If false, use the first occurrence (index 1)
-      return reengineeringStatus ? 4 : 1;
-    }
-    
-    if (stage === 'Transportation') {
-      // If reengineering_status is true, use the second occurrence (index 5)
-      // If false, use the first occurrence (index 2)
-      return reengineeringStatus ? 5 : 2;
-    }
-    
-    // For other stages, find the first matching index
-    const foundIndex = steps.findIndex(s => s.key === stage);
-    return foundIndex >= 0 ? foundIndex : -1;
   })();
 
   const transformedTasks: MyTask[] = (Array.isArray(myTasks) ? myTasks : []).map(task => {
