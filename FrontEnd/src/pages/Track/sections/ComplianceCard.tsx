@@ -1,44 +1,27 @@
  
-type ChecklistItem = { stage: string; actual: number; needed: number; missed: number };
+type ChecklistItem = {
+  stage: string;
+  actual: number;
+  needed: number;
+  missed: number;
+  missing_documents?: string[];
+};
 
 interface ComplianceCardProps {
   items: ChecklistItem[];
-  missingDocuments: string[];
   loading: boolean;
   error: string | null;
 }
 
-export default function ComplianceCard({ items, missingDocuments, loading, error }: ComplianceCardProps) {
-  // Create expanded rows: for each item, create rows based on missing documents
-  // If an item has missed > 0, show one row per missing document
-  // Otherwise show one row with empty missed column
-  const expandedRows: Array<{ stage: string; needed: number; missedDoc: string }> = [];
-  
-  let missingDocIndex = 0;
-  
-  items.forEach((item) => {
-    if (item.missed > 0 && missingDocuments.length > 0) {
-      // Show one row per missing document for this item
-      // Take the next 'missed' number of documents from the array
-      const docsToUse = Math.min(item.missed, missingDocuments.length - missingDocIndex);
-      const rows = Array.from({ length: docsToUse }, (_, i) => {
-        const doc = missingDocuments[missingDocIndex + i];
-        return {
-          stage: item.stage,
-          needed: item.needed,
-          missedDoc: doc
-        };
-      });
-      expandedRows.push(...rows);
-      missingDocIndex += docsToUse;
-    } else {
-      // Show one row with empty missed column
-      expandedRows.push({
-        stage: item.stage,
-        needed: item.needed,
-        missedDoc: ''
-      });
-    }
+export default function ComplianceCard({ items, loading, error }: ComplianceCardProps) {
+  // Create rows: one row per item, joining all missing documents with commas
+  const rows: Array<{ stage: string; needed: number; missedDoc: string }> = items.map((item) => {
+    const docs = Array.isArray(item.missing_documents) ? item.missing_documents : [];
+    return {
+      stage: item.stage,
+      needed: item.needed,
+      missedDoc: docs.length > 0 ? docs.join(', ') : '',
+    };
   });
 
   return (
@@ -47,7 +30,8 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
       <div className="text-xs text-gray-400 mb-3 text-[12px]">Logistic Document Checklist</div>
 
       {/* Table with proper semantic HTML */}
-      <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin]">
+      <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin] bg-[#F8F8F8]">
+        <div className="inline-block min-w-full bg-white rounded-[5px]">
         <table className="w-full text-[12px]">
           <thead className="bg-[#FDF4FF] text-[#6B1176] font-medium sticky top-0">
             <tr>
@@ -71,14 +55,14 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
                 </td>
               </tr>
             )}
-            {!loading && !error && expandedRows.length === 0 && (
+            {!loading && !error && rows.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-4 py-3 text-sm text-gray-500">
                   No checklist items
                 </td>
               </tr>
             )}
-            {!loading && !error && expandedRows.map((row, idx) => (
+            {!loading && !error && rows.map((row, idx) => (
               <tr key={`${row.stage}-${idx}`} className="text-black hover:bg-gray-50">
                 <td className="px-4 py-3 text-left">{row.stage}</td>
                 <td className="px-4 py-3 text-center">{row.needed}</td>
@@ -87,6 +71,7 @@ export default function ComplianceCard({ items, missingDocuments, loading, error
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

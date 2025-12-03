@@ -165,16 +165,13 @@ class TrackingService extends BaseApiService {
   }
 
   /**
-   * Get live tracking data from API (fallback if WebSocket not available)
+   * Get tracking data - mock only (no backend call)
+   *
+   * For now we only use local mock data and do NOT hit the backend endpoint.
+   * This avoids 404s for /api/tracking/live/{patientId} until the API exists.
    */
   async getLiveTrackingData(patientId: string): Promise<TrackingPosition[]> {
-    try {
-      return await this.get<TrackingPosition[]>(`/api/tracking/live/${patientId}`);
-    } catch (error) {
-      console.error('Error fetching live tracking data:', error);
-      // Fallback to mock data
-      return this.getMockTrackingData();
-    }
+    return this.getMockTrackingData();
   }
 }
 

@@ -12,7 +12,8 @@ const TrackAndTraceMap = () => {
   const [positions, setPositions] = useState<TrackingPosition[]>([]);
   const [useWebSocket, setUseWebSocket] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
-  const [mapType, setMapType] = useState<google.maps.MapTypeId>(google.maps.MapTypeId.ROADMAP);
+  type MapType = google.maps.MapTypeId | "roadmap" | "satellite";
+  const [mapType, setMapType] = useState<MapType>("roadmap");
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const pathPolylineRef = useRef<google.maps.Polyline | null>(null);
@@ -285,7 +286,7 @@ const TrackAndTraceMap = () => {
                 mapContainerStyle={{ width: "100%", height: "100%" }}
                 center={positions[0]}
                 zoom={14}
-                mapTypeId={mapType}
+                mapTypeId={mapType as google.maps.MapTypeId}
                 options={{
                   mapTypeControl: false,
                   fullscreenControl: false,
@@ -305,9 +306,9 @@ const TrackAndTraceMap = () => {
                   mapType === "roadmap" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
                 }`}
                 onClick={() => {
-                  setMapType(google.maps.MapTypeId.ROADMAP);
+                  setMapType("roadmap");
                   if (googleMapRef.current) {
-                    googleMapRef.current.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                    googleMapRef.current.setMapTypeId("roadmap");
                   }
                 }}
               >
@@ -319,9 +320,9 @@ const TrackAndTraceMap = () => {
                   mapType === "satellite" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
                 }`}
                 onClick={() => {
-                  setMapType(google.maps.MapTypeId.SATELLITE);
+                  setMapType("satellite");
                   if (googleMapRef.current) {
-                    googleMapRef.current.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+                    googleMapRef.current.setMapTypeId("satellite");
                   }
                 }}
               >
