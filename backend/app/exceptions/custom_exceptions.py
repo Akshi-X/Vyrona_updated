@@ -1506,3 +1506,46 @@ class IoTGenerateDeviceReportFailedException(IoTException):
             response_body=response_body,
             iot_trace_id=iot_trace_id
         )
+
+
+class IoTCreateWebhookFailedException(IoTException):
+    """Failed to create webhook in IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_CREATE_WEBHOOK_FAILED,
+            error_code=ERROR_CODES["IOT_CREATE_WEBHOOK_FAILED"],
+            status_code=400,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTGetWebhooksFailedException(IoTException):
+    """Failed to retrieve webhooks from IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_WEBHOOKS_FAILED,
+            error_code=ERROR_CODES["IOT_GET_WEBHOOKS_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class IoTDeleteWebhookFailedException(IoTException):
+    """Failed to delete webhook from IoT provider"""
+    
+    def __init__(self, webhook_id: str, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_DELETE_WEBHOOK_FAILED,
+            error_code=ERROR_CODES["IOT_DELETE_WEBHOOK_FAILED"],
+            status_code=400,
+            webhook_id=webhook_id,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )

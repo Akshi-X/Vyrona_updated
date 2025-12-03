@@ -181,6 +181,9 @@ class ErrorMessages:
     IOT_ADD_DEVICE_ALERT_PRESETS_FAILED = "Failed to add alert presets to device"
     IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED = "Failed to remove alert presets from device"
     IOT_GENERATE_DEVICE_REPORT_FAILED = "Failed to generate device report"
+    IOT_CREATE_WEBHOOK_FAILED = "Failed to create webhook in IoT provider"
+    IOT_GET_WEBHOOKS_FAILED = "Failed to retrieve webhooks from IoT provider"
+    IOT_DELETE_WEBHOOK_FAILED = "Failed to delete webhook from IoT provider"
 
 
 class SuccessMessages:
