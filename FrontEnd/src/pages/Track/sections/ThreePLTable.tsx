@@ -100,19 +100,19 @@ export default function ThreePLTable() {
             <table className="w-full table-fixed text-xs min-w-[760px]">
               <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">3PL Player Name</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px] rounded-tl-[10px]">3PL Player Name</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Mode of Transport</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Transport Route</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Departure Time</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Arrival Time</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Handover Time</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">LN2 Refill</th>
-                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px]">Warehouse</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap w-[140px] rounded-tr-[10px]">Warehouse</th>
                 </tr>
               </thead>
               <tbody>
                 {players.filter(Boolean).map((player, i) => (
-                  <tr key={i} className="text-black text-[14px]">
+                  <tr key={i} className="text-black text-[14px] hover:bg-gray-50">
                     <td className="px-3 py-2 break-words w-[140px]">{player.player_name || 'N/A'}</td>
                     <td className="px-3 py-2 break-words w-[140px]">{player.modes || 'N/A'}</td>
                     <td className="px-3 py-2 whitespace-pre-wrap break-words w-[140px]">{formatRoute(player.source, player.destination)}</td>
