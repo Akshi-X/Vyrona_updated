@@ -11,9 +11,9 @@ export default function AuditTrailTable() {
         <table className="w-full text-xs">
           <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] sticky top-0">
             <tr>
-              <th className="px-3 py-5 text-left">Data</th>
+              <th className="px-3 py-5 text-left rounded-tl-[10px]">Data</th>
               <th className="px-3 py-5 text-left">User</th>
-              <th className="px-3 py-5 text-left">Doc</th>
+              <th className="px-3 py-5 text-left rounded-tr-[10px]">Doc</th>
             </tr>
           </thead>
           <tbody>

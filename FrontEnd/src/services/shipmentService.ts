@@ -52,7 +52,11 @@ class ShipmentService extends BaseApiService {
    * Control Tower Map routes
    * GET /api/shipment/control-tower-map
    */
-  async getControlTowerMapRoutes(): Promise<
+  async getControlTowerMapRoutes(filters?: {
+    routeStatus?: string;
+    carrier?: string;
+    region?: string;
+  }): Promise<
     Array<{
       shipment_id: number | string;
       patient_id: string;
@@ -64,6 +68,20 @@ class ShipmentService extends BaseApiService {
       destination_longitude: number;
     }>
   > {
+    const params = new URLSearchParams();
+    if (filters?.routeStatus && filters.routeStatus !== 'All') {
+      params.append('route_status', filters.routeStatus);
+    }
+    if (filters?.carrier && filters.carrier !== 'All') {
+      params.append('carriers', filters.carrier);
+    }
+    if (filters?.region && filters.region !== 'All') {
+      params.append('regions', filters.region);
+    }
+
+    const queryString = params.toString();
+    const url = queryString ? `/api/shipment/control-tower-map?${queryString}` : '/api/shipment/control-tower-map';
+
     const res = await this.get<{
       routes: Array<{
         shipment_id: number | string;
@@ -76,7 +94,7 @@ class ShipmentService extends BaseApiService {
         destination_longitude: number;
       }>;
       total_routes?: number;
-    } | Array<any>>('/api/shipment/control-tower-map');
+    } | Array<any>>(url);
 
     const list = Array.isArray(res) ? (res as any) : (res as any)?.routes || [];
     return list as any;

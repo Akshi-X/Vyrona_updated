@@ -26,7 +26,7 @@ export default function HistoricLaneRiskAssessment() {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg">
+    <div className="bg-white rounded-lg border border-[#E7E1E1] p-5 h-full">
       <h3 className="font-semibold text-black text-[16px] mb-3">Historic Lane Risk Assessment</h3>
       <div className="overflow-x-auto rounded-lg ">
         {loading ? (
@@ -37,7 +37,7 @@ export default function HistoricLaneRiskAssessment() {
           <div className="p-4 text-sm text-gray-500">No data available</div>
         ) : (
           <div className="max-h-[320px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-            <table className="w-full text-xs border border-[#E7E1E1]">
+            <table className="w-full text-xs">
               <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-5 text-left font-[600]">Risk Factor</th>
