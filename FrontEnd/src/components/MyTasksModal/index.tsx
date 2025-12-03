@@ -559,34 +559,32 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </svg>
                   </button>
                   {isAssignedByFilterOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                      <div className="py-1 flex flex-col">
+                    <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden max-h-60 overflow-y-auto flex flex-col">
+                      <button
+                        onClick={() => {
+                          setAssignedByFilter('all');
+                          setIsAssignedByFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                          assignedByFilter === 'all' ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                        }`}
+                      >
+                        All
+                      </button>
+                      {uniqueAssignedBy.map((name) => (
                         <button
+                          key={name}
                           onClick={() => {
-                            setAssignedByFilter('all');
+                            setAssignedByFilter(name);
                             setIsAssignedByFilterOpen(false);
                           }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                            assignedByFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                            assignedByFilter === name ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                           }`}
                         >
-                          All
+                          {name}
                         </button>
-                        {uniqueAssignedBy.map((name) => (
-                          <button
-                            key={name}
-                            onClick={() => {
-                              setAssignedByFilter(name);
-                              setIsAssignedByFilterOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                              assignedByFilter === name ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
-                            }`}
-                          >
-                            {name}
-                          </button>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -611,34 +609,32 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </svg>
                   </button>
                   {isAssignedToFilterOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
-                      <div className="py-1 flex flex-col">
+                    <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden max-h-60 overflow-y-auto flex flex-col">
+                      <button
+                        onClick={() => {
+                          setAssignedToFilter('all');
+                          setIsAssignedToFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                          assignedToFilter === 'all' ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                        }`}
+                      >
+                        All
+                      </button>
+                      {uniqueAssignedTo.map((name) => (
                         <button
+                          key={name}
                           onClick={() => {
-                            setAssignedToFilter('all');
+                            setAssignedToFilter(name);
                             setIsAssignedToFilterOpen(false);
                           }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                            assignedToFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                            assignedToFilter === name ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                           }`}
                         >
-                          All
+                          {name}
                         </button>
-                        {uniqueAssignedTo.map((name) => (
-                          <button
-                            key={name}
-                            onClick={() => {
-                              setAssignedToFilter(name);
-                              setIsAssignedToFilterOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                              assignedToFilter === name ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
-                            }`}
-                          >
-                            {name}
-                          </button>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -664,34 +660,32 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </svg>
                   </button>
                   {isPriorityFilterOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                      <div className="py-1 flex flex-col">
+                    <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
+                      <button
+                        onClick={() => {
+                          setPriorityFilter('all');
+                          setIsPriorityFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                          priorityFilter === 'all' ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                        }`}
+                      >
+                        All
+                      </button>
+                      {priorities.map((priority) => (
                         <button
+                          key={priority}
                           onClick={() => {
-                            setPriorityFilter('all');
+                            setPriorityFilter(priority);
                             setIsPriorityFilterOpen(false);
                           }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                            priorityFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                            priorityFilter === priority ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                           }`}
                         >
-                          All
+                          {priority}
                         </button>
-                        {priorities.map((priority) => (
-                          <button
-                            key={priority}
-                            onClick={() => {
-                              setPriorityFilter(priority);
-                              setIsPriorityFilterOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                              priorityFilter === priority ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
-                            }`}
-                          >
-                            {priority}
-                          </button>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -716,34 +710,32 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </svg>
                   </button>
                   {isStatusFilterOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                      <div className="py-1 flex flex-col">
+                    <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
+                      <button
+                        onClick={() => {
+                          setStatusFilter('all');
+                          setIsStatusFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                          statusFilter === 'all' ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                        }`}
+                      >
+                        All
+                      </button>
+                      {statuses.map((status) => (
                         <button
+                          key={status}
                           onClick={() => {
-                            setStatusFilter('all');
+                            setStatusFilter(status);
                             setIsStatusFilterOpen(false);
                           }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                            statusFilter === 'all' ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
+                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                            statusFilter === status ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                           }`}
                         >
-                          All
+                          {status}
                         </button>
-                        {statuses.map((status) => (
-                          <button
-                            key={status}
-                            onClick={() => {
-                              setStatusFilter(status);
-                              setIsStatusFilterOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-purple-50 transition-colors ${
-                              statusFilter === status ? 'bg-purple-50 text-[#6b1176] font-medium' : 'text-gray-700'
-                            }`}
-                          >
-                            {status}
-                          </button>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
