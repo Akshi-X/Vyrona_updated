@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { patientService, type Patient } from '../services/patientService';
 import { ALL_STAGES, TREATMENT_STATUS_OPTIONS, getTreatmentStatusColor } from '../constants/stages';
+import FilterLight from '../assets/FilterLight.svg';
+import FilterDark from '../assets/FilterDark.svg';
 
 interface DatabaseTableProps {
   pharmaId?: string;
@@ -218,23 +220,22 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                         e.stopPropagation();
                         setIsDropdownOpen(!isDropdownOpen);
                       }}
-                      className={`text-xs p-1.5 text-[#6b1176] transition-all duration-200 ${
-                        stageFilter !== 'all' ? 'text-[#6b1176]' : ''
+                      className={`text-xs p-1.5 rounded transition-all duration-200 ${
+                        stageFilter !== 'all' 
+                          ? ' text-white' 
+                          : 'text-[#6b1176]'
                       }`}
                       title={stageFilter === 'all' ? 'All Stages' : `Filtered: ${stageFilter}`}
                     >
-                      <svg 
-                        className={`w-4 h-4 ${stageFilter === 'all' ? 'text-gray-400' : 'text-[#6b1176]'}`}
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                      </svg>
+                      <img 
+                        src={stageFilter === 'all' ? FilterLight : FilterDark}
+                        alt="Filter"
+                        className="w-[14px] h-[14px]"
+                      />
                     </button>
                     
                     {isDropdownOpen && (
-                      <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden">
+                      <div className="absolute top-full mt-1 left-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] font-normal overflow-hidden">
                         {['all', ...allStages, ...statusOptions].map((item) => {
                           const isAll = item === 'all';
                           const isStatus = typeof item === 'string' && statusOptions.includes((item as string).toLowerCase());
@@ -328,7 +329,7 @@ export const DatabaseTable = ({ pharmaId = '1' }: DatabaseTableProps) => {
                     {patient.hospital}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTreatmentStatusColor(patient.treatment_status, patient.stage)}`}>
+                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getTreatmentStatusColor(patient.treatment_status, patient.stage)}`}>
                       {patient.stage}
                     </span>
                   </td>

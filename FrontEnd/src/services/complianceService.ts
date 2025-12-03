@@ -23,13 +23,11 @@ export interface ComplianceApiResponse {
 
 export class ComplianceService extends BaseApiService {
   /**
-   * Get compliance metrics for a specific pharma
+   * Get compliance metrics
    */
-  async getComplianceMetrics(pharmaId: string): Promise<ComplianceMetrics> {
+  async getComplianceMetrics(): Promise<ComplianceMetrics> {
     try {
-      const response = await this.request<ComplianceApiResponse>(
-        `/api/compliance?pharma_id=${pharmaId}`
-      );
+      const response = await this.request<ComplianceApiResponse>(`/api/compliance`);
       
       if (response.status === 'success') {
         return response.metrics;
