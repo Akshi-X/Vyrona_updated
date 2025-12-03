@@ -30,7 +30,8 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
       <div className="text-xs text-gray-400 mb-3 text-[12px]">Logistic Document Checklist</div>
 
       {/* Table with proper semantic HTML */}
-      <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin]">
+      <div className="mt-3 h-[165px] overflow-y-auto [scrollbar-width:thin] bg-[#F8F8F8]">
+        <div className="inline-block min-w-full bg-white rounded-[5px]">
         <table className="w-full text-[12px]">
           <thead className="bg-[#FDF4FF] text-[#6B1176] font-medium sticky top-0">
             <tr>
@@ -70,6 +71,7 @@ export default function ComplianceCard({ items, loading, error }: ComplianceCard
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
