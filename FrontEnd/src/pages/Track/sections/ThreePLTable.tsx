@@ -82,7 +82,7 @@ export default function ThreePLTable() {
           <h3 className="text-base font-semibold text-gray-900  text-[16px]">Logistics</h3>
         </div>
       </div>
-      <div className="overflow-x-auto h-[254px] [scrollbar-width:thin]">
+      <div className="overflow-x-auto h-[254px] [scrollbar-width:thin] bg-[#F8F8F8]">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-500 text-sm">Loading...</p>
@@ -96,8 +96,8 @@ export default function ThreePLTable() {
             <p className="text-gray-500 text-sm">No 3PL players found</p>
           </div>
         ) : (
-          <div className="w-full">
-            <table className="w-full table-fixed text-xs min-w-[760px]">
+          <div className="inline-block min-w-[760px] bg-white rounded-[5px]">
+            <table className="table-fixed text-xs w-full">
               <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left whitespace-nowrap w-[140px] rounded-tl-[10px]">3PL Player Name</th>
