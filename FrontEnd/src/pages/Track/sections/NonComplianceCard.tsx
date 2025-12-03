@@ -13,8 +13,8 @@ export default function NonComplianceCard({ percentage, missedDocsCount, loading
   const display = Math.round(value);
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
-      <h3 className="font-semibold text-black text-sm mb-4 text-[16px]">Non-Compliance</h3>
+    <div className="bg-[#FFF4EE] border border-[#E7E1E1] rounded-lg p-4 h-full flex flex-col">
+      <h3 className="font-semibold text-gray-700 text-sm mb-4 text-[16px]">Non-Compliance</h3>
       
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
@@ -43,7 +43,7 @@ export default function NonComplianceCard({ percentage, missedDocsCount, loading
                     { offset: '100%', color: 'rgba(244, 149, 0, 1)' }, // #F49500
                   ],
                 }}
-                backgroundColor="#F4F4F4"
+                backgroundColor="#FFFFFF"
                 strokeWidth={7.5}
                 size="md"
               />
@@ -59,13 +59,13 @@ export default function NonComplianceCard({ percentage, missedDocsCount, loading
             <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
               <img src={RiskIcon} alt="Exclamation Icon" className="w-4 h-4" />
             </div>
-            <span className="text-black text-sm text-[12px]">No. of missed docs</span>
+            <span className="text-gray-700 text-sm text-[12px]">No. of missed docs</span>
           </div>
 
           {/* Count badge */}
           <div className="flex justify-center">
-            <div className="bg-[#FFF5E6] border border-white rounded-[10px] w-[47px] h-[24px] flex items-center justify-center px-4 py-2">
-              <span className="text-[#F97316] text-[12px] font-semibold text-base">{missedDocsCount}</span>
+            <div className="bg-[#FFFFFF] w-[47px] h-[24px] rounded-[8px] px-3 py-1.5 flex items-center justify-center">
+              <span className="text-[#F97316] text-[12px] font-bold">{missedDocsCount}</span>
             </div>
           </div>
         </>
