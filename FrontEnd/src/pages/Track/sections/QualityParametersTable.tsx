@@ -51,7 +51,7 @@ export default function QualityParametersTable() {
 
   const getApiBaseUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    return envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    return envBaseUrl;
   };
 
   const getWebSocketUrl = () => {
@@ -275,10 +275,10 @@ export default function QualityParametersTable() {
           </colgroup>
           <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left">Parameter</th>
+              <th className="px-3 py-2 text-left rounded-tl-[10px]">Parameter</th>
               <th className="px-3 py-2 text-left">Current Value</th>
               <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-left">Acceptable Range</th>
+              <th className="px-3 py-2 text-left rounded-tr-[10px]">Acceptable Range</th>
             </tr>
           </thead>
           <tbody>
@@ -292,7 +292,7 @@ export default function QualityParametersTable() {
               </tr>
             ) : (
               filteredRows.map((r, i) => (
-                <tr key={i} className="text-black text-[14px] h-[56px]">
+                <tr key={i} className="text-black text-[14px] h-[56px] hover:bg-gray-50">
                   <td className="px-3 py-2 text-black text-[14px] ">{r.label}</td>
                   <td className={`px-3 py-2  ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
                     {formatValueWithUnit(r.value, r.threshold, r.label)}

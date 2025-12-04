@@ -4,6 +4,7 @@ Service for calculating real-time metrics for shipment tracking and management.
 """
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session, Query
@@ -1169,18 +1170,17 @@ class ShipmentService:
             # Get all leg IDs for this patient's shipment legs
             leg_ids = [leg.id for leg in legs]
             
-            # Get all missing documents across all legs for this patient
-            all_missing_docs = []
+            # Get all missing documents across all legs for this patient and group by leg_id
+            docs_by_leg = defaultdict(list)
             if leg_ids:
-                all_missing_docs = self.db.query(ShipmentLegDocument).filter(
+                missing_docs = self.db.query(ShipmentLegDocument).filter(
                     and_(
                         ShipmentLegDocument.shipment_leg_id.in_(leg_ids),
                         ShipmentLegDocument.is_missing == True
                     )
                 ).all()
-            
-            # Extract unique document names (in case same document is missing in multiple legs)
-            missing_document_names = list(set([doc.document_name for doc in all_missing_docs]))
+                for doc in missing_docs:
+                    docs_by_leg[doc.shipment_leg_id].append(doc.document_name)
             
             # Build checklist items and calculate totals
             checklist_items = []
@@ -1201,11 +1201,15 @@ class ShipmentService:
                 total_actual += leg_actual
                 total_needed += leg_needed
                 
+                # Get missing documents for this leg (as array, not comma-separated)
+                leg_missing_docs = docs_by_leg.get(leg.id, [])
+                
                 checklist_items.append({
                     "stage": stage,
                     "actual": leg.doc_count_actual,
                     "needed": leg.doc_count_needed,
-                    "missed": leg_missed
+                    "missed": leg_missed,
+                    "missing_documents": leg_missing_docs
                 })
             
             # Calculate non-compliance percentage
@@ -1222,7 +1226,6 @@ class ShipmentService:
             return {
                 "items": checklist_items,
                 "total_items": len(checklist_items),
-                "missing_documents": missing_document_names,
                 "non_compliance_percentage": non_compliance_percentage
             }
             
