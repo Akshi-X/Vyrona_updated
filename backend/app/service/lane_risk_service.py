@@ -1259,6 +1259,13 @@ class LaneRiskService:
         - Impact on: Flight delays/cancellations, road blockages, tarmac exposure,
           temperature excursions, loading/unloading risks
         
+        **Scoring Table (based on number of adverse events):**
+        - 0 events: 4.5 (Excellent - Normal weather)
+        - 1 event: 3.5 (Very Good - Minor weather)
+        - 2 events: 2.5 (Good - Moderate weather)
+        - 3 events: 1.5 (Moderate - Significant weather)
+        - 4+ events: 0.5 (Basic - Severe weather)
+        
         **Required Data Sources:**
         1. Shipment coordinates (at least one required):
            - shipment.source_latitude / shipment.source_longitude
@@ -1366,32 +1373,29 @@ class LaneRiskService:
                     f"{len(adverse_weather_events)} adverse events found")
         
         # Calculate risk score based on adverse weather events
-        if not adverse_weather_events:
+        # Simple table-based scoring similar to Number of Legs
+        # Better weather (fewer/no events) = higher score (4.5)
+        event_count = len(adverse_weather_events)
+        
+        if event_count == 0:
             avg_score = 4.5  # Excellent - no adverse weather
             classification = "Normal"
             logger.debug(f"Weather check completed: {total_route_points} locations checked, "
                         f"no adverse weather events detected (normal conditions)")
-        else:
-            # Score based on severity and frequency
-            # More adverse events = lower score
-            event_count = len(adverse_weather_events)
-            severity_sum = sum(event.get("severity", 1) for event in adverse_weather_events)
-            risk_factor = (event_count * severity_sum) / max(total_route_points, 1)
-            
-            if risk_factor >= 3.0:
-                avg_score = 0.5  # Basic - severe weather
-                classification = "Severe"
-            elif risk_factor >= 2.0:
-                avg_score = 1.5  # Moderate - significant weather
-                classification = "Significant"
-            elif risk_factor >= 1.0:
-                avg_score = 2.5  # Good - moderate weather
-                classification = "Moderate"
-            else:
-                avg_score = 3.5  # Very Good - minor weather
-                classification = "Minor"
+        elif event_count == 1:
+            avg_score = 3.5  # Very Good - minor weather
+            classification = "Minor"
+        elif event_count == 2:
+            avg_score = 2.5  # Good - moderate weather
+            classification = "Moderate"
+        elif event_count == 3:
+            avg_score = 1.5  # Moderate - significant weather
+            classification = "Significant"
+        else:  # 4+ events
+            avg_score = 0.5  # Basic - severe weather
+            classification = "Severe"
         
-        return avg_score, f"{classification} ({len(adverse_weather_events)} events)"
+        return avg_score, f"{classification} ({event_count} events)"
     
     def _check_weather_at_location(
         self,
