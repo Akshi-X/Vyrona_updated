@@ -3,7 +3,7 @@ Application Configuration
 Loaded from environment variables (.env file)
 """
  
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings  # pyright: ignore[reportMissingImports]
 from typing import List, Optional, Dict, Any
 from functools import lru_cache
 from urllib.parse import quote_plus
@@ -66,6 +66,18 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 5
     REDIS_SOCKET_TIMEOUT: int = 5
+    # World Bank LPI API Configuration (Optional - defaults to v2 API)
+    LPI_TIMELINESS_API_URL: str = "https://api.worldbank.org/v2/country/all/indicator/LP.LPI.TIM.XQ"
+    LPI_OVERALL_API_URL: str = "https://api.worldbank.org/v2/country/all/indicator/LP.LPI.OVRL.XQ"
+    # Weather API Configuration
+    # Note: Google Maps doesn't provide weather data, but we use it for location services
+    # WeatherAPI.com (1M calls/month free tier, includes historical data)
+    WEATHER_API_KEY: Optional[str] = None  # WeatherAPI.com API key
+    WEATHER_API_PROVIDER: str = "weatherapi"  # Weather provider (default: "weatherapi")
+    # Option 2: Google Maps API (Reuse your existing key from frontend for geocoding/location services)
+    # This enhances weather reports with location names (e.g., "New York, NY" instead of just coordinates)
+    # You can use the same Google Maps API key you're already using for shipment tracking
+    GOOGLE_MAPS_API_KEY: Optional[str] = None  # Google Maps API key (same key as VITE_GOOGLE_MAPS_API_KEY in frontend)
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================
