@@ -23,13 +23,11 @@ export interface PerformanceApiResponse {
 
 export class PerformanceService extends BaseApiService {
   /**
-   * Get performance metrics for a specific pharma
+   * Get performance metrics
    */
-  async getPerformanceMetrics(pharmaId: string): Promise<PerformanceMetrics> {
+  async getPerformanceMetrics(): Promise<PerformanceMetrics> {
     try {
-      const response = await this.request<PerformanceApiResponse>(
-        `/api/performance?pharma_id=${pharmaId}`
-      );
+      const response = await this.request<PerformanceApiResponse>(`/api/performance`);
       
       if (response.status === 'success') {
         return response.metrics;
