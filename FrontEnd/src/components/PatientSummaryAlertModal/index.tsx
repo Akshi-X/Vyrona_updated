@@ -292,7 +292,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       description={summary ? `Supply Chain Summary for Patient ${summary.patient_id}` : `Loading summary for ${patientId}...`}
       icon={
         <img
-          className="w-6 h-6"
+          className="w-[24px] h-[24px]"
           alt="Patient Summary"
           src={PatientSummaryIcon}
         />
@@ -316,12 +316,6 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
           {/* Patient Information Card - sticky, does not scroll */}
           <div className="rounded-lg bg-purple-50 p-4 sticky top-0 z-10">
             <div className="flex items-center gap-4">
-              {/* Circular Avatar */}
-              <div className="w-12 h-12 bg-[#6B1176] rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-semibold">
-                  {getInitials(summary.hospital_name || summary.patient_id)}
-                </span>
-              </div>
               
               {/* Patient Details */}
               <div className="flex-1 min-w-0">
