@@ -67,11 +67,17 @@ export default function TrackPage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [userInitials, setUserInitials] = useState<string>('');
   const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [reengineeringStatus, setReengineeringStatus] = useState<boolean>(false);
   const [patientData, setPatientData] = useState<PatientResponse | null>(null);
   const [loadingPatient, setLoadingPatient] = useState(false);
   const [checklistData, setChecklistData] = useState<{
-    items: Array<{ stage: string; actual: number; needed: number; missed: number }>;
-    missing_documents?: string[];
+    items: Array<{
+      stage: string;
+      actual: number;
+      needed: number;
+      missed: number;
+      missing_documents?: string[];
+    }>;
     non_compliance_percentage?: number;
   } | null>(null);
   const [loadingChecklist, setLoadingChecklist] = useState(false);
@@ -198,10 +204,39 @@ export default function TrackPage() {
   };
 
   // user initials are set in fetchCurrentUser
-  const currentIndex = Math.max(
-    0,
-    steps.findIndex(s => s.key === (currentStage ?? ''))
-  );
+  // Calculate currentIndex based on stage and reengineering_status
+  const currentIndex = (() => {
+    if (!currentStage) return -1; // No stage means not started yet
+    
+    const stage = currentStage;
+    
+    switch (stage) {
+      // Special case: "Completed" - all stages are completed
+      case 'Completed':
+        return steps.length; // This makes all stages appear as completed (idx < steps.length for all)
+      
+      // Special case: "Scheduled" - nothing has started yet
+      case 'Scheduled':
+        return -1; // This makes all stages appear as not started (idx >= -1 is always true, but we'll handle it differently)
+      
+      // For Cryopreservation, use reengineering_status to determine which occurrence
+      case 'Cryopreservation':
+        // If reengineering_status is true, use the second occurrence (index 4)
+        // If false, use the first occurrence (index 1)
+        return reengineeringStatus ? 4 : 1;
+      
+      // For Transportation, use reengineering_status to determine which occurrence
+      case 'Transportation':
+        // If reengineering_status is true, use the second occurrence (index 5)
+        // If false, use the first occurrence (index 2)
+        return reengineeringStatus ? 5 : 2;
+      
+      // For other stages, find the first matching index
+      default:
+        const foundIndex = steps.findIndex(s => s.key === stage);
+        return foundIndex >= 0 ? foundIndex : -1;
+    }
+  })();
 
   const transformedTasks: MyTask[] = (Array.isArray(myTasks) ? myTasks : []).map(task => {
     try {
@@ -248,6 +283,7 @@ export default function TrackPage() {
         ]);
         if (isMounted) {
           setCurrentStage(stageData?.stage ?? null);
+          setReengineeringStatus(stageData?.reengineering_status ?? false);
           setPatientData(patientDataResp);
         }
       } catch {
@@ -274,7 +310,6 @@ export default function TrackPage() {
         if (isMounted) {
           setChecklistData({
             items: res.items || [],
-            missing_documents: res.missing_documents,
             non_compliance_percentage: res.non_compliance_percentage,
           });
         }
@@ -293,7 +328,7 @@ export default function TrackPage() {
   }, [patientId]);
 
   return (
-    <div className="bg-[#fcfaff] flex w-full h-full">
+    <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
         {/* Top Black Bar */}
@@ -319,7 +354,7 @@ export default function TrackPage() {
             {/* Critical Alerts */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Critical Alerts"
                 src={CriticalAlertsIcon}
                 onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
@@ -340,7 +375,7 @@ export default function TrackPage() {
             {/* Stakeholder Chats */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Stakeholder Chats"
                 src={StakeholderChatsIcon}
                 onClick={() => setShowStakeholderChatScreen(true)}
@@ -361,7 +396,7 @@ export default function TrackPage() {
             {/* My Tasks */}
             <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="My Tasks"
                 src={MyTasksIcon}
                 onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
@@ -382,7 +417,7 @@ export default function TrackPage() {
              {/* Patient Summary */}
              <div className="relative group">
               <img
-                className="w-[30px] h-[30px] cursor-pointer"
+                className="w-[25px] h-[25px] cursor-pointer"
                 alt="Patient Summary"
                 src={PatientSummaryIcon}
                 onClick={() => {
@@ -421,14 +456,28 @@ export default function TrackPage() {
             <div className="flex items-center justify-between">
                   <div className="flex items-center gap-0 w-full">
                     {steps.map((s, idx) => {
-                      const isCompleted = idx < currentIndex;
-                      const isActive = idx === currentIndex;
-                      const isCurrentOrUpcoming = idx >= currentIndex;
+                      // Handle special cases: Completed and Scheduled
+                      const isCompleted = currentIndex === steps.length 
+                        ? true // All completed when currentIndex === steps.length
+                        : (currentIndex > -1 && idx < currentIndex);
+                      const isActive = currentIndex > -1 && currentIndex < steps.length && idx === currentIndex;
+                      const isCurrentOrUpcoming = currentIndex === -1 
+                        ? false // Scheduled: nothing is current or upcoming
+                        : (idx >= currentIndex);
                       const circleBg = (isCompleted || isActive) ? '#8d2b8f' : '#f6e9f8';
                       const labelColor = (isCompleted || isActive) ? 'text-gray-700' : 'text-gray-500';
                       const icon = (isCompleted || isActive) ? s.dark : s.light;
                       const connector = (() => {
                         if (idx === steps.length - 1) return null;
+                        // Completed: all connectors are solid purple
+                        if (currentIndex === steps.length) {
+                          return <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />;
+                        }
+                        // Scheduled: all connectors are light gray
+                        if (currentIndex === -1) {
+                          return <div className="h-[2px] bg-[#f1dff5] rounded-full flex-1" />;
+                        }
+                        // Normal flow
                         if (idx < currentIndex - 1) return <div className="h-[2px] bg-[#8d2b8f] rounded-full flex-1" />;
                         if (idx === currentIndex - 1) return (
                           <div className="flex-1">
@@ -477,7 +526,6 @@ export default function TrackPage() {
             <div className="min-w-0 h-full">
               <ComplianceCard 
                 items={checklistData?.items || []}
-                missingDocuments={checklistData?.missing_documents || []}
                 loading={loadingChecklist}
                 error={checklistError}
               />
@@ -494,7 +542,12 @@ export default function TrackPage() {
             <div className="h-full">
               <NonComplianceCard 
                 percentage={checklistData?.non_compliance_percentage ?? 0}
-                missedDocsCount={checklistData?.missing_documents?.length ?? 0}
+              missedDocsCount={
+                (checklistData?.items || []).reduce(
+                  (sum, item) => sum + (item.missing_documents?.length ?? 0),
+                  0
+                )
+              }
                 loading={loadingChecklist}
                 error={checklistError}
               />
