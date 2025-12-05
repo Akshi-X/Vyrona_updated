@@ -337,12 +337,28 @@ export default function Dashboard({ }: DashboardProps) {
 
 
   return (
-    <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
+    <div 
+      className="bg-[#fcfaff] flex w-full overflow-x-hidden" 
+      style={{ 
+        height: '100vh',
+        maxWidth: '100vw',
+        touchAction: 'pan-y',
+        overscrollBehaviorX: 'none'
+      }}
+    >
       {/* Left Sidebar */}
       <Sidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden ml-60">
+      <main 
+        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden ml-60 min-w-0"
+        style={{
+          maxWidth: 'calc(100vw - 15rem)',
+          touchAction: 'pan-y',
+          overscrollBehaviorX: 'none',
+          height: '100vh'
+        }}
+      >
         <Header
           title=""
           showBackButton={false}
@@ -360,7 +376,16 @@ export default function Dashboard({ }: DashboardProps) {
         />
 
         {/* Dashboard Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+        <div 
+          className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" 
+          style={{ 
+            paddingTop: 'calc(63px + 1rem)',
+            touchAction: 'pan-y',
+            overscrollBehaviorX: 'none',
+            overscrollBehaviorY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
 
 
           <div className="flex gap-6 flex-1 flex-col lg:flex-row">
