@@ -7,6 +7,72 @@ import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
 import { useAuth } from "../../contexts/AuthContext";
 
+// Helper function to validate email
+const validateEmail = (email: string): boolean => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+};
+
+// Helper function to get redirect path from location state
+const getRedirectPathFromState = (locationState: any): string | null => {
+    const from = locationState?.from;
+    if (!from) return null;
+    
+    const pathname = from.pathname || "";
+    const search = from.search || "";
+    const hash = from.hash || "";
+    
+    if (pathname) {
+        return `${pathname}${search}${hash}`;
+    }
+    if (search) {
+        return `/approval-screen${search}${hash}`;
+    }
+    return null;
+};
+
+// Helper function to check if user is an admin role
+const isAdminRole = (userRole?: string): boolean => {
+    if (!userRole) return false;
+    const roleLower = userRole.toLowerCase();
+    return roleLower === 'admin' || roleLower === 'mygrape_admin' || roleLower === 'pharma_admin';
+};
+
+// Helper function to determine redirect destination
+const getRedirectDestination = (locationState: any, userRole?: string): string => {
+    const fromPath = locationState?.fromPath || getRedirectPathFromState(locationState);
+    if (fromPath) {
+        return fromPath;
+    }
+    return isAdminRole(userRole) ? '/user-profile' : '/dashboard';
+};
+
+// Helper function to get fromPath for OTP navigation
+const getFromPathForOTP = (locationState: any): string | undefined => {
+    // Check state.fromPath first
+    if (locationState?.fromPath) {
+        return locationState.fromPath;
+    }
+    
+    // Fallback 1: construct from 'from' object
+    const fromPath = getRedirectPathFromState(locationState);
+    if (fromPath) {
+        return fromPath;
+    }
+    
+    // Fallback 2: check sessionStorage
+    try {
+        const storedPath = sessionStorage.getItem('approval_redirect_path');
+        if (storedPath) {
+            sessionStorage.removeItem('approval_redirect_path');
+            return storedPath;
+        }
+    } catch {
+        // Silently handle sessionStorage errors
+    }
+    
+    return undefined;
+};
 const Login: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,11 +86,6 @@ const Login: React.FC = () => {
     const location = useLocation();
     const { isAuthenticated, isLoading, userRole } = useAuth();
 
-    // Removed API_BASE_URL - now using authService
-    const validateEmail = (email: string) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return regex.test(email);
-    };
 
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setEmail(e.target.value);
@@ -49,21 +110,8 @@ const Login: React.FC = () => {
     // Redirect if already authenticated
     useEffect(() => {
         if (!isLoading && isAuthenticated) {
-            // Check if user came from a specific page (e.g., approval screen)
-            const from = (location.state as any)?.from;
-            if (from) {
-                const fromPath = `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`;
-                navigate(fromPath, { replace: true });
-                return;
-            }
-            
-            // If user is mygrape_admin, redirect to user-profile or support
-            if (userRole === 'mygrape_admin') {
-                navigate('/user-profile', { replace: true });
-            } else {
-                // For other roles, redirect to dashboard
-                navigate('/dashboard', { replace: true });
-            }
+            const redirectPath = getRedirectDestination(location.state, userRole);
+            navigate(redirectPath, { replace: true });
         }
     }, [isAuthenticated, isLoading, userRole, navigate, location.state]);
 
@@ -78,17 +126,8 @@ const Login: React.FC = () => {
 
     // Redirect if authenticated (this handles the case where useEffect hasn't run yet)
     if (isAuthenticated) {
-        // Check if user came from a specific page (e.g., approval screen)
-        const from = (location.state as any)?.from;
-        if (from) {
-            const fromPath = `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`;
-            return <Navigate to={fromPath} replace />;
-        }
-        
-        if (userRole === 'mygrape_admin') {
-            return <Navigate to="/user-profile" replace />;
-        }
-        return <Navigate to="/dashboard" replace />;
+        const redirectPath = getRedirectDestination(location.state, userRole);
+        return <Navigate to={redirectPath} replace />;
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -125,39 +164,8 @@ const Login: React.FC = () => {
 
             if (response.status === "OTP Sent") {
                 // Preserve original destination (if any) to return after OTP login
-                // Check multiple sources: state.fromPath, state.from object, and sessionStorage
                 const state = location.state as any;
-                
-                let fromPath: string | undefined = state?.fromPath;
-                
-                if (!fromPath) {
-                    // Fallback 1: construct from 'from' object
-                    const from = state?.from;
-                    if (from) {
-                        const pathname = from.pathname || "";
-                        const search = from.search || "";
-                        const hash = from.hash || "";
-                        if (pathname) {
-                            fromPath = `${pathname}${search}${hash}`;
-                        } else if (search) {
-                            fromPath = `/approval-screen${search}${hash}`;
-                        }
-                    }
-                }
-                
-                // Fallback 2: check sessionStorage
-                if (!fromPath) {
-                    try {
-                        const storedPath = sessionStorage.getItem('approval_redirect_path');
-                        if (storedPath) {
-                            fromPath = storedPath;
-                            // Clear it after use
-                            sessionStorage.removeItem('approval_redirect_path');
-                        }
-                    } catch (e) {
-                        // Silently handle sessionStorage errors
-                    }
-                }
+                const fromPath = getFromPathForOTP(state);
                 
                 // Navigate to OTP page with preserved redirect path
                 navigate("/verify-otp", {
