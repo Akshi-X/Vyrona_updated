@@ -14,10 +14,17 @@ export const AuthRedirect: React.FC = () => {
     );
   }
 
+  // Helper function to check if user is an admin role
+  const isAdminRole = (role?: string): boolean => {
+    if (!role) return false;
+    const roleLower = role.toLowerCase();
+    return roleLower === 'admin' || roleLower === 'mygrape_admin' || roleLower === 'pharma_admin';
+  };
+
   // Redirect based on authentication and role
   if (isAuthenticated) {
-    // If user is mygrape_admin, redirect to user-profile or support
-    if (userRole === 'mygrape_admin') {
+    // If user is an admin role, redirect to user-profile
+    if (isAdminRole(userRole)) {
       return <Navigate to="/user-profile" replace />;
     }
     // For other roles, redirect to dashboard
