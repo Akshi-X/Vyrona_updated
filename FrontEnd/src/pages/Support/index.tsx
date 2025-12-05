@@ -99,20 +99,62 @@ const Support: React.FC = () => {
     fetchCurrentUserName();
   }, []);
 
+  // Helper function to format timestamp consistently
+  const formatCommentTimestamp = (timestamp: string | Date): string => {
+    try {
+      let date: Date;
+      
+      if (typeof timestamp === 'string') {
+        // Handle ISO format with microseconds (e.g., "2025-12-02T16:19:37.998203")
+        let normalizedTimestamp = timestamp.trim();
+        
+        // If it's in ISO format with microseconds, normalize to milliseconds
+        if (normalizedTimestamp.includes('T') && normalizedTimestamp.includes('.')) {
+          // Match ISO format: YYYY-MM-DDTHH:MM:SS.microseconds or YYYY-MM-DDTHH:MM:SS.microsecondsZ
+          const isoMatch = normalizedTimestamp.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d+)(.*)$/);
+          if (isoMatch) {
+            const [, baseTime, decimalPart, timezone] = isoMatch;
+            // Truncate to 3 digits (milliseconds) and preserve timezone if present
+            const milliseconds = decimalPart.substring(0, 3);
+            normalizedTimestamp = `${baseTime}.${milliseconds}${timezone || ''}`;
+          }
+        }
+        
+        date = new Date(normalizedTimestamp);
+      } else {
+        date = timestamp;
+      }
+      
+      if (Number.isNaN(date.getTime())) {
+        return typeof timestamp === 'string' ? timestamp : timestamp.toString();
+      }
+      
+      // Format as YYYY-MM-DD HH:MM
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    } catch {
+      return typeof timestamp === 'string' ? timestamp : timestamp.toString();
+    }
+  };
+
   const addComment = async () => {
     if (!newComment.trim()) return;
     if (!activeFeedbackId) return;
     try {
       const res = await feedbackApi.addComment(activeFeedbackId, newComment.trim(), isEmailNotificationsEnabled);
-    const now = new Date();
-    const item: CommentItem = {
+      const now = new Date();
+      const item: CommentItem = {
         id: String(res.comment_id),
-      author: currentUserName || 'You',
-      content: newComment.trim(),
-      createdAt: now.toISOString().slice(0, 16).replace('T', ' ')
-    };
+        author: currentUserName || 'You',
+        content: newComment.trim(),
+        createdAt: formatCommentTimestamp(now)
+      };
       setComments(prev => [item, ...prev]);
-    setNewComment('');
+      setNewComment('');
     } catch (e) {
       // optionally surface error UI
     }
@@ -235,7 +277,7 @@ const Support: React.FC = () => {
           id: String(c.id),
           author: c.commented_by || 'Unknown User', // Now returns full name from backend
           content: c.comment,
-          createdAt: c.created_at
+          createdAt: formatCommentTimestamp(c.created_at)
         }));
         setComments(mapped.reverse()); // newest last to match prepend behavior
       })
