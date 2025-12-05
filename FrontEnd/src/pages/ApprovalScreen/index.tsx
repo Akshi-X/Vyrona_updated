@@ -11,7 +11,7 @@ import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 const ApprovalScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const registrationId = searchParams.get("registration_id");
-  const { token: authToken, isAuthenticated, logout, userRole } = useAuth();
+  const { token: authToken, isAuthenticated, logout } = useAuth();
   const cookieToken = authUtils.getToken();
 
   const [status, setStatus] = useState<string | null>(null);
@@ -112,17 +112,9 @@ const ApprovalScreen: React.FC = () => {
         // Ignore error, user info will be stale but that's okay
       }
 
-      // Helper function to check if user is an admin role
-      const isAdminRole = (role?: string): boolean => {
-        if (!role) return false;
-        const roleLower = role.toLowerCase();
-        return roleLower === 'admin' || roleLower === 'mygrape_admin' || roleLower === 'pharma_admin';
-      };
-
-      // Navigate based on user role after 1 second
+      // Navigate to dashboard after 1 second
       setTimeout(() => {
-        const redirectPath = isAdminRole(userRole) ? '/user-profile' : '/dashboard';
-        navigate(redirectPath, { replace: true });
+        navigate("/dashboard", { replace: true });
       }, 1000);
     } catch (err: any) {
       if (err.message?.includes('401')) {

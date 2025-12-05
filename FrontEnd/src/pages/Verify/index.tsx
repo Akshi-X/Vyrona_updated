@@ -106,13 +106,6 @@ const VerifyOtp: React.FC = () => {
         }
     }, [otpExpiry]);
     
-    // Helper function to check if user is an admin role
-    const isAdminRole = (role?: string): boolean => {
-        if (!role) return false;
-        const roleLower = role.toLowerCase();
-        return roleLower === 'admin' || roleLower === 'mygrape_admin' || roleLower === 'pharma_admin';
-    };
-
     // Handle redirect after OTP verification
     useEffect(() => {
         if (otpVerified && isAuthenticated) {
@@ -123,7 +116,7 @@ const VerifyOtp: React.FC = () => {
                 if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
                     // Always redirect back to original page if it exists (e.g., approval screen)
                     navigate(targetPath, { replace: true });
-                } else if (isAdminRole(verifiedRole)) {
+                } else if (verifiedRole === "mygrape_admin") {
                     navigate("/user-profile", { replace: true });
                 } else {
                     navigate("/dashboard", { replace: true });
