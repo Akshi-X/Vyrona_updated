@@ -87,6 +87,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
   const [tooltipPosition, setTooltipPosition] = useState<Map<string, google.maps.LatLngLiteral>>(new Map());
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
+  const [shouldLoadRoutes, setShouldLoadRoutes] = useState<boolean>(false);
 
 
 
@@ -124,6 +125,11 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
 
   useEffect(() => {
+
+    // Only load routes if the flag is enabled
+    if (!shouldLoadRoutes) {
+      return;
+    }
 
     let mounted = true;
 
@@ -192,7 +198,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
     return () => { mounted = false; };
 
-  }, [filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier]);
+  }, [shouldLoadRoutes, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier]);
 
 
 
@@ -308,6 +314,30 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
             </div>
 
           </div>
+
+          {/* Load Routes Flag Button (top-left) */}
+
+          {!shouldLoadRoutes && (
+
+            <div className="absolute top-3 left-3 z-10">
+
+              <button
+
+                type="button"
+
+                onClick={() => setShouldLoadRoutes(true)}
+
+                className="bg-white/15 backdrop-blur-sm border border-white/30 rounded-lg px-4 py-2 shadow-sm hover:bg-white/25 transition-colors duration-200"
+
+              >
+
+                <div className="text-[12px] font-medium text-[#FFFFFF]">Load Routes</div>
+
+              </button>
+
+            </div>
+
+          )}
 
 
 
