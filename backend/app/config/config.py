@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     # This enhances weather reports with location names (e.g., "New York, NY" instead of just coordinates)
     # You can use the same Google Maps API key you're already using for shipment tracking
     GOOGLE_MAPS_API_KEY: Optional[str] = None  # Google Maps API key (same key as VITE_GOOGLE_MAPS_API_KEY in frontend)
+    # FlightRadar24 API Configuration
+    FLIGHTRADAR24_API_KEY: Optional[str] = None  # FlightRadar24 API key for on-time flight performance
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================
