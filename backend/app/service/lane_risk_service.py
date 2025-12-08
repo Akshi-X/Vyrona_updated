@@ -9,22 +9,25 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 
 from app.models.shipment_model import Shipment
+from app.models.shipment_leg_model import ShipmentLeg
 from app.service.quality_service import QualityService
 from app.service.shipment_service import ShipmentService
 from app.service.redis_service import get_redis
 from app.config.config import settings
+from app.utils.lane_risk_utils import LaneRiskUtils
+from app.constants.lane_risk_constants import (
+    WEATHER_CONSTANTS,
+    FLIGHT_PERFORMANCE_CONSTANTS,
+    LPI_CACHE_TTL,
+    WEATHER_CACHE_TTL,
+    FLIGHT_PERFORMANCE_CACHE_TTL,
+    LPI_REDIS_KEY_PREFIX,
+    LPI_OVERALL_REDIS_KEY_PREFIX,
+    FLIGHT_PERFORMANCE_REDIS_KEY_PREFIX,
+    LPI_TIMELINESS_FALLBACK_MAP,
+)
 
 logger = logging.getLogger(__name__)
-
-# Weather detection constants
-WEATHER_CONSTANTS = {
-    "EXTREME_HEAT_THRESHOLD": 35.0,  # Celsius
-    "EXTREME_COLD_THRESHOLD": -10.0,  # Celsius
-    "STRONG_WIND_THRESHOLD": 15.0,  # m/s (54 km/h)
-    "LOW_VISIBILITY_THRESHOLD": 1000,  # meters (1km)
-    "WEATHER_CACHE_TTL_HOURS": 6,
-    "LPI_CACHE_TTL_HOURS": 24,
-}
 
 # Try to import httpx for external API calls (available in dev dependencies)
 try:
@@ -38,314 +41,7 @@ try:
 except ImportError:
     HTTPX_AVAILABLE = False
     _http_client = None
-    logger.warning("httpx not available. World Bank LPI data fetching will use cached data only.")
-
-# World Bank LPI API URLs - Configurable via environment variables
-# Can be overridden in .env file:
-# LPI_TIMELINESS_API_URL=https://api.worldbank.org/v3/country/all/indicator/LP.LPI.TIM.XQ
-# LPI_OVERALL_API_URL=https://api.worldbank.org/v3/country/all/indicator/LP.LPI.OVRL.XQ
-LPI_TIMELINESS_API_URL = settings.LPI_TIMELINESS_API_URL
-LPI_OVERALL_API_URL = settings.LPI_OVERALL_API_URL
-LPI_CACHE_TTL = timedelta(hours=WEATHER_CONSTANTS["LPI_CACHE_TTL_HOURS"])
-WEATHER_CACHE_TTL = timedelta(hours=WEATHER_CONSTANTS["WEATHER_CACHE_TTL_HOURS"])
-LPI_REDIS_KEY_PREFIX = "lpi:timeliness:"
-LPI_REDIS_MAP_KEY = "lpi:timeliness:map"
-LPI_REDIS_TIMESTAMP_KEY = "lpi:timeliness:timestamp"
-LPI_OVERALL_REDIS_KEY_PREFIX = "lpi:overall:"
-LPI_OVERALL_REDIS_MAP_KEY = "lpi:overall:map"
-LPI_OVERALL_REDIS_TIMESTAMP_KEY = "lpi:overall:timestamp"
-# In-memory cache as fallback (for single-instance deployments)
-_lpi_live_cache: Dict[str, float] = {}
-_lpi_live_cache_timestamp: Optional[datetime] = None
-_lpi_overall_cache: Dict[str, float] = {}
-_lpi_overall_cache_timestamp: Optional[datetime] = None
-
-LPI_TIMELINESS_FALLBACK_MAP: Dict[str, float] = {
-    # Top performers (Excellent - 4.0+)
-    "SG": 4.3, "SGP": 4.3, "SINGAPORE": 4.3,
-    "FI": 4.2, "FIN": 4.2, "FINLAND": 4.2,
-    "DK": 4.2, "DNK": 4.2, "DENMARK": 4.2,
-    "DE": 4.1, "DEU": 4.1, "GERMANY": 4.1,
-    "NL": 4.1, "NLD": 4.1, "NETHERLANDS": 4.1,
-    "CH": 4.1, "CHE": 4.1, "SWITZERLAND": 4.1,
-    "BE": 4.0, "BEL": 4.0, "BELGIUM": 4.0,
-    "AT": 4.0, "AUT": 4.0, "AUSTRIA": 4.0,
-    "SE": 4.0, "SWE": 4.0, "SWEDEN": 4.0,
-    "LU": 4.0, "LUX": 4.0, "LUXEMBOURG": 4.0,
-    "IE": 3.9, "IRL": 3.9, "IRELAND": 3.9,
-    "US": 3.9, "USA": 3.9, "UNITED STATES": 3.9, "UNITED STATES OF AMERICA": 3.9,
-    "GB": 3.9, "GBR": 3.9, "UK": 3.9, "UNITED KINGDOM": 3.9,
-    "JP": 3.9, "JPN": 3.9, "JAPAN": 3.9,
-    "CA": 3.8, "CAN": 3.8, "CANADA": 3.8,
-    "AU": 3.8, "AUS": 3.8, "AUSTRALIA": 3.8,
-    "NZ": 3.7, "NZL": 3.7, "NEW ZEALAND": 3.7,
-    "FR": 3.7, "FRA": 3.7, "FRANCE": 3.7,
-    "ES": 3.6, "ESP": 3.6, "SPAIN": 3.6,
-    "IT": 3.6, "ITA": 3.6, "ITALY": 3.6,
-    "NO": 3.6, "NOR": 3.6, "NORWAY": 3.6,
-    "KR": 3.5, "KOR": 3.5, "SOUTH KOREA": 3.5, "KOREA": 3.5,
-    "CN": 3.4, "CHN": 3.4, "CHINA": 3.4,
-    "IN": 3.2, "IND": 3.2, "INDIA": 3.2,
-    "BR": 3.1, "BRA": 3.1, "BRAZIL": 3.1,
-    "MX": 3.0, "MEX": 3.0, "MEXICO": 3.0,
-    "ZA": 2.9, "ZAF": 2.9, "SOUTH AFRICA": 2.9,
-    "TR": 2.8, "TUR": 2.8, "TURKEY": 2.8,
-    "RU": 2.7, "RUS": 2.7, "RUSSIA": 2.7,
-    "ID": 2.6, "IDN": 2.6, "INDONESIA": 2.6,
-    "PH": 2.5, "PHL": 2.5, "PHILIPPINES": 2.5,
-    "VN": 2.4, "VNM": 2.4, "VIETNAM": 2.4,
-    "TH": 2.3, "THA": 2.3, "THAILAND": 2.3,
-    "PK": 2.2, "PAK": 2.2, "PAKISTAN": 2.2,
-    "BD": 2.1, "BGD": 2.1, "BANGLADESH": 2.1,
-    "NG": 2.0, "NGA": 2.0, "NIGERIA": 2.0,
-    "KE": 1.9, "KEN": 1.9, "KENYA": 1.9,
-    "ET": 1.8, "ETH": 1.8, "ETHIOPIA": 1.8,
-    # Lower performers (from World Bank LPI data)
-    "SO": 2.0, "SOM": 2.0, "SOMALIA": 2.0,
-    "HT": 2.0, "HTI": 2.0, "HAITI": 2.0,
-    "AF": 2.0, "AFG": 2.0, "AFGHANISTAN": 2.0,
-    "YE": 2.2, "YEM": 2.2, "YEMEN": 2.2, "YEMEN, REP.": 2.2,
-    "NE": 2.3, "NER": 2.3, "NIGER": 2.3,
-    "CF": 2.3, "CAF": 2.3, "CENTRAL AFRICAN REPUBLIC": 2.3, "C.A.R.": 2.3,
-    "BT": 2.3, "BTN": 2.3, "BHUTAN": 2.3,
-    "CU": 2.2, "CUB": 2.2, "CUBA": 2.2,
-    "LS": 2.2, "LSO": 2.2, "LESOTHO": 2.2,
-    "BI": 2.2, "BDI": 2.2, "BURUNDI": 2.2,
-    "LY": 2.2, "LBY": 2.2, "LIBYA": 2.2,
-    "GQ": 2.2, "GNQ": 2.2, "EQUATORIAL GUINEA": 2.2,
-    "MR": 2.2, "MRT": 2.2, "MAURITANIA": 2.2,
-    "GA": 2.2, "GAB": 2.2, "GABON": 2.2,
-    "IQ": 2.2, "IRQ": 2.2, "IRAQ": 2.2,
-    "AO": 2.2, "AGO": 2.2, "ANGOLA": 2.2,
-    "ZW": 2.2, "ZWE": 2.2, "ZIMBABWE": 2.2,
-    "ER": 2.1, "ERI": 2.1, "ERITREA": 2.1,
-    "SY": 2.1, "SYR": 2.1, "SYRIA": 2.1, "SYRIAN ARAB REPUBLIC": 2.1,
-    "SL": 2.1, "SLE": 2.1, "SIERRA LEONE": 2.1,
-}
-
-
-def _fetch_lpi_data_from_api(api_url: str, max_retries: int = 3) -> Optional[Dict[str, Dict[str, Any]]]:
-    """
-    Generic function to fetch LPI data from World Bank API.
-    Returns aggregated data dictionary keyed by normalized country codes.
-    
-    Includes retry logic with exponential backoff for timeout handling.
-    """
-    if not HTTPX_AVAILABLE:
-        logger.warning("httpx not available, cannot fetch LPI data from World Bank API")
-        return None
-    
-    for attempt in range(max_retries):
-        try:
-            aggregated: Dict[str, Dict[str, Any]] = {}
-            page = 1
-            per_page = 500
-            
-            while True:
-                params = {
-                    "format": "json",
-                    "per_page": per_page,
-                    "page": page
-                }
-                
-                # Use shared HTTP client with connection pooling for better performance
-                if _http_client:
-                    response = _http_client.get(api_url, params=params)
-                else:
-                    # Fallback if client not available
-                    response = httpx.get(api_url, params=params, timeout=httpx.Timeout(60.0, connect=10.0))
-                response.raise_for_status()
-                payload = response.json()
-                
-                if not isinstance(payload, list) or len(payload) < 2:
-                    break
-                
-                metadata, entries = payload
-                
-                if not isinstance(entries, list):
-                    break
-                
-                for entry in entries:
-                    value = entry.get("value")
-                    date = entry.get("date")
-                    if value is None or date is None:
-                        continue
-                    
-                    country_info = entry.get("country") or {}
-                    iso2 = country_info.get("id")
-                    country_name = country_info.get("value")
-                    iso3 = entry.get("countryiso3code")
-                    
-                    keys = [iso3, iso2, country_name]
-                    
-                    for key in keys:
-                        if not key:
-                            continue
-                        normalized_key = key.strip().upper()
-                        existing = aggregated.get(normalized_key)
-                        if not existing or date > existing.get("date", ""):
-                            aggregated[normalized_key] = {"value": float(value), "date": date}
-                
-                total_pages = int(metadata.get("pages", 1)) if isinstance(metadata, dict) else 1
-                if page >= total_pages:
-                    break
-                page += 1
-            
-            if aggregated:
-                logger.info(f"World Bank LPI data fetched successfully - {len(aggregated)} countries")
-                return aggregated
-            else:
-                logger.warning("World Bank API returned no data")
-                return None
-        
-        except httpx.TimeoutException as exc:
-            wait_time = (2 ** attempt) * 5  # Exponential backoff: 5s, 10s, 20s
-            if attempt < max_retries - 1:
-                logger.warning(f"World Bank API timeout (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
-                import time
-                time.sleep(wait_time)
-            else:
-                logger.error(f"World Bank API timeout after {max_retries} attempts - URL: {api_url}")
-                return None
-        except httpx.HTTPError as exc:
-            logger.error(f"World Bank API HTTP error - URL: {api_url}, Error: {exc}")
-            return None
-        except json.JSONDecodeError as exc:
-            logger.error(f"World Bank API JSON decode error - URL: {api_url}, Error: {exc}")
-            return None
-        except Exception as exc:
-            logger.error(f"World Bank API unexpected error - URL: {api_url}, Error: {exc}", exc_info=True)
-            return None
-    
-    return None
-
-
-def _get_lpi_map_with_cache(
-    api_url: str,
-    redis_map_key: str,
-    redis_timestamp_key: str,
-    cache_var_name: str,
-    force_refresh: bool = False
-) -> Optional[Dict[str, float]]:
-    """
-    Generic function to get LPI map with Redis and in-memory caching.
-    Reduces code duplication between Timeliness and Overall LPI fetching.
-    """
-    global _lpi_live_cache, _lpi_live_cache_timestamp, _lpi_overall_cache, _lpi_overall_cache_timestamp
-    
-    if not HTTPX_AVAILABLE:
-        return None
-    
-    now = datetime.now(timezone.utc)
-    
-    # Try Redis cache first
-    try:
-        r = get_redis()
-        if not force_refresh:
-            cached_map_json = r.get(redis_map_key)
-            cached_timestamp_str = r.get(redis_timestamp_key)
-            
-            if cached_map_json and cached_timestamp_str:
-                try:
-                    cached_timestamp = datetime.fromisoformat(cached_timestamp_str)
-                    cache_age = now - cached_timestamp
-                    if cache_age < LPI_CACHE_TTL:
-                        cached_map = json.loads(cached_map_json)
-                        logger.debug(f"World Bank LPI {cache_var_name} data from cache - {len(cached_map)} countries")
-                        # Update in-memory cache
-                        if cache_var_name == "timeliness":
-                            _lpi_live_cache = cached_map
-                            _lpi_live_cache_timestamp = cached_timestamp
-                        else:
-                            _lpi_overall_cache = cached_map
-                            _lpi_overall_cache_timestamp = cached_timestamp
-                        return cached_map
-                except (ValueError, json.JSONDecodeError):
-                    pass
-    except Exception as e:
-        logger.debug(f"Redis cache check failed: {e}")
-    
-    # Check in-memory cache
-    if cache_var_name == "timeliness":
-        cache_var = _lpi_live_cache
-        cache_timestamp_var = _lpi_live_cache_timestamp
-    else:
-        cache_var = _lpi_overall_cache
-        cache_timestamp_var = _lpi_overall_cache_timestamp
-    
-    if (
-        not force_refresh
-        and cache_var
-        and cache_timestamp_var
-        and now - cache_timestamp_var < LPI_CACHE_TTL
-    ):
-        logger.debug(f"World Bank LPI {cache_var_name} data from in-memory cache")
-        return cache_var
-    
-    # Fetch from API
-    logger.debug(f"Fetching World Bank LPI {cache_var_name} data from API")
-    aggregated = _fetch_lpi_data_from_api(api_url)
-    if not aggregated:
-        return None
-    
-    result_map = {key: data["value"] for key, data in aggregated.items()}
-    
-    # Store in Redis (batch operation using pipeline)
-    try:
-        r = get_redis()
-        ttl_seconds = int(LPI_CACHE_TTL.total_seconds())
-        pipe = r.pipeline()
-        pipe.setex(redis_map_key, ttl_seconds, json.dumps(result_map))
-        pipe.setex(redis_timestamp_key, ttl_seconds, now.isoformat())
-        pipe.execute()
-        logger.debug(f"World Bank LPI {cache_var_name} data cached in Redis")
-    except Exception as e:
-        logger.debug(f"Failed to store World Bank LPI {cache_var_name} in Redis: {e}")
-    
-    # Update in-memory cache
-    if cache_var_name == "timeliness":
-        _lpi_live_cache = result_map
-        _lpi_live_cache_timestamp = now
-    else:
-        _lpi_overall_cache = result_map
-        _lpi_overall_cache_timestamp = now
-    
-    return result_map
-
-
-def _get_live_lpi_timeliness_map(force_refresh: bool = False) -> Optional[Dict[str, float]]:
-    """
-    Fetch the most recent LPI Timeliness scores from the World Bank API.
-    Results are cached in Redis (24h TTL) and in-memory as fallback.
-    """
-    return _get_lpi_map_with_cache(
-        LPI_TIMELINESS_API_URL,
-        LPI_REDIS_MAP_KEY,
-        LPI_REDIS_TIMESTAMP_KEY,
-        "timeliness",
-        force_refresh
-    )
-
-
-def _get_live_lpi_overall_map(force_refresh: bool = False) -> Optional[Dict[str, float]]:
-    """
-    Fetch the most recent LPI Overall (composite) scores from the World Bank API.
-    Results are cached in Redis (24h TTL) and in-memory as fallback.
-    The overall LPI is a composite score based on 6 dimensions:
-    1. Customs efficiency
-    2. Quality of transport and trade infrastructure
-    3. Ease of arranging international shipments
-    4. Competence of logistics services
-    5. Ability to track and trace consignments
-    6. Timeliness of deliveries
-    """
-    return _get_lpi_map_with_cache(
-        LPI_OVERALL_API_URL,
-        LPI_OVERALL_REDIS_MAP_KEY,
-        LPI_OVERALL_REDIS_TIMESTAMP_KEY,
-        "overall",
-        force_refresh
-    )
+    logger.warning("httpx not available. External API calls will use cached data only.")
 
 
 
@@ -455,8 +151,11 @@ class LaneRiskService:
         if parking_stops_score is not None:
             scores.append(parking_stops_score)
         
-        # 3. On-time Flight Performance - Not implemented yet
-        contributors.append("-")
+        # 3. On-time Flight Performance
+        flight_performance_score, flight_performance_info = self._calculate_on_time_flight_performance(shipments)
+        contributors.append(f"On time flight performance: {flight_performance_info}")
+        if flight_performance_score is not None:
+            scores.append(flight_performance_score)
         
         # 4. World Bank Timeliness Index
         timeliness_score, timeliness_info = self._calculate_world_bank_timeliness_score(shipments)
@@ -471,7 +170,7 @@ class LaneRiskService:
         # Calculate average score (only use available scores)
         if scores:
             avg_score = sum(scores) / len(scores)
-            classification = self._score_to_classification(avg_score)
+            classification = LaneRiskUtils.score_to_classification(avg_score)
             risk_scale = f"{avg_score:.1f} ({classification})"
         else:
             risk_scale = "N/A"
@@ -682,7 +381,7 @@ class LaneRiskService:
             else:
                 risk_score = 0.5  # Basic
         
-        classification = self._score_to_classification(risk_score)
+        classification = LaneRiskUtils.score_to_classification(risk_score)
         risk_scale = f"{risk_score:.1f} ({classification})"
         
         return {
@@ -729,7 +428,7 @@ class LaneRiskService:
         # Calculate average score
         if scores:
             avg_score = sum(scores) / len(scores)
-            classification = self._score_to_classification(avg_score)
+            classification = LaneRiskUtils.score_to_classification(avg_score)
             risk_scale = f"{avg_score:.1f} ({classification})"
         else:
             risk_scale = "N/A"
@@ -1020,6 +719,521 @@ class LaneRiskService:
             logger.warning(f"Error calculating parking stops from location history for leg {leg.id}: {e}")
             return None
     
+    def _calculate_on_time_flight_performance(
+        self,
+        shipments: List[Shipment]
+    ) -> Tuple[Optional[float], str]:
+        """
+        Calculate On-Time Flight Performance score.
+        
+        For every flight, we assess the on-time flight performance score based on:
+        1. FlightRadar24 API data (primary source)
+        2. United States (Open Data): Bureau of Transportation Statistics (BTS)
+        3. Europe (Open Data): Eurocontrol — Monthly Airspace Delay Reports
+        4. Global (Fallback): World Bank LPI Timeliness Index
+        5. myGrape Internal Shipment Data (historical lane performance)
+        
+        FlightStats provides an indicator between 0 and 5 based on actual delays and cancellations.
+        This indicator is then translated to a classification between Basic and Excellent:
+        - 0-0.9: Basic
+        - 1-1.9: Moderate
+        - 2-2.9: Good
+        - 3-3.9: Very Good
+        - 4-5: Excellent
+        
+        On-Time Flight Performance Ratings:
+        - On Time: No delay or delay < 15 minutes
+        - Late: Delay of 15min or more
+        - Very Late: Delay of 30min or more
+        - Excessive: Delay of 45min or more
+        - Cancelled: Flight cancelled
+        - Diverted: Flight diverted
+        
+        Returns:
+            Tuple of (score, description) where score is 0.5-4.5 (lower = higher risk)
+        """
+        if not shipments:
+            return None, "N/A"
+        
+        # Collect all air/flight legs
+        flight_legs = []
+        for shipment in shipments:
+            for leg in shipment.shipment_legs:
+                # Check if it's an air/flight leg (case-insensitive)
+                if leg.mode_of_transport and leg.mode_of_transport.lower() in ['air', 'flight', 'airplane', 'aircraft', 'aviation']:
+                    flight_legs.append(leg)
+        
+        if not flight_legs:
+            return None, "No flight legs"
+        
+        # Calculate flight performance for all flight legs
+        flight_scores = []
+        total_flights = 0
+        on_time_count = 0
+        late_count = 0
+        very_late_count = 0
+        excessive_count = 0
+        cancelled_count = 0
+        diverted_count = 0
+        
+        for leg in flight_legs:
+            # Try to get flight performance data
+            flight_performance = self._get_flight_performance_data(leg)
+            
+            if flight_performance:
+                total_flights += 1
+                flightstats_indicator = flight_performance.get('flightstats_indicator', None)
+                status = flight_performance.get('status', 'unknown')
+                
+                # Count by status
+                if status == 'on_time':
+                    on_time_count += 1
+                elif status == 'late':
+                    late_count += 1
+                elif status == 'very_late':
+                    very_late_count += 1
+                elif status == 'excessive':
+                    excessive_count += 1
+                elif status == 'cancelled':
+                    cancelled_count += 1
+                elif status == 'diverted':
+                    diverted_count += 1
+                
+                # Map FlightStats indicator (0-5) to our score (0.5-4.5)
+                if flightstats_indicator is not None:
+                    # Linear mapping: 0 -> 0.5, 5 -> 4.5
+                    mapped_score = 0.5 + (flightstats_indicator * 0.8)  # 0.8 = (4.5-0.5)/5
+                    flight_scores.append(mapped_score)
+        
+        if not flight_scores:
+            # Fallback: Use World Bank Timeliness Index for the route
+            logger.debug("No flight performance data available, using World Bank Timeliness Index as fallback")
+            timeliness_score, timeliness_info = self._calculate_world_bank_timeliness_score(shipments)
+            if timeliness_score is not None:
+                return timeliness_score, f"Fallback: {timeliness_info}"
+            return None, "No flight data available"
+        
+        # Calculate average score
+        avg_score = sum(flight_scores) / len(flight_scores)
+        classification = LaneRiskUtils.score_to_classification(avg_score)
+        
+        # Build description
+        status_parts = []
+        if on_time_count > 0:
+            status_parts.append(f"{on_time_count} on-time")
+        if late_count > 0:
+            status_parts.append(f"{late_count} late")
+        if very_late_count > 0:
+            status_parts.append(f"{very_late_count} very late")
+        if excessive_count > 0:
+            status_parts.append(f"{excessive_count} excessive")
+        if cancelled_count > 0:
+            status_parts.append(f"{cancelled_count} cancelled")
+        if diverted_count > 0:
+            status_parts.append(f"{diverted_count} diverted")
+        
+        if status_parts:
+            info = f"{total_flights} flight(s): {', '.join(status_parts)} ({classification})"
+        else:
+            info = f"{total_flights} flight(s) ({classification})"
+        
+        logger.info(f"Flight Performance Calculation - Flight legs: {len(flight_legs)}, "
+                   f"Total flights analyzed: {total_flights}, Score: {avg_score:.2f} ({classification})")
+        
+        return avg_score, info
+    
+    def _get_flight_performance_data(self, leg) -> Optional[Dict[str, Any]]:
+        """
+        Get flight performance data for a shipment leg.
+        
+        Tries multiple data sources in order:
+        1. FlightRadar24 API (if flight code available)
+        2. Internal shipment data (historical performance)
+        3. Regional data sources (BTS for US, Eurocontrol for Europe)
+        4. World Bank LPI Timeliness Index (fallback)
+        
+        Returns:
+            Dictionary with flight performance data:
+            {
+                'flightstats_indicator': float (0-5),
+                'status': str ('on_time', 'late', 'very_late', 'excessive', 'cancelled', 'diverted'),
+                'delay_minutes': int,
+                'source': str ('flightradar24', 'internal', 'bts', 'eurocontrol', 'lpi')
+            }
+        """
+        # Try FlightRadar24 API first (if flight code can be extracted)
+        flight_code = self._extract_flight_code(leg)
+        if flight_code:
+            fr24_data = self._fetch_flightradar24_performance(flight_code, leg)
+            if fr24_data:
+                return fr24_data
+        
+        # Try internal shipment data (historical performance)
+        internal_data = self._get_internal_flight_performance(leg)
+        if internal_data:
+            return internal_data
+        
+        # Try regional data sources based on route
+        regional_data = self._get_regional_flight_performance(leg)
+        if regional_data:
+            return regional_data
+        
+        # Fallback to World Bank LPI Timeliness Index
+        return self._get_lpi_fallback_performance(leg)
+    
+    def _extract_flight_code(self, leg) -> Optional[str]:
+        """
+        Extract flight code from shipment leg data.
+        
+        Returns:
+            Flight code string (e.g., "AA1234") or None if not found
+        """
+        # Prefer explicit flight_code stored on the leg
+        if getattr(leg, "flight_code", None):
+            code = leg.flight_code.strip()
+            return code.upper() if code else None
+        return None
+    
+    def _fetch_flightradar24_performance(
+        self,
+        flight_code: str,
+        leg
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Fetch flight performance data from FlightRadar24 API.
+        
+        API Documentation: https://fr24api.flightradar24.com/docs/endpoints/overview
+        
+        Args:
+            flight_code: Flight code (e.g., "AA1234")
+            leg: Shipment leg object
+            
+        Returns:
+            Dictionary with flight performance data or None if unavailable
+        """
+        api_key = getattr(settings, 'FLIGHTRADAR24_API_KEY', None)
+        if not api_key:
+            logger.debug("FlightRadar24 API key not configured")
+            return None
+        
+        if not HTTPX_AVAILABLE:
+            logger.debug("httpx not available for FlightRadar24 API calls")
+            return None
+        
+        # Check cache first
+        cache_key = f"{FLIGHT_PERFORMANCE_REDIS_KEY_PREFIX}{flight_code}"
+        try:
+            r = get_redis()
+            cached_data = r.get(cache_key)
+            if cached_data:
+                try:
+                    cached_performance = json.loads(cached_data)
+                    logger.debug(f"Using cached FlightRadar24 data for {flight_code}")
+                    return cached_performance
+                except (ValueError, json.JSONDecodeError):
+                    pass
+        except Exception as e:
+            logger.debug(f"Redis cache check failed: {e}")
+        
+        try:
+            # FlightRadar24 API endpoint for flight statistics
+            # API Documentation: https://fr24api.flightradar24.com/docs/endpoints/overview
+            # Sandbox endpoint: https://api.flightradar24.com/common/v1/flight/list.json
+            # Note: API key format may be "key|secret" - use the full key as provided
+            # The API key format from FlightRadar24 sandbox: "uuid|token"
+            api_key_value = api_key  # Use full key as provided
+            
+            url = "https://api.flightradar24.com/common/v1/flight/list.json"
+            params = {
+                "query": flight_code,
+                "fetchBy": "flight",
+                "page": 1,
+                "limit": 1
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key_value}",
+                "Accept": "application/json"
+            }
+            
+            # Alternative: If API uses query parameter instead of header
+            # params["token"] = api_key_value
+            
+            # Use shared HTTP client
+            if _http_client:
+                response = _http_client.get(url, params=params, headers=headers)
+            else:
+                response = httpx.get(url, params=params, headers=headers, timeout=10.0)
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            # Parse FlightRadar24 response
+            # API response structure may vary - handle multiple possible formats
+            flight_data = None
+            
+            # Try different response structures
+            if isinstance(data, dict):
+                # Format 1: data.result.response.data[]
+                if data.get("result") and isinstance(data["result"], dict):
+                    response_data = data["result"].get("response", {})
+                    if isinstance(response_data, dict) and response_data.get("data"):
+                        flight_list = response_data["data"]
+                        if isinstance(flight_list, list) and len(flight_list) > 0:
+                            flight_data = flight_list[0]
+                
+                # Format 2: data.data[]
+                if not flight_data and data.get("data"):
+                    flight_list = data["data"]
+                    if isinstance(flight_list, list) and len(flight_list) > 0:
+                        flight_data = flight_list[0]
+                
+                # Format 3: Direct flight object
+                if not flight_data and data.get("flight"):
+                    flight_data = data["flight"]
+            
+            if flight_data:
+                
+                # Extract delay information
+                scheduled_departure = flight_data.get("time", {}).get("scheduled", {}).get("departure")
+                actual_departure = flight_data.get("time", {}).get("real", {}).get("departure")
+                status = flight_data.get("status", {}).get("text", "").lower()
+                
+                delay_minutes = 0
+                flight_status = "on_time"
+                
+                if "cancelled" in status or "canceled" in status:
+                    flight_status = "cancelled"
+                elif "diverted" in status:
+                    flight_status = "diverted"
+                elif scheduled_departure and actual_departure:
+                    # Calculate delay
+                    try:
+                        scheduled = datetime.fromtimestamp(scheduled_departure, tz=timezone.utc)
+                        actual = datetime.fromtimestamp(actual_departure, tz=timezone.utc)
+                        delay_minutes = int((actual - scheduled).total_seconds() / 60)
+                        
+                        if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"]:
+                            flight_status = "on_time"
+                        elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["LATE_THRESHOLD_MINUTES"]:
+                            flight_status = "late"
+                        elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["VERY_LATE_THRESHOLD_MINUTES"]:
+                            flight_status = "very_late"
+                        else:
+                            flight_status = "excessive"
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Calculate FlightStats indicator (0-5) based on performance
+                # Formula: Higher on-time rate = higher indicator
+                # Simplified: Based on delay and status
+                if flight_status == "cancelled":
+                    flightstats_indicator = 0.0
+                elif flight_status == "diverted":
+                    flightstats_indicator = 0.5
+                elif flight_status == "excessive":
+                    flightstats_indicator = 1.0
+                elif flight_status == "very_late":
+                    flightstats_indicator = 1.5
+                elif flight_status == "late":
+                    flightstats_indicator = 2.5
+                else:  # on_time
+                    flightstats_indicator = 4.5
+                
+                performance_data = {
+                    "flightstats_indicator": flightstats_indicator,
+                    "status": flight_status,
+                    "delay_minutes": delay_minutes,
+                    "source": "flightradar24"
+                }
+                
+                # Cache the result
+                try:
+                    r = get_redis()
+                    ttl_seconds = int(FLIGHT_PERFORMANCE_CACHE_TTL.total_seconds())
+                    r.setex(cache_key, ttl_seconds, json.dumps(performance_data))
+                except Exception as e:
+                    logger.debug(f"Failed to cache FlightRadar24 data: {e}")
+                
+                return performance_data
+        
+        except httpx.HTTPError as e:
+            logger.debug(f"FlightRadar24 API HTTP error for {flight_code}: {e}")
+        except Exception as e:
+            logger.debug(f"Error fetching FlightRadar24 data for {flight_code}: {e}")
+        
+        return None
+    
+    def _get_internal_flight_performance(self, leg) -> Optional[Dict[str, Any]]:
+        """
+        Get flight performance from internal shipment data (historical lane performance).
+        
+        As the platform scales, OTP is increasingly driven by historical lane performance
+        captured from actual shipment logs.
+        
+        Returns:
+            Dictionary with flight performance data or None if insufficient historical data
+        """
+        if not leg.shipment_id or not leg.from_location or not leg.to_location:
+            return None
+        
+        try:
+            r = get_redis()
+            # Check for historical performance data for this route
+            route_key = f"flight:performance:route:{leg.from_location}:{leg.to_location}"
+            historical_data = r.get(route_key)
+            
+            if historical_data:
+                try:
+                    performance = json.loads(historical_data)
+                    # Add source indicator
+                    performance["source"] = "internal"
+                    return performance
+                except (ValueError, json.JSONDecodeError):
+                    pass
+            
+            # Calculate from actual shipment data
+            # Get all completed shipments on this route
+            from sqlalchemy import and_
+            completed_legs = self.db.query(ShipmentLeg).filter(
+                and_(
+                    ShipmentLeg.from_location == leg.from_location,
+                    ShipmentLeg.to_location == leg.to_location,
+                    ShipmentLeg.mode_of_transport.in_(['air', 'flight', 'airplane', 'aircraft', 'aviation']),
+                    ShipmentLeg.arrival_time.isnot(None),
+                    ShipmentLeg.scheduled_time.isnot(None)
+                )
+            ).limit(100).all()
+            
+            if len(completed_legs) < 5:  # Need at least 5 data points
+                return None
+            
+            # Calculate on-time percentage
+            on_time_count = 0
+            total_delays = []
+            
+            for completed_leg in completed_legs:
+                if completed_leg.arrival_time and completed_leg.scheduled_time:
+                    delay = (completed_leg.arrival_time - completed_leg.scheduled_time).total_seconds() / 60
+                    total_delays.append(delay)
+                    if delay < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"]:
+                        on_time_count += 1
+            
+            if not total_delays:
+                return None
+            
+            on_time_percentage = (on_time_count / len(total_delays)) * 100
+            avg_delay = sum(total_delays) / len(total_delays)
+            
+            # Map to FlightStats indicator (0-5)
+            # Higher on-time percentage = higher indicator
+            if on_time_percentage >= 95:
+                flightstats_indicator = 4.5
+            elif on_time_percentage >= 85:
+                flightstats_indicator = 3.5
+            elif on_time_percentage >= 75:
+                flightstats_indicator = 2.5
+            elif on_time_percentage >= 60:
+                flightstats_indicator = 1.5
+            else:
+                flightstats_indicator = 0.5
+            
+            performance_data = {
+                "flightstats_indicator": flightstats_indicator,
+                "status": "on_time" if avg_delay < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"] else "late",
+                "delay_minutes": int(avg_delay),
+                "source": "internal",
+                "on_time_percentage": on_time_percentage,
+                "sample_size": len(total_delays)
+            }
+            
+            # Cache the result
+            try:
+                ttl_seconds = int(FLIGHT_PERFORMANCE_CACHE_TTL.total_seconds())
+                r.setex(route_key, ttl_seconds, json.dumps(performance_data))
+            except Exception:
+                pass
+            
+            return performance_data
+            
+        except Exception as e:
+            logger.debug(f"Error getting internal flight performance: {e}")
+            return None
+    
+    def _get_regional_flight_performance(self, leg) -> Optional[Dict[str, Any]]:
+        """
+        Get flight performance from regional data sources.
+        """
+        return None
+
+    # ------------------------------------------------------------------
+    # Helpers for status/indicator mapping and simulated fetches
+    # ------------------------------------------------------------------
+    def _delay_to_status(self, delay_minutes: Optional[int], cancelled: bool = False, diverted: bool = False) -> str:
+        if cancelled:
+            return "cancelled"
+        if diverted:
+            return "diverted"
+        if delay_minutes is None:
+            return "on_time"
+        if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"]:
+            return "on_time"
+        if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["LATE_THRESHOLD_MINUTES"]:
+            return "late"
+        if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["VERY_LATE_THRESHOLD_MINUTES"]:
+            return "very_late"
+        return "excessive"
+
+    def _status_to_indicator(self, status: str) -> float:
+        if status == "cancelled":
+            return 0.0
+        if status == "diverted":
+            return 0.5
+        if status == "excessive":
+            return 1.0
+        if status == "very_late":
+            return 1.5
+        if status == "late":
+            return 2.5
+        return 4.5  # on_time or unknown defaults to best available among non-cancelled
+
+    
+    def _get_lpi_fallback_performance(self, leg) -> Optional[Dict[str, Any]]:
+        """
+        Get flight performance using World Bank LPI Timeliness Index as fallback.
+        
+        Uses the destination country's LPI Timeliness Index to estimate flight performance.
+        
+        Returns:
+            Dictionary with flight performance data mapped from LPI score
+        """
+        if not leg.shipment or not leg.shipment.destination_country:
+            return None
+        
+        lpi_score = self._get_world_bank_timeliness_score(leg.shipment.destination_country)
+        if lpi_score is None:
+            return None
+        
+        # Map LPI score (1-5) to FlightStats indicator (0-5)
+        # LPI 1.0 -> FlightStats 0.5, LPI 5.0 -> FlightStats 4.5
+        flightstats_indicator = max(0.5, min(4.5, lpi_score - 0.5))
+        
+        # Estimate status based on LPI score
+        if lpi_score >= 4.0:
+            status = "on_time"
+        elif lpi_score >= 3.0:
+            status = "late"
+        elif lpi_score >= 2.0:
+            status = "very_late"
+        else:
+            status = "excessive"
+        
+        return {
+            "flightstats_indicator": flightstats_indicator,
+            "status": status,
+            "delay_minutes": None,
+            "source": "lpi"
+        }
+    
     def _calculate_world_bank_timeliness_score(
         self,
         shipments: List[Shipment]
@@ -1073,7 +1287,7 @@ class LaneRiskService:
         # Formula: our_score = 0.5 + (lpi_score - 1.0) * (4.0 / 4.0) = 0.5 + (lpi_score - 1.0) * 1.0
         # Simplified: our_score = lpi_score - 0.5
         mapped_score = max(0.5, min(4.5, avg_timeliness - 0.5))
-        classification = self._score_to_classification(mapped_score)
+        classification = LaneRiskUtils.score_to_classification(mapped_score)
         
         # Show which countries were used for clarity
         destination_countries_list = list(destination_countries)
@@ -1176,7 +1390,7 @@ class LaneRiskService:
         # Fetch remaining countries from live data or fallback
         if uncached_countries:
             # Get the full map once (cached)
-            live_map = _get_live_lpi_timeliness_map()
+            live_map = LaneRiskUtils.get_live_lpi_timeliness_map()
             fallback_map = LPI_TIMELINESS_FALLBACK_MAP
             
             for country_code in uncached_countries:
@@ -1184,11 +1398,11 @@ class LaneRiskService:
                 
                 # Try live map
                 if live_map:
-                    score = self._match_country_in_map(country_code, live_map)
+                    score = LaneRiskUtils.match_country_in_map(country_code, live_map)
                 
                 # Try fallback map
                 if score is None:
-                    score = self._match_country_in_map(country_code, fallback_map)
+                    score = LaneRiskUtils.match_country_in_map(country_code, fallback_map)
                 
                 if score is not None:
                     scores.append(score)
@@ -1207,11 +1421,11 @@ class LaneRiskService:
         if not country_code:
             return None
         
-        live_map = _get_live_lpi_timeliness_map()
+        live_map = LaneRiskUtils.get_live_lpi_timeliness_map()
         if not live_map:
             return None
         
-        return self._match_country_in_map(country_code, live_map)
+        return LaneRiskUtils.match_country_in_map(country_code, live_map)
     
     def _get_cached_lpi_timeliness(self, country_code: str) -> Optional[float]:
         """
@@ -1224,7 +1438,7 @@ class LaneRiskService:
         if not country_code_upper:
             return None
         
-        return self._match_country_in_map(country_code_upper, LPI_TIMELINESS_FALLBACK_MAP)
+        return LaneRiskUtils.match_country_in_map(country_code_upper, LPI_TIMELINESS_FALLBACK_MAP)
     
     
     def _get_live_iot_coordinates(self, shipment: Shipment) -> Tuple[Optional[float], Optional[float]]:
@@ -1750,42 +1964,6 @@ class LaneRiskService:
         
         return adverse_events
     
-    def _get_location_name_from_google_maps(
-        self,
-        latitude: float,
-        longitude: float,
-        api_key: str
-    ) -> Optional[str]:
-        """
-        Use Google Maps Reverse Geocoding API to get location name from coordinates.
-        This enhances weather reports with human-readable location names.
-        """
-        try:
-            url = "https://maps.googleapis.com/maps/api/geocode/json"
-            params = {
-                "latlng": f"{latitude},{longitude}",
-                "key": api_key
-            }
-            
-            # Use shared HTTP client for better performance
-            if _http_client:
-                response = _http_client.get(url, params=params)
-            else:
-                response = httpx.get(url, params=params, timeout=5.0)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get("status") == "OK" and data.get("results"):
-                # Get the most specific result (first one is usually most specific)
-                result = data["results"][0]
-                location_name = result.get("formatted_address")
-                return location_name
-            
-            return None
-            
-        except Exception as e:
-            logger.debug(f"Google Maps reverse geocoding error: {e}")
-            return None
     
     def _calculate_lpi_score(
         self,
@@ -1838,7 +2016,7 @@ class LaneRiskService:
         # Formula: our_score = 0.5 + (lpi_score - 1.0) * (4.0 / 4.0) = 0.5 + (lpi_score - 1.0) * 1.0
         # Simplified: our_score = lpi_score - 0.5
         mapped_score = max(0.5, min(4.5, avg_lpi - 0.5))
-        classification = self._score_to_classification(mapped_score)
+        classification = LaneRiskUtils.score_to_classification(mapped_score)
         
         # Build detailed info string showing which countries were used
         # Clearly label as "Overall LPI" to distinguish from Timeliness Index
@@ -1913,7 +2091,7 @@ class LaneRiskService:
         # Fetch remaining countries from live data
         if uncached_countries:
             # Get the full map once (cached)
-            live_map = _get_live_lpi_overall_map()
+            live_map = LaneRiskUtils.get_live_lpi_overall_map()
             
             # Batch cache writes using pipeline
             pipe = None
@@ -1929,7 +2107,7 @@ class LaneRiskService:
                 
                 # Try live map
                 if live_map:
-                    score = self._match_country_in_map(country_code, live_map)
+                    score = LaneRiskUtils.match_country_in_map(country_code, live_map)
                 
                 if score is not None:
                     country_scores_map[country_code] = score
@@ -1950,41 +2128,4 @@ class LaneRiskService:
         
         return country_scores_map
     
-    def _match_country_in_map(self, country_code: str, source_map: Dict[str, float]) -> Optional[float]:
-        """
-        Helper to match ISO codes or names against an LPI lookup map.
-        Optimized: Direct lookup first, then partial matching only if needed.
-        """
-        if not country_code or not source_map:
-            return None
-        
-        normalized_code = country_code.strip().upper()
-        
-        # Direct lookup (O(1))
-        if normalized_code in source_map:
-            return source_map[normalized_code]
-        
-        # Partial matching (O(n) but only if direct lookup fails)
-        # This handles cases like "UNITED STATES" matching "UNITED STATES OF AMERICA"
-        for key, value in source_map.items():
-            if normalized_code in key or key in normalized_code:
-                return value
-        
-        return None
-    
-    def _score_to_classification(self, score: float) -> str:
-        """
-        Convert numeric score to classification
-        Based on Table 11 mapping
-        """
-        if score >= 4.0:
-            return "Excellent"
-        elif score >= 3.0:
-            return "Very Good"
-        elif score >= 2.0:
-            return "Good"
-        elif score >= 1.0:
-            return "Moderate"
-        else:
-            return "Basic"
 

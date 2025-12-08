@@ -165,6 +165,18 @@ SENDGRID_API_KEY=your-sendgrid-api-key
 SENDGRID_FROM_EMAIL=your-email@example.com
 
 # ============================================
+# External API Configuration
+# ============================================
+# FlightRadar24 API (for on-time flight performance)
+# API Documentation: https://fr24api.flightradar24.com/docs/endpoints/overview
+# Format: "uuid|token" (e.g., "019afc9b-9c8d-720c-8437-379631bea03f|d717VTkYrYoqoZFCh2GoqLvJp6pmeMz3FBfVPDMr20e9a583")
+FLIGHTRADAR24_API_KEY=your-flightradar24-api-key
+
+# Weather API (for weather adversities calculation)
+WEATHER_API_KEY=your-weatherapi-key
+WEATHER_API_PROVIDER=weatherapi  # Options: "weatherapi"
+
+# ============================================
 # Admin Account Configuration
 # ============================================
 ADMIN_DEFAULT_PASSWORD=secure-admin-password
@@ -901,6 +913,9 @@ poetry shell
 | `HOST` | No | `0.0.0.0` | Server host |
 | `PORT` | No | `8000` | Server port |
 | `RELOAD` | No | `True` | Auto-reload on code changes |
+| `FLIGHTRADAR24_API_KEY` | No | - | FlightRadar24 API key for flight performance data |
+| `WEATHER_API_KEY` | No | - | WeatherAPI.com API key for weather data |
+| `WEATHER_API_PROVIDER` | No | `weatherapi` | Weather API provider |
 
 ## 🔒 Security Best Practices
 
