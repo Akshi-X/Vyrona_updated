@@ -45,6 +45,7 @@ def init_db():
         feedback_comments,
         shipment_model,
         shipment_leg_model,
+        therapy_model,
         pharma_model,
         provider_model,
         carrier_model,

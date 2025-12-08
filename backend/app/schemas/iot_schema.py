@@ -457,7 +457,7 @@ class WebhookCreateRequest(BaseModel):
     Example:
     {
         "name": "MyGrape Webhook",
-        "url": "http://14.141.162.122/api/iot/webhooks/consume",
+        "url": "{WEBHOOK_URL from .env or BACKEND_URL/api/iot/webhooks/consume}",
         "description": "Webhook for receiving Tive events",
         "version": "1.0",
         "template": "",
