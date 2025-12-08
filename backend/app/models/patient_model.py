@@ -15,7 +15,6 @@ class Patient(Base):
     # Patient Information
     patient_name = Column(String, nullable=False)
     condition = Column(String, nullable=True)
-    therapy_id = Column(String, nullable=True)
     
     # Insurance Information
     insurance_provider = Column(String, nullable=True)
