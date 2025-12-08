@@ -52,5 +52,6 @@ def init_db():
         task_model,
         chat_model,
         chat_read_status,
+        telemetry_model,
     )
     Base.metadata.create_all(bind=engine)
