@@ -5,13 +5,11 @@ All business logic is in IoTService
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Path, Depends, Request, Response
+from fastapi import APIRouter, HTTPException, Path, Depends, Response
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 import json
 
 from ..service.iot_service import IoTService
-from ..service.webhook_consumer_service import WebhookConsumerService
 from ..schemas.iot_schema import (
     DeviceResponse,
     DeviceListResponse,
@@ -32,6 +30,7 @@ from ..schemas.iot_schema import (
 from ..exceptions.custom_exceptions import AppException
 from ..constants.messages import ErrorMessages
 from ..constants.http_status import HTTPStatus
+from ..config.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -483,7 +482,7 @@ def create_webhook(
     Request body matches Tive API Swagger structure:
     {
         "name": "MyGrape Webhook",
-        "url": "http://14.141.162.122/api/iot/webhooks/consume",
+        "url": "{WEBHOOK_URL from .env}",
         "description": "Webhook for receiving Tive events",
         "version": "1.0",
         "template": "",
@@ -556,168 +555,6 @@ def delete_webhook(
         _handle_service_error(e, f"deleting webhook {webhook_id}")
 
 
-@router.post("/webhooks/consume")
-async def consume_webhook(
-    request: Request
-):
-    """
-    Webhook consumer endpoint - receives webhook data from Tive
-    
-    This endpoint is called by Tive when webhook events occur.
-    IP whitelist: 14.141.162.122 (VMS data whitelisted to consume from Tive)
-    
-    The endpoint accepts any JSON payload from Tive webhooks and processes it
-    using the WebhookConsumerService.
-    
-    Webhook data is saved to:
-    - Application logs: logs/app.log
-    - Individual files: logs/webhooks/webhook_YYYYMMDD_HHMMSS.json
-    - Log file: logs/webhooks/webhook_log.jsonl (JSON Lines format)
-    
-    Request Body: Any JSON payload from Tive webhooks
-    
-    Returns: Processing result with status and timestamp
-    
-    Example request body:
-    {
-        "event": "ShipmentStatusChanged",
-        "shipmentId": "12345",
-        "status": "In Transit"
-    }
-    """
-    try:
-        # Get raw request body
-        body = await request.body()
-        
-        # Try to parse as JSON
-        try:
-            webhook_data = json.loads(body)
-        except json.JSONDecodeError:
-            webhook_data = {"raw_body": body.decode('utf-8', errors='ignore')}
-        
-        # Get client IP for verification (if needed)
-        client_ip = request.client.host if request.client else "unknown"
-        
-        # Log incoming webhook
-        logger.info(f"=== WEBHOOK RECEIVED ===")
-        logger.info(f"From IP: {client_ip}")
-        logger.info(f"Payload: {json.dumps(webhook_data, indent=2)}")
-        
-        # Process webhook using consumer service
-        consumer_service = WebhookConsumerService()
-        result = consumer_service.process_webhook(webhook_data, client_ip)
-        
-        # Return 200 OK to acknowledge receipt
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error processing webhook: {e}", exc_info=True)
-        # Still return 200 to prevent Tive from retrying
-        # (or return 500 if you want Tive to retry)
-        return {
-            "status": "error",
-            "message": f"Error processing webhook: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
-
-
-@router.get("/webhooks/received")
-def view_received_webhooks(
-    limit: int = 20
-):
-    """
-    View webhook data received from Tive
-    
-    This endpoint shows all webhook data that has been pushed to the VM at 14.141.162.122.
-    Use this to verify that Tive is successfully sending webhook data.
-    
-    Query Parameters:
-    - limit: Number of recent webhooks to return (default: 20, max: 100)
-    
-    Returns: 
-    - Status of webhook reception
-    - List of recent webhook data with timestamps
-    - Total count of webhooks received
-    
-    Example Response:
-    {
-        "status": "active",
-        "total_received": 5,
-        "last_received_at": "2025-01-03T14:30:22.123456",
-        "webhook_log_file": "logs/webhooks/webhook_log.jsonl",
-        "recent_webhooks": [...]
-    }
-    """
-    try:
-        from pathlib import Path
-        
-        # Limit max to prevent memory issues
-        limit = min(limit, 100)
-        
-        webhook_log_file = Path("logs/webhooks/webhook_log.jsonl")
-        webhook_dir = Path("logs/webhooks")
-        
-        # Check if webhook directory exists
-        if not webhook_dir.exists():
-            return {
-                "status": "no_data",
-                "message": "No webhook data received yet. Webhook directory does not exist.",
-                "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
-                "total_received": 0,
-                "recent_webhooks": []
-            }
-        
-        # Check if log file exists
-        if not webhook_log_file.exists():
-            return {
-                "status": "no_data",
-                "message": "No webhook data received yet. Waiting for Tive to send webhooks.",
-                "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
-                "total_received": 0,
-                "recent_webhooks": []
-            }
-        
-        # Read all webhooks from JSONL file
-        all_webhooks = []
-        with open(webhook_log_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        webhook_entry = json.loads(line)
-                        all_webhooks.append(webhook_entry)
-                    except json.JSONDecodeError:
-                        continue
-        
-        # Get recent webhooks (last N)
-        recent_webhooks = all_webhooks[-limit:] if len(all_webhooks) > limit else all_webhooks
-        
-        # Get last received timestamp
-        last_received_at = recent_webhooks[-1].get('received_at') if recent_webhooks else None
-        
-        # Count individual webhook files
-        webhook_files = list(webhook_dir.glob("webhook_*.json"))
-        
-        return {
-            "status": "active",
-            "message": f"Webhook endpoint is active. {len(all_webhooks)} webhook(s) received.",
-            "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
-            "total_received": len(all_webhooks),
-            "total_files": len(webhook_files),
-            "last_received_at": last_received_at,
-            "webhook_log_file": str(webhook_log_file),
-            "showing_recent": len(recent_webhooks),
-            "recent_webhooks": recent_webhooks
-        }
-        
-    except Exception as e:
-        logger.error(f"Error viewing received webhooks: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-            detail=f"Error viewing received webhooks: {str(e)}"
-        )
-
-
 @router.get("/webhooks/status")
 def webhook_status():
     """
@@ -739,7 +576,7 @@ def webhook_status():
         if not webhook_log_file.exists():
             return {
                 "endpoint_active": True,
-                "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
+                "webhook_url": settings.webhook_url,
                 "webhooks_received": False,
                 "total_received": 0,
                 "last_received_at": None,
@@ -763,7 +600,7 @@ def webhook_status():
         
         return {
             "endpoint_active": True,
-            "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
+            "webhook_url": settings.webhook_url,
             "webhooks_received": total_count > 0,
             "total_received": total_count,
             "last_received_at": last_received_at,
@@ -774,7 +611,7 @@ def webhook_status():
         logger.error(f"Error checking webhook status: {e}", exc_info=True)
         return {
             "endpoint_active": True,
-            "webhook_url": "http://14.141.162.122/api/iot/webhooks/consume",
+            "webhook_url": settings.webhook_url,
             "error": str(e),
             "message": "Error checking webhook status"
         }

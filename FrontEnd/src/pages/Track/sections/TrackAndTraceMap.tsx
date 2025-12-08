@@ -12,6 +12,7 @@ const TrackAndTraceMap = () => {
   const [positions, setPositions] = useState<TrackingPosition[]>([]);
   const [useWebSocket, setUseWebSocket] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
+  const [shouldLoadTrackingData, setShouldLoadTrackingData] = useState<boolean>(false);
   type MapType = google.maps.MapTypeId | "roadmap" | "satellite";
   const [mapType, setMapType] = useState<MapType>("roadmap");
   const googleMapRef = useRef<google.maps.Map | null>(null);
@@ -38,8 +39,13 @@ const TrackAndTraceMap = () => {
     preventGoogleFontsLoading: true
   });
 
-  // Load tracking data on mount
+  // Load tracking data only when flag is enabled
   useEffect(() => {
+    // Only load routes if the flag is enabled
+    if (!shouldLoadTrackingData) {
+      return;
+    }
+
     const loadTrackingData = async () => {
       try {
         // Try to get live data from API, fallback to mock data
@@ -60,7 +66,7 @@ const TrackAndTraceMap = () => {
     };
 
     loadTrackingData();
-  }, [patientId]);
+  }, [shouldLoadTrackingData, patientId]);
 
   // Initialize Google Map when the GoogleMap component loads
   const handleMapLoad = (map: google.maps.Map) => {
@@ -297,78 +303,95 @@ const TrackAndTraceMap = () => {
             )}
           </div>
 
-          {/* Custom Map/Satellite toggle */}
-          <div className="absolute top-2 left-2 z-10">
-            <div className="flex rounded-full bg-white/70 backdrop-blur-sm border border-white/80 shadow-sm overflow-hidden text-xs">
+          {/* Load Tracking Data Flag Button */}
+          {!shouldLoadTrackingData && (
+            <div className="absolute top-2 left-2 z-20">
               <button
                 type="button"
-                className={`px-3 py-1.5 border-r border-white/60 ${
-                  mapType === "roadmap" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
-                }`}
-                onClick={() => {
-                  setMapType("roadmap");
-                  if (googleMapRef.current) {
-                    googleMapRef.current.setMapTypeId("roadmap");
-                  }
-                }}
+                onClick={() => setShouldLoadTrackingData(true)}
+                className="bg-white/90 backdrop-blur-sm border border-white/80 rounded-lg px-4 py-2 shadow-lg hover:bg-white transition-colors duration-200"
               >
-                Map
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1.5 ${
-                  mapType === "satellite" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
-                }`}
-                onClick={() => {
-                  setMapType("satellite");
-                  if (googleMapRef.current) {
-                    googleMapRef.current.setMapTypeId("satellite");
-                  }
-                }}
-              >
-                Satellite
+                <div className="text-xs font-medium text-gray-900">Load Tracking Data</div>
               </button>
             </div>
-          </div>
+          )}
+
+          {/* Custom Map/Satellite toggle */}
+          {shouldLoadTrackingData && (
+            <div className="absolute top-2 left-2 z-10">
+              <div className="flex rounded-full bg-white/70 backdrop-blur-sm border border-white/80 shadow-sm overflow-hidden text-xs">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 border-r border-white/60 ${
+                    mapType === "roadmap" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
+                  }`}
+                  onClick={() => {
+                    setMapType("roadmap");
+                    if (googleMapRef.current) {
+                      googleMapRef.current.setMapTypeId("roadmap");
+                    }
+                  }}
+                >
+                  Map
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 ${
+                    mapType === "satellite" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
+                  }`}
+                  onClick={() => {
+                    setMapType("satellite");
+                    if (googleMapRef.current) {
+                      googleMapRef.current.setMapTypeId("satellite");
+                    }
+                  }}
+                >
+                  Satellite
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Controls */}
-          <div className="absolute top-2 right-2 bg-white rounded-lg shadow-lg p-2 flex items-center gap-2 z-10">
-            <div className="text-xs text-gray-600 px-2">
-              Position: <span className="font-semibold">{currentIndex + 1}</span> / {positions.length || 0}
-            </div>
+          {shouldLoadTrackingData && (
+            <div className="absolute top-2 right-2 bg-white rounded-lg shadow-lg p-2 flex items-center gap-2 z-10">
+              <div className="text-xs text-gray-600 px-2">
+                Position: <span className="font-semibold">{currentIndex + 1}</span> / {positions.length || 0}
+              </div>
 
-            <div className="flex gap-1">
-              {!isTracking ? (
-                <button
-                  onClick={handleStart}
-                  disabled={!mapLoaded}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded text-white text-sm font-medium ${mapLoaded ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 cursor-not-allowed"
-                    }`}
-                >
-                  <Play size={16} />
-                  Start
-                </button>
-              ) : (
-                <button
-                  onClick={handlePause}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium"
-                >
-                  <Pause size={16} />
-                  Pause
-                </button>
-              )}
+              <div className="flex gap-1">
+                {!isTracking ? (
+                  <button
+                    onClick={handleStart}
+                    disabled={!mapLoaded}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded text-white text-sm font-medium ${mapLoaded ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 cursor-not-allowed"
+                      }`}
+                  >
+                    <Play size={16} />
+                    Start
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePause}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium"
+                  >
+                    <Pause size={16} />
+                    Pause
+                  </button>
+                )}
 
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
-              >
-                Reset
-              </button>
+                <button
+                  onClick={handleReset}
+                  className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Current Location Info */}
-          {positions[currentIndex] && (
+          {shouldLoadTrackingData && positions[currentIndex] && (
             <div className="absolute bottom-2 left-2 bg-white/40 backdrop-blur-sm border border-white/80 rounded-lg shadow-lg p-3 max-w-[280px] z-10">
               <div className="flex items-center gap-2 mb-2">
                 <MapPin color="#4fff00" size={18} />
@@ -386,21 +409,23 @@ const TrackAndTraceMap = () => {
           )}
 
           {/* Status Indicator */}
-          <div className="absolute bottom-2 right-2 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-3 h-3 rounded-full ${isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400"
-                  }`}
-              />
-              <span className="text-xs font-medium text-gray-700">
-                {isTracking
-                  ? (useWebSocket && isWebSocketConnected
-                    ? "Live Tracking (WebSocket)"
-                    : "Tracking Active")
-                  : "Tracking Paused"}
-              </span>
+          {shouldLoadTrackingData && (
+            <div className="absolute bottom-2 right-2 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-3 h-3 rounded-full ${isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                    }`}
+                />
+                <span className="text-xs font-medium text-gray-700">
+                  {isTracking
+                    ? (useWebSocket && isWebSocketConnected
+                      ? "Live Tracking (WebSocket)"
+                      : "Tracking Active")
+                    : "Tracking Paused"}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
