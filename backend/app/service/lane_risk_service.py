@@ -544,14 +544,19 @@ class LaneRiskService:
             return None, "No road legs"
         
         total_parking_stops = 0
+        total_wait_minutes = 0.0
         
         # Process each road leg
         for leg in road_legs:
             # Calculate from Redis location history (lat/lng same for 10-20 mins)
             calculated_stops = self._calculate_parking_stops_from_location_history(leg)
             if calculated_stops is not None:
-                total_parking_stops += calculated_stops
-                logger.debug(f"Leg {leg.id}: Calculated parking stops from location history = {calculated_stops}")
+                stops_detected, wait_minutes = calculated_stops
+                total_parking_stops += stops_detected
+                total_wait_minutes += wait_minutes
+                logger.debug(
+                    f"Leg {leg.id}: Parking stops={stops_detected}, waiting_minutes={wait_minutes:.1f}"
+                )
             else:
                 logger.debug(f"Leg {leg.id}: No location history data available in Redis for parking stops calculation")
         
@@ -572,7 +577,10 @@ class LaneRiskService:
             score = 0.5
             classification = "Basic"
         
-        info = f"Road Stoppage: {total_parking_stops} stop(s)" if total_parking_stops > 0 else "Road Stoppage: No stops"
+        if total_parking_stops > 0:
+            info = f"Road Stoppage: {total_parking_stops} stop(s), waiting {total_wait_minutes:.1f} min"
+        else:
+            info = "Road Stoppage: No stops"
         
         logger.info(f"Parking Stops Calculation - Road legs: {len(road_legs)}, Total stops: {total_parking_stops}, Score: {score} ({classification})")
         
@@ -581,14 +589,18 @@ class LaneRiskService:
     def _calculate_parking_stops_from_location_history(
         self,
         leg
-    ) -> Optional[int]:
+    ) -> Optional[Tuple[int, float]]:
         """
         Calculate parking stops from location history.
         
-        Detects stops by checking if lat/lng remains the same for 10-20 minutes.
+        Detects stops by checking if lat/lng remains the same for >=10 minutes.
         A stop is detected when:
-        - Same coordinates (within small tolerance) for 10-20 minutes
+        - Same coordinates (within small tolerance) for at least 10 minutes
         - Multiple consecutive readings at same location
+        
+        Returns both:
+        - Number of stops detected
+        - Total waiting minutes beyond the 10-minute threshold (e.g., 20min stop -> 10 waiting minutes)
         
         **Data Source:**
         - Redis location history: `location_history:{shipment_id}:{leg_order}`
@@ -596,14 +608,13 @@ class LaneRiskService:
         - Note: IoT device location history integration can be added when available
         
         **Returns:**
-        - Number of parking stops detected, or None if no location history available
+        - Tuple (stops_detected, total_wait_minutes) or None if no location history available
         """
         if not leg:
             return None
         
         # Constants for stop detection
         MIN_STOP_DURATION_MINUTES = 10  # Minimum duration to consider as a stop
-        MAX_STOP_DURATION_MINUTES = 20  # Maximum duration before it's considered a significant delay
         COORDINATE_TOLERANCE = 0.0001  # ~11 meters tolerance for "same location"
         
         try:
@@ -664,56 +675,61 @@ class LaneRiskService:
             # Sort by timestamp
             location_points.sort(key=lambda x: x['timestamp'])
             
-            # Detect stops: consecutive points at same location for 10-20 minutes
+            # One-pass stillness window (streaming-friendly)
             stops_detected = 0
-            i = 0
+            total_wait_minutes = 0.0
             
-            while i < len(location_points) - 1:
-                current_point = location_points[i]
-                stop_start_idx = i
+            # Initialize state with the first point
+            last_point = location_points[0]
+            current_stop_minutes = 0.0
+            
+            for idx in range(1, len(location_points)):
+                point = location_points[idx]
                 
-                # Find consecutive points at same location
-                j = i + 1
-                while j < len(location_points):
-                    next_point = location_points[j]
-                    
-                    # Check if coordinates are the same (within tolerance)
-                    lat_diff = abs(current_point['lat'] - next_point['lat'])
-                    lng_diff = abs(current_point['lng'] - next_point['lng'])
-                    
-                    if lat_diff <= COORDINATE_TOLERANCE and lng_diff <= COORDINATE_TOLERANCE:
-                        # Same location - check duration
-                        time_diff = (next_point['timestamp'] - current_point['timestamp']).total_seconds() / 60.0
-                        
-                        if time_diff >= MIN_STOP_DURATION_MINUTES:
-                            # This is a stop - find the end of this stop
-                            j += 1
-                            continue
-                        else:
-                            # Not long enough to be a stop
-                            break
-                    else:
-                        # Location changed - end of potential stop
-                        break
+                # Time delta in minutes
+                time_diff = (point['timestamp'] - last_point['timestamp']).total_seconds() / 60.0
+                if time_diff < 0:
+                    # Ignore out-of-order negative deltas
+                    last_point = point
+                    continue
                 
-                # Check if we found a stop (duration between first and last point at same location)
-                if j > stop_start_idx + 1:
-                    stop_duration = (location_points[j - 1]['timestamp'] - location_points[stop_start_idx]['timestamp']).total_seconds() / 60.0
-                    
-                    if MIN_STOP_DURATION_MINUTES <= stop_duration <= MAX_STOP_DURATION_MINUTES:
+                # Check movement
+                lat_diff = abs(point['lat'] - last_point['lat'])
+                lng_diff = abs(point['lng'] - last_point['lng'])
+                is_still = lat_diff <= COORDINATE_TOLERANCE and lng_diff <= COORDINATE_TOLERANCE
+                
+                if is_still:
+                    current_stop_minutes += time_diff
+                else:
+                    if current_stop_minutes >= MIN_STOP_DURATION_MINUTES:
                         stops_detected += 1
+                        waiting_minutes = current_stop_minutes - MIN_STOP_DURATION_MINUTES
+                        total_wait_minutes += waiting_minutes
                         logger.debug(
                             f"Leg {leg.id}: Detected parking stop #{stops_detected} - "
-                            f"Duration: {stop_duration:.1f} mins, "
-                            f"Location: ({current_point['lat']:.4f}, {current_point['lng']:.4f})"
+                            f"Duration: {current_stop_minutes:.1f} mins "
+                            f"(waiting {waiting_minutes:.1f} mins), "
+                            f"Location: ({last_point['lat']:.4f}, {last_point['lng']:.4f})"
                         )
-                    
-                    i = j
-                else:
-                    i += 1
+                    # Reset stop accumulator after movement
+                    current_stop_minutes = 0.0
+                
+                last_point = point
+            
+            # Close any open stop at the end
+            if current_stop_minutes >= MIN_STOP_DURATION_MINUTES:
+                stops_detected += 1
+                waiting_minutes = current_stop_minutes - MIN_STOP_DURATION_MINUTES
+                total_wait_minutes += waiting_minutes
+                logger.debug(
+                    f"Leg {leg.id}: Detected parking stop #{stops_detected} (end-of-data) - "
+                    f"Duration: {current_stop_minutes:.1f} mins "
+                    f"(waiting {waiting_minutes:.1f} mins), "
+                    f"Location: ({last_point['lat']:.4f}, {last_point['lng']:.4f})"
+                )
             
             logger.info(f"Leg {leg.id}: Detected {stops_detected} parking stops from location history")
-            return stops_detected
+            return stops_detected, total_wait_minutes
             
         except Exception as e:
             logger.warning(f"Error calculating parking stops from location history for leg {leg.id}: {e}")
