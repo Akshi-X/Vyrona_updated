@@ -112,10 +112,19 @@ async def websocket_endpoint(websocket: WebSocket):
                                 quality_service.validate_patient_belongs_to_pharma(patient_id, pharma_id)
                                 # Client is subscribing to a patient
                                 manager.set_patient_subscription(connection_id, patient_id)
-                                # Send confirmation
+                                
+                                # Get last 12 messages from Redis and send them
+                                history = quality_service.get_patient_redis_history(patient_id, limit=12)
+                                
+                                # Send history messages first (most recent first)
+                                for historical_data in history:
+                                    await websocket.send_json(historical_data)
+                                
+                                # Send confirmation after history
                                 await websocket.send_json({
                                     "type": "subscription_confirmed",
-                                    "patient_id": patient_id
+                                    "patient_id": patient_id,
+                                    "history_count": len(history)
                                 })
                             except Exception as e:
                                 await websocket.send_json({
