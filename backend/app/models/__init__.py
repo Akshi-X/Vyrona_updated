@@ -15,3 +15,4 @@ from .shipment_leg_document_model import ShipmentLegDocument
 from .task_model import Tasks
 from .chat_model import ChatMessage
 from .chat_read_status import ChatReadStatus
+from .quality_log_model import QualityLog
