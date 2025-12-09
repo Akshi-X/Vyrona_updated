@@ -296,6 +296,105 @@ class LaneRiskUtils:
         return None
     
     @staticmethod
+    def map_delay_to_category(
+        delay_minutes: Optional[float],
+        cancelled: bool = False,
+        diverted: bool = False
+    ) -> str:
+        """
+        Step 1: Determine Delay Category (Table 10)
+        
+        Category Logic:
+        - On Time: < 15 min late
+        - Late: ≥ 15 min late
+        - Very Late: ≥ 30 min late
+        - Excessive: ≥ 45 min late
+        - Cancelled: flight_status == cancelled
+        - Diverted: flight_status == diverted
+        
+        Args:
+            delay_minutes: Delay in minutes (None if unknown)
+            cancelled: Whether flight was cancelled
+            diverted: Whether flight was diverted
+            
+        Returns:
+            Category string: 'on_time', 'late', 'very_late', 'excessive', 'cancelled', 'diverted'
+        """
+        if cancelled:
+            return "cancelled"
+        if diverted:
+            return "diverted"
+        if delay_minutes is None:
+            return "on_time"  # Default to on_time if delay unknown
+        
+        if delay_minutes < 15:
+            return "on_time"
+        elif delay_minutes < 30:
+            return "late"
+        elif delay_minutes < 45:
+            return "very_late"
+        else:
+            return "excessive"
+    
+    @staticmethod
+    def category_to_indicator(category: str) -> float:
+        """
+        Step 2: Convert Category → FlightStats Indicator (0-5)
+        
+        Mandatory mapping:
+        - On Time: 5
+        - Late: 3
+        - Very Late: 2
+        - Excessive: 1
+        - Cancelled: 0
+        - Diverted: 0
+        
+        Args:
+            category: Delay category string
+            
+        Returns:
+            Indicator value (0-5)
+        """
+        mapping = {
+            "on_time": 5.0,
+            "late": 3.0,
+            "very_late": 2.0,
+            "excessive": 1.0,
+            "cancelled": 0.0,
+            "diverted": 0.0
+        }
+        return mapping.get(category.lower(), 0.0)
+    
+    @staticmethod
+    def indicator_to_classification(indicator: float) -> str:
+        """
+        Step 3: Convert Indicator → Final Classification (Table 11)
+        
+        Indicator Range → Classification:
+        - 0-0.9: Basic
+        - 1-1.9: Moderate
+        - 2-2.9: Good
+        - 3-3.9: Very Good
+        - 4-5: Excellent
+        
+        Args:
+            indicator: FlightStats indicator (0-5)
+            
+        Returns:
+            Classification string
+        """
+        if indicator >= 4.0:
+            return "Excellent"
+        elif indicator >= 3.0:
+            return "Very Good"
+        elif indicator >= 2.0:
+            return "Good"
+        elif indicator >= 1.0:
+            return "Moderate"
+        else:
+            return "Basic"
+    
+    @staticmethod
     def score_to_classification(score: float) -> str:
         """
         Convert numeric score to classification

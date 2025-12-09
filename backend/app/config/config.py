@@ -131,6 +131,20 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = True
         extra = "ignore"  # Allow extra fields from environment
+        
+        @classmethod
+        def customise_sources(
+            cls,
+            init_settings,
+            env_settings,
+            file_secret_settings,
+        ):
+            # Prioritize .env file, then environment variables
+            return (
+                init_settings,
+                env_settings,
+                file_secret_settings,
+            )
  
  
 @lru_cache()
