@@ -412,13 +412,14 @@ class QualityService:
             limit: Number of messages to retrieve (default: 12)
         
         Returns:
-            List of quality data dictionaries, most recent first
+            List of quality data dictionaries, oldest first (ascending order)
         """
         try:
             redis_client = get_redis()
             history_key = f"quality_history:{patient_id}"
             
             # Get last N messages (0 to limit-1, since lrange is inclusive)
+            # Redis lpush stores newest at index 0, so this gets newest first
             raw_history = redis_client.lrange(history_key, 0, limit - 1)
             
             if not raw_history:
@@ -433,6 +434,9 @@ class QualityService:
                 except json.JSONDecodeError as e:
                     logger.warning(f"Failed to parse Redis message for patient {patient_id}: {e}")
                     continue
+            
+            # Reverse to get ascending order (oldest first)
+            history.reverse()
             
             return history
         except Exception as e:

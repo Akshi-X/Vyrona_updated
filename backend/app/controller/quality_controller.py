@@ -116,7 +116,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 # Get last 12 messages from Redis and send them
                                 history = quality_service.get_patient_redis_history(patient_id, limit=12)
                                 
-                                # Send history messages first (most recent first)
+                                # Send history messages first (oldest first, ascending order)
                                 for historical_data in history:
                                     await websocket.send_json(historical_data)
                                 
