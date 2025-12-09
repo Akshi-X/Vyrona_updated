@@ -766,81 +766,134 @@ class LaneRiskService:
         if not flight_legs:
             return None, "No flight legs"
         
-        # Calculate flight performance for all flight legs
-        flight_scores = []
-        total_flights = 0
-        on_time_count = 0
-        late_count = 0
-        very_late_count = 0
-        excessive_count = 0
-        cancelled_count = 0
-        diverted_count = 0
+        # Calculate OTP for all flight legs using the new OTP service
+        otp_results = []
+        all_categories = []
         
         for leg in flight_legs:
-            # Try to get flight performance data
-            flight_performance = self._get_flight_performance_data(leg)
+            # Automatically extract flight code from leg
+            flight_code = self._extract_flight_code(leg)
             
-            if flight_performance:
-                total_flights += 1
-                flightstats_indicator = flight_performance.get('flightstats_indicator', None)
-                status = flight_performance.get('status', 'unknown')
-                
-                # Count by status
-                if status == 'on_time':
-                    on_time_count += 1
-                elif status == 'late':
-                    late_count += 1
-                elif status == 'very_late':
-                    very_late_count += 1
-                elif status == 'excessive':
-                    excessive_count += 1
-                elif status == 'cancelled':
-                    cancelled_count += 1
-                elif status == 'diverted':
-                    diverted_count += 1
-                
-                # Map FlightStats indicator (0-5) to our score (0.5-4.5)
-                if flightstats_indicator is not None:
-                    # Linear mapping: 0 -> 0.5, 5 -> 4.5
-                    mapped_score = 0.5 + (flightstats_indicator * 0.8)  # 0.8 = (4.5-0.5)/5
-                    flight_scores.append(mapped_score)
+            # Get destination country from shipment
+            destination_country = None
+            if leg.shipment:
+                destination_country = leg.shipment.destination_country
+            
+            # Log flight code extraction for debugging
+            logger.info(
+                f"Processing flight leg {leg.id}: flight_code={flight_code}, "
+                f"from={leg.from_location}, to={leg.to_location}, "
+                f"destination_country={destination_country}"
+            )
+            
+            # Calculate OTP with automatic fallback chaining
+            otp_result = self._calculate_otp_for_leg(
+                leg=leg,
+                flight_code=flight_code,
+                destination_country=destination_country
+            )
+            
+            if otp_result:
+                otp_results.append(otp_result)
+                all_categories.extend(otp_result.get('delay_categories', []))
+                logger.info(
+                    f"OTP result for leg {leg.id}: {otp_result['source_used']} - "
+                    f"indicator={otp_result['indicator_score']}, "
+                    f"classification={otp_result['classification']}, "
+                    f"categories={otp_result['delay_categories']}"
+                )
+            else:
+                logger.warning(f"No OTP result for leg {leg.id} - all sources failed")
         
-        if not flight_scores:
+        if not otp_results:
             # Fallback: Use World Bank Timeliness Index for the route
-            logger.debug("No flight performance data available, using World Bank Timeliness Index as fallback")
+            logger.debug("No OTP data available, using World Bank Timeliness Index as fallback")
             timeliness_score, timeliness_info = self._calculate_world_bank_timeliness_score(shipments)
             if timeliness_score is not None:
                 return timeliness_score, f"Fallback: {timeliness_info}"
             return None, "No flight data available"
         
-        # Calculate average score
-        avg_score = sum(flight_scores) / len(flight_scores)
-        classification = LaneRiskUtils.score_to_classification(avg_score)
+        # Aggregate indicators from all OTP results
+        indicators = [result['indicator_score'] for result in otp_results]
+        avg_indicator = sum(indicators) / len(indicators) if indicators else 0.0
+        
+        # Map indicator (0-5) to lane score (0.5-4.5)
+        # Linear mapping: 0 -> 0.5, 5 -> 4.5
+        lane_score = 0.5 + (avg_indicator * 0.8)  # 0.8 = (4.5-0.5)/5
+        classification = LaneRiskUtils.score_to_classification(lane_score)
+        
+        # Determine primary data source
+        sources = [result['source_used'] for result in otp_results]
+        primary_source = sources[0] if sources else 'unknown'
+        
+        # Count categories
+        category_counts = {}
+        for cat in all_categories:
+            category_counts[cat] = category_counts.get(cat, 0) + 1
         
         # Build description
         status_parts = []
-        if on_time_count > 0:
-            status_parts.append(f"{on_time_count} on-time")
-        if late_count > 0:
-            status_parts.append(f"{late_count} late")
-        if very_late_count > 0:
-            status_parts.append(f"{very_late_count} very late")
-        if excessive_count > 0:
-            status_parts.append(f"{excessive_count} excessive")
-        if cancelled_count > 0:
-            status_parts.append(f"{cancelled_count} cancelled")
-        if diverted_count > 0:
-            status_parts.append(f"{diverted_count} diverted")
+        if category_counts.get('on_time', 0) > 0:
+            status_parts.append(f"{category_counts['on_time']} on-time")
+        if category_counts.get('late', 0) > 0:
+            status_parts.append(f"{category_counts['late']} late")
+        if category_counts.get('very_late', 0) > 0:
+            status_parts.append(f"{category_counts['very_late']} very late")
+        if category_counts.get('excessive', 0) > 0:
+            status_parts.append(f"{category_counts['excessive']} excessive")
+        if category_counts.get('cancelled', 0) > 0:
+            status_parts.append(f"{category_counts['cancelled']} cancelled")
+        if category_counts.get('diverted', 0) > 0:
+            status_parts.append(f"{category_counts['diverted']} diverted")
         
         if status_parts:
-            info = f"{total_flights} flight(s): {', '.join(status_parts)} ({classification})"
+            info = f"{len(otp_results)} flight(s): {', '.join(status_parts)} ({classification}, source: {primary_source})"
         else:
-            info = f"{total_flights} flight(s) ({classification})"
+            info = f"{len(otp_results)} flight(s) ({classification}, source: {primary_source})"
         
-        logger.info(f"Flight Performance Calculation - Flight legs: {len(flight_legs)}, "
-                   f"Total flights analyzed: {total_flights}, Score: {avg_score:.2f} ({classification})")
+        # Format detailed log message with all data
+        log_details = (
+            f"OTP Calculation Complete - "
+            f"flight_legs={len(flight_legs)}, "
+            f"otp_results={len(otp_results)}, "
+            f"avg_indicator={round(avg_indicator, 2)}, "
+            f"lane_score={round(lane_score, 2)}, "
+            f"classification={classification}, "
+            f"primary_source={primary_source}, "
+            f"categories={category_counts}"
+        )
         
-        return avg_score, info
+        # Add per-leg details
+        if otp_results:
+            log_details += " | Per-leg details: "
+            leg_details = []
+            for idx, result in enumerate(otp_results):
+                leg_details.append(
+                    f"leg{idx+1}[source={result['source_used']}, "
+                    f"indicator={result['indicator_score']}, "
+                    f"classification={result['classification']}, "
+                    f"categories={result['delay_categories']}]"
+                )
+            log_details += ", ".join(leg_details)
+        
+        logger.info(log_details)
+        
+        # Also log with extra for structured logging systems
+        logger.info(
+            "OTP Calculation Complete (structured)",
+            extra={
+                "flight_legs": len(flight_legs),
+                "otp_results": len(otp_results),
+                "avg_indicator": round(avg_indicator, 2),
+                "lane_score": round(lane_score, 2),
+                "classification": classification,
+                "primary_source": primary_source,
+                "categories": category_counts,
+                "otp_result_details": otp_results,
+            }
+        )
+        
+        return lane_score, info
     
     def _get_flight_performance_data(self, leg) -> Optional[Dict[str, Any]]:
         """
@@ -912,12 +965,14 @@ class LaneRiskService:
             Dictionary with flight performance data or None if unavailable
         """
         api_key = getattr(settings, 'FLIGHTRADAR24_API_KEY', None)
+        logger.info(f"FR24 API key check: key_exists={api_key is not None}, key_length={len(api_key) if api_key else 0}, key_preview={api_key[:20] + '...' if api_key and len(api_key) > 20 else api_key}")
         if not api_key:
-            logger.debug("FlightRadar24 API key not configured")
+            logger.warning(f"FlightRadar24 API key not configured - cannot fetch data for {flight_code}")
+            logger.warning(f"Please check: 1) .env file exists in backend/ directory, 2) FLIGHTRADAR24_API_KEY is set, 3) Server was restarted after adding the key")
             return None
         
         if not HTTPX_AVAILABLE:
-            logger.debug("httpx not available for FlightRadar24 API calls")
+            logger.warning(f"httpx not available for FlightRadar24 API calls - cannot fetch data for {flight_code}")
             return None
         
         # Check cache first
@@ -958,14 +1013,36 @@ class LaneRiskService:
             # Alternative: If API uses query parameter instead of header
             # params["token"] = api_key_value
             
-            # Use shared HTTP client
-            if _http_client:
-                response = _http_client.get(url, params=params, headers=headers)
-            else:
-                response = httpx.get(url, params=params, headers=headers, timeout=10.0)
+            response = None
+            key_param = api_key_value.split("|", 1)[0] if "|" in api_key_value else api_key_value
             
-            response.raise_for_status()
+            # Attempt 1: token as query param (sandbox-friendly), no Authorization header
+            params_token = params.copy()
+            params_token["token"] = key_param
+            headers_token = {
+                "Accept": "application/json",
+                "User-Agent": "fr24-sandbox-client"
+            }
+            try:
+                if _http_client:
+                    response = _http_client.get(url, params=params_token, headers=headers_token)
+                else:
+                    response = httpx.get(url, params=params_token, headers=headers_token, timeout=10.0)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 403:
+                    logger.info(f"FR24 token-param auth failed (403); retrying with bearer for {flight_code}")
+                    # Attempt 2: bearer with full key
+                    if _http_client:
+                        response = _http_client.get(url, params=params, headers=headers)
+                    else:
+                        response = httpx.get(url, params=params, headers=headers, timeout=10.0)
+                    response.raise_for_status()
+                else:
+                    raise
             data = response.json()
+            
+            logger.info(f"FR24 API response received for {flight_code}: status={response.status_code}, has_data={bool(data)}")
             
             # Parse FlightRadar24 response
             # API response structure may vary - handle multiple possible formats
@@ -990,76 +1067,79 @@ class LaneRiskService:
                 # Format 3: Direct flight object
                 if not flight_data and data.get("flight"):
                     flight_data = data["flight"]
-            
-            if flight_data:
                 
-                # Extract delay information
-                scheduled_departure = flight_data.get("time", {}).get("scheduled", {}).get("departure")
-                actual_departure = flight_data.get("time", {}).get("real", {}).get("departure")
-                status = flight_data.get("status", {}).get("text", "").lower()
-                
-                delay_minutes = 0
-                flight_status = "on_time"
-                
-                if "cancelled" in status or "canceled" in status:
-                    flight_status = "cancelled"
-                elif "diverted" in status:
-                    flight_status = "diverted"
-                elif scheduled_departure and actual_departure:
-                    # Calculate delay
+                if flight_data:
+                    # Extract delay information
+                    scheduled_departure = flight_data.get("time", {}).get("scheduled", {}).get("departure")
+                    actual_departure = flight_data.get("time", {}).get("real", {}).get("departure")
+                    status = flight_data.get("status", {}).get("text", "").lower()
+                    
+                    delay_minutes = 0
+                    flight_status = "on_time"
+                    
+                    if "cancelled" in status or "canceled" in status:
+                        flight_status = "cancelled"
+                    elif "diverted" in status:
+                        flight_status = "diverted"
+                    elif scheduled_departure and actual_departure:
+                        # Calculate delay
+                        try:
+                            scheduled = datetime.fromtimestamp(scheduled_departure, tz=timezone.utc)
+                            actual = datetime.fromtimestamp(actual_departure, tz=timezone.utc)
+                            delay_minutes = int((actual - scheduled).total_seconds() / 60)
+                            
+                            if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"]:
+                                flight_status = "on_time"
+                            elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["LATE_THRESHOLD_MINUTES"]:
+                                flight_status = "late"
+                            elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["VERY_LATE_THRESHOLD_MINUTES"]:
+                                flight_status = "very_late"
+                            else:
+                                flight_status = "excessive"
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    # Calculate FlightStats indicator (0-5) based on performance
+                    # Formula: Higher on-time rate = higher indicator
+                    # Simplified: Based on delay and status
+                    if flight_status == "cancelled":
+                        flightstats_indicator = 0.0
+                    elif flight_status == "diverted":
+                        flightstats_indicator = 0.5
+                    elif flight_status == "excessive":
+                        flightstats_indicator = 1.0
+                    elif flight_status == "very_late":
+                        flightstats_indicator = 1.5
+                    elif flight_status == "late":
+                        flightstats_indicator = 2.5
+                    else:  # on_time
+                        flightstats_indicator = 4.5
+                    
+                    performance_data = {
+                        "flightstats_indicator": flightstats_indicator,
+                        "status": flight_status,
+                        "delay_minutes": delay_minutes,
+                        "source": "flightradar24"
+                    }
+                    
+                    # Cache the result
                     try:
-                        scheduled = datetime.fromtimestamp(scheduled_departure, tz=timezone.utc)
-                        actual = datetime.fromtimestamp(actual_departure, tz=timezone.utc)
-                        delay_minutes = int((actual - scheduled).total_seconds() / 60)
-                        
-                        if delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["ON_TIME_THRESHOLD_MINUTES"]:
-                            flight_status = "on_time"
-                        elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["LATE_THRESHOLD_MINUTES"]:
-                            flight_status = "late"
-                        elif delay_minutes < FLIGHT_PERFORMANCE_CONSTANTS["VERY_LATE_THRESHOLD_MINUTES"]:
-                            flight_status = "very_late"
-                        else:
-                            flight_status = "excessive"
-                    except (ValueError, TypeError):
-                        pass
-                
-                # Calculate FlightStats indicator (0-5) based on performance
-                # Formula: Higher on-time rate = higher indicator
-                # Simplified: Based on delay and status
-                if flight_status == "cancelled":
-                    flightstats_indicator = 0.0
-                elif flight_status == "diverted":
-                    flightstats_indicator = 0.5
-                elif flight_status == "excessive":
-                    flightstats_indicator = 1.0
-                elif flight_status == "very_late":
-                    flightstats_indicator = 1.5
-                elif flight_status == "late":
-                    flightstats_indicator = 2.5
-                else:  # on_time
-                    flightstats_indicator = 4.5
-                
-                performance_data = {
-                    "flightstats_indicator": flightstats_indicator,
-                    "status": flight_status,
-                    "delay_minutes": delay_minutes,
-                    "source": "flightradar24"
-                }
-                
-                # Cache the result
-                try:
-                    r = get_redis()
-                    ttl_seconds = int(FLIGHT_PERFORMANCE_CACHE_TTL.total_seconds())
-                    r.setex(cache_key, ttl_seconds, json.dumps(performance_data))
-                except Exception as e:
-                    logger.debug(f"Failed to cache FlightRadar24 data: {e}")
-                
-                return performance_data
+                        r = get_redis()
+                        ttl_seconds = int(FLIGHT_PERFORMANCE_CACHE_TTL.total_seconds())
+                        r.setex(cache_key, ttl_seconds, json.dumps(performance_data))
+                    except Exception as e:
+                        logger.debug(f"Failed to cache FlightRadar24 data: {e}")
+                    
+                    return performance_data
+                else:
+                    logger.warning(f"FR24 API returned data but no flight_data found for {flight_code}")
+            else:
+                logger.warning(f"FR24 API returned invalid response format (not a dict) for {flight_code}")
         
         except httpx.HTTPError as e:
-            logger.debug(f"FlightRadar24 API HTTP error for {flight_code}: {e}")
+            logger.warning(f"FlightRadar24 API HTTP error for {flight_code}: {e}")
         except Exception as e:
-            logger.debug(f"Error fetching FlightRadar24 data for {flight_code}: {e}")
+            logger.warning(f"Error fetching FlightRadar24 data for {flight_code}: {e}", exc_info=True)
         
         return None
     
@@ -1164,6 +1244,228 @@ class LaneRiskService:
         Get flight performance from regional data sources.
         """
         return None
+    
+    def _calculate_otp_for_leg(
+        self,
+        leg,
+        flight_code: Optional[str] = None,
+        destination_country: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Main OTP calculation wrapper with fallback chaining.
+        
+        Follows exact priority sequence:
+        1. Flightradar24 (FR24) - Primary
+        2. BTS (USA flights) - Fallback
+        3. Eurocontrol (European flights) - Fallback
+        4. World Bank LPI Timeliness Index - Fallback
+        5. myGrape Internal Historical Shipment Data - Fallback
+        
+        Returns:
+            OTP result dict with format:
+            {
+                "indicator_score": float (0-5),
+                "classification": str,
+                "delay_categories": [str],
+                "source_used": str
+            }
+        """
+        # 1. Try Flightradar24 (Primary)
+        if flight_code:
+            logger.info(f"Attempting FR24 for flight_code={flight_code}, leg_id={leg.id}")
+            fr24_result = self._compute_otp_fr24(flight_code, leg)
+            if fr24_result:
+                logger.info(f"FR24 succeeded for flight_code={flight_code}, leg_id={leg.id}")
+                return fr24_result
+            else:
+                logger.info(f"FR24 failed for flight_code={flight_code}, leg_id={leg.id} - trying fallbacks")
+        else:
+            logger.info(f"No flight_code for leg_id={leg.id} - skipping FR24, trying fallbacks")
+        
+        # 2. Try BTS (USA flights)
+        if destination_country and self._is_us_country(destination_country):
+            logger.debug(f"Attempting BTS for leg_id={leg.id}, country={destination_country}")
+            bts_result = self._compute_otp_bts(leg)
+            if bts_result:
+                logger.info(f"BTS succeeded for leg_id={leg.id}")
+                return bts_result
+        
+        # 3. Try Eurocontrol (European flights)
+        if destination_country and self._is_eu_country(destination_country):
+            logger.debug(f"Attempting Eurocontrol for leg_id={leg.id}, country={destination_country}")
+            euro_result = self._compute_otp_eurocontrol(leg)
+            if euro_result:
+                logger.info(f"Eurocontrol succeeded for leg_id={leg.id}")
+                return euro_result
+        
+        # 4. Try World Bank LPI Timeliness Index
+        if destination_country:
+            logger.debug(f"Attempting World Bank LPI for leg_id={leg.id}, country={destination_country}")
+            lpi_result = self._compute_otp_worldbank(destination_country)
+            if lpi_result:
+                logger.info(f"World Bank LPI succeeded for leg_id={leg.id}, country={destination_country}")
+                return lpi_result
+        
+        # 5. Try Internal Historical Data
+        if leg.from_location and leg.to_location:
+            logger.debug(f"Attempting Internal data for leg_id={leg.id}, route={leg.from_location}->{leg.to_location}")
+            internal_result = self._compute_otp_internal(leg)
+            if internal_result:
+                logger.info(f"Internal data succeeded for leg_id={leg.id}")
+                return internal_result
+        
+        logger.warning(f"All OTP sources failed for leg_id={leg.id}")
+        return None
+    
+    def _compute_otp_fr24(self, flight_code: str, leg) -> Optional[Dict[str, Any]]:
+        """Compute OTP from FlightRadar24 data (Primary source)."""
+        logger.info(f"Fetching FR24 data for flight_code={flight_code}, leg_id={leg.id}")
+        fr24_data = self._fetch_flightradar24_performance(flight_code, leg)
+        if not fr24_data:
+            logger.info(f"FR24 returned no data for flight_code={flight_code}, leg_id={leg.id}")
+            return None
+        
+        # Extract delay and status from FR24 data
+        delay_minutes = fr24_data.get('delay_minutes')
+        status = fr24_data.get('status', 'on_time')
+        cancelled = status == 'cancelled'
+        diverted = status == 'diverted'
+        
+        # Map delay to category
+        category = LaneRiskUtils.map_delay_to_category(delay_minutes, cancelled, diverted)
+        
+        # Convert category to indicator
+        indicator = LaneRiskUtils.category_to_indicator(category)
+        
+        # Convert indicator to classification
+        classification = LaneRiskUtils.indicator_to_classification(indicator)
+        
+        return {
+            "indicator_score": round(indicator, 2),
+            "classification": classification,
+            "delay_categories": [category],
+            "source_used": "fr24"
+        }
+    
+    def _compute_otp_bts(self, leg) -> Optional[Dict[str, Any]]:
+        """Compute OTP from BTS (Bureau of Transportation Statistics) data."""
+        # TODO: Implement BTS API integration
+        # For now, returns None (stub)
+        logger.debug("BTS OTP computation not yet implemented")
+        return None
+    
+    def _compute_otp_eurocontrol(self, leg) -> Optional[Dict[str, Any]]:
+        """Compute OTP from Eurocontrol data."""
+        # TODO: Implement Eurocontrol API integration
+        # For now, returns None (stub)
+        logger.debug("Eurocontrol OTP computation not yet implemented")
+        return None
+    
+    def _compute_otp_worldbank(self, destination_country: str) -> Optional[Dict[str, Any]]:
+        """Compute OTP from World Bank LPI Timeliness Index."""
+        try:
+            lpi_score = self._get_world_bank_timeliness_score(destination_country)
+            if lpi_score is None:
+                return None
+            
+            # Round LPI score (1-5) to indicator (0-5)
+            indicator = round(lpi_score)
+            indicator = max(0.0, min(5.0, indicator))
+            
+            classification = LaneRiskUtils.indicator_to_classification(indicator)
+            
+            # Map LPI score to approximate category
+            if indicator >= 4.0:
+                category = "on_time"
+            elif indicator >= 3.0:
+                category = "late"
+            elif indicator >= 2.0:
+                category = "very_late"
+            else:
+                category = "excessive"
+            
+            return {
+                "indicator_score": round(indicator, 2),
+                "classification": classification,
+                "delay_categories": [category],
+                "source_used": "world_bank_lpi"
+            }
+        except Exception as e:
+            logger.debug(f"World Bank LPI OTP computation error: {e}")
+            return None
+    
+    def _compute_otp_internal(self, leg) -> Optional[Dict[str, Any]]:
+        """Compute OTP from myGrape Internal Historical Shipment Data."""
+        try:
+            from sqlalchemy import and_
+            
+            # Get historical flight legs on this route
+            completed_legs = self.db.query(ShipmentLeg).filter(
+                and_(
+                    ShipmentLeg.from_location == leg.from_location,
+                    ShipmentLeg.to_location == leg.to_location,
+                    ShipmentLeg.mode_of_transport.in_(['air', 'flight', 'airplane', 'aircraft', 'aviation']),
+                    ShipmentLeg.arrival_time.isnot(None),
+                    ShipmentLeg.scheduled_time.isnot(None)
+                )
+            ).limit(100).all()
+            
+            if len(completed_legs) < 5:  # Need at least 5 data points
+                return None
+            
+            historical_indicators = []
+            for completed_leg in completed_legs:
+                if completed_leg.arrival_time and completed_leg.scheduled_time:
+                    delay_seconds = (completed_leg.arrival_time - completed_leg.scheduled_time).total_seconds()
+                    delay_minutes = delay_seconds / 60.0
+                    category = LaneRiskUtils.map_delay_to_category(delay_minutes, False, False)
+                    indicator = LaneRiskUtils.category_to_indicator(category)
+                    historical_indicators.append(indicator)
+            
+            if not historical_indicators:
+                return None
+            
+            # Average historical indicators
+            avg_indicator = sum(historical_indicators) / len(historical_indicators)
+            avg_indicator = max(0.0, min(5.0, avg_indicator))
+            
+            classification = LaneRiskUtils.indicator_to_classification(avg_indicator)
+            
+            # Map average indicator to approximate category
+            if avg_indicator >= 4.0:
+                category = "on_time"
+            elif avg_indicator >= 3.0:
+                category = "late"
+            elif avg_indicator >= 2.0:
+                category = "very_late"
+            else:
+                category = "excessive"
+            
+            return {
+                "indicator_score": round(avg_indicator, 2),
+                "classification": classification,
+                "delay_categories": [category],
+                "source_used": "internal"
+            }
+        except Exception as e:
+            logger.debug(f"Internal OTP computation error: {e}")
+            return None
+    
+    def _is_us_country(self, country_code: str) -> bool:
+        """Check if country is United States."""
+        us_codes = {'US', 'USA', 'UNITED STATES', 'UNITED STATES OF AMERICA'}
+        return country_code.upper() in us_codes
+    
+    def _is_eu_country(self, country_code: str) -> bool:
+        """Check if country is in Europe."""
+        eu_codes = {
+            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
+            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'UK', 'NO',
+            'CH', 'IS', 'LI', 'AL', 'BA', 'ME', 'MK', 'RS', 'TR', 'UA',
+            'BY', 'MD', 'RU'
+        }
+        return country_code.upper() in eu_codes
 
     # ------------------------------------------------------------------
     # Helpers for status/indicator mapping and simulated fetches
