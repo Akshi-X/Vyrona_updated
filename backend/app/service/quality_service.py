@@ -403,6 +403,46 @@ class QualityService:
             logger.error(f"Error filtering connections: {e}")
             raise QualityServiceException("get_connections_for_pharma", str(e))
     
+    def get_patient_redis_history(self, patient_id: str, limit: int = 12) -> List[dict]:
+        """
+        Get last N messages for a patient from Redis
+        
+        Args:
+            patient_id: Patient ID to get history for
+            limit: Number of messages to retrieve (default: 12)
+        
+        Returns:
+            List of quality data dictionaries, oldest first (ascending order)
+        """
+        try:
+            redis_client = get_redis()
+            history_key = f"quality_history:{patient_id}"
+            
+            # Get last N messages (0 to limit-1, since lrange is inclusive)
+            # Redis lpush stores newest at index 0, so this gets newest first
+            raw_history = redis_client.lrange(history_key, 0, limit - 1)
+            
+            if not raw_history:
+                return []
+            
+            # Parse JSON strings and return as list of dicts
+            history = []
+            for raw_data in raw_history:
+                try:
+                    data = json.loads(raw_data)
+                    history.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse Redis message for patient {patient_id}: {e}")
+                    continue
+            
+            # Reverse to get ascending order (oldest first)
+            history.reverse()
+            
+            return history
+        except Exception as e:
+            logger.error(f"Error retrieving Redis history for patient {patient_id}: {e}")
+            return []
+    
     async def redis_listener(self, connection_manager: 'ConnectionManager'):
         """
         Listen for messages from Redis and broadcast to WebSocket clients
