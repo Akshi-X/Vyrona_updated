@@ -7,6 +7,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.models.shipment_model import Shipment
 from app.models.shipment_leg_model import ShipmentLeg
@@ -591,7 +592,7 @@ class LaneRiskService:
         leg
     ) -> Optional[Tuple[int, float]]:
         """
-        Calculate parking stops from location history.
+        Calculate parking stops from stored geolocation history (DB-first).
         
         Detects stops by checking if lat/lng remains the same for >=10 minutes.
         A stop is detected when:
@@ -602,10 +603,9 @@ class LaneRiskService:
         - Number of stops detected
         - Total waiting minutes beyond the 10-minute threshold (e.g., 20min stop -> 10 waiting minutes)
         
-        **Data Source:**
-        - Redis location history: `location_history:{shipment_id}:{leg_order}`
-        - Format: List of JSON strings with {lat, lng, timestamp}
-        - Note: IoT device location history integration can be added when available
+        **Primary Data Source:**
+        - `geolocation` table (columns: current_latitude/current_longitude/reading_timestamp)
+        - Filtered by shipment_id and optionally by leg time window (departure/arrival)
         
         **Returns:**
         - Tuple (stops_detected, total_wait_minutes) or None if no location history available
@@ -618,68 +618,65 @@ class LaneRiskService:
         COORDINATE_TOLERANCE = 0.0001  # ~11 meters tolerance for "same location"
         
         try:
-            r = get_redis()
+            # 1) Fetch location points from DB geolocation table
+            params = {"shipment_id": leg.shipment_id}
+            time_filter = ""
+            if leg.departure_time and leg.arrival_time:
+                # Narrow to leg window when timestamps are available
+                time_filter = " AND reading_timestamp BETWEEN :start_ts AND :end_ts"
+                params["start_ts"] = leg.departure_time
+                params["end_ts"] = leg.arrival_time
             
-            # Try to get location history from Redis
-            # Format: List of JSON strings with {lat, lng, timestamp}
-            location_key = f"location_history:{leg.shipment_id}:{leg.leg_order}"
-            location_history = r.lrange(location_key, 0, -1)
+            geo_query = text(
+                f"""
+                SELECT current_latitude, current_longitude, reading_timestamp
+                FROM geolocation
+                WHERE shipment_id = :shipment_id
+                {time_filter}
+                ORDER BY reading_timestamp ASC
+                """
+            )
+            rows = self.db.execute(geo_query, params).fetchall()
             
-            if not location_history or len(location_history) < 2:
-                # Not enough data points to detect stops
-                logger.debug(f"Leg {leg.id}: Insufficient location history data ({len(location_history) if location_history else 0} points)")
-                return None
-            
-            # Parse location history
             location_points = []
-            for item in location_history:
+            for row in rows:
+                lat = getattr(row, "current_latitude", None)
+                lng = getattr(row, "current_longitude", None)
+                ts = getattr(row, "reading_timestamp", None)
+                
+                if lat is None or lng is None or ts is None:
+                    continue
+                
                 try:
-                    point = json.loads(item)
-                    lat = point.get('lat') or point.get('latitude')
-                    lng = point.get('lng') or point.get('longitude')
-                    timestamp_str = point.get('timestamp') or point.get('time')
-                    
-                    if lat is None or lng is None or not timestamp_str:
-                        continue
-                    
-                    # Parse timestamp
-                    try:
-                        if isinstance(timestamp_str, str):
-                            # Try parsing ISO format
-                            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                        else:
-                            timestamp = timestamp_str
-                        
-                        # Normalize to UTC if timezone-naive
-                        if timestamp.tzinfo is None:
-                            timestamp = timestamp.replace(tzinfo=timezone.utc)
-                        else:
-                            timestamp = timestamp.astimezone(timezone.utc)
-                    except (ValueError, AttributeError) as e:
-                        logger.debug(f"Leg {leg.id}: Error parsing timestamp {timestamp_str}: {e}")
-                        continue
-                    
+                    timestamp = ts if not isinstance(ts, str) else datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                    # Normalize to UTC if timezone-naive
+                    if timestamp.tzinfo is None:
+                        timestamp = timestamp.replace(tzinfo=timezone.utc)
+                    else:
+                        timestamp = timestamp.astimezone(timezone.utc)
+                except Exception as parse_err:
+                    logger.debug(f"Leg {leg.id}: Error parsing geolocation timestamp {ts}: {parse_err}")
+                    continue
+                
+                try:
                     location_points.append({
                         'lat': float(lat),
                         'lng': float(lng),
                         'timestamp': timestamp
                     })
-                except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-                    logger.debug(f"Leg {leg.id}: Error parsing location point: {e}")
+                except (TypeError, ValueError):
                     continue
             
             if len(location_points) < 2:
-                logger.debug(f"Leg {leg.id}: Insufficient valid location points ({len(location_points)})")
+                logger.debug(f"Leg {leg.id}: Insufficient geolocation points ({len(location_points)})")
                 return None
             
-            # Sort by timestamp
+            # 2) Stop detection (unchanged logic)
             location_points.sort(key=lambda x: x['timestamp'])
             
-            # One-pass stillness window (streaming-friendly)
             stops_detected = 0
             total_wait_minutes = 0.0
             
-            # Initialize state with the first point
             last_point = location_points[0]
             current_stop_minutes = 0.0
             
@@ -728,11 +725,11 @@ class LaneRiskService:
                     f"Location: ({last_point['lat']:.4f}, {last_point['lng']:.4f})"
                 )
             
-            logger.info(f"Leg {leg.id}: Detected {stops_detected} parking stops from location history")
+            logger.info(f"Leg {leg.id}: Detected {stops_detected} parking stops from geolocation history")
             return stops_detected, total_wait_minutes
             
         except Exception as e:
-            logger.warning(f"Error calculating parking stops from location history for leg {leg.id}: {e}")
+            logger.warning(f"Error calculating parking stops from geolocation history for leg {leg.id}: {e}")
             return None
     
     def _calculate_on_time_flight_performance(
