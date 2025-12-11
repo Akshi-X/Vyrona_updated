@@ -227,6 +227,15 @@ IOT_ERROR_FIELD_ERRORS = "errors"
 IOT_ERROR_FIELD_TRACE_ID = "traceId"
 
 # ============================================
+# WEBHOOK STATUS CONSTANTS
+# ============================================
+WEBHOOK_ENDPOINT_ACTIVE = True
+WEBHOOK_ENDPOINT_INACTIVE = False
+WEBHOOK_NOT_RECEIVED_FLAG = False
+WEBHOOK_TOTAL_RECEIVED_DEFAULT = 0
+WEBHOOK_LAST_RECEIVED_AT_DEFAULT = None
+
+# ============================================
 # COMMON API RESPONSE HEADERS
 # ============================================
 # Common headers used across all API responses for CORS and security
