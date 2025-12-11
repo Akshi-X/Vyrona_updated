@@ -66,6 +66,7 @@ class ShipmentService extends BaseApiService {
       source_longitude: number;
       destination_latitude: number;
       destination_longitude: number;
+      route_status?: string;
     }>
   > {
     const params = new URLSearchParams();
@@ -92,6 +93,7 @@ class ShipmentService extends BaseApiService {
         source_longitude: number;
         destination_latitude: number;
         destination_longitude: number;
+        route_status?: string;
       }>;
       total_routes?: number;
     } | Array<any>>(url);
