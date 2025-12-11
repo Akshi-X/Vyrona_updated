@@ -396,8 +396,13 @@ class ExternalFactorsCalculator:
         try:
             if HTTPX_AVAILABLE and _http_client:
                 response = _http_client.get(url, params=params)
-            else:
+            elif HTTPX_AVAILABLE:
+                import httpx
+
                 response = httpx.get(url, params=params, timeout=10.0)
+            else:
+                logger.warning("httpx not available; skipping live weather lookup")
+                return None
             response.raise_for_status()
             data = response.json()
 

@@ -1,479 +1,106 @@
-"""
-Lane Risk Assessment Service
-Calculates risk assessment for shipment lanes based on complexity, quality incidents, and external factors
-"""
-import logging
+"""Lane complexity risk factor calculations."""
 import json
-from typing import Any, Dict, List, Optional, Tuple
+import logging
 from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
+from typing import Any, Dict, List, Optional, Tuple
+
 from sqlalchemy import text
 
-from app.models.shipment_model import Shipment
-from app.models.shipment_leg_model import ShipmentLeg
-from app.service.quality_service import QualityService
-from app.service.shipment_service import ShipmentService
-from app.service.redis_service import get_redis
 from app.config.config import settings
-from app.utils.lane_risk_utils import LaneRiskUtils
 from app.constants.lane_risk_constants import (
-    WEATHER_CONSTANTS,
-    FLIGHT_PERFORMANCE_CONSTANTS,
-    LPI_CACHE_TTL,
-    WEATHER_CACHE_TTL,
     FLIGHT_PERFORMANCE_CACHE_TTL,
-    LPI_REDIS_KEY_PREFIX,
-    LPI_OVERALL_REDIS_KEY_PREFIX,
+    FLIGHT_PERFORMANCE_CONSTANTS,
     FLIGHT_PERFORMANCE_REDIS_KEY_PREFIX,
+    LPI_CACHE_TTL,
+    LPI_OVERALL_REDIS_KEY_PREFIX,
+    LPI_REDIS_KEY_PREFIX,
     LPI_TIMELINESS_FALLBACK_MAP,
+    WEATHER_CACHE_TTL,
+    WEATHER_CONSTANTS,
 )
+from app.models.shipment_leg_model import ShipmentLeg
+from app.models.shipment_model import Shipment
+from app.service.redis_service import get_redis
+from app.utils.lane_risk_utils import LaneRiskUtils
 
 logger = logging.getLogger(__name__)
 
-# Try to import httpx for external API calls (available in dev dependencies)
+# Optional httpx client for external calls
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
-    # Create a shared HTTP client with connection pooling for better performance
     _http_client = httpx.Client(
-        timeout=httpx.Timeout(60.0, connect=10.0), 
-        limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)
+        timeout=httpx.Timeout(60.0, connect=10.0),
+        limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
     )
 except ImportError:
     HTTPX_AVAILABLE = False
     _http_client = None
-    logger.warning("httpx not available. External API calls will use cached data only.")
+    logger.warning("httpx not available. Flight OTP will rely on cached/fallback data.")
 
 
+class LaneComplexityCalculator:
+    """Encapsulates lane-complexity related risk calculations."""
 
-
-class LaneRiskService:
-    """Service for calculating lane risk assessments"""
-    
-    def __init__(self, db: Session):
+    def __init__(self, db):
         self.db = db
-        self.quality_service = QualityService(db)
-    
-    def calculate_lane_risk_assessment(
-        self,
-        patient_id: str,
-        pharma_id: Optional[int] = None
-    ) -> Dict:
-        """
-        Calculate comprehensive lane risk assessment
-        
-        Args:
-            patient_id: Patient ID to aggregate shipments for
-            pharma_id: Optional pharma ID to filter shipments
-            
-        Returns:
-            Dictionary with risk assessment data
-        """
-        # Initialize active_shipment_id to None in case of early exceptions
-        active_shipment_id = None
-        
-        try:
-            if not patient_id:
-                raise ValueError("patient_id is required for lane risk assessment")
-            
-            # Validate patient ownership if pharma context provided
-            if pharma_id is not None:
-                self.quality_service.validate_patient_belongs_to_pharma(patient_id, pharma_id)
-            
-            shipments, active_shipment_id = self._get_shipments(patient_id, pharma_id)
-            factors = []
-            
-            # 1. Lane Complexity
-            lane_complexity = self._calculate_lane_complexity(shipments)
-            factors.append(lane_complexity)
-            
-            # 2. Quality Incidents
-            quality_incidents = self._calculate_quality_incidents(shipments)
-            factors.append(quality_incidents)
-            
-            # 3. External Factors
-            external_factors = self._calculate_external_factors(shipments)
-            factors.append(external_factors)
-            
-            return {
-                "shipment_id": active_shipment_id,
-                "patient_id": patient_id,
-                "total_risk_factors": len(factors),
-                "factors": factors,
-                "last_updated": datetime.now(timezone.utc),
-                "status": "success"
-            }
-            
-        except Exception as e:
-            logger.error(f"Error calculating lane risk assessment: {e}", exc_info=True)
-            return {
-                "shipment_id": active_shipment_id,
-                "patient_id": patient_id,
-                "total_risk_factors": 0,
-                "factors": [],
-                "last_updated": datetime.now(timezone.utc),
-                "status": "error"
-            }
-    
-    def _calculate_lane_complexity(
-        self,
-        shipments: List[Shipment]
-    ) -> Dict:
-        """
-        Calculate Lane Complexity risk factor
-        
-        Currently implemented:
-        - Number of legs (fully implemented)
-        - World Bank Timeliness Index (fully implemented)
-        
-        Pending implementation (will be added when details are available):
-        - Road parking stops
-        - On-time flight performance
-        """
-        contributors = []
-        scores = []
-        
-        # Get shipments to analyze
+
+    def calculate(self, shipments: List[Shipment]) -> Dict:
+        """Calculate Lane Complexity risk factor."""
+        contributors: List[str] = []
+        scores: List[float] = []
+
         if not shipments:
             return {
                 "risk_factor": "Lane Complexity",
                 "risk_contributors": ["-", "-", "-", "-"],
-                "risk_scale": "N/A"
+                "risk_scale": "N/A",
             }
-        
-        # 1. Number of Legs
-        num_legs_score, num_legs_classification = self._calculate_number_of_legs_score(shipments)
+
+        num_legs_score, num_legs_classification = self._calculate_number_of_legs_score(
+            shipments
+        )
         contributors.append(f"Number of Legs: {num_legs_classification}")
         scores.append(num_legs_score)
-        
-        # 2. Road Parking Stops
-        parking_stops_score, parking_stops_info = self._calculate_parking_stops_score(shipments)
+
+        parking_stops_score, parking_stops_info = self._calculate_parking_stops_score(
+            shipments
+        )
         contributors.append(parking_stops_info)
         if parking_stops_score is not None:
             scores.append(parking_stops_score)
-        
-        # 3. On-time Flight Performance
-        flight_performance_score, flight_performance_info = self._calculate_on_time_flight_performance(shipments)
-        contributors.append(f"On time flight performance: {flight_performance_info}")
-        if flight_performance_score is not None:
-            scores.append(flight_performance_score)
-        
-        # 4. World Bank Timeliness Index
-        timeliness_score, timeliness_info = self._calculate_world_bank_timeliness_score(shipments)
+
+        flight_score, flight_info = self._calculate_on_time_flight_performance(
+            shipments
+        )
+        contributors.append(f"On time flight performance: {flight_info}")
+        if flight_score is not None:
+            scores.append(flight_score)
+
+        timeliness_score, timeliness_info = self._calculate_world_bank_timeliness_score(
+            shipments
+        )
         contributors.append(f"World bank timeliness index: {timeliness_info}")
         if timeliness_score is not None:
             scores.append(timeliness_score)
-        
-        # Fill remaining contributors with "-"
+
         while len(contributors) < 4:
             contributors.append("-")
-        
-        # Calculate average score (only use available scores)
+
         if scores:
             avg_score = sum(scores) / len(scores)
             classification = LaneRiskUtils.score_to_classification(avg_score)
             risk_scale = f"{avg_score:.1f} ({classification})"
         else:
             risk_scale = "N/A"
-        
+
         return {
             "risk_factor": "Lane Complexity",
             "risk_contributors": contributors[:4],
-            "risk_scale": risk_scale
+            "risk_scale": risk_scale,
         }
     
-    def _calculate_quality_incidents(
-        self,
-        shipments: List[Shipment]
-    ) -> Dict:
-        """
-        Calculate Quality Incidents risk factor based on quality loss percentage.
-        
-        Quality Loss Percentage Ranges:
-        - ≥ 85% (Green): High quality - no or minimal excursions
-        - 60% – 84% (Yellow): Medium quality - moderate excursions
-        - < 60% (Red): Low quality / risk - severe excursions
-        
-        Excursion Types:
-        - High Excursion: KPIs exceeded acceptable range (above max threshold)
-        - Low Excursion: KPIs fell below acceptable range (below min threshold)
-        - Hybrid Excursion: Both high and low excursions occurred
-        
-        Based on: High/Low/Hybrid excursions, Missing logger, Missing logger data, Frequency of excursions
-        """
-        contributors = []
-        
-        # Get shipments to analyze
-        if not shipments:
-            return {
-                "risk_factor": "Quality Incidents",
-                "risk_contributors": ["-", "-", "-", "-"],
-                "risk_scale": "N/A"
-            }
-        
-        # Get patient IDs from shipments
-        patient_ids = [shipment.patient_id for shipment in shipments]
-        
-        # Analyze quality data from Redis
-        high_excursions = 0
-        low_excursions = 0
-        hybrid_excursions = 0
-        missing_logger_data = 0
-        total_excursions = 0
-        total_readings = 0
-        total_violations = 0
-        
-        try:
-            r = get_redis()
-            
-            # Batch fetch all quality histories at once using pipeline
-            pipe = r.pipeline()
-            history_keys = [f'quality_history:{patient_id}' for patient_id in patient_ids]
-            for key in history_keys:
-                pipe.lrange(key, 0, -1)
-            histories = pipe.execute()
-            
-            # Pre-compute KPI parameters set for faster lookup
-            kpi_parameters = ['temperature', 'humidity', 'agitation']
-            
-            # Process all histories
-            for idx, patient_id in enumerate(patient_ids):
-                history = histories[idx] if idx < len(histories) else []
-                
-                # Check for missing logger data
-                if not history:
-                    # No quality history data available = Missing Logger Data
-                    missing_logger_data += 1
-                    continue
-                
-                has_high = False
-                has_low = False
-                patient_violations = 0
-                patient_readings = 0
-                
-                # Process history items
-                for item in history:
-                    try:
-                        quality_data = json.loads(item)
-                        patient_readings += 1
-                        total_readings += 1
-                        
-                        violated_params = quality_data.get('violated_parameters', [])
-                        threshold_violations = quality_data.get('threshold_violations', {})
-                        
-                        # Check if there are any violations
-                        has_violation = bool(violated_params) or any(threshold_violations.values())
-                        
-                        if has_violation:
-                            total_excursions += 1
-                            patient_violations += 1
-                            total_violations += 1
-                            
-                            # Check for high/low excursions across all KPIs (Temperature, Humidity, Agitation)
-                            thresholds = quality_data.get('thresholds', {})
-                            
-                            # Check each KPI parameter for high/low excursions
-                            for param in kpi_parameters:
-                                param_value = quality_data.get(param)
-                                
-                                # Skip if parameter value is missing
-                                if param_value is None:
-                                    continue
-                                
-                                # Get threshold - handle both dict and object formats
-                                param_threshold = thresholds.get(param)
-                                if not param_threshold:
-                                    continue
-                                
-                                # Handle both dict and object formats (Pydantic models serialize to dict in JSON)
-                                if isinstance(param_threshold, dict):
-                                    param_max = param_threshold.get('max')
-                                    param_min = param_threshold.get('min')
-                                else:
-                                    # If it's an object, try to access attributes
-                                    param_max = getattr(param_threshold, 'max', None)
-                                    param_min = getattr(param_threshold, 'min', None)
-                                    
-                                    # Check for high excursion (exceeds max threshold)
-                                # High excursion: KPIs exceeded acceptable range
-                                if param_max is not None and isinstance(param_value, (int, float)):
-                                    if param_value > param_max:
-                                        has_high = True
-                                        logger.debug(f"High excursion detected: {param}={param_value} > max={param_max}")
-                                    
-                                    # Check for low excursion (falls below min threshold)
-                                # Low excursion: KPIs fell below acceptable range
-                                if param_min is not None and isinstance(param_value, (int, float)):
-                                    if param_value < param_min:
-                                        has_low = True
-                                        logger.debug(f"Low excursion detected: {param}={param_value} < min={param_min}")
-                    
-                    except (json.JSONDecodeError, KeyError, TypeError) as e:
-                        logger.debug(f"Error processing quality data item: {e}")
-                        continue
-                
-                # Classify excursion type for this patient
-                if has_high and has_low:
-                    hybrid_excursions += 1
-                elif has_high:
-                    high_excursions += 1
-                elif has_low:
-                    low_excursions += 1
-            
-        except Exception as e:
-            logger.warning(f"Error accessing Redis for quality data: {e}")
-            # On error, count all as missing logger data
-            missing_logger_data = len(patient_ids)
-        
-        # Calculate quality loss percentage
-        # Quality loss % = (total_violations / total_readings) * 100
-        # Cumulative Quality % = 100 - quality_loss_percentage
-        if total_readings > 0:
-            quality_loss_percentage = (total_violations / total_readings) * 100
-            cumulative_quality_percentage = 100 - quality_loss_percentage
-        else:
-            quality_loss_percentage = 0.0
-            cumulative_quality_percentage = 100.0
-        
-        # Log quality calculation for debugging
-        logger.info(
-            f"Quality Incidents Calculation - "
-            f"Patients analyzed: {len(patient_ids)}, "
-            f"Missing logger data: {missing_logger_data}, "
-            f"Total readings: {total_readings}, Total violations: {total_violations}, "
-            f"Quality loss: {quality_loss_percentage:.2f}%, "
-            f"Cumulative quality: {cumulative_quality_percentage:.2f}%, "
-            f"High excursions: {high_excursions}, Low excursions: {low_excursions}, Hybrid excursions: {hybrid_excursions}"
-        )
-        
-        # Build contributors with excursion details
-        # Always show the format for clarity, even if counts are 0
-        excursion_parts = []
-        excursion_parts.append(f"High: {high_excursions}")
-        excursion_parts.append(f"Low: {low_excursions}")
-        excursion_parts.append(f"Hybrid: {hybrid_excursions}")
-        
-        if high_excursions > 0 or low_excursions > 0 or hybrid_excursions > 0:
-            contributors.append(f"High/low/Hybrid excursions: {', '.join(excursion_parts)}")
-        else:
-            # Show format even when zero for transparency
-            contributors.append(f"High/low/Hybrid excursions: {', '.join(excursion_parts)}")
-        
-        contributors.append("-")  # Missing logger - not implemented yet
-        contributors.append(f"Missing logger data: {missing_logger_data}")
-        contributors.append(f"Frequency of excursions: {total_excursions}")
-        
-        # Calculate risk score based on cumulative quality percentage
-        # ≥ 85% (Green) = High quality = Excellent (4.5)
-        # 60% – 84% (Yellow) = Medium quality = Good to Moderate (2.5-3.5)
-        # < 60% (Red) = Low quality / risk = Basic to Moderate (0.5-1.5)
-        if cumulative_quality_percentage >= 85:
-            risk_score = 4.5  # Excellent - High quality (Green)
-        elif cumulative_quality_percentage >= 60:
-            # Medium quality (Yellow) - map to Good or Very Good based on severity
-            if cumulative_quality_percentage >= 75:
-                risk_score = 3.5  # Very Good
-            else:
-                risk_score = 2.5  # Good
-        else:
-            # Low quality / risk (Red) - map based on severity
-            if cumulative_quality_percentage >= 40:
-                risk_score = 1.5  # Moderate
-            else:
-                risk_score = 0.5  # Basic
-        
-        classification = LaneRiskUtils.score_to_classification(risk_score)
-        risk_scale = f"{risk_score:.1f} ({classification})"
-        
-        return {
-            "risk_factor": "Quality Incidents",
-            "risk_contributors": contributors[:4],
-            "risk_scale": risk_scale
-        }
-    
-    def _calculate_external_factors(
-        self,
-        shipments: List[Shipment]
-    ) -> Dict:
-        """
-        Calculate External Factors risk
-        Based on: Weather Adversities, Logistics Performance Index (LPI)
-        """
-        contributors = []
-        scores = []
-        
-        # Get shipments to analyze
-        if not shipments:
-            return {
-                "risk_factor": "External",
-                "risk_contributors": ["-", "-", "-", "-"],
-                "risk_scale": "N/A"
-            }
-        
-        # 1. Weather Adversities
-        weather_score, weather_info = self._calculate_weather_adversities_score(shipments)
-        contributors.append(f"Weather Adversities: {weather_info}")
-        if weather_score is not None:
-            scores.append(weather_score)
-        
-        # 2. Logistics Performance Index (LPI)
-        lpi_score, lpi_info = self._calculate_lpi_score(shipments)
-        contributors.append(f"Logistics Performance Index: {lpi_info}")
-        if lpi_score is not None:
-            scores.append(lpi_score)
-        
-        # Fill remaining contributors
-        contributors.append("-")
-        contributors.append("-")
-        
-        # Calculate average score
-        if scores:
-            avg_score = sum(scores) / len(scores)
-            classification = LaneRiskUtils.score_to_classification(avg_score)
-            risk_scale = f"{avg_score:.1f} ({classification})"
-        else:
-            risk_scale = "N/A"
-        
-        return {
-            "risk_factor": "External",
-            "risk_contributors": contributors[:4],
-            "risk_scale": risk_scale
-        }
-    
-    def _get_shipments(
-        self,
-        patient_id: str,
-        pharma_id: Optional[int] = None
-    ) -> Tuple[List[Shipment], Optional[int]]:
-        """Get shipments to analyze (restricted to current/ongoing shipment similar to 3PL comparison)."""
-        if not patient_id:
-            raise ValueError("patient_id is required to retrieve shipments")
-        
-        shipment_service = ShipmentService(self.db)
-        shipment_service._validate_patient_for_shipment_operations(
-            patient_id=patient_id,
-            pharma_id=pharma_id,
-            require_shipment=True
-        )
-        target_shipment_id = shipment_service._get_target_shipment_id(
-            patient_id=patient_id,
-            pharma_id=pharma_id
-        )
-        
-        from sqlalchemy.orm import joinedload
-        
-        query = self.db.query(Shipment).filter(Shipment.patient_id == patient_id)
-
-        if target_shipment_id:
-            query = query.filter(Shipment.id == target_shipment_id)
-        
-        if pharma_id:
-            query = query.filter(Shipment.pharma_id == pharma_id)
-        
-        # Eager load shipment_legs to avoid N+1 queries
-        shipments = query.options(joinedload(Shipment.shipment_legs)).all()
-        active_shipment_id = shipments[0].id if shipments else target_shipment_id
-        return shipments, active_shipment_id
     
     def _calculate_number_of_legs_score(
         self,
