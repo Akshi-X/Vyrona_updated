@@ -28,8 +28,14 @@ from ..schemas.iot_schema import (
     WebhookResponse
 )
 from ..exceptions.custom_exceptions import AppException
-from ..constants.messages import ErrorMessages
+from ..constants.messages import ErrorMessages, InfoMessages
 from ..constants.http_status import HTTPStatus
+from ..constants.app_constants import (
+    WEBHOOK_ENDPOINT_ACTIVE,
+    WEBHOOK_NOT_RECEIVED_FLAG,
+    WEBHOOK_TOTAL_RECEIVED_DEFAULT,
+    WEBHOOK_LAST_RECEIVED_AT_DEFAULT
+)
 from ..config.config import settings
 
 logger = logging.getLogger(__name__)
@@ -234,7 +240,7 @@ def generate_device_report(
         if isinstance(report_result, dict) and 'download_url' in report_result:
             return {
                 "status": "accepted",
-                "message": report_result.get('message', 'Report generation accepted. Please download from the provided URL.'),
+                "message": report_result.get('message', InfoMessages.IOT_REPORT_GENERATION_ACCEPTED),
                 "download_url": report_result['download_url'],
                 "status_code": 202
             }
@@ -449,14 +455,14 @@ def update_alert_preset(
             if not has_triggers:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
-                    detail="At least one trigger must be specified when updating an alert preset. Include at least one of: temperatureTriggers, percentTriggers, arriveDepartTriggers, intervalTriggers, shockLightTriggers, geofenceTriggers, shipmentInboundTriggers, booleanTriggers, or tiltTriggers"
+                    detail=ErrorMessages.IOT_ALERT_PRESET_TRIGGER_REQUIRED
                 )
         
         # Ensure at least one field is being updated
         if not update_data:
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
-                detail="At least one field must be provided for update"
+                detail=ErrorMessages.IOT_ALERT_PRESET_UPDATE_FIELD_REQUIRED
             )
         
         return service.update_alert_preset(preset_id, **update_data)
@@ -575,12 +581,12 @@ def webhook_status():
         
         if not webhook_log_file.exists():
             return {
-                "endpoint_active": True,
+                "endpoint_active": WEBHOOK_ENDPOINT_ACTIVE,
                 "webhook_url": settings.webhook_url,
-                "webhooks_received": False,
-                "total_received": 0,
-                "last_received_at": None,
-                "message": "Endpoint is ready but no webhooks received yet"
+                "webhooks_received": WEBHOOK_NOT_RECEIVED_FLAG,
+                "total_received": WEBHOOK_TOTAL_RECEIVED_DEFAULT,
+                "last_received_at": WEBHOOK_LAST_RECEIVED_AT_DEFAULT,
+                "message": InfoMessages.WEBHOOK_ENDPOINT_READY_NO_WEBHOOKS
             }
         
         # Count total webhooks
@@ -599,20 +605,20 @@ def webhook_status():
                         continue
         
         return {
-            "endpoint_active": True,
+            "endpoint_active": WEBHOOK_ENDPOINT_ACTIVE,
             "webhook_url": settings.webhook_url,
-            "webhooks_received": total_count > 0,
+            "webhooks_received": total_count > WEBHOOK_TOTAL_RECEIVED_DEFAULT,
             "total_received": total_count,
             "last_received_at": last_received_at,
-            "message": f"Endpoint is active. {total_count} webhook(s) received." if total_count > 0 else "Endpoint is ready but no webhooks received yet"
+            "message": InfoMessages.WEBHOOK_ENDPOINT_ACTIVE_WITH_COUNT.format(count=total_count) if total_count > WEBHOOK_TOTAL_RECEIVED_DEFAULT else InfoMessages.WEBHOOK_ENDPOINT_READY_NO_WEBHOOKS
         }
         
     except Exception as e:
         logger.error(f"Error checking webhook status: {e}", exc_info=True)
         return {
-            "endpoint_active": True,
+            "endpoint_active": WEBHOOK_ENDPOINT_ACTIVE,
             "webhook_url": settings.webhook_url,
             "error": str(e),
-            "message": "Error checking webhook status"
+            "message": InfoMessages.WEBHOOK_STATUS_CHECK_ERROR
         }
 
