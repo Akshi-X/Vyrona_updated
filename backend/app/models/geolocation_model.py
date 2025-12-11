@@ -17,7 +17,7 @@ class Geolocation(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Foreign Keys
-    shipment_id = Column(Integer, ForeignKey("shipment.id", ondelete="CASCADE"), nullable=False, index=True)
+    shipment_id = Column(String, nullable=False, index=True)
     patient_id = Column(String, ForeignKey("patient.id", ondelete="CASCADE"), nullable=False, index=True)
     telemetry_data_id = Column(Integer, ForeignKey("telemetry_data.id", ondelete="CASCADE"), nullable=False, index=True)
     
