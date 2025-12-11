@@ -42,7 +42,6 @@ class Geolocation(Base):
     
     # Relationships
     telemetry_data = relationship("TelemetryData", backref="geolocations")
-    shipment = relationship("Shipment", backref="geolocations")
     patient = relationship("Patient", backref="geolocations")
     
     # Composite indexes for common query patterns
