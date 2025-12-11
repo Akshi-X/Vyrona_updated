@@ -116,7 +116,19 @@ async def websocket_endpoint(websocket: WebSocket):
                                 # Get last 12 messages from Redis and send them
                                 history = quality_service.get_patient_redis_history(patient_id, limit=12)
                                 
-                                # Send history messages first (oldest first, ascending order)
+                                # Get geolocation records from database
+                                geolocation_history = quality_service.get_patient_geolocation_history(patient_id, limit=100)
+                                
+                                # Send geolocation history as a single array message
+                                if geolocation_history:
+                                    await websocket.send_json({
+                                        "type": "geolocation_history",
+                                        "patient_id": patient_id,
+                                        "geolocations": geolocation_history,
+                                        "count": len(geolocation_history)
+                                    })
+                                
+                                # Send quality history messages (oldest first, ascending order)
                                 for historical_data in history:
                                     await websocket.send_json(historical_data)
                                 
@@ -124,7 +136,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                 await websocket.send_json({
                                     "type": "subscription_confirmed",
                                     "patient_id": patient_id,
-                                    "history_count": len(history)
+                                    "history_count": len(history),
+                                    "geolocation_count": len(geolocation_history)
                                 })
                             except Exception as e:
                                 await websocket.send_json({
