@@ -172,25 +172,26 @@ class ExternalFactorsCalculator:
 
         event_count = len(adverse_weather_events)
 
-        if event_count == 0:
-            avg_score = 4.5
-            classification = "Normal"
-            logger.debug(
-                f"Weather check completed: {total_route_points} locations checked, "
-                f"no adverse weather events detected (normal conditions)"
-            )
-        elif event_count == 1:
-            avg_score = 3.5
-            classification = "Minor"
-        elif event_count == 2:
-            avg_score = 2.5
-            classification = "Moderate"
-        elif event_count == 3:
-            avg_score = 1.5
-            classification = "Significant"
-        else:
-            avg_score = 0.5
-            classification = "Severe"
+        match event_count:
+            case 0:
+                avg_score = 4.5
+                classification = "Normal"
+                logger.debug(
+                    f"Weather check completed: {total_route_points} locations checked, "
+                    f"no adverse weather events detected (normal conditions)"
+                )
+            case 1:
+                avg_score = 3.5
+                classification = "Minor"
+            case 2:
+                avg_score = 2.5
+                classification = "Moderate"
+            case 3:
+                avg_score = 1.5
+                classification = "Significant"
+            case _:
+                avg_score = 0.5
+                classification = "Severe"
 
         return avg_score, f"{classification} ({event_count} event(s))"
 
