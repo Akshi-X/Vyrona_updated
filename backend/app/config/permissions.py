@@ -46,9 +46,6 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     # Quality monitoring health check - public
     ("GET", "/api/quality/health"),
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
-    # Webhook endpoints - public (for monitoring and Tive API)
-    ("GET", "/api/iot/webhooks/status"),  # Webhook status check
-    ("GET", "/api/iot/webhooks/view-recent"),  # View recent webhooks (for debugging)
 }
 
 
