@@ -25,9 +25,6 @@ from ..exceptions.custom_exceptions import (
     IoTAddDeviceAlertPresetsFailedException,
     IoTRemoveDeviceAlertPresetsFailedException,
     IoTGenerateDeviceReportFailedException,
-    IoTCreateWebhookFailedException,
-    IoTGetWebhooksFailedException,
-    IoTDeleteWebhookFailedException
 )
 from ..constants.error_codes import ERROR_CODES
 from ..constants.messages import ErrorMessages
@@ -529,10 +526,7 @@ class IoTService:
             "IOT_CREATE_ALERT_PRESET_FAILED": IoTCreateAlertPresetFailedException, "IOT_UPDATE_ALERT_PRESET_FAILED": IoTUpdateAlertPresetFailedException,
             "IOT_ADD_DEVICE_ALERT_PRESETS_FAILED": IoTAddDeviceAlertPresetsFailedException,
             "IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED": IoTRemoveDeviceAlertPresetsFailedException,
-            "IOT_GENERATE_DEVICE_REPORT_FAILED": IoTGenerateDeviceReportFailedException,
-            "IOT_CREATE_WEBHOOK_FAILED": IoTCreateWebhookFailedException,
-            "IOT_GET_WEBHOOKS_FAILED": IoTGetWebhooksFailedException,
-            "IOT_DELETE_WEBHOOK_FAILED": IoTDeleteWebhookFailedException
+            "IOT_GENERATE_DEVICE_REPORT_FAILED": IoTGenerateDeviceReportFailedException
         }
         exception_class = exception_map.get(error_code_key, IoTAPIRequestFailedException)
         kwargs = {'reason': reason, 'response_body': error_details.get('response_body', ''), 'iot_trace_id': error_details.get('iot_trace_id')}
@@ -559,11 +553,6 @@ class IoTService:
             kwargs.update({'device_id': error_details.get('device_id', ''), 'alert_preset_ids': error_details.get('alert_preset_ids', [])})
         elif error_code_key == "IOT_GENERATE_DEVICE_REPORT_FAILED":
             kwargs['device_id'] = error_details.get('device_id', '')
-        elif error_code_key == "IOT_CREATE_WEBHOOK_FAILED":
-            # IoTCreateWebhookFailedException only accepts reason, response_body, iot_trace_id
-            kwargs = {'reason': reason, 'response_body': error_details.get('response_body', ''), 'iot_trace_id': error_details.get('iot_trace_id')}
-        elif error_code_key == "IOT_DELETE_WEBHOOK_FAILED":
-            kwargs['webhook_id'] = error_details.get('webhook_id', '')
         else:
             kwargs.update({'operation': reason, 'status_code': status_code})
         
@@ -1161,56 +1150,4 @@ class IoTService:
             extension = 'csv'
         return f'report_{device_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{extension}'
     
-    def create_webhook(self, **kwargs) -> Dict[str, Any]:
-        """Create a new webhook in Tive API
-        
-        Reference: https://api.tive.com/public/v3/docs/index.html
-        Endpoint: POST /public/v3/webhooks
-        
-        Required fields:
-        - name: Webhook name
-        - url: Webhook URL where Tive will send events
-        
-        Optional fields:
-        - description, version, template, headers, accountIds, httpMethod, contentType,
-          enabled, applyToAllTrackers, applyToAllShipments, applyToAllAlertPresets
-        
-        Returns: Dict with webhook details including ID
-        """
-        return self._handle_api_request(
-            'POST',
-            '/webhooks',
-            "IOT_CREATE_WEBHOOK_FAILED",
-            "Failed to create webhook",
-            payload=kwargs.copy()
-        )
-    
-    def get_webhooks(self) -> List[Dict[str, Any]]:
-        """Get all webhooks from Tive API
-        
-        Reference: https://api.tive.com/public/v3/docs/index.html
-        Endpoint: GET /public/v3/webhooks
-        
-        Returns: List of webhook dictionaries
-        """
-        return self._get_list('GET', '/webhooks', "IOT_GET_WEBHOOKS_FAILED", "Failed to get webhooks")
-    
-    def delete_webhook(self, webhook_id: str) -> Dict[str, Any]:
-        """Delete a webhook from Tive API
-        
-        Reference: https://api.tive.com/public/v3/docs/index.html
-        Endpoint: DELETE /public/v3/webhooks/{webhookId}
-        
-        Args:
-            webhook_id: The webhook ID to delete
-            
-        Returns: Dict with deletion confirmation
-        """
-        return self._handle_api_request(
-            'DELETE',
-            f'/webhooks/{webhook_id}',
-            "IOT_DELETE_WEBHOOK_FAILED",
-            f"Failed to delete webhook {webhook_id}",
-            details={"webhook_id": webhook_id}
-        )
 

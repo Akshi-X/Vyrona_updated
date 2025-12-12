@@ -181,9 +181,6 @@ class ErrorMessages:
     IOT_ADD_DEVICE_ALERT_PRESETS_FAILED = "Failed to add alert presets to device"
     IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED = "Failed to remove alert presets from device"
     IOT_GENERATE_DEVICE_REPORT_FAILED = "Failed to generate device report"
-    IOT_CREATE_WEBHOOK_FAILED = "Failed to create webhook in IoT provider"
-    IOT_GET_WEBHOOKS_FAILED = "Failed to retrieve webhooks from IoT provider"
-    IOT_DELETE_WEBHOOK_FAILED = "Failed to delete webhook from IoT provider"
     IOT_ALERT_PRESET_TRIGGER_REQUIRED = "At least one trigger must be specified when updating an alert preset. Include at least one of: temperatureTriggers, percentTriggers, arriveDepartTriggers, intervalTriggers, shockLightTriggers, geofenceTriggers, shipmentInboundTriggers, booleanTriggers, or tiltTriggers"
     IOT_ALERT_PRESET_UPDATE_FIELD_REQUIRED = "At least one field must be provided for update"
 
@@ -236,9 +233,6 @@ class InfoMessages:
     # Shipment
     SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE = "Active routes not available"
     
-    # IoT/Webhook
-    WEBHOOK_ENDPOINT_READY_NO_WEBHOOKS = "Endpoint is ready but no webhooks received yet"
-    WEBHOOK_ENDPOINT_ACTIVE_WITH_COUNT = "Endpoint is active. {count} webhook(s) received."
-    WEBHOOK_STATUS_CHECK_ERROR = "Error checking webhook status"
+    # IoT
     IOT_REPORT_GENERATION_ACCEPTED = "Report generation accepted. Please download from the provided URL."
 
