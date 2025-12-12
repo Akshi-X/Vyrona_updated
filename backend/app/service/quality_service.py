@@ -16,6 +16,7 @@ from fastapi.responses import Response
 
 from app.models.patient_model import Patient
 from app.models.user_model import User
+from app.models.geolocation_model import Geolocation
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
 from app.exceptions.patient_exceptions import PatientNotFoundException
@@ -402,6 +403,89 @@ class QualityService:
         except Exception as e:
             logger.error(f"Error filtering connections: {e}")
             raise QualityServiceException("get_connections_for_pharma", str(e))
+    
+    def get_patient_redis_history(self, patient_id: str, limit: int = 12) -> List[dict]:
+        """
+        Get last N messages for a patient from Redis
+        
+        Args:
+            patient_id: Patient ID to get history for
+            limit: Number of messages to retrieve (default: 12)
+        
+        Returns:
+            List of quality data dictionaries, oldest first (ascending order)
+        """
+        try:
+            redis_client = get_redis()
+            history_key = f"quality_history:{patient_id}"
+            
+            # Get last N messages (0 to limit-1, since lrange is inclusive)
+            # Redis lpush stores newest at index 0, so this gets newest first
+            raw_history = redis_client.lrange(history_key, 0, limit - 1)
+            
+            if not raw_history:
+                return []
+            
+            # Parse JSON strings and return as list of dicts
+            history = []
+            for raw_data in raw_history:
+                try:
+                    data = json.loads(raw_data)
+                    history.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse Redis message for patient {patient_id}: {e}")
+                    continue
+            
+            # Reverse to get ascending order (oldest first)
+            history.reverse()
+            
+            return history
+        except Exception as e:
+            logger.error(f"Error retrieving Redis history for patient {patient_id}: {e}")
+            return []
+    
+    def get_patient_geolocation_history(self, patient_id: str, limit: int = 100) -> List[dict]:
+        """
+        Get geolocation records for a patient from database
+        
+        Args:
+            patient_id: Patient ID to get geolocation history for
+            limit: Maximum number of records to retrieve (default: 100)
+        
+        Returns:
+            List of geolocation dictionaries, oldest first (ascending order)
+        """
+        try:
+            # Query geolocation records for the patient, ordered by id
+            geolocation_records = self.db.query(Geolocation).filter(
+                Geolocation.patient_id == patient_id
+            ).order_by(
+                Geolocation.id.asc()
+            ).limit(limit).all()
+            
+            # Convert to dictionary format
+            geolocation_data = []
+            for record in geolocation_records:
+                geolocation_data.append({
+                    "type": "geolocation",
+                    "id": record.id,
+                    "shipment_id": record.shipment_id,
+                    "patient_id": record.patient_id,
+                    "telemetry_data_id": record.telemetry_data_id,
+                    "current_latitude": round(record.current_latitude, 2) if record.current_latitude is not None else None,
+                    "current_longitude": round(record.current_longitude, 2) if record.current_longitude is not None else None,
+                    "shipment_from_latitude": round(record.shipment_from_latitude, 2) if record.shipment_from_latitude is not None else None,
+                    "shipment_from_longitude": round(record.shipment_from_longitude, 2) if record.shipment_from_longitude is not None else None,
+                    "shipment_to_latitude": round(record.shipment_to_latitude, 2) if record.shipment_to_latitude is not None else None,
+                    "shipment_to_longitude": round(record.shipment_to_longitude, 2) if record.shipment_to_longitude is not None else None,
+                    "reading_timestamp": record.reading_timestamp.isoformat() if record.reading_timestamp else None,
+                    "created_at": record.created_at.isoformat() if record.created_at else None,
+                })
+            
+            return geolocation_data
+        except Exception as e:
+            logger.error(f"Error retrieving geolocation history for patient {patient_id}: {e}")
+            return []
     
     async def redis_listener(self, connection_manager: 'ConnectionManager'):
         """

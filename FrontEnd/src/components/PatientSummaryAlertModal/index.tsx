@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AlertCard from '../AlertCard';
 import { shipmentService, type PatientJourneySummaryResponse, type ShipmentLegSummary, type ShipmentLegDetail, type ReengineeringStage } from '../../services/shipmentService';
 import PatientSummaryIcon from '../../assets/TrackAndTraceIcons/PatientSummary.svg';
+import ProcessingTimeIcon from '../../assets/TrackAndTraceIcons/processing-time.svg';
 
 interface PatientSummaryAlertModalProps {
   isOpen: boolean;
@@ -71,28 +72,6 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     return text.substring(0, 2).toUpperCase();
   };
 
-  const getStatusBadge = (status: string): { label: string; className: string; icon?: React.ReactElement } => {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('completed') || statusLower.includes('complete')) {
-      return { 
-        label: 'Completed', 
-        className: 'text-[#00990A] bg-[#F3FFF2] font-bold rounded-lg px-3 py-1.5 flex items-center gap-2',
-        icon: (
-          <div className="w-[12px] h-[12px] bg-[#00990A] rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-            <svg className="w-[8px] h-[8px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        )
-      };
-    } else if (statusLower.includes('ongoing') || statusLower.includes('in_progress') || statusLower.includes('in progress')) {
-      return { label: 'In Progress', className: 'bg-orange-100 text-orange-700' };
-    } else if (statusLower.includes('upcoming') || statusLower.includes('scheduled')) {
-      return { label: 'Upcoming', className: 'bg-orange-100 text-orange-700' };
-    }
-    return { label: status, className: 'bg-gray-100 text-gray-700' };
-  };
-
   const getStatusColors = (status: string): { borderColor: string; bgColor: string; textColor: string } | null => {
     if (!status) return null;
     
@@ -115,9 +94,9 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     // In progress -> orange
     if (statusLower.includes('ongoing') || statusLower.includes('in_progress') || statusLower.includes('in progress')) {
       return {
-        borderColor: 'border-orange-400',
-        bgColor: 'border border-orange-200 bg-orange-50',
-        textColor: 'bg-orange-500'
+        borderColor: 'border-orange-300',
+        bgColor: 'border border-orange-100 bg-orange-50',
+        textColor: 'bg-orange-300'
       };
     }
     
@@ -159,9 +138,13 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     if (!colors) return null;
     
     const isCompleted = leg.status.toLowerCase().includes('completed') || leg.status.toLowerCase().includes('complete');
+    const isInProgress = leg.status.toLowerCase().includes('in_progress') || leg.status.toLowerCase().includes('in progress') || leg.status.toLowerCase().includes('ongoing');
     
     // Determine destination based on title
     const destination = title.includes('Pharma') ? 'Pharma Facility' : 'Hospital';
+    
+    // Determine bullet color based on status
+    const bulletColor = isCompleted ? 'bg-[#22DC0E]' : isInProgress ? 'bg-orange-300' : 'bg-gray-300';
     
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -177,6 +160,18 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
               Completed
             </span>
           )}
+          {isInProgress && (
+            <span className="bg-orange-50 font-semibold text-[10px] rounded-md px-3 py-1.5 flex items-center gap-2 text-orange-600">
+              <div className="w-[16px] h-[16px] flex items-center justify-center flex-shrink-0">
+                <img
+                  src={ProcessingTimeIcon}
+                  alt="In progress"
+                  className="w-[14px] h-[14px]"
+                />
+              </div>
+              In Progress
+            </span>
+          )}
         </div>
         
         {leg.provider_name && (
@@ -190,7 +185,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             
             return (
               <div key={index} className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-[#22DC0E] mt-2 flex-shrink-0 mb-6"/>
+                <div className={`w-2 h-2 rounded-full ${bulletColor} mt-2 flex-shrink-0 mb-6`}/>
                 <div className="flex-1 mb-2">
                   <span className="font-semibold text-gray-900 text-[12px] capitalize ml-3">{mode}:</span><br/>
                   <span className="text-gray-800 text-[12px] ml-3">{description}.</span>
@@ -210,6 +205,19 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
             </span>
           </div>
         )}
+        
+        {isInProgress && leg.planned_date && (
+          <div className="mt-4 rounded-md bg-orange-50 text-orange-600 p-3 flex items-center gap-2">
+            <img
+              src={ProcessingTimeIcon}
+              alt="In progress"
+              className="w-4 h-4 flex-shrink-0"
+            />
+            <span className="text-[12px] text-orange-600 font-semibold">
+              Arrived at {destination} on {formatDateTime(leg.planned_date)}
+            </span>
+          </div>
+        )}
       </div>
     );
   };
@@ -220,42 +228,53 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     // Don't render if status is not started or null
     if (!colors) return null;
     
-    const badge = getStatusBadge(reengineering.status);
+    const isCompleted = reengineering.status.toLowerCase().includes('completed') || reengineering.status.toLowerCase().includes('complete');
     
     return (
-      <div className={`pl-3 border-l-4 ${colors.borderColor}`}>
-        <div className="flex items-center gap-3 mb-2">
-          <span className={`text-[11px] font-semibold ${badge.className}`}>
-            {badge.icon && badge.icon}
-            {badge.label}
-          </span>
-          <h3 className="text-sm font-semibold text-gray-900">Reengineering (Manufacturing Phase)</h3>
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[14px] text-black">Reengineering (Manufacturing Phase)</h3>
+          {isCompleted && (
+            <span className="bg-[#F3FFF2] font-bold text-[10px] rounded-md px-3 py-1.5 flex items-center gap-2">
+              <div className="w-[12px] h-[12px] bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+                <svg className="w-[8px] h-[8px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              Completed
+            </span>
+          )}
         </div>
-        <div className={`rounded-lg border ${colors.bgColor} p-4`}>
-          <div className="space-y-2 text-sm">
-            {reengineering.start_date && reengineering.end_date && (
-              <div className="flex items-start gap-2 text-gray-800">
-                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
-                <span>
+        
+        <div className="space-y-3 mb-4 mt-4">
+          {reengineering.start_date && reengineering.end_date && (
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#22DC0E] mt-2 flex-shrink-0"/>
+              <div className="flex-1">
+                <span className="text-gray-800 text-[12px] ml-3">
                   Cryopreservation + CAR-T reengineering ({formatDate(reengineering.start_date)} – {formatDate(reengineering.end_date)}).
                 </span>
               </div>
-            )}
-            {reengineering.scheduled_start && reengineering.scheduled_end && (
-              <div className="flex items-start gap-2 text-gray-800">
-                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
-                <span>
+            </div>
+          )}
+          {reengineering.scheduled_start && reengineering.scheduled_end && (
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#22DC0E] mt-2 flex-shrink-0"/>
+              <div className="flex-1">
+                <span className="text-gray-800 text-[12px] ml-3">
                   Scheduled: {formatDate(reengineering.scheduled_start)} – {formatDate(reengineering.scheduled_end)}.
                 </span>
               </div>
-            )}
-            {reengineering.description && (
-              <div className="flex items-start gap-2 text-gray-800">
-                <span className={`mt-2 w-2 h-2 rounded-full ${colors.textColor}`} />
-                <span>{reengineering.description}</span>
+            </div>
+          )}
+          {reengineering.description && (
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#22DC0E] mt-2 flex-shrink-0"/>
+              <div className="flex-1">
+                <span className="text-gray-800 text-[12px] ml-3">{reengineering.description}</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -273,7 +292,7 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       description={summary ? `Supply Chain Summary for Patient ${summary.patient_id}` : `Loading summary for ${patientId}...`}
       icon={
         <img
-          className="w-6 h-6"
+          className="w-[24px] h-[24px]"
           alt="Patient Summary"
           src={PatientSummaryIcon}
         />
@@ -294,15 +313,9 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
       
       {summary && (
         <div className="space-y-6">
-          {/* Patient Information Card */}
-          <div className="rounded-lg bg-purple-50 p-4">
+          {/* Patient Information Card - sticky, does not scroll */}
+          <div className="rounded-lg bg-purple-50 p-4 sticky top-0 z-10">
             <div className="flex items-center gap-4">
-              {/* Circular Avatar */}
-              <div className="w-12 h-12 bg-[#6B1176] rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-semibold">
-                  {getInitials(summary.hospital_name || summary.patient_id)}
-                </span>
-              </div>
               
               {/* Patient Details */}
               <div className="flex-1 min-w-0">

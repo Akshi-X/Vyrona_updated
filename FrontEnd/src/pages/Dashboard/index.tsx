@@ -257,9 +257,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
-  // Static pharma ID - in future this will come from verify OTP
-  const PHARMA_ID = 1;
-
   // Fetch patient statistics and logistics metrics on component mount
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -269,11 +266,11 @@ export default function Dashboard({ }: DashboardProps) {
 
         // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
         const [stats, logistics, performance, risk, compliance] = await Promise.all([
-          logisticsService.getPatientStatistics(), // Call without pharma_id
-          logisticsService.getLogisticsMetrics(PHARMA_ID.toString()),
-          performanceService.getPerformanceMetrics(PHARMA_ID.toString()),
-          riskService.getRiskMetrics(PHARMA_ID.toString()),
-          complianceService.getComplianceMetrics(PHARMA_ID.toString())
+          logisticsService.getPatientStatistics(), // /api/patients/statistics
+          logisticsService.getLogisticsMetrics(),  // /api/logistics
+          performanceService.getPerformanceMetrics(), // /api/performance
+          riskService.getRiskMetrics(), // /api/risk
+          complianceService.getComplianceMetrics() // /api/compliance
         ]);
 
         setPatientStats(stats);
@@ -337,12 +334,27 @@ export default function Dashboard({ }: DashboardProps) {
 
 
   return (
-    <div className="bg-[#fcfaff] flex w-full" style={{ height: '100vh' }}>
+    <div 
+      className="bg-[#FDFAFF] flex w-full h-[100vh] overflow-x-hidden" 
+      style={{
+        maxWidth: '100vw',
+        touchAction: 'pan-y',
+        overscrollBehaviorX: 'none'
+      }}
+    >
       {/* Left Sidebar */}
       <Sidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden ml-60">
+      <main 
+        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden ml-60 min-w-0"
+        style={{
+          maxWidth: 'calc(100vw - 15rem)',
+          touchAction: 'pan-y',
+          overscrollBehaviorX: 'none',
+          height: '100vh'
+        }}
+      >
         <Header
           title=""
           showBackButton={false}
@@ -360,7 +372,16 @@ export default function Dashboard({ }: DashboardProps) {
         />
 
         {/* Dashboard Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+        <div 
+          className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" 
+          style={{ 
+            paddingTop: 'calc(63px + 1rem)',
+            touchAction: 'pan-y',
+            overscrollBehaviorX: 'none',
+            overscrollBehaviorY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
 
 
           <div className="flex gap-6 flex-1 flex-col lg:flex-row">
@@ -543,7 +564,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Critical Alerts */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="Critical Alerts"
                       src={CriticalAlertsIcon}
                       onClick={() => {
@@ -570,7 +591,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Stakeholder Chats */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => {
@@ -598,7 +619,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* My Tasks */}
                   <div className="relative group">
                     <img
-                      className="w-[30px] h-[30px] cursor-pointer"
+                      className="w-[25px] h-[25px] cursor-pointer"
                       alt="My Tasks"
                       src={MyTasksIcon}
                       onClick={() => {

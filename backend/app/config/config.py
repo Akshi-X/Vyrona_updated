@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: Optional[str] = None  # Google Maps API key (same key as VITE_GOOGLE_MAPS_API_KEY in frontend)
     # FlightRadar24 API Configuration
     FLIGHTRADAR24_API_KEY: Optional[str] = None  # FlightRadar24 API key for on-time flight performance
+    # IoT Provider Configuration (Required - set in .env)
+    IOT_CLIENT_ID: str
+    IOT_CLIENT_SECRET: str
+    IOT_ACCOUNT_ID: str
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================
