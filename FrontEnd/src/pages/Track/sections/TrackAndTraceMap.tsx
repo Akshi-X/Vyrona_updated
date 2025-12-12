@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { MapPin, Pause, Play } from "lucide-react";
-import { useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import { trackingService, type TrackingPosition, type TrackingUpdate } from "../../../services/trackingService";
 import { useParams } from "react-router-dom";
 
@@ -12,26 +12,40 @@ const TrackAndTraceMap = () => {
   const [positions, setPositions] = useState<TrackingPosition[]>([]);
   const [useWebSocket, setUseWebSocket] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
-  const mapRef = useRef<HTMLDivElement>(null);
+  const [shouldLoadTrackingData, setShouldLoadTrackingData] = useState<boolean>(false);
+  type MapType = google.maps.MapTypeId | "roadmap" | "satellite";
+  const [mapType, setMapType] = useState<MapType>("roadmap");
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const pathPolylineRef = useRef<google.maps.Polyline | null>(null);
   const simulationCleanupRef = useRef<(() => void) | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAD7-vocQRsa6eAn3eieib9M8--AJaKscY';
-  
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      'VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables. ' +
+      'Please ensure the .env file exists in the FrontEnd directory and restart the dev server.'
+    );
+  }
+
   // Use the same loader configuration as ControlTowerMap to avoid conflicts
   // Include both 'maps' and 'geometry' libraries to support all features
-  const { isLoaded } = useJsApiLoader({ 
-    id: 'google-map-script', 
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
     googleMapsApiKey: apiKey,
     libraries: ['geometry', 'maps'],
     preventGoogleFontsLoading: true
   });
 
-  // Load tracking data on mount
+  // Load tracking data only when flag is enabled
   useEffect(() => {
+    // Only load routes if the flag is enabled
+    if (!shouldLoadTrackingData) {
+      return;
+    }
+
     const loadTrackingData = async () => {
       try {
         // Try to get live data from API, fallback to mock data
@@ -52,51 +66,44 @@ const TrackAndTraceMap = () => {
     };
 
     loadTrackingData();
-  }, [patientId]);
+  }, [shouldLoadTrackingData, patientId]);
 
-  // Initialize Google Map
-  useEffect(() => {
-    if (!isLoaded || !mapRef.current || !window.google || positions.length === 0) return;
+  // Initialize Google Map when the GoogleMap component loads
+  const handleMapLoad = (map: google.maps.Map) => {
+    if (!window.google || positions.length === 0) return;
 
-    const initMap = () => {
-      if (!window.google || !mapRef.current || positions.length === 0) return;
+    googleMapRef.current = map;
 
-      const map = new window.google.maps.Map(mapRef.current, {
-        zoom: 14,
-        center: positions[0],
-        mapTypeId: "roadmap",
-      });
+    // Center the map on the first position
+    map.setCenter(positions[0]);
+    map.setZoom(14);
+    map.setMapTypeId(mapType);
 
-      googleMapRef.current = map;
+    // Marker for vehicle
+    markerRef.current = new window.google.maps.Marker({
+      position: positions[0],
+      map,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 10,
+        fillColor: "#4fff00",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 3,
+      },
+    });
 
-      // Marker for vehicle
-      markerRef.current = new window.google.maps.Marker({
-        position: positions[0],
-        map,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: "#4fff00",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-        },
-      });
+    // Polyline path
+    pathPolylineRef.current = new window.google.maps.Polyline({
+      map,
+      strokeColor: "#4fff00",
+      strokeOpacity: 0.8,
+      strokeWeight: 4,
+      path: [positions[0]],
+    });
 
-      // Polyline path
-      pathPolylineRef.current = new window.google.maps.Polyline({
-        map,
-        strokeColor: "#4fff00",
-        strokeOpacity: 0.8,
-        strokeWeight: 4,
-        path: [positions[0]],
-      });
-
-      setMapLoaded(true);
-    };
-
-    initMap();
-  }, [isLoaded, positions]);
+    setMapLoaded(true);
+  };
 
   // Handle WebSocket updates
   useEffect(() => {
@@ -205,7 +212,7 @@ const TrackAndTraceMap = () => {
   const handleStart = () => {
     // Check if WebSocket should be used (you can add a toggle or check env var)
     const enableWebSocket = (import.meta as any).env?.VITE_ENABLE_TRACKING_WEBSOCKET === 'true';
-    
+
     if (enableWebSocket && patientId) {
       setUseWebSocket(true);
     } else {
@@ -239,17 +246,17 @@ const TrackAndTraceMap = () => {
     setIsTracking(false);
     setCurrentIndex(0);
     setUseWebSocket(false);
-    
+
     if (useWebSocket) {
       trackingService.disconnectWebSocket();
       setIsWebSocketConnected(false);
     }
-    
+
     if (simulationCleanupRef.current) {
       simulationCleanupRef.current();
       simulationCleanupRef.current = null;
     }
-    
+
     if (markerRef.current && pathPolylineRef.current && googleMapRef.current && positions.length > 0) {
       markerRef.current.setPosition(positions[0]);
       pathPolylineRef.current.setPath([positions[0]]);
@@ -266,80 +273,159 @@ const TrackAndTraceMap = () => {
   }
 
   return (
-    <div className="w-full h-[460px] rounded overflow-hidden border border-[#E7E1E1] relative">
-      {/* Map */}
-      <div ref={mapRef} className="w-full h-full" />
-
-      {/* Controls */}
-      <div className="absolute top-2 right-2 bg-white rounded-lg shadow-lg p-2 flex items-center gap-2 z-10">
-        <div className="text-xs text-gray-600 px-2">
-          Position: <span className="font-semibold">{currentIndex + 1}</span> / {positions.length || 0}
+    <div className="rounded-[5px] border border-gray-200 bg-white p-4 h-[460px]">
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-gray-900 text-[16px]">Track and Trace</h3>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-green-600 font-semibold">On time</span>
+              <span className="text-gray-400">
+                ETA 12:37pm
+              </span>
+          </div>
         </div>
+        <div className="w-full rounded overflow-hidden border border-[#E7E1E1] relative">
+          {/* Map */}
+          <div className="w-full h-[360px]">
+            {isLoaded && positions.length > 0 && (
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={positions[0]}
+                zoom={14}
+                mapTypeId={mapType as google.maps.MapTypeId}
+                options={{
+                  mapTypeControl: false,
+                  fullscreenControl: false,
+                  streetViewControl: false,
+                }}
+                onLoad={handleMapLoad}
+              />
+            )}
+          </div>
 
-        <div className="flex gap-1">
-          {!isTracking ? (
-            <button
-              onClick={handleStart}
-              disabled={!mapLoaded}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded text-white text-sm font-medium ${
-                mapLoaded ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              <Play size={16} />
-              Start
-            </button>
-          ) : (
-            <button
-              onClick={handlePause}
-              className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium"
-            >
-              <Pause size={16} />
-              Pause
-            </button>
+          {/* Load Tracking Data Flag Button */}
+          {!shouldLoadTrackingData && (
+            <div className="absolute top-2 left-2 z-20">
+              <button
+                type="button"
+                onClick={() => setShouldLoadTrackingData(true)}
+                className="bg-white/90 backdrop-blur-sm border border-white/80 rounded-lg px-4 py-2 shadow-lg hover:bg-white transition-colors duration-200"
+              >
+                <div className="text-xs font-medium text-gray-900">Load Tracking Data</div>
+              </button>
+            </div>
           )}
 
-          <button
-            onClick={handleReset}
-            className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-
-      {/* Current Location Info */}
-      {positions[currentIndex] && (
-        <div className="absolute bottom-2 left-2 bg-white rounded-lg shadow-lg p-3 max-w-[280px] z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin color="#4fff00" size={18} />
-            <h3 className="font-semibold text-gray-800 text-sm m-0">Current Location</h3>
-          </div>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div>
-              Latitude: <span className="font-mono">{positions[currentIndex].lat.toFixed(6)}</span>
+          {/* Custom Map/Satellite toggle */}
+          {shouldLoadTrackingData && (
+            <div className="absolute top-2 left-2 z-10">
+              <div className="flex rounded-full bg-white/70 backdrop-blur-sm border border-white/80 shadow-sm overflow-hidden text-xs">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 border-r border-white/60 ${
+                    mapType === "roadmap" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
+                  }`}
+                  onClick={() => {
+                    setMapType("roadmap");
+                    if (googleMapRef.current) {
+                      googleMapRef.current.setMapTypeId("roadmap");
+                    }
+                  }}
+                >
+                  Map
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 ${
+                    mapType === "satellite" ? "bg-white/30 text-gray-900 font-semibold" : "text-gray-600"
+                  }`}
+                  onClick={() => {
+                    setMapType("satellite");
+                    if (googleMapRef.current) {
+                      googleMapRef.current.setMapTypeId("satellite");
+                    }
+                  }}
+                >
+                  Satellite
+                </button>
+              </div>
             </div>
-            <div>
-              Longitude: <span className="font-mono">{positions[currentIndex].lng.toFixed(6)}</span>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Status Indicator */}
-      <div className="absolute bottom-2 right-2 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400"
-            }`}
-          />
-          <span className="text-xs font-medium text-gray-700">
-            {isTracking 
-              ? (useWebSocket && isWebSocketConnected 
-                  ? "Live Tracking (WebSocket)" 
-                  : "Tracking Active")
-              : "Tracking Paused"}
-          </span>
+          {/* Controls */}
+          {shouldLoadTrackingData && (
+            <div className="absolute top-2 right-2 bg-white rounded-lg shadow-lg p-2 flex items-center gap-2 z-10">
+              <div className="text-xs text-gray-600 px-2">
+                Position: <span className="font-semibold">{currentIndex + 1}</span> / {positions.length || 0}
+              </div>
+
+              <div className="flex gap-1">
+                {!isTracking ? (
+                  <button
+                    onClick={handleStart}
+                    disabled={!mapLoaded}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded text-white text-sm font-medium ${mapLoaded ? "bg-green-500 hover:bg-green-600" : "bg-gray-400 cursor-not-allowed"
+                      }`}
+                  >
+                    <Play size={16} />
+                    Start
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePause}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium"
+                  >
+                    <Pause size={16} />
+                    Pause
+                  </button>
+                )}
+
+                <button
+                  onClick={handleReset}
+                  className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Current Location Info */}
+          {shouldLoadTrackingData && positions[currentIndex] && (
+            <div className="absolute bottom-2 left-2 bg-white/40 backdrop-blur-sm border border-white/80 rounded-lg shadow-lg p-3 max-w-[280px] z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin color="#4fff00" size={18} />
+                <h3 className="font-semibold text-gray-800 text-sm m-0">Current Location</h3>
+              </div>
+              <div className="text-xs text-black-600 space-y-1">
+                <div>
+                  Latitude: <span className="font-mono">{positions[currentIndex].lat.toFixed(6)}</span>
+                </div>
+                <div>
+                  Longitude: <span className="font-mono">{positions[currentIndex].lng.toFixed(6)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Status Indicator */}
+          {shouldLoadTrackingData && (
+            <div className="absolute bottom-2 right-2 bg-white rounded-lg shadow-lg px-3 py-2 z-10">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-3 h-3 rounded-full ${isTracking ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                    }`}
+                />
+                <span className="text-xs font-medium text-gray-700">
+                  {isTracking
+                    ? (useWebSocket && isWebSocketConnected
+                      ? "Live Tracking (WebSocket)"
+                      : "Tracking Active")
+                    : "Tracking Paused"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

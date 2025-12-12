@@ -83,5 +83,6 @@ class ShipmentLeg(Base):
     shipment = relationship("Shipment", back_populates="shipment_legs")
     provider = relationship("Provider", backref="shipment_legs")
     carrier = relationship("Carrier", backref="shipment_legs")
+    therapy = relationship("Therapy", back_populates="shipment_leg", uselist=False, cascade="all, delete-orphan")
 
 

@@ -24,7 +24,7 @@ export interface OngoingTreatment {
 export interface PatientStatistics {
   pharma_id: string;
   current_month_patient_count: number;
-  current_month_treatment_count: number;
+  quality_deviation_flagged: number;
 }
 
 export interface PatientApiResponse extends ApiResponse<Patient[][]> {
@@ -67,9 +67,9 @@ export class PatientService extends BaseApiService {
   /**
    * Get a patient's current stage
    */
-  async getPatientStage(patientId: string): Promise<{ patient_id: string; stage: string } | null> {
+  async getPatientStage(patientId: string): Promise<{ patient_id: string; stage: string; reengineering_status?: boolean } | null> {
     try {
-      const response = await this.request<{ patient_id: string; stage: string }>(
+      const response = await this.request<{ patient_id: string; stage: string; reengineering_status?: boolean }>(
         `/api/patients/${patientId}/stage`
       );
       return response ?? null;

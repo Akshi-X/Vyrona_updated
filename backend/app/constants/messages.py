@@ -164,6 +164,25 @@ class ErrorMessages:
     CHAT_WEBSOCKET_INVALID_TYPE = "Invalid message type"
     CHAT_WEBSOCKET_AUTH_FAILED = "WebSocket authentication failed"
     CHAT_WEBSOCKET_CONNECTION_FAILED = "WebSocket connection failed"
+    
+    # IoT Provider API
+    IOT_AUTHENTICATION_FAILED = "Failed to authenticate with IoT provider API"
+    IOT_API_REQUEST_FAILED = "IoT provider API request failed"
+    IOT_GET_DEVICES_FAILED = "Failed to retrieve devices from IoT provider"
+    IOT_GET_DEVICE_FAILED = "Failed to retrieve device from IoT provider"
+    IOT_UPDATE_DEVICE_FAILED = "Failed to update device in IoT provider"
+    IOT_CREATE_SHIPMENT_FAILED = "Failed to create shipment in IoT provider"
+    IOT_GET_SHIPMENT_FAILED = "Failed to retrieve shipment from IoT provider"
+    IOT_GET_SHIPMENTS_FAILED = "Failed to retrieve shipments from IoT provider"
+    IOT_GET_ALERT_PRESETS_FAILED = "Failed to retrieve alert presets from IoT provider"
+    IOT_GET_ALERT_PRESET_FAILED = "Failed to retrieve alert preset from IoT provider"
+    IOT_CREATE_ALERT_PRESET_FAILED = "Failed to create alert preset in IoT provider"
+    IOT_UPDATE_ALERT_PRESET_FAILED = "Failed to update alert preset in IoT provider"
+    IOT_ADD_DEVICE_ALERT_PRESETS_FAILED = "Failed to add alert presets to device"
+    IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED = "Failed to remove alert presets from device"
+    IOT_GENERATE_DEVICE_REPORT_FAILED = "Failed to generate device report"
+    IOT_ALERT_PRESET_TRIGGER_REQUIRED = "At least one trigger must be specified when updating an alert preset. Include at least one of: temperatureTriggers, percentTriggers, arriveDepartTriggers, intervalTriggers, shockLightTriggers, geofenceTriggers, shipmentInboundTriggers, booleanTriggers, or tiltTriggers"
+    IOT_ALERT_PRESET_UPDATE_FIELD_REQUIRED = "At least one field must be provided for update"
 
 
 class SuccessMessages:
@@ -213,4 +232,7 @@ class InfoMessages:
     
     # Shipment
     SHIPMENT_ACTIVE_ROUTES_NOT_AVAILABLE = "Active routes not available"
+    
+    # IoT
+    IOT_REPORT_GENERATION_ACCEPTED = "Report generation accepted. Please download from the provided URL."
 

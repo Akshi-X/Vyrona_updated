@@ -5,8 +5,8 @@ import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
-
-
+ 
+ 
 interface Ticket {
   id: string;
   title: string;
@@ -14,11 +14,11 @@ interface Ticket {
   status: string; // Allow any status value from API
   submittedOn: string;
 }
-
+ 
 const NAME_MAX = 80;
 const FIRST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for first name
 const LAST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for last name
-
+ 
 const UserProfilePage: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -33,14 +33,14 @@ const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
-
-
+ 
+ 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState<boolean>(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
-
+ 
   // Initialize name fields - removed hardcoded values, will be set by API call
-
+ 
   const getTokenFromCookie = (): string | null => {
     try {
       const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )auth_token=([^;]+)/) : null;
@@ -49,7 +49,7 @@ const UserProfilePage: React.FC = () => {
       return null;
     }
   };
-
+ 
   const decodeJwtPayload = (token: string): any | null => {
     try {
       const parts = token.split('.');
@@ -60,7 +60,7 @@ const UserProfilePage: React.FC = () => {
       return null;
     }
   };
-
+ 
   /* eslint-disable @typescript-eslint/no-unused-vars */
   const resolveUserId = async (): Promise<string | null> => {
     // Prefer state first
@@ -92,31 +92,31 @@ const UserProfilePage: React.FC = () => {
     return null;
   };
   /* eslint-enable @typescript-eslint/no-unused-vars */
-
+ 
   // Check authentication before rendering
   useEffect(() => {
     // Wait for auth context to finish loading
     if (isLoading) {
       return;
     }
-
+ 
     // If not authenticated, redirect immediately without showing content
     if (!isAuthenticated || !token) {
       navigate('/login', { replace: true });
       return;
     }
-
+ 
     // Mark auth as checked and allow rendering
     setIsAuthChecked(true);
   }, [isLoading, isAuthenticated, token, navigate]);
-
+ 
   // Load profile once on mount (only if authenticated)
   useEffect(() => {
     // Don't load profile if auth check hasn't passed
     if (!isAuthChecked || !isAuthenticated) {
       return;
     }
-
+ 
     let isMounted = true;
     (async () => {
       try {
@@ -137,7 +137,7 @@ const UserProfilePage: React.FC = () => {
     })();
     return () => { isMounted = false; };
   }, [isAuthChecked, isAuthenticated]);
-
+ 
   // Load tickets when role is known
   useEffect(() => {
     if (!role) return; // wait until role is resolved
@@ -151,12 +151,12 @@ const UserProfilePage: React.FC = () => {
       }
       setTicketsError(null);
       setLoadingTickets(true);
-
+ 
       const isAdmin = role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin';
-      const ticketPromise = isAdmin 
+      const ticketPromise = isAdmin
         ? feedbackApi.getAllFeedbackTickets()
         : feedbackApi.getUserTickets(uid);
-
+ 
       ticketPromise
         .then((data: UserTicketSummary[]) => {
           const mapped: Ticket[] = data.map((t) => ({
@@ -180,7 +180,7 @@ const UserProfilePage: React.FC = () => {
     })();
     return () => { isMounted = false; };
   }, [role]);
-
+ 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'Open':
@@ -199,7 +199,7 @@ const UserProfilePage: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
+ 
   const validateFirstName = (firstName: string) => {
     const trimmed = firstName.trim();
     if (!trimmed) return 'First name is required';
@@ -208,7 +208,7 @@ const UserProfilePage: React.FC = () => {
     if (!FIRST_NAME_REGEX.test(trimmed)) return 'Enter a valid first name (letters, spaces, , . \' - allowed)';
     return null;
   };
-
+ 
   const validateLastName = (lastName: string) => {
     const trimmed = lastName.trim();
     if (!trimmed) return 'Last name is required';
@@ -217,42 +217,42 @@ const UserProfilePage: React.FC = () => {
     if (!LAST_NAME_REGEX.test(trimmed)) return 'Enter a valid last name (letters, spaces, , . \' - allowed)';
     return null;
   };
-
+ 
   const handleEditProfile = () => {
     setIsEditingProfile(true);
   };
-
+ 
   const handleSaveProfile = async () => {
     const firstNameErr = validateFirstName(firstName);
     const lastNameErr = validateLastName(lastName);
-    
+   
     if (firstNameErr) {
       setFirstNameError(firstNameErr);
     }
     if (lastNameErr) {
       setLastNameError(lastNameErr);
     }
-    
+   
     if (firstNameErr || lastNameErr) {
       return;
     }
-    
+   
     if (!userId) {
       setSaveError('User ID not available. Please refresh the page and try again.');
       return;
     }
-    
+   
     setIsSaving(true);
     setSaveError(null);
     setFirstNameError(null);
     setLastNameError(null);
-    
+   
     try {
       await userService.updateProfile(userId, {
         first_name: firstName,
         last_name: lastName
       });
-      
+     
       // Success - exit edit mode
       setIsEditingProfile(false);
     } catch (error: any) {
@@ -261,7 +261,7 @@ const UserProfilePage: React.FC = () => {
       setIsSaving(false);
     }
   };
-
+ 
   const handleCancelEdit = async () => {
     setIsEditingProfile(false);
     // Reset to original values from API
@@ -276,7 +276,7 @@ const UserProfilePage: React.FC = () => {
     setFirstNameError(null);
     setLastNameError(null);
   };
-
+ 
   const handleSubmitRequest = () => {
     navigate('/support', {
       state: {
@@ -290,8 +290,8 @@ const UserProfilePage: React.FC = () => {
       }
     });
   };
-
-
+ 
+ 
   const navigateToTicketPrefilled = (ticket: Ticket) => {
     navigate('/support', {
       state: {
@@ -310,23 +310,25 @@ const UserProfilePage: React.FC = () => {
       }
     });
   };
-
+ 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
+ 
   const handleBackNavigation = () => {
-    // Check if there's history to go back to
-    // If history length is 1, we're on the first page (no history to go back)
-    if (window.history.length > 1) {
+    // Check if we came from within the app (same origin)
+    const referrer = document.referrer;
+    const currentOrigin = window.location.origin;
+    const cameFromApp = referrer && referrer.startsWith(currentOrigin);
+   
+    if (cameFromApp && window.history.length > 1) {
       navigate(-1);
     } else {
-      // No history available, navigate to dashboard
-      navigate('/dashboard');
+      navigate("/dashboard");
     }
   };
-
+ 
   // Don't render anything until auth is verified
   // This prevents the UI flicker when redirecting to login
   if (isLoading || !isAuthChecked || !isAuthenticated) {
@@ -336,11 +338,11 @@ const UserProfilePage: React.FC = () => {
       </div>
     );
   }
-
+ 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header 
-        title="User Profile" 
+      <Header
+        title="User Profile"
         showBackButton={!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin')}
         onBackClick={handleBackNavigation}
         rightContent={
@@ -359,11 +361,11 @@ const UserProfilePage: React.FC = () => {
           ) : undefined
         }
       />
-
+ 
       <div className="pt-[calc(63px+1rem)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-8">
-
+ 
         {/* Basic Information Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -411,7 +413,7 @@ const UserProfilePage: React.FC = () => {
               </div>
             )}
           </div>
-
+ 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <label className="block text-sm font-bold text-black mb-2">First Name</label>
@@ -432,8 +434,8 @@ const UserProfilePage: React.FC = () => {
                 maxLength={NAME_MAX}
                 disabled={!isEditingProfile}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                  isEditingProfile 
-                    ? firstNameError 
+                  isEditingProfile
+                    ? firstNameError
                       ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
@@ -461,8 +463,8 @@ const UserProfilePage: React.FC = () => {
                 maxLength={NAME_MAX}
                 disabled={!isEditingProfile}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                  isEditingProfile 
-                    ? lastNameError 
+                  isEditingProfile
+                    ? lastNameError
                       ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
                       : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
                     : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
@@ -487,7 +489,7 @@ const UserProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
-          
+         
           {/* Error Display */}
           {saveError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -504,7 +506,7 @@ const UserProfilePage: React.FC = () => {
             </div>
           )}
         </div>
-
+ 
         {/* Support Activity Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -514,7 +516,7 @@ const UserProfilePage: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleSubmitRequest}
-                  className="px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
+                  className="px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
                 >
                   Submit New Request
                 </button>
@@ -525,12 +527,12 @@ const UserProfilePage: React.FC = () => {
               </div>
             )}
           </div>
-
+ 
           <div>
             <div className="flex items-center justify-between mb-4 pl-2">
-              <h3 className="text-lg font-medium text-gray-700">
-                {role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin' 
-                  ? 'All Tickets & Feedback' 
+              <h3 className="text-lg font-bold text-gray-700">
+                {role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin'
+                  ? 'All Tickets & Feedback'
                   : 'My Tickets & Feedback'
                 }
               </h3>
@@ -543,88 +545,111 @@ const UserProfilePage: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className={tickets.length > 5 ? "max-h-[400px] overflow-y-auto" : ""}>
-              <table className="w-full divide-y divide-gray-200 table-fixed">
-              <thead className="bg-white sticky top-0 z-10">
-                <tr className="border-b border-[#eeeeee]">
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
-                    Ticket ID
-                  </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[35%] whitespace-nowrap">
-                    Title
-                  </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
-                    Type
-                  </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[15%] whitespace-nowrap">
-                    Status
-                  </th>
-                  <th className="bg-white p-[10px] font-semibold text-[#6b1176] text-xs text-left w-[20%] whitespace-nowrap">
-                    Submitted On
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="border-b border-[#eeeeee] hover:bg-white/50">
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
-                      <a
-                        href="#"
-                        className="font-medium hover:opacity-80"
-                        style={{ color: COLORS.primary.purpleDark }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          navigateToTicketPrefilled(ticket);
-                        }}
-                      >
-                        {ticket.id}
-                      </a>
-                    </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs">
-                      <div className="truncate break-words max-w-[220px]">
-                      {ticket.title}
-                      </div>
-                    </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
-                      {ticket.type}
-                    </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td className="bg-white p-[10px] font-normal text-[#333333] text-xs whitespace-nowrap">
-                      {ticket.submittedOn.replace(/\./g, '-')}
-                    </td>
-                  </tr>
-                ))}
-                {(!loadingTickets && tickets.length === 0 && !ticketsError) && (
-                  <tr>
-                    <td colSpan={5} className="bg-white p-[15px] font-normal text-[#333333] text-sm">No tickets found.</td>
-                  </tr>
-                )}
-                {ticketsError && (
-                  <tr>
-                    <td colSpan={5} className="bg-white p-[15px] font-normal text-red-600 text-sm">{ticketsError}</td>
-                  </tr>
-                )}
-              </tbody>
-              </table>
-              {loadingTickets && (
-                <div className="px-6 py-3 text-sm text-gray-500">Loading tickets...</div>
-              )}
+            <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+              <div
+                className="max-h-[415px] overflow-y-auto"
+                style={{
+                  scrollbarWidth: 'thin'
+                }}
+              >
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-[#fdeeff] z-10">
+                    <tr className="border-b border-[#eeeeee]">
+                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        Ticket ID
+                      </th>
+                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        Title
+                      </th>
+                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        Type
+                      </th>
+                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        Status
+                      </th>
+                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                        Submitted On
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingTickets ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center"
+                        >
+                          Loading tickets...
+                        </td>
+                      </tr>
+                    ) : ticketsError ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="bg-white p-[15px] font-normal text-red-600 text-sm text-center"
+                        >
+                          {ticketsError}
+                        </td>
+                      </tr>
+                    ) : tickets.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center"
+                        >
+                          No tickets found.
+                        </td>
+                      </tr>
+                    ) : (
+                      tickets.map((ticket) => (
+                        <tr key={ticket.id} className="border-b border-[#eeeeee] hover:bg-white/50">
+                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
+                            <a
+                              href="#"
+                              className="font-medium hover:opacity-80"
+                              style={{ color: COLORS.primary.purpleDark }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                navigateToTicketPrefilled(ticket);
+                              }}
+                            >
+                              {ticket.id}
+                            </a>
+                          </td>
+                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                            <div className="truncate break-words max-w-[220px]" title={ticket.title}>
+                              {ticket.title}
+                            </div>
+                          </td>
+                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
+                            {ticket.type}
+                          </td>
+                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
+                              {ticket.status}
+                            </span>
+                          </td>
+                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
+                            {ticket.submittedOn.replace(/\./g, '-')}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
-
+ 
         {/* Notifications Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Notifications</h2>
-          
+         
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-900">Email me when my ticket is updated</h3>
+                <h3 className="text-sm font-bold text-gray-900">Email me when my ticket is updated</h3>
                 <p className="text-sm text-gray-500 mt-1">Get notifications about ticket status changes</p>
               </div>
               <button
@@ -640,10 +665,10 @@ const UserProfilePage: React.FC = () => {
                 />
               </button>
             </div>
-
+ 
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-900">Include me in myGrape feature update emails</h3>
+                <h3 className="text-sm font-bold text-gray-900">Include me in myGrape feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>
                 <p className="text-xs text-gray-400 mt-1">Coming soon</p>
               </div>
@@ -664,5 +689,5 @@ const UserProfilePage: React.FC = () => {
     </div>
   );
 };
-
+ 
 export default UserProfilePage;
