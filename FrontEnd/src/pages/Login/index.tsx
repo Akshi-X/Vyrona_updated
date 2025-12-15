@@ -22,7 +22,7 @@ const Login: React.FC = () => {
 
     // Removed API_BASE_URL - now using authService
     const validateEmail = (email: string) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const regex = /^[^\s@#]+@[^\s@#]+\.[^\s@#]+$/;
         return regex.test(email);
     };
 
