@@ -1,8 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { chatService } from '../../services/chatService';
-import { userService, type UserListItem, type UserProfileDto } from '../../services/userService';
+import { userService, type UserListItem } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { usePatientChatWebSocket } from '../../hooks/useChatWebSocket';
+
+// Utility function to format date in UTC consistently across all browsers
+const formatUTCTimestamp = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return dateString; // Return original string if invalid
+    }
+    
+    // Format: YYYY-MM-DD HH:mm:ss UTC
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
+  } catch (error) {
+    return dateString; // Return original string on error
+  }
+};
 
 type ChatMessage = { 
   id: string; 
@@ -12,6 +37,7 @@ type ChatMessage = {
   at: string; 
   senderName?: string; 
   senderId?: string; 
+  senderRole?: string; 
   isRead?: boolean; 
   readAt?: string; 
   wasUnread?: boolean 
@@ -33,181 +59,220 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const unreadSeparatorRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const mentionDropdownRef = useRef<HTMLDivElement | null>(null);
+  const mentionItemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const mentionMapRef = useRef<Map<string, string>>(new Map());
-  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMarkedAsReadRef = useRef(false);
+  const previousUnreadCountRef = useRef<number>(0);
+  const previousMessageCountRef = useRef<number>(0);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
   const [draftMessage, setDraftMessage] = useState<string>('');
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [mentionSuggestions, setMentionSuggestions] = useState<UserListItem[]>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(-1);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
-  const [isUserTyping, setIsUserTyping] = useState(false);
 
-  // Polling interval in milliseconds (5 seconds)
-  const POLLING_INTERVAL_MS = 5000;
-  // Typing timeout - resume polling after user stops typing for this duration (2 seconds)
-  const TYPING_TIMEOUT_MS = 2000;
+  // WebSocket for patient messages
+  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = usePatientChatWebSocket(patientId);
 
   // Fetch current user
-  const fetchCurrentUser = async (): Promise<UserProfileDto | null> => {
+  const fetchCurrentUser = async (): Promise<void> => {
     try {
       const profile = await userService.getProfile();
-      setCurrentUser(profile);
       setCurrentUserId(profile.user_id);
-      return profile;
-    } catch (error) {
-      return null;
+    } catch {
+      // Silently handle error
     }
   };
 
   // Fetch users for mention functionality
+  // Keep ALL users (including current user) for rendering mentions in messages
+  // Current user will be filtered out only in the mention dropdown suggestions
   const fetchUsers = async () => {
     try {
       const response = await userService.getAllUsersInCompany();
-      setUsers(response.users || []);
-    } catch (error) {
+      const allUsers = response.users || [];
+      setUsers(allUsers);
+    } catch {
       setUsers([]);
     }
   };
 
-  // Load messages for selected patient
-  const loadPatientMessages = async (patientId: string, userId?: string, showLoader: boolean = true) => {
-    if (!patientId) return;
-    if (showLoader) {
-      setLoadingMessages(true);
+  // Transform WebSocket messages to ChatMessage format
+  useEffect(() => {
+    if (!wsMessages || wsMessages.length === 0) {
+      setMessages([]);
+      return;
     }
-    try {
-      // Use provided userId or currentUserId from state
-      const userIdToCompare = userId || currentUserId;
+
+    const userIdToCompare = currentUserId;
+    
+    // Transform messages
+    const transformedMessages: ChatMessage[] = wsMessages.map((msg) => {
+      // Only determine sender if we have currentUserId
+      const isFromMe = Boolean(userIdToCompare && msg.sender_id === userIdToCompare);
+      const isRead = Boolean(msg.is_read);
       
-      // First, get unread messages to track which ones were unread before opening
-      const unreadResponse = await chatService.getUnreadMessages();
-      const unreadIds = new Set(
-        unreadResponse.unread_messages
-          .filter(msg => msg.patient_id === patientId)
-          .map(msg => msg.message_id.toString())
+      // wasUnread = true if:
+      // 1. We have currentUserId (to determine if message is from us)
+      // 2. Message is not from current user
+      // 3. Message is not read
+      // This shows the separator for any unread message from others
+      const wasUnread = Boolean(
+        userIdToCompare && 
+        !isFromMe && 
+        !isRead
       );
       
-      // Get patient messages - this endpoint automatically marks messages as read for current user
-      const response = await chatService.getPatientMessages(patientId);
-      const transformedMessages: ChatMessage[] = response.messages.map((msg) => {
-        const isFromMe = userIdToCompare && msg.sender_id === userIdToCompare;
-        const wasUnread = unreadIds.has(msg.id.toString());
-        
-        return {
-          id: msg.id.toString(),
-          chatId: patientId,
-          sender: isFromMe ? 'me' : 'them',
-          text: msg.message_content,
-          at: new Date(msg.created_at).toLocaleString(),
-          senderName: msg.sender_name,
-          senderId: msg.sender_id,
-          isRead: msg.is_read,
-          readAt: msg.read_at,
-          wasUnread: wasUnread && !isFromMe,
-        };
-      });
-      setMessages(transformedMessages);
-      
-      // Notify parent to refresh unread messages
-      if (onMessagesUpdated) {
-        onMessagesUpdated();
-      }
-    } catch (error) {
-      // Only clear messages if this was an initial load, not a polling update
-      if (showLoader) {
-        setMessages([]);
-      }
-    } finally {
-      if (showLoader) {
-        setLoadingMessages(false);
-      }
-    }
-  };
+      return {
+        id: msg.id.toString(),
+        chatId: patientId || '',
+        sender: isFromMe ? 'me' : 'them',
+        text: msg.message_content,
+        at: formatUTCTimestamp(msg.created_at),
+        senderName: msg.sender_name,
+        senderId: msg.sender_id,
+        senderRole: msg.sender_role || 'User',
+        isRead: msg.is_read,
+        readAt: msg.read_at,
+        wasUnread: wasUnread,
+      };
+    });
 
-  // When opening chat screen, load messages
+    // Sort by created_at descending (latest first), then reverse for display (oldest first)
+    transformedMessages.sort((a, b) => {
+      const aTime = new Date(wsMessages.find(m => m.id.toString() === a.id)?.created_at || 0).getTime();
+      const bTime = new Date(wsMessages.find(m => m.id.toString() === b.id)?.created_at || 0).getTime();
+      return aTime - bTime; // Oldest first for display
+    });
+
+    setMessages(transformedMessages);
+    
+   
+  }, [wsMessages, currentUserId, patientId, isOpen]);
+
+  // Note: Mark as read functionality:
+  // 1. When user closes chat dialog (handleClose function)
+  // 2. When user sends a message (handleSendDraft function)
+  // Auto-mark-as-read when receiving new messages while chat is open is disabled for now
+
+  // Scroll to bottom of chat with retry mechanism
+  const scrollToUnreadOrBottom = useCallback((smooth: boolean = false, retryCount: number = 0, force: boolean = false) => {
+    const el = chatScrollRef.current;
+    
+    if (!el || messages.length === 0) return;
+    
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!el) return;
+        
+        const targetScrollTop = el.scrollHeight - el.clientHeight;
+        const currentScrollTop = el.scrollTop;
+        const isAtBottom = Math.abs(currentScrollTop - targetScrollTop) < 5; // 5px tolerance
+        
+        // If already at bottom and not retrying and not forced, skip
+        if (isAtBottom && retryCount === 0 && !smooth && !force) {
+          return;
+        }
+        
+        // Scroll to bottom
+        if (smooth) {
+          el.scrollTo({
+            top: el.scrollHeight,
+            behavior: 'smooth'
+          });
+        } else {
+          // Use scrollTop for instant scroll (more reliable)
+          el.scrollTop = el.scrollHeight;
+        }
+        
+        // Verify scroll happened, retry if needed (max 3 retries)
+        if (retryCount < 3) {
+          setTimeout(() => {
+            if (!el) return;
+            const newScrollTop = el.scrollTop;
+            const newTargetScrollTop = el.scrollHeight - el.clientHeight;
+            const stillNotAtBottom = Math.abs(newScrollTop - newTargetScrollTop) > 5;
+            
+            if (stillNotAtBottom) {
+              // Retry with slightly longer delay
+              scrollToUnreadOrBottom(smooth, retryCount + 1, force);
+            }
+          }, 150 + (retryCount * 100)); // Increasing delay for retries
+        }
+      });
+    });
+  }, [messages]);
+
+  // Initialize when chat opens
   useEffect(() => {
     if (isOpen && patientId) {
       const initializeChat = async () => {
-        const userProfile = await fetchCurrentUser();
+        setLoadingMessages(true);
+        await fetchCurrentUser();
         await fetchUsers();
-        // Load messages after fetching user, passing the user ID directly
-        if (userProfile) {
-          await loadPatientMessages(patientId, userProfile.user_id);
-        } else {
-          await loadPatientMessages(patientId);
-        }
+        hasMarkedAsReadRef.current = false;
+        previousUnreadCountRef.current = unreadCount;
+        setLoadingMessages(false);
       };
       initializeChat();
     } else {
-      // Clear messages when chat is closed
-      setMessages([]);
+      // Reset when chat closes
+      hasMarkedAsReadRef.current = false;
+      previousUnreadCountRef.current = 0;
     }
-  }, [isOpen, patientId]);
+  }, [isOpen, patientId, unreadCount, currentUserId]);
 
-  // Polling effect - fetch new messages periodically when chat is open
+  // Scroll to bottom when loading completes and messages are available
   useEffect(() => {
-    // Clear any existing polling interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    // Start polling only if chat is open, patientId exists, user is not typing, and we have currentUserId
-    if (isOpen && patientId && !isUserTyping && currentUserId) {
-      // Set up polling interval
-      // The effect will automatically recreate the interval when dependencies change
-      pollingIntervalRef.current = setInterval(async () => {
-        try {
-          // Poll without showing loader to avoid UI flicker
-          await loadPatientMessages(patientId, currentUserId, false);
-        } catch (error) {
-          // Silently handle polling errors to avoid console spam
-        }
-      }, POLLING_INTERVAL_MS);
-    }
-
-    // Cleanup function - clears interval when dependencies change or component unmounts
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [isOpen, patientId, currentUserId, isUserTyping]);
-
-  // Auto scroll to first unread message
-  useEffect(() => {
-    const el = chatScrollRef.current;
-    const separatorEl = unreadSeparatorRef.current;
-    
-    if (el && messages.length > 0) {
-      const firstUnreadIndex = messages.findIndex(m => m.wasUnread === true);
-      const hasUnreadMessages = firstUnreadIndex !== -1;
+    if (!loadingMessages && messages.length > 0 && isOpen) {
+      // Wait a bit longer after loading completes to ensure all content is rendered
+      // This ensures we scroll after WebSocket messages are fully loaded
+      const timeoutId = setTimeout(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToUnreadOrBottom(false, 0, true); // Force scroll after loading
+          });
+        });
+      }, 250);
       
-      if (hasUnreadMessages && separatorEl) {
-        setTimeout(() => {
-          if (el && separatorEl) {
-            const separatorTop = separatorEl.offsetTop;
-            const containerTop = el.offsetTop;
-            el.scrollTop = separatorTop - containerTop - 20;
-          }
-        }, 150);
-      } else {
-        setTimeout(() => {
-          if (el) {
-            el.scrollTop = el.scrollHeight;
-          }
-        }, 100);
-      }
+      return () => clearTimeout(timeoutId);
     }
-  }, [messages, isOpen]);
+  }, [loadingMessages, messages.length, isOpen, scrollToUnreadOrBottom]);
+
+  // Scroll to bottom when chat opens or messages change (initial load)
+  useEffect(() => {
+    if (messages.length > 0 && isOpen && !loadingMessages) {
+      // Force scroll to bottom on initial load to ensure we show latest messages
+      // Use multiple requestAnimationFrame calls to ensure content is rendered
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToUnreadOrBottom(false, 0, true); // Force scroll on initial load
+        });
+      });
+    }
+  }, [messages, isOpen, loadingMessages, scrollToUnreadOrBottom]);
+
+  // Scroll to bottom smoothly when new messages arrive (user is viewing chat)
+  useEffect(() => {
+    if (messages.length > 0 && isOpen && !loadingMessages && messages.length > previousMessageCountRef.current) {
+      // New message arrived - scroll smoothly to bottom
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        scrollToUnreadOrBottom(true); // Smooth scroll for new messages
+      });
+      
+      previousMessageCountRef.current = messages.length;
+    } else if (messages.length > 0) {
+      previousMessageCountRef.current = messages.length;
+    }
+  }, [messages.length, isOpen, loadingMessages, scrollToUnreadOrBottom]);
 
   // Extract mentions from message text
   const extractMentions = (messageText: string): string[] => {
@@ -305,12 +370,18 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     const text = draftMessage.trim();
     if (!patientId || !text) return;
     
+    // Clear input immediately for better UX
+    const messageToSend = text;
+    mentionMapRef.current.clear();
+    setDraftMessage('');
+    setShowMentionDropdown(false);
+    
     try {
       if (users.length === 0) {
         await fetchUsers();
       }
       
-      let taggedUserIds = extractMentions(text);
+      let taggedUserIds = extractMentions(messageToSend);
       taggedUserIds = taggedUserIds.filter(id => id && typeof id === 'string' && id.trim().length > 0);
       
       if (!Array.isArray(taggedUserIds)) {
@@ -318,32 +389,35 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       }
       
       const requestPayload = {
-        message_content: text,
+        message_content: messageToSend,
         patient_id: patientId,
         tagged_user_ids: taggedUserIds
       };
       
-      const response = await chatService.sendMessage(requestPayload);
+      await chatService.sendMessage(requestPayload);
       
-      mentionMapRef.current.clear();
+      // Mark as read after sending message (user typed a reply)
+      try {
+        markAsRead();
+      } catch {
+        // Fallback to HTTP API if WebSocket fails
+        chatService.markPatientAsRead(patientId).catch(() => {
+          // Silently handle errors
+        });
+      }
+      hasMarkedAsReadRef.current = true;
       
-      const now = new Date();
-      setMessages(prev => ([
-        ...prev,
-        {
-          id: response.message_id.toString(),
-          chatId: patientId,
-          sender: 'me' as const,
-          text,
-          at: now.toLocaleString(),
-          senderName: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : undefined,
-          senderId: currentUser ? currentUser.user_id : undefined,
-        }
-      ]));
+      // Refresh messages to get updated is_read status (removes unread separator)
+      setTimeout(() => {
+        refreshMessages();
+      }, 200);
       
-      setDraftMessage('');
-      setShowMentionDropdown(false);
-      setIsUserTyping(false); // Resume polling after sending
+      // Scroll to bottom after sending message
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollToUnreadOrBottom(true); // Smooth scroll after sending
+        });
+      }, 300);
       
       // Clear typing timeout
       if (typingTimeoutRef.current) {
@@ -351,32 +425,13 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         typingTimeoutRef.current = null;
       }
       
-      // Reload messages with current user ID to ensure proper sender detection
-      // Don't show loader for this refresh as it's immediate after sending
-      await loadPatientMessages(patientId, currentUser?.user_id || currentUserId, false);
-      
-      // Notify parent to refresh unread messages
+      // Notify parent
       if (onMessagesUpdated) {
         onMessagesUpdated();
       }
-    } catch (error) {
-      setIsUserTyping(false); // Resume polling even on error
-      const now = new Date();
-      setMessages(prev => ([
-        ...prev,
-        {
-          id: `loc-${now.getTime()}`,
-          chatId: patientId,
-          sender: 'me' as const,
-          text,
-          at: now.toLocaleString(),
-          senderName: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : undefined,
-          senderId: currentUser ? currentUser.user_id : undefined,
-        }
-      ]));
-      setDraftMessage('');
+    } catch {
+      // Input already cleared, just clear dropdown if needed
       setShowMentionDropdown(false);
-      setIsUserTyping(false); // Resume polling after error
       
       // Clear typing timeout
       if (typingTimeoutRef.current) {
@@ -386,13 +441,9 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     }
   };
 
-  // Cleanup polling and typing timeouts on unmount
+  // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
@@ -400,21 +451,30 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     };
   }, []);
 
+  // Handle close - mark as read
+  const handleClose = () => {
+    if (patientId && !hasMarkedAsReadRef.current) {
+      // Mark as read when closing chat
+      // Try WebSocket first, fallback to HTTP API
+      try {
+        markAsRead();
+        // Refresh messages after marking as read (for next time chat opens)
+        setTimeout(() => {
+          refreshMessages();
+        }, 200);
+      } catch {
+        // Fallback to HTTP API if WebSocket fails
+        chatService.markPatientAsRead(patientId).catch(() => {
+          // Silently handle errors
+        });
+      }
+      hasMarkedAsReadRef.current = true;
+    }
+    onClose();
+  };
+
   const handleMessageChange = (value: string) => {
     setDraftMessage(value);
-    
-    // Pause polling while user is typing
-    setIsUserTyping(true);
-    
-    // Clear existing typing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Resume polling after user stops typing for TYPING_TIMEOUT_MS
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsUserTyping(false);
-    }, TYPING_TIMEOUT_MS);
     
     const cursorPos = inputRef.current?.selectionStart || value.length;
     const textBeforeCursor = value.substring(0, cursorPos);
@@ -429,6 +489,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       
       const searchQuery = textAfterAt.toLowerCase();
       const filtered = users.filter(user => {
+        // Exclude current user from mention suggestions
+        if (currentUserId && user.user_id === currentUserId) {
+          return false;
+        }
         const fullName = `${user.first_name} ${user.last_name}`.toLowerCase();
         const email = user.email.toLowerCase();
         return fullName.includes(searchQuery) || email.includes(searchQuery);
@@ -497,13 +561,66 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     }
   };
 
+  // Auto-scroll dropdown to keep highlighted item in view
+  useEffect(() => {
+    if (showMentionDropdown && selectedMentionIndex >= 0 && mentionDropdownRef.current) {
+      const scrollToItem = (retryCount = 0) => {
+        const selectedItem = mentionItemRefs.current.get(selectedMentionIndex);
+        const dropdown = mentionDropdownRef.current;
+        
+        if (selectedItem && dropdown) {
+          // Calculate positions relative to the scrollable container
+          const itemTop = selectedItem.offsetTop;
+          const itemBottom = itemTop + selectedItem.offsetHeight;
+          
+          const dropdownScrollTop = dropdown.scrollTop;
+          const dropdownHeight = dropdown.clientHeight;
+          const visibleTop = dropdownScrollTop;
+          const visibleBottom = dropdownScrollTop + dropdownHeight;
+
+          // Check if item is above visible area
+          if (itemTop < visibleTop) {
+            // Scroll to show item at the top with padding
+            dropdown.scrollTo({
+              top: Math.max(0, itemTop - 8),
+              behavior: 'smooth'
+            });
+          }
+          // Check if item is below visible area
+          else if (itemBottom > visibleBottom) {
+            // Scroll to show item at the bottom with padding
+            dropdown.scrollTo({
+              top: itemBottom - dropdownHeight + 8,
+              behavior: 'smooth'
+            });
+          }
+        } else if (retryCount < 3) {
+          // Retry if refs aren't set yet (max 3 retries)
+          setTimeout(() => scrollToItem(retryCount + 1), 50);
+        }
+      };
+      
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        scrollToItem();
+      });
+    }
+  }, [selectedMentionIndex, showMentionDropdown, mentionSuggestions.length]);
+
+  // Cleanup refs when dropdown closes
+  useEffect(() => {
+    if (!showMentionDropdown) {
+      mentionItemRefs.current.clear();
+    }
+  }, [showMentionDropdown]);
+
   // Lock body scroll when chat box is open
   useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={handleClose}>
       <div className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b">
@@ -519,7 +636,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 <p className="text-[11px] text-gray-500">Receive message from stakeholders and team members</p>
               </div>
             </div>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={onClose}>
+            <button className="p-2 rounded-full hover:bg-gray-100" onClick={handleClose}>
               <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -534,8 +651,11 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
               <div className="text-center text-xs text-gray-500 mt-10">Loading messages...</div>
             ) : messages.length > 0 ? (
               (() => {
+                // Find first message with wasUnread flag
                 const firstUnreadIndex = messages.findIndex(m => m.wasUnread === true);
                 const hasUnreadMessages = firstUnreadIndex !== -1;
+                
+              
                 
                 return messages.map((m, index) => {
                   const showUnreadSeparator = hasUnreadMessages && index === firstUnreadIndex;
@@ -558,13 +678,14 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-medium text-black">{m.senderName || 'Unknown'}</span>
-                              <span className="text-xs text-gray-500">Admin</span>
+                              <span className="text-xs text-gray-500">{m.senderRole || 'User'}</span>
                             </div>
                             <div className="bg-gray-100 rounded-lg px-3 py-2 inline-block">
                               <div className="text-sm whitespace-pre-wrap" style={{ color: '#000000' }}>
-                                {renderMessageWithMentions(m.text)}
+                                {renderMessageWithMentions(m.text, users)}
                               </div>
                             </div>
+                            <div className="text-[10px] text-gray-500 mt-1">{m.at}</div>
                           </div>
                         </div>
                       ) : (
@@ -572,7 +693,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                           <div className="max-w-[70%]">
                             <div className="bg-purple-50 rounded-lg px-3 py-2 inline-block">
                               <div className="text-sm whitespace-pre-wrap" style={{ color: '#000000' }}>
-                                {renderMessageWithMentions(m.text)}
+                                {renderMessageWithMentions(m.text, users)}
                               </div>
                             </div>
                             <div className="text-[10px] text-gray-500 mt-1 text-right">{m.at}</div>
@@ -606,10 +727,20 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 />
                 {/* Mention dropdown */}
                 {showMentionDropdown && mentionSuggestions.length > 0 && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
+                  <div 
+                    ref={mentionDropdownRef}
+                    className="absolute bottom-full left-0 mb-2 w-full bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-48 overflow-y-auto"
+                  >
                     {mentionSuggestions.map((user, index) => (
                       <button
                         key={user.user_id}
+                        ref={(el) => {
+                          if (el) {
+                            mentionItemRefs.current.set(index, el);
+                          } else {
+                            mentionItemRefs.current.delete(index);
+                          }
+                        }}
                         type="button"
                         onClick={() => handleMentionSelect(user)}
                         className={`w-full text-left px-3 py-2 hover:bg-purple-50 flex items-center gap-2 ${

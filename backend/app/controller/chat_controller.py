@@ -2,10 +2,10 @@ import json
 import logging
 import uuid
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Response
 from sqlalchemy.orm import Session
 from typing import List
-
+import time
 from app.config import database
 from app.schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, 
@@ -47,6 +47,8 @@ router = APIRouter(
 
 @router.post("/messages", 
     response_model=ChatMessageCreateResponse,
+    response_model_exclude_unset=True,  # Skip unset fields for faster serialization
+    response_model_exclude_none=False,  # Keep None fields (frontend may need them)
     summary="Send chat message",
     description="""
     Send a chat message for a specific patient.
@@ -55,10 +57,13 @@ router = APIRouter(
     """)
 async def send_chat_message(
     request: ChatMessageCreateRequest,
+    response: Response,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
     """Send a chat message for a specific patient"""
+
+    start_time = time.time()
     try:
         if request.tagged_user_ids and current_user.user_id in request.tagged_user_ids:
             raise ChatInvalidDataException(
@@ -67,14 +72,20 @@ async def send_chat_message(
             )
         
         sender_name = f"{current_user.first_name} {current_user.last_name}"
+        sender_role = current_user.role.value if current_user.role else None
+        db_start = time.time()
         result = create_chat_message(
             request,
             current_user.user_id,
             current_user.pharma_id,
             sender_name,
+            sender_role,
             db
         )
+        db_time = time.time() - db_start
         
+        # Start WebSocket broadcast in background (non-blocking)
+        broadcast_start = time.time()
         asyncio.create_task(
             broadcast_new_message(
                 result,
@@ -82,6 +93,15 @@ async def send_chat_message(
                 chat_connection_manager
             )
         )
+        broadcast_setup_time = time.time() - broadcast_start
+        
+        elapsed_time = time.time() - start_time
+        
+        # Add performance headers
+        response.headers["X-Response-Time-Ms"] = f"{elapsed_time * 1000:.0f}"
+        response.headers["X-DB-Time-Ms"] = f"{db_time * 1000:.0f}"
+        
+        logger.info(f"[PERF] POST /api/chat/messages - Total: {elapsed_time:.3f}s | DB: {db_time:.3f}s | Broadcast setup: {broadcast_setup_time:.3f}s (patient_id={request.patient_id}, message_id={result.message_id})")
         
         return result
     except ChatMessageCreateFailedException as e:
@@ -107,7 +127,11 @@ async def send_chat_message(
     summary="Get patient messages",
     description="""
     Get all messages for a specific patient.
-    Messages are automatically marked as read when this endpoint is called.
+    Messages are NOT automatically marked as read.
+    Frontend must explicitly call the mark_as_read endpoint when user:
+    - Sends a message
+    - Closes chat window
+    - Keeps chat window open while receiving new messages
     """)
 async def get_patient_chat_messages(
     patient_id: str = Path(..., description="Patient ID"),
@@ -115,9 +139,9 @@ async def get_patient_chat_messages(
     current_user: user_model.User = Depends(get_current_user),
     pharma_id: int = Depends(get_pharma_id_from_request)
 ):
-    """Get all messages for a specific patient and mark them as read"""
+    """Get all messages for a specific patient (does NOT mark as read)"""
     try:
-        result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db)
+        result = await get_patient_messages(patient_id, current_user.user_id, pharma_id, db, mark_as_read=False)
         return result
     except ChatPatientNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
@@ -152,6 +176,63 @@ def get_user_unread_messages(
     except ChatUserNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
     except ChatMessageNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.post("/patients/{patient_id}/mark-read",
+    summary="Mark patient messages as read",
+    description="""
+    Mark all messages for a patient as read.
+    Frontend should call this when:
+    - User sends a message
+    - User closes chat window
+    - User keeps chat window open while receiving new messages
+    """)
+async def mark_patient_messages_as_read(
+    patient_id: str = Path(..., description="Patient ID"),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    pharma_id: int = Depends(get_pharma_id_from_request)
+):
+    """Mark all messages for a patient as read"""
+    try:
+        from app.service.chat_service import mark_patient_as_read, get_patient_unread_count, broadcast_unread_messages_update
+        
+        # Mark all messages as read
+        latest_message_id = mark_patient_as_read(current_user.user_id, patient_id, db)
+        
+        # Get updated unread count
+        unread_count = get_patient_unread_count(current_user.user_id, patient_id, db)
+        
+        # Broadcast unread update via WebSocket (non-blocking)
+        # Create a new DB session for the broadcast task since the current session will be closed
+        try:
+            from app.config.database import SessionLocal
+            asyncio.create_task(
+                broadcast_unread_messages_update(
+                    current_user.user_id,
+                    pharma_id,
+                    chat_connection_manager,
+                    SessionLocal()  # Create new session for background task
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast unread update after marking messages as read: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Messages for patient {patient_id} marked as read",
+            "patient_id": patient_id,
+            "last_read_message_id": latest_message_id,
+            "unread_count": unread_count
+        }
+    except ChatPatientNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
     except Exception as e:
         raise HTTPException(status_code=500, detail={

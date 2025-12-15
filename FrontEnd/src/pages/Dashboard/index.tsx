@@ -17,6 +17,7 @@ import { riskService, type RiskMetrics } from '../../services/riskService';
 import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
 import { userService } from '../../services/userService';
+import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -66,12 +67,15 @@ export default function Dashboard({ }: DashboardProps) {
   const [trackError, setTrackError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
 
+  // WebSocket for unread chat count (tagged messages only)
+  const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket();
+
   // User initials for avatar
   const [userInitials, setUserInitials] = useState<string>('');
 
 
 
-  // Fetch stakeholder chats from API
+  // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
     setLoadingChats(true);
     try {
@@ -92,8 +96,26 @@ export default function Dashboard({ }: DashboardProps) {
     }
   };
 
+  // Update stakeholder chats from WebSocket data
+  useEffect(() => {
+    if (wsUnreadMessages && wsUnreadMessages.length > 0) {
+      const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
+        id: msg.message_id.toString(),
+        sender: msg.sender_name,
+        patientId: `Patient ID: ${msg.patient_id}`,
+        message: msg.message_content,
+        timestamp: new Date(msg.created_at).toLocaleString(),
+        isRead: false
+      }));
+      setStakeholderChats(transformedChats);
+    } else {
+      setStakeholderChats([]);
+    }
+  }, [wsUnreadMessages]);
+
   // Calculate dynamic notification counts
-  const stakeholderChatCount = stakeholderChats.length; // Show total chats count
+  // Use WebSocket unread count (tagged messages only) for badge
+  const stakeholderChatCount = wsUnreadCount || 0;
   const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
   const myTasksCount = myTasks.length; // Show total tasks count
 
@@ -142,45 +164,13 @@ export default function Dashboard({ }: DashboardProps) {
     fetchMyTasks();
   }, []);
 
-  // Fetch stakeholder chats on component mount
+  // Fetch stakeholder chats when modal opens (for display)
+  // WebSocket handles real-time updates automatically
   useEffect(() => {
-    if (isAuthenticated) {
+    if (showStakeholderChats && isAuthenticated) {
       fetchStakeholderChats();
     }
-  }, [isAuthenticated]);
-
-  // Lightweight polling to keep unread chat badge updated on dashboard
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const start = () => {
-      fetchStakeholderChats();
-      intervalId = setInterval(fetchStakeholderChats, 20000);
-    };
-    const stop = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        start();
-      } else {
-        stop();
-      }
-    };
-
-    handleVisibility();
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      stop();
-    };
-  }, [isAuthenticated]);
+  }, [showStakeholderChats, isAuthenticated]);
 
   // Fetch user profile to compute initials
   useEffect(() => {
@@ -595,7 +585,8 @@ export default function Dashboard({ }: DashboardProps) {
                       alt="Stakeholder Chats"
                       src={StakeholderChatsIcon}
                       onClick={() => {
-                        fetchStakeholderChats();
+                        refreshUnread(); // Refresh from WebSocket
+                        fetchStakeholderChats(); // Also fetch for modal display
                         setShowStakeholderChats(true);
                       }}
                     />
