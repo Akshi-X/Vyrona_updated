@@ -12,7 +12,7 @@ const ForgotPassword: React.FC = () => {
     const [message, setMessage] = useState("");
 
     const validateEmail = (email: string) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const regex = /^[^\s@#]+@[^\s@#]+\.[^\s@#]+$/;
         return regex.test(email);
     };
 
