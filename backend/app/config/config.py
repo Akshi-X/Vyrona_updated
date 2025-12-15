@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 5
     REDIS_SOCKET_TIMEOUT: int = 5
+    # IoT Provider Configuration (Required - set in .env)
+    IOT_CLIENT_ID: str
+    IOT_CLIENT_SECRET: str
+    IOT_ACCOUNT_ID: str
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================

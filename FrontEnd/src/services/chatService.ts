@@ -10,6 +10,7 @@ export interface ChatMessageResponse {
   patient_id: string;
   sender_id: string;
   sender_name: string;
+  sender_role?: string;
   tagged_user_ids: string[];
   created_at: string;
   is_read: boolean;
@@ -85,6 +86,21 @@ export class ChatService extends BaseApiService {
     return await this.request<ChatMessageCreateResponse>('/api/chat/messages', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Mark patient messages as read
+   */
+  async markPatientAsRead(patientId: string): Promise<{
+    success: boolean;
+    message: string;
+    patient_id: string;
+    last_read_message_id: number;
+    unread_count: number;
+  }> {
+    return await this.request(`/api/chat/patients/${patientId}/mark-read`, {
+      method: 'POST',
     });
   }
 

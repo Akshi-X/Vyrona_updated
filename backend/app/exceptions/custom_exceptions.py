@@ -9,7 +9,7 @@ These exceptions follow industry standards:
 - Easy to catch and handle
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from ..constants.status_constants import STATUS_FAILED
@@ -1282,3 +1282,228 @@ class ChatWebSocketAuthFailedException(ChatException):
             status_code=401,
             reason=reason
         )
+
+
+# ============================================
+# IoT PROVIDER API EXCEPTIONS
+# ============================================
+
+class IoTException(AppException):
+    """Base exception for IoT provider API errors"""
+    
+    def __init__(self, message: str, error_code: str, status_code: int = 500, **kwargs):
+        super().__init__(message, error_code, status_code, kwargs)
+
+
+class IoTAuthenticationFailedException(IoTException):
+    """Failed to authenticate with IoT provider API"""
+    
+    def __init__(self, reason: Optional[str] = None, response_body: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_AUTHENTICATION_FAILED,
+            error_code=ERROR_CODES["IOT_AUTH_FAILED"],
+            status_code=401,
+            reason=reason,
+            response_body=response_body
+        )
+
+
+class IoTAPIRequestFailedException(IoTException):
+    """IoT provider API request failed"""
+    
+    def __init__(self, operation: str, reason: Optional[str] = None, response_body: Optional[str] = None, 
+                 iot_trace_id: Optional[str] = None, status_code: int = 500):
+        super().__init__(
+            message=ErrorMessages.IOT_API_REQUEST_FAILED,
+            error_code=ERROR_CODES["IOT_REQUEST_FAILED"],
+            status_code=status_code,
+            operation=operation,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTGetDevicesFailedException(IoTException):
+    """Failed to retrieve devices from IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_DEVICES_FAILED,
+            error_code=ERROR_CODES["IOT_GET_DEVICES_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class IoTGetDeviceFailedException(IoTException):
+    """Failed to retrieve device from IoT provider"""
+    
+    def __init__(self, device_id: str, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_DEVICE_FAILED,
+            error_code=ERROR_CODES["IOT_GET_DEVICE_FAILED"],
+            status_code=500,
+            device_id=device_id,
+            reason=reason
+        )
+
+
+class IoTUpdateDeviceFailedException(IoTException):
+    """Failed to update device in IoT provider"""
+    
+    def __init__(self, device_id: str, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_UPDATE_DEVICE_FAILED,
+            error_code=ERROR_CODES["IOT_UPDATE_DEVICE_FAILED"],
+            status_code=400,
+            device_id=device_id,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTCreateShipmentFailedException(IoTException):
+    """Failed to create shipment in IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_CREATE_SHIPMENT_FAILED,
+            error_code=ERROR_CODES["IOT_CREATE_SHIPMENT_FAILED"],
+            status_code=400,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTGetShipmentFailedException(IoTException):
+    """Failed to retrieve shipment from IoT provider"""
+    
+    def __init__(self, shipment_id: str, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_SHIPMENT_FAILED,
+            error_code=ERROR_CODES["IOT_GET_SHIPMENT_FAILED"],
+            status_code=500,
+            shipment_id=shipment_id,
+            reason=reason
+        )
+
+
+class IoTGetShipmentsFailedException(IoTException):
+    """Failed to retrieve shipments from IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_SHIPMENTS_FAILED,
+            error_code=ERROR_CODES["IOT_GET_SHIPMENTS_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class IoTGetAlertPresetsFailedException(IoTException):
+    """Failed to retrieve alert presets from IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_ALERT_PRESETS_FAILED,
+            error_code=ERROR_CODES["IOT_GET_ALERT_PRESETS_FAILED"],
+            status_code=500,
+            reason=reason
+        )
+
+
+class IoTGetAlertPresetFailedException(IoTException):
+    """Failed to retrieve alert preset from IoT provider"""
+    
+    def __init__(self, preset_id: str, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GET_ALERT_PRESET_FAILED,
+            error_code=ERROR_CODES["IOT_GET_ALERT_PRESET_FAILED"],
+            status_code=500,
+            preset_id=preset_id,
+            reason=reason
+        )
+
+
+class IoTCreateAlertPresetFailedException(IoTException):
+    """Failed to create alert preset in IoT provider"""
+    
+    def __init__(self, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_CREATE_ALERT_PRESET_FAILED,
+            error_code=ERROR_CODES["IOT_CREATE_ALERT_PRESET_FAILED"],
+            status_code=400,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTUpdateAlertPresetFailedException(IoTException):
+    """Failed to update alert preset in IoT provider"""
+    
+    def __init__(self, preset_id: str, reason: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_UPDATE_ALERT_PRESET_FAILED,
+            error_code=ERROR_CODES["IOT_UPDATE_ALERT_PRESET_FAILED"],
+            status_code=500,
+            preset_id=preset_id,
+            reason=reason
+        )
+
+
+class IoTAddDeviceAlertPresetsFailedException(IoTException):
+    """Failed to add alert presets to device"""
+    
+    def __init__(self, device_id: str, alert_preset_ids: List[int], reason: Optional[str] = None,
+                 response_body: Optional[str] = None, iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_ADD_DEVICE_ALERT_PRESETS_FAILED,
+            error_code=ERROR_CODES["IOT_ADD_DEVICE_ALERT_PRESETS_FAILED"],
+            status_code=400,
+            device_id=device_id,
+            alert_preset_ids=alert_preset_ids,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTRemoveDeviceAlertPresetsFailedException(IoTException):
+    """Failed to remove alert presets from device"""
+    
+    def __init__(self, device_id: str, alert_preset_ids: List[int], reason: Optional[str] = None,
+                 response_body: Optional[str] = None, iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED,
+            error_code=ERROR_CODES["IOT_REMOVE_DEVICE_ALERT_PRESETS_FAILED"],
+            status_code=400,
+            device_id=device_id,
+            alert_preset_ids=alert_preset_ids,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
+
+class IoTGenerateDeviceReportFailedException(IoTException):
+    """Failed to generate device report"""
+    
+    def __init__(self, device_id: str, reason: Optional[str] = None, response_body: Optional[str] = None,
+                 iot_trace_id: Optional[str] = None):
+        super().__init__(
+            message=ErrorMessages.IOT_GENERATE_DEVICE_REPORT_FAILED,
+            error_code=ERROR_CODES["IOT_GENERATE_DEVICE_REPORT_FAILED"],
+            status_code=400,
+            device_id=device_id,
+            reason=reason,
+            response_body=response_body,
+            iot_trace_id=iot_trace_id
+        )
+
