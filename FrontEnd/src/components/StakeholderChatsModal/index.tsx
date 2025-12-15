@@ -17,6 +17,31 @@ interface StakeholderChatsModalProps {
   loading?: boolean;
 }
 
+// Utility function to format timestamp in UTC
+const formatUTCTimestamp = (timestamp: string): string => {
+  try {
+    // Try to parse the timestamp string as a date
+    const date = new Date(timestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return timestamp; // Return original string if invalid
+    }
+    
+    // Format: YYYY-MM-DD HH:mm:ss UTC
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
+  } catch {
+    return timestamp; // Return original string on error
+  }
+};
+
 const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
   isOpen,
   onClose,
@@ -71,7 +96,7 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
                 {chat.message}
               </p>
               <span className="text-xs text-[#333333] flex-shrink-0">
-                {chat.timestamp}
+                {formatUTCTimestamp(chat.timestamp)}
               </span>
             </div>
           </div>

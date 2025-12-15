@@ -101,10 +101,11 @@ MAX_PAGE_SIZE = 100
 # ============================================
 # DATABASE
 # ============================================
-DB_POOL_SIZE = 15
-DB_MAX_OVERFLOW = 10
-DB_POOL_TIMEOUT = 30
-DB_POOL_RECYCLE = 3600
+# Priority 3: Optimized connection pool settings for better concurrency
+DB_POOL_SIZE = 25  # Increased from 15 for better concurrency
+DB_MAX_OVERFLOW = 15  # Increased from 10 for peak load handling
+DB_POOL_TIMEOUT = 30  # Seconds to wait for connection from pool
+DB_POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 DB_ECHO = True  # SQL logging
 
 # ============================================
