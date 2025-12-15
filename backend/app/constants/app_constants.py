@@ -101,10 +101,11 @@ MAX_PAGE_SIZE = 100
 # ============================================
 # DATABASE
 # ============================================
-DB_POOL_SIZE = 15
-DB_MAX_OVERFLOW = 10
-DB_POOL_TIMEOUT = 30
-DB_POOL_RECYCLE = 3600
+# Priority 3: Optimized connection pool settings for better concurrency
+DB_POOL_SIZE = 25  # Increased from 15 for better concurrency
+DB_MAX_OVERFLOW = 15  # Increased from 10 for peak load handling
+DB_POOL_TIMEOUT = 30  # Seconds to wait for connection from pool
+DB_POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 DB_ECHO = True  # SQL logging
 
 # ============================================
@@ -191,6 +192,40 @@ PHONE_REGEX = r'^\+?1?\d{9,15}$'
 # QUALITY MONITORING
 # ============================================
 QUALITY_EXPORT_DEFAULT_MINUTES = 10
+
+# ============================================
+# IoT PROVIDER API
+# ============================================
+IOT_API_BASE_URL = "https://api.tive.com/public/v3"
+IOT_API_TIMEOUT_SECONDS = 30
+IOT_TOKEN_EXPIRY_SECONDS = 3600
+IOT_TOKEN_SAFETY_MARGIN_SECONDS = 60
+IOT_RESPONSE_PREVIEW_LENGTH = 500
+IOT_LONG_RESPONSE_PREVIEW_LENGTH = 2000
+IOT_USER_AGENT = "MyGrape-API-Client/1.0"
+
+# JWT Token parsing constants
+IOT_JWT_TOKEN_PARTS_COUNT = 3
+IOT_JWT_PAYLOAD_INDEX = 1
+IOT_BASE64_PADDING_MODULO = 4
+
+# Content types
+IOT_CONTENT_TYPE_TEXT_PLAIN = "text/plain"
+IOT_CONTENT_TYPE_JSON = "application/json"
+IOT_CONTENT_TYPE_OCTET_STREAM = "application/octet-stream"
+
+# File content types for report downloads
+IOT_FILE_CONTENT_TYPES = [
+    "csv", "pdf", "excel",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "octet-stream", "text/csv", "application/csv"
+]
+
+# Error field names for parsing IoT API error responses
+IOT_ERROR_FIELDS = ["error", "message", "errorMessage", "detail", "description", "title"]
+IOT_ERROR_FIELD_ERRORS = "errors"
+IOT_ERROR_FIELD_TRACE_ID = "traceId"
 
 # ============================================
 # COMMON API RESPONSE HEADERS

@@ -1,0 +1,16 @@
+{
+  "name": "MyGrape Webhook",
+  "url": "http://14.141.162.122:8000/api/iot/webhooks/consume",
+  "description": "Webhook for receiving Tive events at MyGrape VMS",
+  "version": "1.0",
+  "template": "",
+  "headers": [],
+  "accountIds": [],
+  "httpMethod": "POST",
+  "contentType": "application/json",
+  "enabled": true,
+  "applyToAllTrackers": true,
+  "applyToAllShipments": true,
+  "applyToAllAlertPresets": true
+}
+

@@ -61,11 +61,13 @@ class ChatMessageResponse(BaseModel):
     patient_id: str
     sender_id: str
     sender_name: str
+    sender_role: Optional[str] = None
     tagged_user_ids: List[str]
     tagged_user_names: Optional[List[str]] = None
     created_at: datetime
     is_read: bool = False
     read_at: Optional[datetime] = None
+    # Note: Frontend can derive was_unread = !is_read for unread separator bar
     
     class Config:
         from_attributes = True
@@ -78,6 +80,7 @@ class ChatMessageCreateResponse(BaseModel):
     message_content: str
     sender_id: str
     sender_name: str
+    sender_role: Optional[str] = None
     tagged_user_ids: List[str]
     tagged_user_names: Optional[List[str]] = None
     created_at: datetime
@@ -86,6 +89,8 @@ class ChatMessageCreateResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        # Pydantic v2 uses model_serializer instead of json_encoders
+        # FastAPI will handle datetime serialization automatically
 
 
 class PatientMessagesResponse(BaseModel):

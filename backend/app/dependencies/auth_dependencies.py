@@ -40,6 +40,7 @@ from ..exceptions import (
 from ..exceptions.custom_exceptions import (
     ChatWebSocketAuthFailedException
 )
+from ..exceptions import TokenExpiredException
 from ..models.user_model import User
 from ..schemas.user_schema import UserRegister
 from ..auth.auth import verify_token
@@ -304,9 +305,12 @@ async def authenticate_websocket(
     try:
         try:
             payload = verify_token(token)
+        except TokenExpiredException:
+            logger.warning("WebSocket connection attempt with expired token")
+            raise ChatWebSocketAuthFailedException(reason="Token has expired. Please login again")
         except Exception as e:
             logger.error(f"Token verification failed: {e}")
-            raise ChatWebSocketAuthFailedException(reason="Invalid or expired token")
+            raise ChatWebSocketAuthFailedException(reason="Invalid token")
 
         user_id = payload.get("user_id") or payload.get("sub")
         if not user_id:

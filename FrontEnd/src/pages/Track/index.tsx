@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import QualityTrackingChart from './sections/QualityTrackingChart.tsx';
@@ -38,8 +38,8 @@ import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } fro
 import { tasksService, type Task } from '../../services/tasksService';
 
 import { userService, type UserProfileDto } from '../../services/userService';
-import { chatService } from '../../services/chatService';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
+import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 const steps = [
   { key: 'Apheresis', dark: DarkApheresisIcon, light: LightApheresisIcon },
   { key: 'Cryopreservation', dark: DarkCryopreservationIcon, light: LightCryopreservationIcon },
@@ -86,7 +86,15 @@ export default function TrackPage() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
 
-  const stakeholderChatCount = stakeholderChats.length;
+  // WebSocket for unread count (tagged messages only) - Dashboard hook for general unread
+  const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
+
+  // Calculate stakeholder chat count: only show count if patient has tagged unread messages
+  const stakeholderChatCount = React.useMemo(() => {
+    if (!patientId || !wsUnreadMessages) return 0;
+    // Count only tagged unread messages for this specific patient
+    return wsUnreadMessages.filter(msg => msg.patient_id === patientId).length;
+  }, [patientId, wsUnreadMessages]);
   const criticalAlertsCount = criticalAlerts.length;
   const myTasksCount = myTasks.length;
 
@@ -149,47 +157,13 @@ export default function TrackPage() {
   useEffect(() => {
     fetchCriticalAlerts();
     fetchMyTasks();
-    fetchUnreadMessages();
     fetchCurrentUser();
   }, [patientId]); // Re-fetch tasks when patientId changes
 
-  // Lightweight polling to keep unread chat badge updated when chat window is closed
+  // Update stakeholder chats from WebSocket data
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const start = () => {
-      fetchUnreadMessages();
-      intervalId = setInterval(fetchUnreadMessages, 15000);
-    };
-    const stop = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        start();
-      } else {
-        stop();
-      }
-    };
-
-    handleVisibility();
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      stop();
-    };
-  }, []);
-
-  // Fetch unread messages to populate stakeholder chats
-  const fetchUnreadMessages = async () => {
-    try {
-      const response = await chatService.getUnreadMessages();
-      const transformedChats = response.unread_messages.map((msg) => ({
+    if (wsUnreadMessages && wsUnreadMessages.length > 0) {
+      const transformedChats = wsUnreadMessages.map((msg) => ({
         id: msg.patient_id,
         sender: msg.sender_name,
         patientId: `Patient ID : ${msg.patient_id}`,
@@ -198,10 +172,10 @@ export default function TrackPage() {
         isRead: false
       }));
       setStakeholderChats(transformedChats);
-    } catch (error) {
+    } else {
       setStakeholderChats([]);
     }
-  };
+  }, [wsUnreadMessages]);
 
   // user initials are set in fetchCurrentUser
   // Calculate currentIndex based on stage and reengineering_status
@@ -443,8 +417,8 @@ export default function TrackPage() {
           onClose={() => setShowStakeholderChatScreen(false)}
           patientId={patientId}
           onMessagesUpdated={() => {
-            // Refresh unread messages to update badge count
-            fetchUnreadMessages();
+            // WebSocket will automatically update unread count
+            // No need to manually refresh
           }}
         />
 
