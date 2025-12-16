@@ -304,9 +304,9 @@ export default function TrackPage() {
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-hidden ml-60">
-        {/* Top Black Bar */}
-        <header className="h-[63px] bg-black border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 flex-shrink-0" style={{ backgroundColor: '#000000' }}>
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
+        {/* Top Nav Bar (fixed like Control Tower) */}
+        <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 z-40">
           {/* Avatar only on the black bar */}
           <div 
             className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
