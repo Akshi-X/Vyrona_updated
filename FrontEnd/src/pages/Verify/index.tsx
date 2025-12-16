@@ -116,7 +116,7 @@ const VerifyOtp: React.FC = () => {
                 if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
                     // Always redirect back to original page if it exists (e.g., approval screen)
                     navigate(targetPath, { replace: true });
-                } else if (verifiedRole === "mygrape_admin") {
+                } else if (verifiedRole?.toLowerCase() === "mygrape_admin") {
                     navigate("/user-profile", { replace: true });
                 } else {
                     navigate("/dashboard", { replace: true });
