@@ -403,7 +403,7 @@ const Signup: React.FC = () => {
                                                 if (confirmPasswordError) setConfirmPasswordError("");
                                             }}
                                             placeholder="Confirm Password"
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmPasswordError ? "border-red-500" : "border-gray-300"
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${confirmPasswordError || (passwordError && password === confirmPassword) || (confirmPassword && !validatePassword(confirmPassword)) ? "border-red-500" : "border-gray-300"
                                                 }`}
                                         />
                                         <button
@@ -424,7 +424,7 @@ const Signup: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className={`h-[40px] w-full px-2 rounded-lg font-semibold text-white text-base ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#5a0e62]"
+                                    className={`h-[40px] w-full px-2 rounded-lg font-semibold text-white text-base ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#6b1176] hover:bg-[#5a0e62] cursor-pointer"
                                         }`}
                                 >
                                     {loading ? "Submitting..." : "Sign up"}
