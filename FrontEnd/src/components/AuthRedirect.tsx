@@ -16,8 +16,8 @@ export const AuthRedirect: React.FC = () => {
 
   // Redirect based on authentication and role
   if (isAuthenticated) {
-    // If user is mygrape_admin, redirect to user-profile or support
-    if (userRole === 'mygrape_admin') {
+    // If user is Mygrape_admin, redirect to user-profile
+    if (userRole?.toLowerCase() === 'mygrape_admin') {
       return <Navigate to="/user-profile" replace />;
     }
     // For other roles, redirect to dashboard
