@@ -57,8 +57,8 @@ const Login: React.FC = () => {
                 return;
             }
             
-            // If user is mygrape_admin, redirect to user-profile or support
-            if (userRole === 'mygrape_admin') {
+            // If user is Mygrape_admin, redirect to user-profile
+            if (userRole?.toLowerCase() === 'mygrape_admin') {
                 navigate('/user-profile', { replace: true });
             } else {
                 // For other roles, redirect to dashboard
@@ -85,7 +85,7 @@ const Login: React.FC = () => {
             return <Navigate to={fromPath} replace />;
         }
         
-        if (userRole === 'mygrape_admin') {
+        if (userRole?.toLowerCase() === 'mygrape_admin') {
             return <Navigate to="/user-profile" replace />;
         }
         return <Navigate to="/dashboard" replace />;
