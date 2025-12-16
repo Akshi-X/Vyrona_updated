@@ -37,6 +37,9 @@ interface QualityPayload {
     agitation: boolean;
   };
   violated_parameters: string[];
+  quality_loss?: number;
+  quality_status?: string;
+  quality_percentage?: number;
 }
 
 export default function QualityParametersTable() {
@@ -236,9 +239,23 @@ export default function QualityParametersTable() {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="rounded-[6px] bg-[#EAB308] px-3 py-2 text-xs font-semibold h-[30px] text-white">
-              Quality Loss: 11.5%
-            </span>
+            {latest?.quality_loss !== undefined ? (
+              <span
+                className={`rounded-[6px] px-3 py-2 text-xs font-semibold h-[30px] text-white ${
+                  latest.quality_status === 'Critical'
+                    ? 'bg-red-600'
+                    : latest.quality_status === 'Warning'
+                    ? 'bg-[#EAB308]'
+                    : 'bg-green-600'
+                }`}
+              >
+                Quality Loss: {latest.quality_loss.toFixed(1)}%
+              </span>
+            ) : (
+              <span className="rounded-[6px] bg-gray-400 px-3 py-2 text-xs font-semibold h-[30px] text-white">
+                Quality Loss: —
+              </span>
+            )}
             <button
               type="button"
               aria-label="Download"

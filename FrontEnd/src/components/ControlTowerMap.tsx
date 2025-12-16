@@ -19,6 +19,8 @@ type MapRoute = {
 
   destination_longitude: number;
 
+  route_status?: string;
+
 };
 
 interface ControlTowerMapFilters {
@@ -293,6 +295,16 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
   }, []);
 
+  // Helper function to get color based on route status
+  const getRouteColor = useCallback((routeStatus?: string): string => {
+    if (!routeStatus) return '#22DC0E'; // Default to safe (green)
+    const status = routeStatus.toLowerCase();
+    if (status === 'safe') return '#22DC0E'; // Green
+    if (status === 'high_risk' || status === 'failed') return '#E80000'; // Red
+    if (status === 'delayed') return '#FFD901'; // Yellow
+    return '#22DC0E'; // Default to safe (green)
+  }, []);
+
 
 
   return (
@@ -372,12 +384,15 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                   lng: (r.source_longitude + r.destination_longitude) / 2,
                 } as google.maps.LatLngLiteral;
 
+                // Get color based on route status
+                const routeColor = getRouteColor(r.route_status);
+
                 return (
 
                   <React.Fragment key={routeKey}>
                     <Marker
                       position={origin}
-                      icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#22DC0E', fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
+                      icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: routeColor, fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
                       onLoad={(marker) => {
                         if (marker) {
                           markersRef.current.set(`${routeKey}-origin`, marker);
@@ -397,7 +412,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                     />
                     <Marker
                       position={dest}
-                      icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#22DC0E', fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
+                      icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: routeColor, fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
                       onLoad={(marker) => {
                         if (marker) {
                           markersRef.current.set(`${routeKey}-dest`, marker);
@@ -418,7 +433,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                     <Polyline
                       path={[origin, dest]}
                       options={{
-                        strokeColor: '#22DC0E',
+                        strokeColor: routeColor,
                         strokeOpacity: 0.95,
                         strokeWeight: 3,
                         clickable: true,
@@ -504,7 +519,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
                 <div className="flex items-center gap-3">
 
-                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#22c55e]" />
+                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#22DC0E]" />
 
                   <span className="text-[12px]">Safe Route (On Time)</span>
 
@@ -512,7 +527,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
                 <div className="flex items-center gap-3">
 
-                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#eab308]" />
+                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#FFD901]" />
 
                   <span className="text-[12px]">Delayed Routes</span>
 
@@ -520,7 +535,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
                 <div className="flex items-center gap-3">
 
-                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#ef4444]" />
+                  <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
 
                   <span className="text-[12px]">High-Risk Routes</span>
 
