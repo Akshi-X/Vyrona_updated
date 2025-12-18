@@ -99,7 +99,7 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
       title="Quality Loss Assessment"
       description="Real-time quality impact based on parameter excursions"
       // No icon for this modal to match design
-      containerClassName="w-full max-w-lg"
+      containerClassName="w-full max-w-lg text-[16px]"
     >
       <div className="space-y-6">
         {/* Quality summary (centered, large, like design) */}
