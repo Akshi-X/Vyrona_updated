@@ -13,7 +13,10 @@ from app.schemas.patient_schema import (
     PharmaStatisticsResponse,
     PatientSummaryResponse,
     PatientDetailedResponse,
-    PatientStageResponse
+    PatientStageResponse,
+    StageActionRequest,
+    StageApprovalResponse,
+    StageRejectionResponse
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -139,3 +142,81 @@ def get_patient_stage(
     """Get the current stage for a patient from process_phase table"""
     patient_service = PatientService(db)
     return patient_service.get_patient_current_stage(patient_id=patient_id, pharma_id=pharma_id)
+
+
+@router.post("/stage/approve", response_model=StageApprovalResponse)
+def approve_stage(
+    request: StageActionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Approve a patient stage by setting is_success to True.
+    
+    This endpoint is designed to be called by Azure services when an email
+    approval button is clicked. The stage_id should be included in the email
+    link/button payload.
+    
+    Note: Consider adding authentication (API key/token) for production use.
+    """
+    from app.exceptions.patient_exceptions import PatientStageNotFoundException
+    
+    patient_service = PatientService(db)
+    try:
+        result = patient_service.update_stage_success_status(
+            stage_id=request.stage_id,
+            is_success=True,
+            patient_id=request.patient_id
+        )
+        
+        return StageApprovalResponse(
+            stage_id=result["stage_id"],
+            patient_id=result["patient_id"],
+            stage=result["stage"],
+            is_success=result["is_success"],
+            is_active=result["is_active"],
+            message=f"Stage '{result['stage']}' approved successfully for patient {result['patient_id']}"
+        )
+    except PatientStageNotFoundException as e:
+        raise
+    except Exception as e:
+        from app.exceptions.patient_exceptions import PatientServiceError
+        raise PatientServiceError("approve_stage", f"Failed to approve stage: {str(e)}")
+
+
+@router.post("/stage/reject", response_model=StageRejectionResponse)
+def reject_stage(
+    request: StageActionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a patient stage by setting is_success to False.
+    
+    This endpoint is designed to be called by Azure services when an email
+    rejection button is clicked. The stage_id should be included in the email
+    link/button payload.
+    
+    Note: Consider adding authentication (API key/token) for production use.
+    """
+    from app.exceptions.patient_exceptions import PatientStageNotFoundException
+    
+    patient_service = PatientService(db)
+    try:
+        result = patient_service.update_stage_success_status(
+            stage_id=request.stage_id,
+            is_success=False,
+            patient_id=request.patient_id
+        )
+        
+        return StageRejectionResponse(
+            stage_id=result["stage_id"],
+            patient_id=result["patient_id"],
+            stage=result["stage"],
+            is_success=result["is_success"],
+            is_active=result["is_active"],
+            message=f"Stage '{result['stage']}' rejected for patient {result['patient_id']}"
+        )
+    except PatientStageNotFoundException as e:
+        raise
+    except Exception as e:
+        from app.exceptions.patient_exceptions import PatientServiceError
+        raise PatientServiceError("reject_stage", f"Failed to reject stage: {str(e)}")
