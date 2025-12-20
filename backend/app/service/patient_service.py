@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from app.schemas.patient_schema import (
@@ -458,3 +458,67 @@ class PatientService:
             raise
         except Exception as e:
             raise PatientServiceError("get_patient_current_stage", f"Failed to get patient stage: {str(e)}")
+
+    def update_stage_success_status(self, stage_id: int, is_success: bool, patient_id: Optional[str] = None) -> Dict[str, Any]:
+        """Update the is_success status for a patient stage in process_phase table.
+        
+        This method is used when approving (is_success=True) or rejecting (is_success=False)
+        a patient stage via email triggers from Azure services.
+        
+        Args:
+            stage_id: ID of the patient stage (process_phase) to update
+            is_success: True for approval, False for rejection
+            patient_id: Optional patient ID for validation
+            
+        Returns:
+            Dictionary with updated stage information
+            
+        Raises:
+            PatientStageNotFoundException: If stage not found
+            PatientServiceError: If update fails
+        """
+        try:
+            from datetime import timezone
+            from app.exceptions.patient_exceptions import PatientStageNotFoundException, PatientStageUpdateException
+            
+            # Find the stage by ID
+            stage = self.db.query(PatientStage).filter(PatientStage.id == stage_id).first()
+            if not stage:
+                raise PatientStageNotFoundException(stage_id=stage_id)
+            
+            # Optional validation: verify patient_id matches if provided
+            if patient_id and stage.patient_id != patient_id:
+                raise PatientStageNotFoundException(
+                    stage_id=stage_id,
+                    reason=f"Stage belongs to different patient. Expected: {patient_id}, Found: {stage.patient_id}"
+                )
+            
+            # Update the stage
+            stage.is_success = is_success
+            stage.updated_at = datetime.now(timezone.utc)
+            
+            # If rejecting, also deactivate the stage and set end_time
+            if not is_success:
+                stage.is_active = False
+                if not stage.end_time:
+                    stage.end_time = datetime.now(timezone.utc)
+            
+            self.db.commit()
+            self.db.refresh(stage)
+            
+            # Return updated stage information
+            return {
+                "stage_id": stage.id,
+                "patient_id": stage.patient_id,
+                "stage": stage.stage.value if hasattr(stage.stage, 'value') else str(stage.stage),
+                "is_success": stage.is_success,
+                "is_active": stage.is_active,
+                "end_time": stage.end_time.isoformat() if stage.end_time else None,
+                "updated_at": stage.updated_at.isoformat() if stage.updated_at else None
+            }
+            
+        except PatientStageNotFoundException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise PatientServiceError("update_stage_success_status", f"Failed to update stage status: {str(e)}")
