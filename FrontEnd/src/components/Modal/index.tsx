@@ -6,7 +6,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   containerClassName?: string;
   headerAction?: React.ReactNode;
@@ -43,9 +43,11 @@ const Modal: React.FC<ModalProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 flex items-center justify-center mr-3">
-                  {icon}
-                </div>
+                {icon && (
+                  <div className="w-8 h-8 flex items-center justify-center mr-3">
+                    {icon}
+                  </div>
+                )}
                 <div>
                   <h3 className="text-[16px] font-semibold text-black mt-5">{title}</h3>
                   <p className="text-[12px] text-[#969696]">{description}</p>

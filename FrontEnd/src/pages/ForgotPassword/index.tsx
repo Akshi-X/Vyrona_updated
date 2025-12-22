@@ -12,7 +12,7 @@ const ForgotPassword: React.FC = () => {
     const [message, setMessage] = useState("");
 
     const validateEmail = (email: string) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const regex = /^[^\s@#]+@[^\s@#]+\.[^\s@#]+$/;
         return regex.test(email);
     };
 
@@ -128,7 +128,7 @@ const ForgotPassword: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50"
+                            className="w-full py-3 mb-1 bg-[#6b1176] text-white rounded-md font-medium hover:bg-[#8b2a96] transition disabled:opacity-50 cursor-pointer"
                         >
                             {loading ? "Sending..." : "Send"}
                         </button>
