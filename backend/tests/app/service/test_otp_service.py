@@ -300,7 +300,7 @@ def test_verify_otp_and_create_token_success(mock_validate, mock_create_token, d
     assert result["email"] == "user@example.com"
     assert result["auth_token"] == "jwt_token_123"
     assert result["pharma_id"] == 42
-    assert result["role"] == "manager"
+    assert result["role"] == "Manager"
     assert "expires_at" in result
     mock_validate.assert_called_once_with("USER-123", "123456", db_session)
     mock_create_token.assert_called_once()

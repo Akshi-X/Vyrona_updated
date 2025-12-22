@@ -365,11 +365,16 @@ def test_get_control_tower_map_success(client):
                 "destination_latitude": 34.0522,
                 "destination_longitude": -118.2437,
                 "route_status": "safe",
+                "carrier": "Carrier A",
+                "region": "North America",
+                "source_region": "North America",
+                "destination_region": "North America",
                 "last_updated": "16:25:17"
             }
         ],
         "total_routes": 1,
-        "last_updated": "16:25:17"
+        "last_updated": "16:25:17",
+        "message": None
     }
     service_mock.get_control_tower_map_data.return_value = expected_map_data
 
@@ -488,18 +493,19 @@ def test_get_document_checklist_success(client):
                 "stage": "Location A - Location B",
                 "actual": 3,
                 "needed": 5,
-                "missed": 2
+                "missed": 2,
+                "missing_documents": ["Bill of Lading", "Customs Declaration"]
             },
             {
                 "stage": "Location B - Location C",
                 "actual": 4,
                 "needed": 4,
-                "missed": 0
+                "missed": 0,
+                "missing_documents": []
             }
         ],
         "total_items": 2,
-        "missing_documents": ["Bill of Lading", "Customs Declaration"],
-        "non_compliance_percentage": 25.5
+        "non_compliance_percentage": 22.22
     }
     service_mock.get_document_checklist.return_value = expected_checklist
 
@@ -509,7 +515,10 @@ def test_get_document_checklist_success(client):
     body = response.json()
     assert body["items"] == expected_checklist["items"]
     assert body["total_items"] == 2
-    assert body["missing_documents"] == expected_checklist["missing_documents"]
+    assert body["non_compliance_percentage"] == 22.22
+    # Verify missing_documents is at item level, not top level
+    assert "missing_documents" not in body or body.get("missing_documents") is None
+    assert body["items"][0]["missing_documents"] == ["Bill of Lading", "Customs Declaration"]
     service_mock.get_document_checklist.assert_called_once_with(patient_id="PT-123", pharma_id=42)
 
 
