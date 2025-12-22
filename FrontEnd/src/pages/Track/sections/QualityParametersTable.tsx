@@ -4,6 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
 import ExtractIcon from '../../../assets/TrackAndTraceIcons/Extract.svg';
 import LightExtractIcon from '../../../assets/TrackAndTraceIcons/LightExtract.svg';
+import QualityLossModal from '../../../components/QualityLossModal';
 
 interface Threshold {
   min: number | null;
@@ -44,6 +45,7 @@ interface QualityPayload {
 
 export default function QualityParametersTable() {
   const [showAnomalies, setShowAnomalies] = useState(false);
+  const [showQualityLossModal, setShowQualityLossModal] = useState(false);
   const [latest, setLatest] = useState<QualityPayload | null>(null);
   const [exporting, setExporting] = useState(false);
   const { patientId } = useParams<{ patientId: string }>();
@@ -240,7 +242,9 @@ export default function QualityParametersTable() {
           </div>
           <div className="flex items-center gap-3">
             {latest?.quality_loss !== undefined ? (
-              <span
+              <button
+                type="button"
+                onClick={() => setShowQualityLossModal(true)}
                 className={`rounded-[6px] px-3 py-2 text-xs font-semibold h-[30px] text-white ${
                   latest.quality_status === 'Critical'
                     ? 'bg-red-600'
@@ -249,8 +253,8 @@ export default function QualityParametersTable() {
                     : 'bg-green-600'
                 }`}
               >
-                Quality Loss: {latest.quality_loss.toFixed(1)}%
-              </span>
+                Quality Loss: {latest.quality_loss}%
+              </button>
             ) : (
               <span className="rounded-[6px] bg-gray-400 px-3 py-2 text-xs font-semibold h-[30px] text-white">
                 Quality Loss: —
@@ -324,6 +328,15 @@ export default function QualityParametersTable() {
           </tbody>
         </table>
       </div>
+
+      {/* Quality Loss Assessment Modal */}
+      <QualityLossModal
+        isOpen={showQualityLossModal}
+        onClose={() => setShowQualityLossModal(false)}
+        qualityLoss={latest?.quality_loss}
+        qualityScore={latest?.quality_percentage}
+        activeAnomalies={latest ? Object.values(latest.threshold_violations || {}).filter(Boolean).length : 0}
+      />
     </div>
   );
 }

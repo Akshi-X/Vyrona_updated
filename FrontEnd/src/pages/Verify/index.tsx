@@ -253,7 +253,7 @@ const VerifyOtp: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 mb-3 rounded-md font-medium text-white transition ${loading
+                            className={`w-full py-3 mb-3 rounded-md font-medium text-white transition cursor-pointer ${loading
                                 ? "bg-gray-400 cursor-not-allowed"
                                 : "bg-[#6b1176] hover:bg-[#8b2a96]"
                                 }`}
@@ -263,7 +263,7 @@ const VerifyOtp: React.FC = () => {
 
                         <button
                             type="button"
-                            className="w-full py-2 text-[#8b2a96] text-sm font-semibold underline mt-2"
+                            className="w-full py-2 text-[#8b2a96] text-sm font-semibold underline mt-2 cursor-pointer"
                             onClick={() => navigate("/login")}
                         >
                             Back to Login
