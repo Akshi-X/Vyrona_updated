@@ -302,11 +302,24 @@ def test_websocket_subscription_success(websocket_client):
 
     with test_client.websocket_connect("/quality/ws?token=ok") as websocket:
         service_mock.validate_patient_belongs_to_pharma.return_value = True
+        service_mock.get_patient_redis_history.return_value = []  # Empty history
+        service_mock.get_patient_geolocation_history.return_value = []  # Empty geolocation history
+        
         websocket.send_text(json.dumps({"patient_id": "pid-1"}))
-        confirmation = websocket.receive_json()
+        
+        # Receive all messages until we get subscription_confirmed
+        confirmation = None
+        while True:
+            message = websocket.receive_json()
+            if message.get("type") == "subscription_confirmed":
+                confirmation = message
+                break
+        
         assert confirmation == {
             "type": "subscription_confirmed",
             "patient_id": "pid-1",
+            "history_count": 0,
+            "geolocation_count": 0
         }
 
     assert service_mock.validate_patient_belongs_to_pharma.called

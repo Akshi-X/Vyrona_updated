@@ -24,7 +24,7 @@ def test_get_role_permissions_admin():
     assert result["can_reject_users"] is True
     assert result["can_view_all_users"] is True
     assert result["can_manage_system"] is True
-    assert result["role"] == "admin"
+    assert result["role"] == "Admin"
 
 
 def test_get_role_permissions_admin_case_insensitive():
@@ -35,7 +35,7 @@ def test_get_role_permissions_admin_case_insensitive():
     assert result["can_reject_users"] is True
     assert result["can_view_all_users"] is True
     assert result["can_manage_system"] is True
-    assert result["role"] == "admin"
+    assert result["role"] == "Admin"
 
 
 def test_get_role_permissions_pharma_admin():
@@ -46,7 +46,7 @@ def test_get_role_permissions_pharma_admin():
     assert result["can_reject_users"] is True
     assert result["can_view_all_users"] is True
     assert result["can_manage_system"] is False
-    assert result["role"] == "pharma_admin"
+    assert result["role"] == "Pharma_admin"
 
 
 def test_get_role_permissions_mygrape_admin():
@@ -59,7 +59,7 @@ def test_get_role_permissions_mygrape_admin():
     assert result["can_manage_feedback"] is True
     assert result["can_view_all_feedback"] is True
     assert result["can_manage_system"] is False
-    assert result["role"] == "mygrape_admin"
+    assert result["role"] == "Mygrape_admin"
 
 
 def test_get_role_permissions_manager():
@@ -70,7 +70,7 @@ def test_get_role_permissions_manager():
     assert result["can_reject_users"] is False
     assert result["can_view_all_users"] is False
     assert result["can_manage_system"] is False
-    assert result["role"] == "manager"
+    assert result["role"] == "Manager"
 
 
 def test_get_role_permissions_user():
@@ -81,7 +81,7 @@ def test_get_role_permissions_user():
     assert result["can_reject_users"] is False
     assert result["can_view_all_users"] is False
     assert result["can_manage_system"] is False
-    assert result["role"] == "user"
+    assert result["role"] == "User"
 
 
 def test_get_role_permissions_unknown_role():
@@ -105,9 +105,9 @@ def test_get_role_permissions_mixed_case():
     result2 = get_role_permissions("MANAGER")
     result3 = get_role_permissions("User")
     
-    assert result1["role"] == "pharma_admin"
-    assert result2["role"] == "manager"
-    assert result3["role"] == "user"
+    assert result1["role"] == "Pharma_admin"
+    assert result2["role"] == "Manager"
+    assert result3["role"] == "User"
 
 
 # ============================================
