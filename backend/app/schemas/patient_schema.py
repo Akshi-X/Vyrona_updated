@@ -260,32 +260,3 @@ class DocumentChecklistResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
-# ============================================
-# PATIENT STAGE APPROVAL/REJECTION SCHEMAS
-# ============================================
-
-class StageActionRequest(BaseModel):
-    """Schema for stage approval/rejection request"""
-    stage_id: int = Field(..., description="ID of the patient stage (process_phase) to update")
-    patient_id: Optional[str] = Field(None, description="Optional patient ID for validation")
-
-
-class StageApprovalResponse(BaseModel):
-    """Schema for stage approval response"""
-    stage_id: int = Field(..., description="ID of the updated stage")
-    patient_id: str = Field(..., description="Patient ID")
-    stage: str = Field(..., description="Stage name")
-    is_success: bool = Field(..., description="Success status (True for approved)")
-    is_active: bool = Field(..., description="Whether the stage is active")
-    message: str = Field(..., description="Response message")
-
-
-class StageRejectionResponse(BaseModel):
-    """Schema for stage rejection response"""
-    stage_id: int = Field(..., description="ID of the updated stage")
-    patient_id: str = Field(..., description="Patient ID")
-    stage: str = Field(..., description="Stage name")
-    is_success: bool = Field(..., description="Success status (False for rejected)")
-    is_active: bool = Field(..., description="Whether the stage is active")
-    message: str = Field(..., description="Response message")
