@@ -23,6 +23,7 @@ from app.config.database import SessionLocal
 from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
 from app.schemas.response_schema import HealthCheckResponse
 from app.constants.status_constants import HEALTH_HEALTHY
+from app.utils.lane_risk_utils import schedule_daily_lpi_fetch
 import uvicorn
 
 # Create logs directory if it doesn't exist (BEFORE logging setup)
@@ -130,6 +131,10 @@ async def startup_event():
     quality_service = QualityService(db)
     asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
     asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
+    
+    # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
+    logger.info("Starting World Bank LPI daily fetch scheduler...")
+    asyncio.create_task(schedule_daily_lpi_fetch())
 
     print("!" * 60 + "\n")
 
