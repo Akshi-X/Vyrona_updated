@@ -644,10 +644,30 @@ def test_add_comment_success(db_session, mock_feedback, mock_user):
         send_email=False
     )
     
-    # Mock feedback query
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query = Mock(side_effect=[feedback_query, MagicMock(), MagicMock()])
+    # Create submitter mock
+    submitter = Mock(spec=User)
+    submitter.user_id = "USER-456"
+    submitter.email = "submitter@example.com"
+    
+    # Mock the join query: db.query(Feedback, User).join(...).filter(...).first()
+    # This returns a tuple (feedback, submitter)
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query: db.query(User).filter(...).first()
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    # db.query is called with (Feedback, User) first, then with (User) only
+    query_call_count = [0]
+    def query_side_effect(*models):
+        query_call_count[0] += 1
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     
     # Mock comment creation
     mock_comment = Mock(spec=Comment)
@@ -676,9 +696,16 @@ def test_add_comment_feedback_not_found(db_session):
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = None
-    db_session.query.return_value = feedback_query
+    # Mock the join query returning None (feedback not found)
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = None
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        return MagicMock()
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     
     with pytest.raises(FeedbackNotFoundException):
         feedback_service.add_comment(
@@ -689,39 +716,70 @@ def test_add_comment_feedback_not_found(db_session):
         )
 
 
-def test_add_comment_database_error(db_session, mock_feedback):
+def test_add_comment_database_error(db_session, mock_feedback, mock_user):
     """Test adding comment with database error"""
     request = CommentCreateRequest(
         comment="Test comment",
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query.return_value = feedback_query
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
+    # Mock the join query
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit.side_effect = IntegrityError("statement", "params", "orig")
     
-    with pytest.raises(FeedbackCommentCreateFailedException):
-        feedback_service.add_comment(
-            db_session,
-            "TK-2024-01-001",
-            request,
-            "USER-123"
-        )
+    with patch('app.service.feedback_service.Comment'):
+        with pytest.raises(FeedbackCommentCreateFailedException):
+            feedback_service.add_comment(
+                db_session,
+                "TK-2024-01-001",
+                request,
+                "USER-123"
+            )
     
     db_session.rollback.assert_called()
 
 
-def test_add_comment_general_exception(db_session, mock_feedback):
+def test_add_comment_general_exception(db_session, mock_feedback, mock_user):
     """Test adding comment with general exception (not IntegrityError) - lines 258-260"""
     request = CommentCreateRequest(
         comment="Test comment",
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query.return_value = feedback_query
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
+    # Mock the join query
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit.side_effect = RuntimeError("General database error")
     db_session.refresh = MagicMock()
     
@@ -749,14 +807,16 @@ def test_add_comment_user_not_found(db_session, mock_feedback):
         send_email=False
     )
     
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
+            query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
             return query
         elif query_call_count[0] == 2:
             # User query - return None (user not found)
@@ -787,22 +847,12 @@ def test_add_comment_submitter_not_found(db_session, mock_feedback, mock_user):
     
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
+            # Return None to simulate submitter not found
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
-            return query
-        elif query_call_count[0] == 2:
-            # User query (commented_by) - return user
-            query = MagicMock()
-            query.filter.return_value.first.return_value = mock_user
-            return query
-        elif query_call_count[0] == 3:
-            # Submitter query - return None (submitter not found)
-            query = MagicMock()
-            query.filter.return_value.first.return_value = None
+            query.join.return_value.filter.return_value.first.return_value = None
             return query
         else:
             return MagicMock()
@@ -810,7 +860,7 @@ def test_add_comment_submitter_not_found(db_session, mock_feedback, mock_user):
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit = MagicMock()
     
-    with pytest.raises(FeedbackUserNotFoundException):
+    with pytest.raises(FeedbackNotFoundException):
         feedback_service.add_comment(
             db_session,
             "TK-2024-01-001",
@@ -838,25 +888,16 @@ def test_add_comment_email_exception(db_session, mock_feedback, mock_user):
     
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
+            query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
             return query
-        elif query_call_count[0] == 2:
-            # User query (commented_by)
+        else:  # db.query(User) - user query
             query = MagicMock()
             query.filter.return_value.first.return_value = mock_user
             return query
-        elif query_call_count[0] == 3:
-            # Submitter query
-            query = MagicMock()
-            query.filter.return_value.first.return_value = submitter
-            return query
-        else:
-            return MagicMock()
     
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit = MagicMock()
@@ -892,9 +933,24 @@ def test_update_feedback_status_success(db_session, mock_feedback, mock_user):
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query = Mock(side_effect=[feedback_query, MagicMock(), MagicMock()])
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
+    # Mock the join query: db.query(Feedback, User).join(...).filter(...).first()
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query: db.query(User).filter(...).first()
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     
     with patch('app.service.feedback_service.send_feedback_status_update_email'):
         result = feedback_service.update_feedback_status(
@@ -917,9 +973,16 @@ def test_update_feedback_status_not_found(db_session):
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = None
-    db_session.query.return_value = feedback_query
+    # Mock the join query returning None (feedback not found)
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = None
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        return MagicMock()
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     
     with pytest.raises(FeedbackNotFoundException):
         feedback_service.update_feedback_status(
@@ -930,16 +993,31 @@ def test_update_feedback_status_not_found(db_session):
         )
 
 
-def test_update_feedback_status_database_error(db_session, mock_feedback):
+def test_update_feedback_status_database_error(db_session, mock_feedback, mock_user):
     """Test updating feedback status with database error"""
     request = FeedbackStatusUpdateRequest(
         status=FeedbackStatus.IN_PROGRESS,
         send_email=False
     )
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query.return_value = feedback_query
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
+    # Mock the join query
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit.side_effect = IntegrityError("statement", "params", "orig")
     
     with pytest.raises(FeedbackStatusUpdateFailedException):
@@ -953,21 +1031,36 @@ def test_update_feedback_status_database_error(db_session, mock_feedback):
     db_session.rollback.assert_called()
 
 
-def test_update_feedback_status_general_exception(db_session, mock_feedback):
+def test_update_feedback_status_general_exception(db_session, mock_feedback, mock_user):
     """Test updating feedback status with general exception (not IntegrityError) - lines 321-323"""
     request = FeedbackStatusUpdateRequest(
         status=FeedbackStatus.IN_PROGRESS,
         send_email=False
     )
     
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
     # Create a mock status with value attribute
     mock_status = MagicMock()
     mock_status.value = "Open"
     mock_feedback.status = mock_status
     
-    feedback_query = MagicMock()
-    feedback_query.filter.return_value.first.return_value = mock_feedback
-    db_session.query.return_value = feedback_query
+    # Mock the join query
+    join_query = MagicMock()
+    join_query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
+    
+    # Mock the user query
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = mock_user
+    
+    def query_side_effect(*models):
+        if len(models) == 2:  # db.query(Feedback, User)
+            return join_query
+        else:  # db.query(User)
+            return user_query
+    
+    db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit.side_effect = RuntimeError("General database error")
     
     with pytest.raises(FeedbackStatusUpdateFailedException) as exc_info:
@@ -990,14 +1083,16 @@ def test_update_feedback_status_user_not_found(db_session, mock_feedback):
         send_email=False
     )
     
+    submitter = Mock(spec=User)
+    submitter.email = "submitter@example.com"
+    
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
+            query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
             return query
         elif query_call_count[0] == 2:
             # User query - return None (user not found)
@@ -1028,22 +1123,12 @@ def test_update_feedback_status_submitter_not_found(db_session, mock_feedback, m
     
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
+            # Return None to simulate submitter not found
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
-            return query
-        elif query_call_count[0] == 2:
-            # User query (updated_by) - return user
-            query = MagicMock()
-            query.filter.return_value.first.return_value = mock_user
-            return query
-        elif query_call_count[0] == 3:
-            # Submitter query - return None (submitter not found)
-            query = MagicMock()
-            query.filter.return_value.first.return_value = None
+            query.join.return_value.filter.return_value.first.return_value = None
             return query
         else:
             return MagicMock()
@@ -1051,7 +1136,7 @@ def test_update_feedback_status_submitter_not_found(db_session, mock_feedback, m
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit = MagicMock()
     
-    with pytest.raises(FeedbackUserNotFoundException):
+    with pytest.raises(FeedbackNotFoundException):
         feedback_service.update_feedback_status(
             db_session,
             "TK-2024-01-001",
@@ -1075,25 +1160,16 @@ def test_update_feedback_status_email_exception(db_session, mock_feedback, mock_
     
     query_call_count = [0]
     
-    def query_side_effect(model):
+    def query_side_effect(*models):
         query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            # Feedback query
+        if len(models) == 2:  # db.query(Feedback, User) - join query
             query = MagicMock()
-            query.filter.return_value.first.return_value = mock_feedback
+            query.join.return_value.filter.return_value.first.return_value = (mock_feedback, submitter)
             return query
-        elif query_call_count[0] == 2:
-            # User query (updated_by)
+        else:  # db.query(User) - user query
             query = MagicMock()
             query.filter.return_value.first.return_value = mock_user
             return query
-        elif query_call_count[0] == 3:
-            # Submitter query
-            query = MagicMock()
-            query.filter.return_value.first.return_value = submitter
-            return query
-        else:
-            return MagicMock()
     
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.commit = MagicMock()

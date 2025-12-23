@@ -546,32 +546,46 @@ def test_get_document_checklist_success(service):
     leg2.doc_count_needed = 4
     
     missing_doc = Mock(spec=ShipmentLegDocument)
+    missing_doc.shipment_leg_id = 1  # Associate with leg1
     missing_doc.document_name = "Bill of Lading"
     
     # Mock patient query - first db.query() call
     patient_query = MagicMock()
     patient_query.filter.return_value.first.return_value = patient
     
-    # Mock legs query - second db.query() call (joins with Shipment)
+    # Mock shipment query for _get_target_shipment_id - second db.query() call
+    # Query: db.query(Shipment).filter(pharma_id).filter(patient_id).order_by(...).all()
+    shipment_query_ordered = MagicMock()
+    shipment_query_ordered.all.return_value = []  # Empty list means no shipments, so target_shipment_id will be None
+    shipment_query_filtered = MagicMock()
+    shipment_query_filtered.order_by.return_value = shipment_query_ordered
+    shipment_query_filtered.filter.return_value = shipment_query_filtered  # Chain filter calls
+    shipment_query_base = MagicMock()
+    shipment_query_base.filter.return_value = shipment_query_filtered
+    
+    # Mock legs query - third db.query() call (joins with Shipment)
     # Query: db.query(ShipmentLeg).join(Shipment).filter(patient_id).filter(pharma_id).order_by(...).all()
-    legs_query_final = MagicMock()
-    legs_query_final.order_by.return_value.all.return_value = [leg1, leg2]
-    legs_query_final.filter.return_value = legs_query_final  # Chain filter calls
+    legs_query_ordered = MagicMock()
+    legs_query_ordered.all.return_value = [leg1, leg2]
+    legs_query_filtered = MagicMock()
+    legs_query_filtered.order_by.return_value = legs_query_ordered
+    legs_query_filtered.filter.return_value = legs_query_filtered  # Chain filter calls for multiple filters
     
     legs_query_after_join = MagicMock()
-    legs_query_after_join.filter.return_value = legs_query_final  # Chain filter calls
-    legs_query_after_join.order_by.return_value.all.return_value = [leg1, leg2]
+    legs_query_after_join.filter.return_value = legs_query_filtered  # Chain filter calls
     
     legs_query_base = MagicMock()
     legs_query_base.join.return_value = legs_query_after_join
     
-    # Mock missing documents query - third db.query() call
+    # Mock missing documents query - fourth db.query() call
+    # Query: db.query(ShipmentLegDocument).filter(and_(leg_id.in_(...), is_missing==True)).all()
     docs_query = MagicMock()
     docs_query.filter.return_value.all.return_value = [missing_doc]
     
-    # Set up the query chain - first call for patient, second for legs, third for docs
+    # Set up the query chain - patient, shipments (for _get_target_shipment_id), legs, docs
     service.db.query.side_effect = [
         patient_query,      # Patient query
+        shipment_query_base, # Shipment query for _get_target_shipment_id
         legs_query_base,    # Legs query base
         docs_query          # Missing documents query
     ]
@@ -580,10 +594,17 @@ def test_get_document_checklist_success(service):
     
     assert "items" in result
     assert "total_items" in result
-    assert "missing_documents" in result
     assert "non_compliance_percentage" in result
     assert result["total_items"] == 2
-    assert len(result["missing_documents"]) == 1
+    # missing_documents is at item level, not top level
+    assert len(result["items"]) == 2
+    # First item should have missing documents (leg1 has missing doc)
+    assert "missing_documents" in result["items"][0]
+    assert len(result["items"][0]["missing_documents"]) == 1
+    assert result["items"][0]["missing_documents"][0] == "Bill of Lading"
+    # Second item should have empty missing_documents (leg2 has no missing docs)
+    assert "missing_documents" in result["items"][1]
+    assert len(result["items"][1]["missing_documents"]) == 0
 
 
 def test_get_document_checklist_patient_not_found(service):
