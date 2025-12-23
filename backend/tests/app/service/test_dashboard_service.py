@@ -17,15 +17,28 @@ def dashboard_service(db_session):
     return DashboardService(db_session)
 
 
-def _set_query_results(db_session, rows):
-    """Configure the SQLAlchemy query chain to return provided rows."""
-    filter_mock = MagicMock()
-    filter_mock.all.return_value = rows
+def _set_query_results(db_session, rows, on_time_rows=None):
+    """Configure the SQLAlchemy query chain to return provided rows.
+    
+    The dashboard service makes two queries in performance metrics:
+    1) departure_time/arrival_time for lead time
+    2) handover_time/scheduled_time for on-time percentage
+    """
+    on_time_rows = on_time_rows or []
 
-    query_mock = MagicMock()
-    query_mock.filter.return_value = filter_mock
+    def make_query(data_rows):
+        filtered = [(a, b) for a, b in data_rows if a is not None]
+        filter_mock = MagicMock()
+        filter_mock.all.return_value = filtered
+        filter_mock.filter.return_value = filter_mock  # allow chaining
+        query_mock = MagicMock()
+        query_mock.filter.return_value = filter_mock
+        return query_mock
 
-    db_session.query.return_value = query_mock
+    shipment_query = make_query(rows)
+    on_time_query = make_query(on_time_rows)
+
+    db_session.query.side_effect = [shipment_query, on_time_query]
 
 
 def test_get_performance_metrics_average_lead_time(dashboard_service, db_session):
@@ -44,11 +57,16 @@ def test_get_performance_metrics_average_lead_time(dashboard_service, db_session
         ),
         (
             current_month_start + timedelta(days=10),
-            None,
+            None,  # Pending shipment - arrival_time is None, departure_time is valid
         ),
     ]
+    # Provide on-time rows (handover_time, scheduled_time) for on-time calculation
+    on_time_rows = [
+        (current_month_start + timedelta(days=2), current_month_start + timedelta(days=3)),
+        (current_month_start + timedelta(days=6), current_month_start + timedelta(days=6, hours=12)),
+    ]
 
-    _set_query_results(db_session, shipments)
+    _set_query_results(db_session, shipments, on_time_rows)
 
     response = dashboard_service.get_performance_metrics(pharma_id=42)
 

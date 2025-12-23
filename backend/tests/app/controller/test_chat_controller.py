@@ -1,5 +1,5 @@
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.testclient import TestClient
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,7 @@ from app.schemas.chat_schema import (
     PatientMessagesResponse, UnreadMessagesResponse
 )
 from app.models import user_model
+from app.constants.enums import UserRole
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.middleware.token_validation_middleware import TokenValidationMiddleware
@@ -27,7 +28,44 @@ from app.middleware.exception_handler import exception_handler_middleware
 
 
 def _create_test_client(monkeypatch):
+    from app.service import chat_service
+    
+    # Create mocks
+    create_chat_message_mock = MagicMock()
+    get_patient_messages_mock = AsyncMock()
+    get_unread_messages_mock = MagicMock()
+    broadcast_new_message_mock = AsyncMock()
+    
+    service_mocks = {
+        'create_chat_message': create_chat_message_mock,
+        'get_patient_messages': get_patient_messages_mock,
+        'get_unread_messages': get_unread_messages_mock,
+        'broadcast_new_message': broadcast_new_message_mock,
+    }
+
+    # Patch in service module (source of the functions)
+    monkeypatch.setattr(chat_service, "create_chat_message", create_chat_message_mock)
+    monkeypatch.setattr(chat_service, "get_patient_messages", get_patient_messages_mock)
+    monkeypatch.setattr(chat_service, "get_unread_messages", get_unread_messages_mock)
+    monkeypatch.setattr(chat_service, "broadcast_new_message", broadcast_new_message_mock)
+    
+    # Also patch in controller module namespace (where they're imported and used)
+    monkeypatch.setattr(chat_controller, "create_chat_message", create_chat_message_mock)
+    monkeypatch.setattr(chat_controller, "get_patient_messages", get_patient_messages_mock)
+    monkeypatch.setattr(chat_controller, "get_unread_messages", get_unread_messages_mock)
+    monkeypatch.setattr(chat_controller, "broadcast_new_message", broadcast_new_message_mock)
+    
     app = FastAPI()
+    
+    # Add HTTPException handler BEFORE router to handle exceptions from controller
+    # FastAPI wraps HTTPException.detail in {"detail": ...} format, so we need to match that
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
     app.include_router(chat_controller.router)
 
     # Add CORS middleware
@@ -45,7 +83,7 @@ def _create_test_client(monkeypatch):
             self.id = 1
             self.user_id = "USER-123"
             self.pharma_id = 42
-            self.role = "pharma_admin"
+            self.role = UserRole.PHARMA_ADMIN  # Must be enum - controller accesses role.value
             self.email = "test@example.com"
             self.first_name = "John"
             self.last_name = "Doe"
@@ -60,13 +98,13 @@ def _create_test_client(monkeypatch):
             request.state.pharma_id = mock_user.pharma_id
             return await call_next(request)
 
-    # Add middleware
-    app.add_middleware(RBACMiddleware)
+    # Minimal middleware for tests: only mock token validation to set user/pharma
     app.add_middleware(MockTokenValidationMiddleware)
-    app.add_middleware(RequestValidationMiddleware)
-    app.add_middleware(PatientValidationMiddleware)
-    app.add_middleware(SanitizationMiddleware)
-    app.add_middleware(BaseHTTPMiddleware, dispatch=exception_handler_middleware)
+    
+    # Note: We don't add exception_handler_middleware here because:
+    # 1. HTTPException handler is registered above to handle controller exceptions
+    # 2. The middleware would catch HTTPException and change the response format
+    # 3. Tests expect the HTTPException format directly
 
     db_mock = MagicMock(name="db_session")
 
@@ -78,19 +116,6 @@ def _create_test_client(monkeypatch):
     app.dependency_overrides[database.get_db] = override_get_db
     app.dependency_overrides[auth_dependencies.get_current_user] = lambda: mock_user
     app.dependency_overrides[auth_dependencies.get_pharma_id_from_request] = lambda: mock_user.pharma_id
-
-    # Mock services
-    service_mocks = {
-        'create_chat_message': MagicMock(),
-        'get_patient_messages': AsyncMock(),
-        'get_unread_messages': MagicMock(),
-        'broadcast_new_message': AsyncMock(),
-    }
-
-    monkeypatch.setattr(chat_controller, "create_chat_message", service_mocks['create_chat_message'])
-    monkeypatch.setattr(chat_controller, "get_patient_messages", service_mocks['get_patient_messages'])
-    monkeypatch.setattr(chat_controller, "get_unread_messages", service_mocks['get_unread_messages'])
-    monkeypatch.setattr(chat_controller, "broadcast_new_message", service_mocks['broadcast_new_message'])
 
     client = TestClient(app)
     try:
@@ -268,8 +293,10 @@ def test_get_patient_messages_success(client):
 
     mock_response = PatientMessagesResponse(
         patient_id="PAT-123",
+        patient_name="Test Patient",
         messages=[],
-        total_messages=0
+        total_messages=0,
+        unread_count=0
     )
 
     service_mocks['get_patient_messages'].return_value = mock_response

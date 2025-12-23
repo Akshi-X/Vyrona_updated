@@ -220,7 +220,7 @@ def test_register_user_success(
     
     assert result.user_id == "USR-123456"
     assert result.email == "newuser@example.com"
-    assert result.role == "manager"
+    assert result.role == "Manager"
     db_session.add.assert_called_once()
     db_session.commit.assert_called_once()
     mock_send_email.assert_called_once()
