@@ -24,6 +24,7 @@ class ShipmentLeg(Base):
     mode_of_transport = Column(String, nullable=False)
     from_location = Column(String, nullable=False)
     to_location = Column(String, nullable=False)
+    flight_code = Column(String, nullable=True)  # Flight number/code for air legs
     
     # Coordinates for mapping (latitude, longitude)
     latitude = Column(Float, nullable=True)  # Latitude of current location

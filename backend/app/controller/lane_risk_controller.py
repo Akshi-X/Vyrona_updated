@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Depends
-from datetime import datetime
+from fastapi import APIRouter, Depends, Query, HTTPException
 
-from app.schemas.lane_risk_schema import (
-    LaneRiskAssessmentResponse,
-    LaneRiskAssessmentItem
-)
+from app.schemas.lane_risk_schema import LaneRiskAssessmentResponse
 from app.dependencies.auth_dependencies import get_pharma_id_from_request
+from app.config.database import SessionLocal
+from app.service.lane_risk_service import LaneRiskService
 
 router = APIRouter(tags=["Lane Risk Assessment"])
 
@@ -14,77 +12,38 @@ router = APIRouter(tags=["Lane Risk Assessment"])
 # Get Lane Risk Assessment
 # ---------------------------
 @router.get("/lane-risk-assessment", response_model=LaneRiskAssessmentResponse)
-def get_lane_risk_assessment(pharma_id: int = Depends(get_pharma_id_from_request)):
+def get_lane_risk_assessment(
+    patient_id: str = Query(..., description="Patient ID to aggregate shipments for (required)"),
+    pharma_id: int = Depends(get_pharma_id_from_request)
+):
     """
     Get lane risk assessment data.
     
     Protected endpoint. Auth token required; pharma_id taken from token.
     
+    Calculates risk assessment based on:
+    - Lane Complexity: Number of legs, road parking stops, on-time flight performance, World Bank Timeliness Index
+    - Quality Incidents: High/low/hybrid excursions, missing logger, missing logger data, frequency of excursions
+    - External Factors: Weather adversities, Logistics Performance Index (LPI)
+    
     Args:
+        patient_id: Patient ID. Aggregates shipments belonging to this patient (within the same pharma).
         pharma_id: Pharmaceutical company ID from token
     
     Returns:
-        Table of risk factors with their corresponding contributors and risk scale.
+        Lane risk assessment with three main factors and their contributors.
     """
-    
-    # Mock lane risk assessment data aligned with new UI table
-    factors = [
-        LaneRiskAssessmentItem(
-            risk_factor="Quality Deviations",
-            risk_contributors=[
-                "Temperature Deviation - 5",
-                "Humidity Deviation - 0",
-                "-",
-                "-"
-            ],
-            risk_scale="0"
-        ),
-        LaneRiskAssessmentItem(
-            risk_factor="Returns & Regulatory",
-            risk_contributors=[
-                "Temperature Deviation - 5",
-                "Humidity Deviation - 0",
-                "-",
-                "-"
-            ],
-            risk_scale="--"
-        ),
-        LaneRiskAssessmentItem(
-            risk_factor="Loss/Physical Damage",
-            risk_contributors=[
-                "Temperature Deviation - 5",
-                "Humidity Deviation - 0",
-                "-",
-                "-"
-            ],
-            risk_scale="--"
-        ),
-        LaneRiskAssessmentItem(
-            risk_factor="3PL Reliability",
-            risk_contributors=[
-                "Temperature Deviation - 5",
-                "Humidity Deviation - 0",
-                "-",
-                "-"
-            ],
-            risk_scale="--"
-        ),
-        LaneRiskAssessmentItem(
-            risk_factor="Weather",
-            risk_contributors=[
-                "Temperature Deviation - 5",
-                "Humidity Deviation - 0",
-                "-",
-                "-"
-            ],
-            risk_scale="--"
+    db = SessionLocal()
+    try:
+        lane_risk_service = LaneRiskService(db)
+        assessment = lane_risk_service.calculate_lane_risk_assessment(
+            patient_id=patient_id,
+            pharma_id=pharma_id
         )
-    ]
-    
-    return LaneRiskAssessmentResponse(
-        total_risk_factors=len(factors),
-        factors=factors,
-        last_updated=datetime.now(),
-        status="success"
-    )
+        
+        return LaneRiskAssessmentResponse(**assessment)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating lane risk assessment: {str(e)}")
+    finally:
+        db.close()
 
