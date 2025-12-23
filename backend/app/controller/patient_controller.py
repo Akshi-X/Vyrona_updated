@@ -18,6 +18,10 @@ from app.schemas.patient_schema import (
     StageApprovalResponse,
     StageRejectionResponse
 )
+from app.exceptions.patient_exceptions import (
+    PatientStageNotFoundException,
+    PatientServiceError
+)
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -144,7 +148,7 @@ def get_patient_stage(
     return patient_service.get_patient_current_stage(patient_id=patient_id, pharma_id=pharma_id)
 
 
-@router.post("/stage/approve", response_model=StageApprovalResponse)
+@router.put("/stage/approve", response_model=StageApprovalResponse)
 def approve_stage(
     request: StageActionRequest,
     db: Session = Depends(get_db)
@@ -158,8 +162,6 @@ def approve_stage(
     
     Note: Consider adding authentication (API key/token) for production use.
     """
-    from app.exceptions.patient_exceptions import PatientStageNotFoundException
-    
     patient_service = PatientService(db)
     try:
         result = patient_service.update_stage_success_status(
@@ -179,11 +181,10 @@ def approve_stage(
     except PatientStageNotFoundException as e:
         raise
     except Exception as e:
-        from app.exceptions.patient_exceptions import PatientServiceError
         raise PatientServiceError("approve_stage", f"Failed to approve stage: {str(e)}")
 
 
-@router.post("/stage/reject", response_model=StageRejectionResponse)
+@router.put("/stage/reject", response_model=StageRejectionResponse)
 def reject_stage(
     request: StageActionRequest,
     db: Session = Depends(get_db)
@@ -197,8 +198,6 @@ def reject_stage(
     
     Note: Consider adding authentication (API key/token) for production use.
     """
-    from app.exceptions.patient_exceptions import PatientStageNotFoundException
-    
     patient_service = PatientService(db)
     try:
         result = patient_service.update_stage_success_status(
@@ -218,5 +217,4 @@ def reject_stage(
     except PatientStageNotFoundException as e:
         raise
     except Exception as e:
-        from app.exceptions.patient_exceptions import PatientServiceError
         raise PatientServiceError("reject_stage", f"Failed to reject stage: {str(e)}")

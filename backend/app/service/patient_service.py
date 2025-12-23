@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.schemas.patient_schema import (
     PatientCreate, 
@@ -16,12 +16,16 @@ from app.schemas.patient_schema import (
 )
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
+from app.models.pharma_model import Pharma
+from app.models.provider_model import Provider
 from app.utils.patient_utils import generate_patient_id
 from app.constants.enums import PatientStage as PatientStageEnum
 from app.exceptions.patient_exceptions import (
     PatientNotFoundError,
     PatientValidationError,
-    PatientServiceError
+    PatientServiceError,
+    PatientStageNotFoundException,
+    PatientStageUpdateException
 )
 
 class PatientService:
@@ -234,12 +238,6 @@ class PatientService:
         """Get patient summary data with joined provider and pharma information - includes all patients plus failure and aftercare data from last 2 weeks.
         Optionally filters by current stage or computed treatment status (ongoing/after_care/failure)."""
         try:
-            # Import here to avoid circular imports
-            from app.models.pharma_model import Pharma
-            from app.models.provider_model import Provider
-            from datetime import datetime, timedelta, timezone
-            from app.constants.enums import PatientStage as PatientStageEnum
-            
             # Calculate date 2 weeks ago from today
             two_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=2)
             
@@ -329,10 +327,6 @@ class PatientService:
     def get_patients_detailed(self, pharma_id: int) -> List[PatientDetailedResponse]:
         """Get detailed patient data with docs_report for specific pharma"""
         try:
-            # Import here to avoid circular imports
-            from app.models.pharma_model import Pharma
-            from app.models.provider_model import Provider
-            
             # Query with joins to get related data - filter for specific pharma
             query = self.db.query(
                 Patient.id.label('patient_id'),
@@ -478,9 +472,6 @@ class PatientService:
             PatientServiceError: If update fails
         """
         try:
-            from datetime import timezone
-            from app.exceptions.patient_exceptions import PatientStageNotFoundException, PatientStageUpdateException
-            
             # Find the stage by ID
             stage = self.db.query(PatientStage).filter(PatientStage.id == stage_id).first()
             if not stage:
