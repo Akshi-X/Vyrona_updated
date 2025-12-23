@@ -484,15 +484,9 @@ class PatientService:
                     reason=f"Stage belongs to different patient. Expected: {patient_id}, Found: {stage.patient_id}"
                 )
             
-            # Update the stage
+            # Update the stage success flag only
             stage.is_success = is_success
             stage.updated_at = datetime.now(timezone.utc)
-            
-            # If rejecting, also deactivate the stage and set end_time
-            if not is_success:
-                stage.is_active = False
-                if not stage.end_time:
-                    stage.end_time = datetime.now(timezone.utc)
             
             self.db.commit()
             self.db.refresh(stage)
