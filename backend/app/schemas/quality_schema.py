@@ -62,3 +62,19 @@ class QualityConnectionsResponse(BaseModel):
     count: int = Field(..., description="Number of active connections")
     connections: List[QualityConnectionInfo] = Field(..., description="List of connection details")
 
+
+class QualityLossDecisionRequest(BaseModel):
+    """Request payload for approving or rejecting a quality-loss notification"""
+    stage_id: int = Field(..., description="ID of the patient stage (process_phase) to update")
+    patient_id: Optional[str] = Field(None, description="Optional patient ID for validation")
+    approved: bool = Field(..., description="True when quality loss is approved, False when rejected")
+
+
+class QualityLossDecisionResponse(BaseModel):
+    """Response payload after updating stage success based on quality loss decision"""
+    stage_id: int = Field(..., description="ID of the updated stage")
+    patient_id: str = Field(..., description="Patient ID")
+    stage: str = Field(..., description="Stage name")
+    is_success: bool = Field(..., description="Success flag after decision")
+    is_active: bool = Field(..., description="Whether the stage remains active")
+    message: str = Field(..., description="Human-readable outcome message")

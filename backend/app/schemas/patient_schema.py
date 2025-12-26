@@ -259,3 +259,4 @@ class DocumentChecklistResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
