@@ -12,7 +12,7 @@ import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
-import { performanceService, type PerformanceMetrics } from '../../services/performanceService';
+import { performanceService, type AvgQualityDeviationsResponse, type OnTimePercentageResponse, type AvgLeadTimeResponse, type SuccessRateResponse } from '../../services/performanceService';
 import { riskService, type RiskMetrics } from '../../services/riskService';
 import { complianceService, type ComplianceMetrics } from '../../services/complianceService';
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
@@ -241,9 +241,12 @@ export default function Dashboard({ }: DashboardProps) {
   // State for patient statistics
   const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
   const [logisticsMetrics, setLogisticsMetrics] = useState<LogisticsMetrics | null>(null);
-  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
   const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
   const [complianceMetrics, setComplianceMetrics] = useState<ComplianceMetrics | null>(null);
+  const [qualityDeviations, setQualityDeviations] = useState<AvgQualityDeviationsResponse | null>(null);
+  const [onTimePercentage, setOnTimePercentage] = useState<OnTimePercentageResponse | null>(null);
+  const [avgLeadTime, setAvgLeadTime] = useState<AvgLeadTimeResponse | null>(null);
+  const [successRate, setSuccessRate] = useState<SuccessRateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
@@ -254,20 +257,26 @@ export default function Dashboard({ }: DashboardProps) {
         setLoading(true);
         setError(null);
 
-        // Fetch patient statistics, logistics metrics, performance metrics, risk metrics, and compliance metrics in parallel
-        const [stats, logistics, performance, risk, compliance] = await Promise.all([
+        // Fetch patient statistics, logistics metrics, risk metrics, compliance metrics, quality deviations, on-time percentage, average lead time, and success rate in parallel
+        const [stats, logistics, risk, compliance, qualityDev, onTime, leadTime, success] = await Promise.all([
           logisticsService.getPatientStatistics(), // /api/patients/statistics
           logisticsService.getLogisticsMetrics(),  // /api/logistics
-          performanceService.getPerformanceMetrics(), // /api/performance
           riskService.getRiskMetrics(), // /api/risk
-          complianceService.getComplianceMetrics() // /api/compliance
+          complianceService.getComplianceMetrics(), // /api/compliance
+          performanceService.getAvgQualityDeviations(), // /api/performance/avg-quality-deviations
+          performanceService.getOnTimePercentage(), // /api/performance/on-time-percentage
+          performanceService.getAvgLeadTime(), // /api/performance/avg-lead-time
+          performanceService.getSuccessRate() // /api/performance/success-rate
         ]);
 
         setPatientStats(stats);
         setLogisticsMetrics(logistics);
-        setPerformanceMetrics(performance);
         setRiskMetrics(risk);
         setComplianceMetrics(compliance);
+        setQualityDeviations(qualityDev);
+        setOnTimePercentage(onTime);
+        setAvgLeadTime(leadTime);
+        setSuccessRate(success);
       } catch (err) {
         setError('Failed to load dashboard data');
       } finally {
@@ -422,7 +431,7 @@ export default function Dashboard({ }: DashboardProps) {
                           Quality Deviation Flagged:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : patientStats?.quality_deviation_flagged || '0'}
+                          {loading ? '...' : qualityDeviations?.total_deviations || '0'}
                         </div>
                       </div>
                     </div>
@@ -511,8 +520,8 @@ export default function Dashboard({ }: DashboardProps) {
                         <div className="font-semibold text-black text-[28px] mt-1">
                           {loading
                             ? '...'
-                            : performanceMetrics?.on_time_percentage != null
-                              ? `${performanceMetrics.on_time_percentage}%`
+                            : onTimePercentage?.on_time_percentage != null
+                              ? `${onTimePercentage.on_time_percentage}%`
                               : '0%'}
                         </div>
                       </div>
@@ -534,8 +543,8 @@ export default function Dashboard({ }: DashboardProps) {
                         <div className="font-semibold text-black text-[28px] mt-1">
                           {loading
                             ? '...'
-                            : performanceMetrics?.avg_lead_time_days != null
-                              ? `${performanceMetrics.avg_lead_time_days}d`
+                            : avgLeadTime?.avg_lead_time_days != null
+                              ? `${avgLeadTime.avg_lead_time_days}d`
                               : '0d'}
                         </div>
                       </div>
@@ -769,7 +778,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                   <div className="relative flex items-center justify-center w-[185px] h-[92px] mt-12 mb-6">
                     <CurveBar
-                      percentage={loading ? 0 : complianceMetrics?.audit_coverage_percentage || 0}
+                      percentage={loading ? 0 : successRate?.success_rate || 0}
                       color="#1083c5"
                       size="md"
                       gradient={{
@@ -786,7 +795,7 @@ export default function Dashboard({ }: DashboardProps) {
                     />
                     <div className="absolute mt-[25px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                       <div className="font-semibold text-black text-[28px]">
-                        {loading ? '...' : complianceMetrics?.audit_coverage_percentage || 0}%
+                        {loading ? '...' : successRate?.success_rate != null ? `${successRate.success_rate}%` : '0%'}
                       </div>
                       <div className="font-normal text-black text-[12px]">
                         Success Rate

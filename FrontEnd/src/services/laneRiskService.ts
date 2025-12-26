@@ -7,6 +7,8 @@ export interface RiskFactor {
 }
 
 export interface LaneRiskAssessmentResponse {
+  shipment_id?: number;
+  patient_id: string;
   total_risk_factors: number;
   factors: RiskFactor[];
   last_updated: string;
@@ -14,8 +16,8 @@ export interface LaneRiskAssessmentResponse {
 }
 
 class LaneRiskService extends BaseApiService {
-  async getLaneRiskAssessment(): Promise<LaneRiskAssessmentResponse> {
-    return this.get<LaneRiskAssessmentResponse>('/api/lane-risk-assessment');
+  async getLaneRiskAssessment(patientId: string): Promise<LaneRiskAssessmentResponse> {
+    return this.get<LaneRiskAssessmentResponse>(`/api/lane-risk-assessment?patient_id=${encodeURIComponent(patientId)}`);
   }
 }
 
