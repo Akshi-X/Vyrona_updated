@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -139,3 +139,4 @@ def get_patient_stage(
     """Get the current stage for a patient from process_phase table"""
     patient_service = PatientService(db)
     return patient_service.get_patient_current_stage(patient_id=patient_id, pharma_id=pharma_id)
+
