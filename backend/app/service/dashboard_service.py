@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Tuple, Dict, Optional
 import json
 import logging
+from dateutil.relativedelta import relativedelta
 
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.shipment_model import Shipment
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
+from app.models.quality_log_model import QualityLog
 from app.schemas.dashboard_schema import (
     DashboardCategoryResponse,
     AvgLeadTimeResponse,
@@ -16,6 +18,7 @@ from app.schemas.dashboard_schema import (
     AvgQualityDeviationsResponse
 )
 from app.service.redis_service import get_redis
+from app.utils.lane_risk_utils import LaneRiskUtils
 
 logger = logging.getLogger(__name__)
 
@@ -408,4 +411,539 @@ class DashboardService:
                 continue
 
         return None
+
+    def _calculate_cold_chain_packaging_failures(self, pharma_id: int) -> Tuple[int, int]:
+        """
+        Calculate Cold Chain Packaging Failures for current month.
+        Counts shipments that have IoT metric violations (temperature, humidity, agitation).
+        
+        Returns:
+            Tuple of (failure_count, total_shipments)
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get all shipments for current month
+        monthly_shipments = (
+            self.db.query(Shipment.id, Shipment.patient_id)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .all()
+        )
+        
+        total_shipments = len(monthly_shipments)
+        if total_shipments == 0:
+            return 0, 0
+        
+        # Get patient IDs from shipments
+        patient_ids = list(set([shipment.patient_id for shipment in monthly_shipments]))
+        
+        # Count shipments with IoT violations using QualityLog
+        shipments_with_failures = (
+            self.db.query(QualityLog.patient_id)
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                Patient.id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                (
+                    (QualityLog.is_temp_loss == True) |
+                    (QualityLog.is_humidity_loss == True) |
+                    (QualityLog.is_agitation_loss == True)
+                )
+            )
+            .distinct()
+            .all()
+        )
+        
+        failure_count = len(shipments_with_failures)
+        
+        return failure_count, total_shipments
+
+    def _calculate_avg_quality_loss_per_patient(self, pharma_id: int) -> float:
+        """
+        Calculate average quality loss per patient for current month.
+        
+        Returns:
+            Average quality loss percentage across all patients
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get all patients for this pharma with shipments in current month
+        monthly_patients = (
+            self.db.query(Shipment.patient_id)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .distinct()
+            .all()
+        )
+        
+        patient_ids = [patient_id[0] for patient_id in monthly_patients]
+        
+        if not patient_ids:
+            return 0.0
+        
+        # Calculate average quality loss from QualityLog
+        avg_quality_loss = (
+            self.db.query(func.avg(QualityLog.quality_loss))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                QualityLog.quality_loss.isnot(None)
+            )
+            .scalar()
+        )
+        
+        if avg_quality_loss is None:
+            # Fallback to Redis if no database records
+            try:
+                redis_client = get_redis()
+                total_loss = 0.0
+                count = 0
+                
+                for patient_id in patient_ids:
+                    history_key = f'quality_history:{patient_id}'
+                    try:
+                        history = redis_client.lrange(history_key, 0, -1)
+                        for item in history:
+                            try:
+                                quality_data = json.loads(item)
+                                timestamp_str = quality_data.get('timestamp')
+                                if timestamp_str:
+                                    parsed_timestamp = self._parse_quality_timestamp(timestamp_str)
+                                    if parsed_timestamp and current_month_start <= parsed_timestamp < next_month_start:
+                                        quality_loss = quality_data.get('quality_loss')
+                                        if quality_loss is not None:
+                                            total_loss += float(quality_loss)
+                                            count += 1
+                            except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+                                continue
+                    except Exception:
+                        continue
+                
+                avg_quality_loss = (total_loss / count) if count > 0 else 0.0
+            except Exception as e:
+                logger.warning(f"Error calculating quality loss from Redis: {e}")
+                avg_quality_loss = 0.0
+        
+        return round(avg_quality_loss, 2) if avg_quality_loss else 0.0
+
+    def _calculate_top_risk_driver(self, pharma_id: int) -> Dict:
+        """
+        Calculate Top Risk Driver - the risk factor with highest combined impact.
+        
+        Risk factors considered:
+        - Temperature excursions
+        - Humidity deviations
+        - Vibration/shock events (agitation)
+        - ETA delays
+        
+        Returns:
+            Dict with risk driver name, score, and severity
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get shipments for current month
+        monthly_shipments = (
+            self.db.query(Shipment)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .all()
+        )
+        
+        if not monthly_shipments:
+            return {
+                "name": "N/A",
+                "score": 0.0,
+                "severity": "N/A"
+            }
+        
+        patient_ids = [shipment.patient_id for shipment in monthly_shipments]
+        
+        risk_factors = {}
+        
+        # 1. Temperature Excursions
+        temp_excursions = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                QualityLog.is_temp_loss == True
+            )
+            .scalar() or 0
+        )
+        
+        # 2. Humidity Deviations
+        humidity_deviations = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                QualityLog.is_humidity_loss == True
+            )
+            .scalar() or 0
+        )
+        
+        # 3. Vibration/Shock Events (Agitation)
+        agitation_events = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                QualityLog.is_agitation_loss == True
+            )
+            .scalar() or 0
+        )
+        
+        # 4. ETA Delays (SLA breaches)
+        delayed_shipments = (
+            self.db.query(func.count(Shipment.id))
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start,
+                Shipment.handover_time.isnot(None),
+                Shipment.scheduled_time.isnot(None),
+                Shipment.handover_time > Shipment.scheduled_time
+            )
+            .scalar() or 0
+        )
+        
+        # Get total readings for severity calculation
+        total_readings = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start
+            )
+            .scalar() or 1  # Avoid division by zero
+        )
+        
+        # Calculate severity scores using Quality Status Logic
+        # Severity mapping based on quality loss buckets:
+        # 0-15% -> Green (severity 1)
+        # 16-30% -> Yellow (severity 2)
+        # 31%+ -> Red (severity 3)
+        def calculate_severity_score(frequency: int, total: int) -> float:
+            """Calculate severity score based on frequency and quality loss percentage."""
+            if total == 0:
+                return 0.0
+            
+            violation_rate = (frequency / total) * 100
+            
+            if violation_rate <= 15:
+                return 1.0  # Green
+            elif violation_rate <= 30:
+                return 2.0  # Yellow
+            else:
+                return 3.0  # Red
+        
+        # Calculate risk scores (Frequency × Severity)
+        if temp_excursions > 0:
+            temp_severity = calculate_severity_score(temp_excursions, total_readings)
+            risk_factors["Temperature Excursions"] = temp_excursions * temp_severity
+        
+        if humidity_deviations > 0:
+            humidity_severity = calculate_severity_score(humidity_deviations, total_readings)
+            risk_factors["Humidity Deviations"] = humidity_deviations * humidity_severity
+        
+        if agitation_events > 0:
+            agitation_severity = calculate_severity_score(agitation_events, total_readings)
+            risk_factors["Vibration/Shock Events"] = agitation_events * agitation_severity
+        
+        if delayed_shipments > 0:
+            # For delays, use a simple severity based on delay percentage
+            delay_severity = 2.0  # Medium severity for delays
+            risk_factors["ETA Delays"] = delayed_shipments * delay_severity
+        
+        if not risk_factors:
+            return {
+                "name": "N/A",
+                "score": 0.0,
+                "severity": "N/A"
+            }
+        
+        # Find top risk driver
+        top_driver = max(risk_factors.items(), key=lambda x: x[1])
+        driver_name, driver_score = top_driver
+        
+        # Determine severity label
+        if driver_score >= 3.0:
+            severity_label = "High"
+        elif driver_score >= 2.0:
+            severity_label = "Medium"
+        else:
+            severity_label = "Low"
+        
+        return {
+            "name": driver_name,
+            "score": round(driver_score, 2),
+            "severity": severity_label
+        }
+
+    def _calculate_risk_deviation(self, pharma_id: int) -> Dict:
+        """
+        Calculate Risk Deviation - compares observed risk score against baseline threshold.
+        
+        Formula: Risk Deviation = Observed Risk Score - Baseline Risk Threshold
+        
+        Returns:
+            Dict with risk_deviation value and interpretation
+        """
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        
+        # Get shipments for current month
+        monthly_shipments = (
+            self.db.query(Shipment)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .all()
+        )
+        
+        if not monthly_shipments:
+            return {
+                "risk_deviation": 0.0,
+                "observed_risk_score": 0.0,
+                "baseline_threshold": 0.0,
+                "interpretation": "No data"
+            }
+        
+        patient_ids = [shipment.patient_id for shipment in monthly_shipments]
+        
+        # Calculate observed risk score based on quality incidents
+        # Using similar logic to QualityIncidentsCalculator
+        total_readings = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start
+            )
+            .scalar() or 0
+        )
+        
+        total_violations = (
+            self.db.query(func.count(QualityLog.id))
+            .join(Patient, QualityLog.patient_id == Patient.id)
+            .filter(
+                Patient.pharma_id == pharma_id,
+                QualityLog.patient_id.in_(patient_ids),
+                QualityLog.reading_timestamp >= current_month_start,
+                QualityLog.reading_timestamp < next_month_start,
+                (
+                    (QualityLog.is_temp_loss == True) |
+                    (QualityLog.is_humidity_loss == True) |
+                    (QualityLog.is_agitation_loss == True)
+                )
+            )
+            .scalar() or 0
+        )
+        
+        if total_readings > 0:
+            quality_loss_percentage = (total_violations / total_readings) * 100
+            cumulative_quality_percentage = 100 - quality_loss_percentage
+            
+            # Calculate risk score using same logic as QualityIncidentsCalculator
+            if cumulative_quality_percentage >= 85:
+                observed_risk_score = 4.5
+            elif cumulative_quality_percentage >= 60:
+                observed_risk_score = 3.5 if cumulative_quality_percentage >= 75 else 2.5
+            else:
+                observed_risk_score = 1.5 if cumulative_quality_percentage >= 40 else 0.5
+        else:
+            observed_risk_score = 0.0
+        
+        # Calculate baseline threshold from historical average (last 3 months)
+        three_months_ago = current_month_start - relativedelta(months=3)
+        
+        historical_shipments = (
+            self.db.query(Shipment.patient_id)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= three_months_ago,
+                Shipment.departure_time < current_month_start
+            )
+            .distinct()
+            .all()
+        )
+        
+        historical_patient_ids = [pid[0] for pid in historical_shipments]
+        
+        if historical_patient_ids:
+            historical_readings = (
+                self.db.query(func.count(QualityLog.id))
+                .join(Patient, QualityLog.patient_id == Patient.id)
+                .filter(
+                    Patient.pharma_id == pharma_id,
+                    QualityLog.patient_id.in_(historical_patient_ids),
+                    QualityLog.reading_timestamp >= three_months_ago,
+                    QualityLog.reading_timestamp < current_month_start
+                )
+                .scalar() or 0
+            )
+            
+            historical_violations = (
+                self.db.query(func.count(QualityLog.id))
+                .join(Patient, QualityLog.patient_id == Patient.id)
+                .filter(
+                    Patient.pharma_id == pharma_id,
+                    QualityLog.patient_id.in_(historical_patient_ids),
+                    QualityLog.reading_timestamp >= three_months_ago,
+                    QualityLog.reading_timestamp < current_month_start,
+                    (
+                        (QualityLog.is_temp_loss == True) |
+                        (QualityLog.is_humidity_loss == True) |
+                        (QualityLog.is_agitation_loss == True)
+                    )
+                )
+                .scalar() or 0
+            )
+            
+            if historical_readings > 0:
+                historical_quality_loss = (historical_violations / historical_readings) * 100
+                historical_cumulative_quality = 100 - historical_quality_loss
+                
+                if historical_cumulative_quality >= 85:
+                    baseline_threshold = 4.5
+                elif historical_cumulative_quality >= 60:
+                    baseline_threshold = 3.5 if historical_cumulative_quality >= 75 else 2.5
+                else:
+                    baseline_threshold = 1.5 if historical_cumulative_quality >= 40 else 0.5
+            else:
+                baseline_threshold = 2.5  # Default moderate baseline
+        else:
+            baseline_threshold = 2.5  # Default moderate baseline if no historical data
+        
+        # Calculate risk deviation
+        risk_deviation = observed_risk_score - baseline_threshold
+        
+        # Interpretation
+        if risk_deviation > 0:
+            interpretation = "Higher-than-expected risk"
+        elif risk_deviation == 0:
+            interpretation = "Risk matches expectation"
+        else:
+            interpretation = "Lower-than-expected risk"
+        
+        return {
+            "risk_deviation": round(risk_deviation, 2),
+            "observed_risk_score": round(observed_risk_score, 2),
+            "baseline_threshold": round(baseline_threshold, 2),
+            "interpretation": interpretation
+        }
+
+    def get_logistics_metrics(self, pharma_id: int) -> DashboardCategoryResponse:
+        """
+        Get logistics metrics for current month:
+        - Cold Chain Packaging Failure percentage
+        - Average Quality Lost per Patient percentage
+        """
+        failure_count, total_shipments = self._calculate_cold_chain_packaging_failures(pharma_id)
+        failure_percentage = round((failure_count / total_shipments * 100), 2) if total_shipments > 0 else 0.0
+        
+        avg_quality_loss = self._calculate_avg_quality_loss_per_patient(pharma_id)
+        
+        # Get additional metrics
+        current_month_start, next_month_start = self._get_current_month_bounds()
+        monthly_shipments = (
+            self.db.query(Shipment)
+            .filter(
+                Shipment.pharma_id == pharma_id,
+                Shipment.departure_time.isnot(None),
+                Shipment.departure_time >= current_month_start,
+                Shipment.departure_time < next_month_start
+            )
+            .all()
+        )
+        
+        total_shipments_count = len(monthly_shipments)
+        successful_deliveries = len([s for s in monthly_shipments if s.arrival_time is not None])
+        failed_deliveries = total_shipments_count - successful_deliveries
+        
+        # Calculate average transit time
+        transit_times = []
+        for shipment in monthly_shipments:
+            if shipment.departure_time and shipment.arrival_time:
+                duration_hours = (shipment.arrival_time - shipment.departure_time).total_seconds() / 3600
+                transit_times.append(duration_hours)
+        
+        avg_transit_time = round(sum(transit_times) / len(transit_times), 2) if transit_times else 0.0
+        
+        metrics = {
+            "cold_chain_packaging_failure_percentage": failure_percentage,
+            "avg_quality_lost_per_patient_percentage": avg_quality_loss,
+            "total_shipments": total_shipments_count,
+            "successful_deliveries": successful_deliveries,
+            "failed_deliveries": failed_deliveries,
+            "average_transit_time_hours": avg_transit_time
+        }
+        
+        return DashboardCategoryResponse(
+            category="logistics",
+            metrics=metrics,
+            last_updated=datetime.now(),
+            status="success"
+        )
+
+    def get_risk_metrics(self, pharma_id: int) -> DashboardCategoryResponse:
+        """
+        Get risk metrics for current month:
+        - Risk Deviation
+        - Top Risk Driver
+        """
+        risk_deviation_data = self._calculate_risk_deviation(pharma_id)
+        top_risk_driver = self._calculate_top_risk_driver(pharma_id)
+        
+        metrics = {
+            "deviation_percentage": risk_deviation_data["risk_deviation"],
+            "top_risk_driver": {
+                "name": top_risk_driver["name"],
+                "score": top_risk_driver["score"],
+                "severity": top_risk_driver["severity"]
+            },
+            "observed_risk_score": risk_deviation_data["observed_risk_score"],
+            "baseline_threshold": risk_deviation_data["baseline_threshold"],
+            "risk_interpretation": risk_deviation_data["interpretation"]
+        }
+        
+        return DashboardCategoryResponse(
+            category="risk",
+            metrics=metrics,
+            last_updated=datetime.now(),
+            status="success"
+        )
 
