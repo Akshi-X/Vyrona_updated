@@ -46,6 +46,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     # Quality monitoring health check - public
     ("GET", "/api/quality/health"),
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
+    # Quality loss email decision endpoint (email buttons)
+    ("PUT", "/api/quality/loss/decision"),
 }
 
 

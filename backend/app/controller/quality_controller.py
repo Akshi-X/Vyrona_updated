@@ -5,12 +5,13 @@ Handles WebSocket and REST endpoints for real-time quality monitoring
 import asyncio
 import json
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Request, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.service.redis_service import get_redis
 from app.service.quality_service import QualityService
+from app.service.patient_service import PatientService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
 from app.dependencies.auth_dependencies import get_current_user_pharma_id, get_current_user
@@ -20,11 +21,14 @@ from app.schemas.quality_schema import (
     QualityHealthResponse,
     QualityPatientsResponse,
     QualityHistoryResponse,
-    QualityConnectionsResponse
+    QualityConnectionsResponse,
+    QualityLossDecisionRequest,
+    QualityLossDecisionResponse
 )
 from app.exceptions.quality_exceptions import (
     QualityServiceException
 )
+from app.exceptions.patient_exceptions import PatientStageNotFoundException
 from app.exceptions import InvalidTokenException
 
 logger = logging.getLogger(__name__)
@@ -223,4 +227,42 @@ async def get_connections(
     connections_info = manager.get_connections_info()
     filtered_info = quality_service.get_connections_for_pharma(current_user.pharma_id, connections_info, manager)
     return QualityConnectionsResponse(**filtered_info)
+
+
+@router.put("/loss/decision", response_model=QualityLossDecisionResponse)
+async def process_quality_loss_decision(
+    request: QualityLossDecisionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Update the stage success flag when a pharma admin approves or rejects a quality-loss email.
+    
+    This is intended to be called via email buttons. It only toggles the
+    is_success flag for the provided stage_id.
+    """
+    patient_service = PatientService(db)
+    try:
+        result = patient_service.update_stage_success_status(
+            stage_id=request.stage_id,
+            is_success=request.approved,
+            patient_id=request.patient_id
+        )
+
+        action = "approved" if request.approved else "rejected"
+        return QualityLossDecisionResponse(
+            stage_id=result["stage_id"],
+            patient_id=result["patient_id"],
+            stage=result["stage"],
+            is_success=result["is_success"],
+            is_active=result["is_active"],
+            message=f"Quality loss decision {action} for patient {result['patient_id']}"
+        )
+    except PatientStageNotFoundException:
+        # Bubble up to global handlers for consistent error responses
+        raise
+    except Exception as exc:
+        raise QualityServiceException(
+            operation="process_quality_loss_decision",
+            detail=str(exc)
+        )
 
