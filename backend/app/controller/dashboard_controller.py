@@ -121,7 +121,10 @@ def get_avg_quality_deviations(
 # 2. Get Risk Metrics
 # ---------------------------
 @router.get("/risk", response_model=DashboardCategoryResponse)
-def get_risk_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
+def get_risk_metrics(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
     """
     Get risk metrics only.
     
@@ -131,30 +134,12 @@ def get_risk_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
         pharma_id: Pharmaceutical company ID from token
     
     Returns:
-    - Deviation: 12%
-    - Top Risk Driver: Temperature
+    - Risk Deviation: difference between observed risk score and baseline threshold
+    - Top Risk Driver: risk factor with highest combined impact (frequency × severity)
     """
     
-    metrics = {
-        "deviation_percentage": 12.0,
-        "top_risk_driver": {
-            "name": "Temperature",
-            "percentage": 12.0,
-            "severity": "Medium",
-            "trend": "Stable"
-        },
-        "total_risks": 45,
-        "high_risks": 8,
-        "medium_risks": 22,
-        "low_risks": 15
-    }
-    
-    return DashboardCategoryResponse(
-        category="risk",
-        metrics=metrics,
-        last_updated=datetime.now(),
-        status="success"
-    )
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_risk_metrics(pharma_id)
 
 
 # ---------------------------
@@ -196,7 +181,10 @@ def get_compliance_metrics(pharma_id: int = Depends(get_pharma_id_from_request))
 # 5. Get Logistics Metrics
 # ---------------------------
 @router.get("/logistics", response_model=DashboardCategoryResponse)
-def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
+def get_logistics_metrics(
+    pharma_id: int = Depends(get_pharma_id_from_request),
+    db: Session = Depends(get_db)
+):
     """
     Get logistics metrics only.
     
@@ -206,25 +194,12 @@ def get_logistics_metrics(pharma_id: int = Depends(get_pharma_id_from_request)):
         pharma_id: Pharmaceutical company ID from token
     
     Returns:
-    - Cold Chain Packaging Failure: 4.2%
-    - Avg Quality Lost/Patient: 23%
+    - Cold Chain Packaging Failure: percentage of shipments with IoT metric violations
+    - Avg Quality Lost/Patient: average quality loss percentage across all patients
     """
     
-    metrics = {
-        "cold_chain_packaging_failure_percentage": 4.2,
-        "avg_quality_lost_per_patient_percentage": 23.0,
-        "total_shipments": 50,
-        "successful_deliveries": 38,
-        "failed_deliveries": 52,
-        "average_transit_time_hours": 18.5
-    }
-    
-    return DashboardCategoryResponse(
-        category="logistics",
-        metrics=metrics,
-        last_updated=datetime.now(),
-        status="success"
-    )
+    dashboard_service = DashboardService(db)
+    return dashboard_service.get_logistics_metrics(pharma_id)
 
 
 # ---------------------------
