@@ -40,9 +40,10 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
       return {
         label: 'Not Available',
         chipText: 'No Data',
-        chipClass: 'bg-gray-300 text-gray-900',
+        chipBgColor: '#E5E7EB',
+        chipTextColor: '#111827',
         riskLevel: 'N/A',
-        riskColor: 'text-gray-700',
+        textColor: '#374151',
       };
     }
 
@@ -51,9 +52,10 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
       return {
         label: 'Good Quality',
         chipText: 'Good Quality',
-        chipClass: 'bg-emerald-100 text-emerald-700',
+        chipBgColor: '#21aa12ff',
+        chipTextColor: '#FFFFFF',
         riskLevel: 'Green',
-        riskColor: 'text-emerald-600',
+        textColor: '#21aa12ff',
       };
     }
 
@@ -62,9 +64,10 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
       return {
         label: 'Moderate Quality Impact',
         chipText: 'Moderate Risk',
-        chipClass: 'bg-amber-100 text-amber-700',
+        chipBgColor: '#EAB308',
+        chipTextColor: '#FFFFFF',
         riskLevel: 'Yellow',
-        riskColor: 'text-amber-500',
+        textColor: '#EAB308',
       };
     }
 
@@ -72,9 +75,10 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
     return {
       label: 'High Quality Risk',
       chipText: 'High Risk',
-      chipClass: 'bg-red-100 text-red-700',
+      chipBgColor: '#b30a0aff',
+      chipTextColor: '#FFFFFF',
       riskLevel: 'Red',
-      riskColor: 'text-red-600',
+      textColor: '#b30a0aff',
     };
   };
 
@@ -82,15 +86,6 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
 
   // Risk level strictly follows loss percentage bands defined above
   const riskLabel = bucket.riskLevel;
-
-  const riskColorClass =
-    riskLabel === 'Red'
-      ? 'text-red-600'
-      : riskLabel === 'Yellow'
-      ? 'text-amber-600'
-      : riskLabel === 'Green'
-      ? 'text-emerald-600'
-      : bucket.riskColor;
 
   return (
     <Modal
@@ -104,10 +99,13 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
       <div className="space-y-6">
         {/* Quality summary (centered, large, like design) */}
         <div className="text-center">
-          <p className="text-[22px] font-semibold text-[#059669] mb-2">
+          <p className="text-[22px] font-semibold mb-2" style={{ color: bucket.textColor }}>
             Quality Loss: {lossValue !== undefined ? `${lossValue}%` : '—'}
           </p>
-          <div className="inline-flex items-center justify-center px-5 py-1.5 rounded-full text-xs font-semibold bg-[#BBF7D0] text-[#166534]">
+          <div 
+            className="inline-flex items-center justify-center px-5 py-1.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: bucket.chipBgColor, color: bucket.chipTextColor }}
+          >
             {bucket.chipText}
           </div>
         </div>
@@ -126,7 +124,7 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gray-700 font-medium">Risk Level:</span>
-            <span className={`font-semibold ${riskColorClass}`}>
+            <span className="font-semibold" style={{ color: bucket.textColor }}>
               {riskLabel}
             </span>
           </div>
@@ -139,15 +137,15 @@ const QualityLossModal: React.FC<QualityLossModalProps> = ({
           </p>
           <ul className="space-y-1 text-xs text-gray-700">
             <li className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#21aa12ff' }} />
               <span>Good (0–15% loss)</span>
             </li>
             <li className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#EAB308' }} />
               <span>Moderate (16–30% loss)</span>
             </li>
             <li className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#b30a0aff' }} />
               <span>High Risk (31%+ loss)</span>
             </li>
           </ul>
