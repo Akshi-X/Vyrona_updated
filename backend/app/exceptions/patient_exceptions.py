@@ -415,6 +415,61 @@ class PatientDocumentDownloadException(PatientDocumentException):
 
 
 # ============================================
+# PATIENT STAGE EXCEPTIONS
+# ============================================
+
+class PatientStageNotFoundException(PatientException):
+    """Exception raised when a patient stage is not found"""
+    
+    def __init__(self, stage_id: Optional[int] = None, patient_id: Optional[str] = None, reason: Optional[str] = None):
+        if stage_id:
+            message = f"Patient stage with ID '{stage_id}' not found"
+            details = {"stage_id": stage_id}
+        elif patient_id:
+            message = f"Active patient stage not found for patient ID '{patient_id}'"
+            details = {"patient_id": patient_id}
+        else:
+            message = "Patient stage not found"
+            details = {}
+        
+        if reason:
+            message += f": {reason}"
+            details["reason"] = reason
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES.get("PATIENT_STAGE_NOT_FOUND", "ERR_9002"),
+            status_code=404,
+            details=details
+        )
+
+
+class PatientStageUpdateException(PatientServiceException):
+    """Exception raised when patient stage update fails"""
+    
+    def __init__(self, stage_id: Optional[int] = None, reason: Optional[str] = None):
+        if stage_id and reason:
+            message = f"Failed to update patient stage '{stage_id}': {reason}"
+            details = {"stage_id": stage_id, "reason": reason}
+        elif stage_id:
+            message = f"Failed to update patient stage '{stage_id}'"
+            details = {"stage_id": stage_id}
+        elif reason:
+            message = f"Patient stage update failed: {reason}"
+            details = {"reason": reason}
+        else:
+            message = "Patient stage update failed"
+            details = {}
+        
+        super().__init__(
+            message=message,
+            error_code=ERROR_CODES.get("PATIENT_STAGE_UPDATE_FAILED", "ERR_5007"),
+            status_code=500,
+            details=details
+        )
+
+
+# ============================================
 # LEGACY COMPATIBILITY (for existing code)
 # ============================================
 
