@@ -71,7 +71,7 @@ class DashboardService:
                     duration_seconds = (arrival_time - departure_time).total_seconds()
                     total_lead_time_days += duration_seconds / (24 * 3600)
 
-        avg_lead_time_days = round(total_lead_time_days / lead_time_shipments, 2) if lead_time_shipments else 0.0
+        avg_lead_time_days = round(total_lead_time_days / lead_time_shipments) if lead_time_shipments else 0.0
         pending_shipments = max(total_shipments - completed_shipments, 0)
         return avg_lead_time_days, completed_shipments, pending_shipments
 
@@ -110,7 +110,7 @@ class DashboardService:
                 on_time_deliveries += 1
 
         # Calculate percentage: (On-Time Deliveries ÷ Total Deliveries) × 100
-        on_time_percentage = round((on_time_deliveries / total_deliveries * 100), 2) if total_deliveries > 0 else 0.0
+        on_time_percentage = round((on_time_deliveries / total_deliveries * 100)) if total_deliveries > 0 else 0.0
 
         return on_time_percentage, on_time_deliveries, total_deliveries
 
@@ -206,7 +206,7 @@ class DashboardService:
         successful_outcomes = (result.successful_outcomes if result else 0) or 0
         total_outcomes = (result.total_outcomes if result else 0) or 0
 
-        success_rate = round((successful_outcomes / total_outcomes) * 100, 2) if total_outcomes else 0.0
+        success_rate = round((successful_outcomes / total_outcomes) * 100) if total_outcomes else 0.0
 
         return SuccessRateResponse(
             pharma_id=pharma_id,
@@ -356,7 +356,7 @@ class DashboardService:
             )
         
         # Calculate average: total deviations / total treatments
-        avg_deviations = round(total_deviations / total_treatments, 2) if total_treatments > 0 else 0.0
+        avg_deviations = round(total_deviations / total_treatments) if total_treatments > 0 else 0.0
         
         return AvgQualityDeviationsResponse(
             pharma_id=pharma_id,
@@ -537,7 +537,7 @@ class DashboardService:
                 logger.warning(f"Error calculating quality loss from Redis: {e}")
                 avg_quality_loss = 0.0
         
-        return round(avg_quality_loss, 2) if avg_quality_loss else 0.0
+        return round(avg_quality_loss) if avg_quality_loss else 0.0
 
     def _calculate_top_risk_driver(self, pharma_id: int) -> Dict:
         """
@@ -704,7 +704,7 @@ class DashboardService:
         
         return {
             "name": driver_name,
-            "score": round(driver_score, 2),
+            "score": round(driver_score),
             "severity": severity_label
         }
 
@@ -848,21 +848,21 @@ class DashboardService:
         else:
             baseline_threshold = 2.5  # Default moderate baseline if no historical data
         
-        # Calculate risk deviation
-        risk_deviation = observed_risk_score - baseline_threshold
+        # Calculate risk deviation (always positive/absolute value)
+        risk_deviation = abs(observed_risk_score - baseline_threshold)
         
-        # Interpretation
-        if risk_deviation > 0:
+        # Interpretation based on whether observed is higher or lower
+        if observed_risk_score > baseline_threshold:
             interpretation = "Higher-than-expected risk"
-        elif risk_deviation == 0:
+        elif observed_risk_score == baseline_threshold:
             interpretation = "Risk matches expectation"
         else:
             interpretation = "Lower-than-expected risk"
         
         return {
-            "risk_deviation": round(risk_deviation, 2),
-            "observed_risk_score": round(observed_risk_score, 2),
-            "baseline_threshold": round(baseline_threshold, 2),
+            "risk_deviation": round(risk_deviation),
+            "observed_risk_score": round(observed_risk_score),
+            "baseline_threshold": round(baseline_threshold),
             "interpretation": interpretation
         }
 
@@ -873,7 +873,7 @@ class DashboardService:
         - Average Quality Lost per Patient percentage
         """
         failure_count, total_shipments = self._calculate_cold_chain_packaging_failures(pharma_id)
-        failure_percentage = round((failure_count / total_shipments * 100), 2) if total_shipments > 0 else 0.0
+        failure_percentage = round((failure_count / total_shipments * 100)) if total_shipments > 0 else 0.0
         
         avg_quality_loss = self._calculate_avg_quality_loss_per_patient(pharma_id)
         
@@ -901,7 +901,7 @@ class DashboardService:
                 duration_hours = (shipment.arrival_time - shipment.departure_time).total_seconds() / 3600
                 transit_times.append(duration_hours)
         
-        avg_transit_time = round(sum(transit_times) / len(transit_times), 2) if transit_times else 0.0
+        avg_transit_time = round(sum(transit_times) / len(transit_times)) if transit_times else 0.0
         
         metrics = {
             "cold_chain_packaging_failure_percentage": failure_percentage,
@@ -929,14 +929,14 @@ class DashboardService:
         top_risk_driver = self._calculate_top_risk_driver(pharma_id)
         
         metrics = {
-            "deviation_percentage": risk_deviation_data["risk_deviation"],
+            "deviation_percentage": round(risk_deviation_data["risk_deviation"]),
             "top_risk_driver": {
                 "name": top_risk_driver["name"],
-                "score": top_risk_driver["score"],
+                "score": round(top_risk_driver["score"]),
                 "severity": top_risk_driver["severity"]
             },
-            "observed_risk_score": risk_deviation_data["observed_risk_score"],
-            "baseline_threshold": risk_deviation_data["baseline_threshold"],
+            "observed_risk_score": round(risk_deviation_data["observed_risk_score"]),
+            "baseline_threshold": round(risk_deviation_data["baseline_threshold"]),
             "risk_interpretation": risk_deviation_data["interpretation"]
         }
         
