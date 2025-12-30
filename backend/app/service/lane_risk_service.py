@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.shipment_model import Shipment
+from app.models.telemetry_model import TelemetryData
 from app.service.external_factors_calculator import ExternalFactorsCalculator
 from app.service.lane_complexity_calculator import LaneComplexityCalculator
 from app.service.quality_service import QualityService
@@ -218,6 +219,9 @@ class RoadStoppageCalculator:
 class QualityIncidentsCalculator:
     """Handles Quality Incidents risk factor calculations."""
 
+    def __init__(self, db: Session):
+        self.db = db
+
     def calculate(self, shipments: List[Shipment]) -> Dict:
         """Calculate Quality Incidents risk factor based on quality loss percentage."""
         contributors: List[str] = []
@@ -234,6 +238,7 @@ class QualityIncidentsCalculator:
         high_excursions = 0
         low_excursions = 0
         hybrid_excursions = 0
+        missing_logger = 0
         missing_logger_data = 0
         total_excursions = 0
         total_readings = 0
@@ -254,7 +259,29 @@ class QualityIncidentsCalculator:
                 history = histories[idx] if idx < len(histories) else []
 
                 if not history:
-                    missing_logger_data += 1
+                    # Check if device exists (has telemetry_data) but no data in Redis
+                    # Missing logger = missing device (no device assigned)
+                    # Missing logger data = device exists but no telemetry data
+                    patient_shipments = [s for s in shipments if s.patient_id == patient_id]
+                    patient_shipment_ids = [s.id for s in patient_shipments]
+                    
+                    has_telemetry = False
+                    if patient_shipment_ids:
+                        try:
+                            # Check if telemetry_data exists in database (indicates device exists)
+                            telemetry_exists = self.db.query(TelemetryData).filter(
+                                TelemetryData.shipment_id.in_(patient_shipment_ids)
+                            ).first() is not None
+                            has_telemetry = telemetry_exists
+                        except Exception as e:
+                            logger.debug(f"Error checking telemetry for patient {patient_id}: {e}")
+                    
+                    if has_telemetry:
+                        # Device exists but no telemetry data in Redis
+                        missing_logger_data += 1
+                    else:
+                        # No device assigned (missing logger/device)
+                        missing_logger += 1
                     continue
 
                 has_high = False
@@ -327,7 +354,31 @@ class QualityIncidentsCalculator:
 
         except Exception as e:
             logger.warning(f"Error accessing Redis for quality data: {e}")
-            missing_logger_data = len(patient_ids)
+            # If Redis error, check if devices exist in database
+            # Missing logger = missing device (no device assigned)
+            # Missing logger data = device exists but no telemetry data
+            for patient_id in set(patient_ids):
+                patient_shipments = [s for s in shipments if s.patient_id == patient_id]
+                patient_shipment_ids = [s.id for s in patient_shipments]
+                
+                if patient_shipment_ids:
+                    try:
+                        # Check if telemetry_data exists (indicates device exists)
+                        has_telemetry = self.db.query(TelemetryData).filter(
+                            TelemetryData.shipment_id.in_(patient_shipment_ids)
+                        ).first() is not None
+                        
+                        if has_telemetry:
+                            # Device exists but no telemetry data
+                            missing_logger_data += 1
+                        else:
+                            # No device assigned (missing logger/device)
+                            missing_logger += 1
+                    except Exception as db_err:
+                        logger.debug(f"Error checking telemetry for patient {patient_id}: {db_err}")
+                        missing_logger += 1
+                else:
+                    missing_logger += 1
 
         if total_readings > 0:
             quality_loss_percentage = (total_violations / total_readings) * 100
@@ -339,11 +390,13 @@ class QualityIncidentsCalculator:
         logger.info(
             f"Quality Incidents Calculation - "
             f"Patients analyzed: {len(patient_ids)}, "
+            f"Missing logger: {missing_logger}, "
             f"Missing logger data: {missing_logger_data}, "
             f"Total readings: {total_readings}, Total violations: {total_violations}, "
             f"Quality loss: {quality_loss_percentage:.2f}%, "
             f"Cumulative quality: {cumulative_quality_percentage:.2f}%, "
-            f"High excursions: {high_excursions}, Low excursions: {low_excursions}, Hybrid excursions: {hybrid_excursions}"
+            f"High excursions: {high_excursions}, Low excursions: {low_excursions}, Hybrid excursions: {hybrid_excursions}, "
+            f"Frequency of excursions: {total_excursions}"
         )
 
         excursion_parts = [
@@ -355,7 +408,7 @@ class QualityIncidentsCalculator:
         contributors.append(
             f"High/low/Hybrid excursions: {', '.join(excursion_parts)}"
         )
-        contributors.append("-")
+        contributors.append(f"Missing logger: {missing_logger}")
         contributors.append(f"Missing logger data: {missing_logger_data}")
         contributors.append(f"Frequency of excursions: {total_excursions}")
 
@@ -385,7 +438,7 @@ class LaneRiskService:
         self.lane_complexity_calculator = LaneComplexityCalculator(
             db, self.road_stoppage_calculator
         )
-        self.quality_calculator = QualityIncidentsCalculator()
+        self.quality_calculator = QualityIncidentsCalculator(db)
         self.external_calculator = ExternalFactorsCalculator(db)
 
     def calculate_lane_risk_assessment(
