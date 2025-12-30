@@ -72,4 +72,6 @@ def init_db():
         quality_log_model,
         geolocation_model,
     )
+    # Import IVF models
+    from ..models.IVF import hospital_model, hospital_branch_model
     Base.metadata.create_all(bind=engine)
