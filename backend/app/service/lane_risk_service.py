@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.shipment_model import Shipment
 from app.models.telemetry_model import TelemetryData
@@ -498,8 +498,6 @@ class LaneRiskService:
         target_shipment_id = shipment_service._get_target_shipment_id(
             patient_id=patient_id, pharma_id=pharma_id
         )
-
-        from sqlalchemy.orm import joinedload
 
         query = self.db.query(Shipment).filter(Shipment.patient_id == patient_id)
 
