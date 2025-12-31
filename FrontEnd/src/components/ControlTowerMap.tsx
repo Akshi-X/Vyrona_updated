@@ -145,10 +145,16 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
 
 
-  // Fetch IVF Control Tower data
   useEffect(() => {
+
+    // Only load routes and IVF markers if the flag is enabled
+    if (!shouldLoadRoutes) {
+      return;
+    }
+
     let mounted = true;
 
+    // Fetch IVF Control Tower data
     (async () => {
       try {
         const data = await shipmentService.getIVFControlTower();
@@ -173,29 +179,14 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
       }
     })();
 
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-
-    // Only load routes if the flag is enabled
-    if (!shouldLoadRoutes) {
-      return;
-    }
-
-    let mounted = true;
-
-    // Clear existing route markers and polylines when filters change (but keep IVF branch markers)
+    // Clear existing markers and polylines when filters change
     markersRef.current.forEach((marker, key) => {
-      // Only clear route-related markers, not IVF branch markers
-      if (!key.startsWith('ivf-')) {
-        try {
-          google.maps.event.clearInstanceListeners(marker);
-          marker.setMap(null);
-          markersRef.current.delete(key);
-        } catch(error) {
-          return;
-        }
+      try {
+        google.maps.event.clearInstanceListeners(marker);
+        marker.setMap(null);
+        markersRef.current.delete(key);
+      } catch(error) {
+        return;
       }
     });
     polylinesRef.current.forEach((polyline) => {
@@ -208,8 +199,9 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
     });
     polylinesRef.current.clear();
 
-    // Immediately clear routes state to prevent old routes from being rendered
+    // Immediately clear routes and IVF branches state to prevent old data from being rendered
     setRoutes([]);
+    setIvfBranches([]);
     // Clear tooltip state to prevent stale tooltips
     setActiveTooltip(null);
     setTooltipPosition(new Map());
