@@ -1,10 +1,19 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, func
 from typing import List, Dict, Any
 from decimal import Decimal
 from collections import defaultdict
 
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.tank_model import Tank
+from ...models.IVF.canister_model import Canister
+from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.cane_model import Cane
+from ...models.IVF.cryolock_model import Cryolock
+from ...models.IVF.patient_model import IVFPatient
+from ...models.IVF.embryo_model import Embryo
+from ...constants.enums import CanisterStatus
 
 
 class IVFService:
@@ -51,9 +60,13 @@ class IVFService:
                 latitude = float(branch.latitude) if branch.latitude is not None else None
                 longitude = float(branch.longitude) if branch.longitude is not None else None
                 
+                # Calculate branch status based on canister statuses
+                # Get all active canisters for this branch through tanks
+                branch_status = self._calculate_branch_status(branch.branch_id)
+                
                 branch_data = {
                     "branch_name": branch.branch_name,
-                    "branch_status": "safe",
+                    "branch_status": branch_status,
                     "address": {
                         "area": branch.area,
                         "district": branch.district_name,
@@ -80,4 +93,187 @@ class IVFService:
             
         except Exception as e:
             raise Exception(f"Error fetching IVF control tower map locations: {str(e)}")
+    
+    def get_active_canisters(self) -> Dict[str, Any]:
+        """
+        Get active canisters with their status and last updated time from LN2 logs.
+        
+        Returns:
+            Dictionary containing:
+            - canisters: List of active canisters with:
+                - canister_id: Canister ID
+                - canister_status: Status (safe, risk, critical)
+                - updated_at: Last updated date and time from LN2 logs
+            - total: Total number of active canisters
+        """
+        try:
+            # Query active canisters
+            active_canisters = self.db.query(Canister).filter(
+                Canister.is_active == True
+            ).all()
+            
+            canister_list = []
+            
+            for canister in active_canisters:
+                # Get the latest LN2 log entry for this canister
+                latest_log = self.db.query(CanisterLn2Log).filter(
+                    CanisterLn2Log.canister_id == canister.canister_id
+                ).order_by(desc(CanisterLn2Log.created_at)).first()
+                
+                # Use updated_at from latest log, or None if no logs exist
+                updated_at = latest_log.created_at if latest_log else None
+                
+                canister_data = {
+                    "canister_id": canister.canister_id,
+                    "canister_status": canister.canister_status.value if canister.canister_status else "safe",
+                    "updated_at": updated_at
+                }
+                
+                canister_list.append(canister_data)
+            
+            return {
+                "canisters": canister_list,
+                "total": len(canister_list)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error fetching active canisters: {str(e)}")
+    
+    def _calculate_branch_status(self, branch_id: int) -> str:
+        """
+        Calculate branch status based on canister statuses.
+        
+        Logic:
+        - If any active canister is "critical" -> branch status = "critical"
+        - Else if any active canister is "risk" -> branch status = "risk"
+        - Else -> branch status = "safe"
+        - If no active canisters -> default to "safe"
+        
+        Args:
+            branch_id: The branch ID to calculate status for
+            
+        Returns:
+            Branch status string: "critical", "risk", or "safe"
+        """
+        try:
+            # Get all active canisters for this branch through tanks
+            active_canisters = self.db.query(Canister).join(Tank).filter(
+                Tank.branch_id == branch_id,
+                Canister.is_active == True
+            ).all()
+            
+            # If no active canisters, default to safe
+            if not active_canisters:
+                return "safe"
+            
+            # Check for critical status (highest priority)
+            for canister in active_canisters:
+                if canister.canister_status == CanisterStatus.CRITICAL:
+                    return "critical"
+            
+            # Check for risk status
+            for canister in active_canisters:
+                if canister.canister_status == CanisterStatus.RISK:
+                    return "risk"
+            
+            # All canisters are safe
+            return "safe"
+            
+        except Exception as e:
+            # If there's an error calculating status, default to safe
+            return "safe"
+    
+    def get_embryo_tracking(self) -> Dict[str, Any]:
+        """
+        Get embryo tracking data grouped by cryolock.
+        Returns data in the format matching the table structure.
+        
+        Returns:
+            Dictionary containing:
+            - data: List of tracking records with:
+                - his_number: Patient HIS Number
+                - cryolock_number: Cryolock Number
+                - canister_number: Canister Number
+                - tank_id: Tank ID (formatted as "Tank {tank_id}" or tank_code)
+                - cane_id: Cane ID (formatted as cane_code or "Cane-{cane_id}")
+                - goblet_color: Goblet Color
+                - cryolock_color: Cryolock Color
+                - date_of_vitrification: Date of Vitrification
+                - embryo_grading: Comma-separated embryo gradings
+            - total: Total number of records
+        """
+        try:
+            # Query embryos with all related data
+            # Join: Embryo -> Patient, Cryolock -> Cane -> Canister -> Tank
+            query = (
+                self.db.query(
+                    IVFPatient.his_number,
+                    Cryolock.cryolock_number,
+                    Canister.canister_number,
+                    Tank.tank_id,
+                    Tank.tank_code,
+                    Cane.cane_id,
+                    Cane.cane_code,
+                    Cane.goblet_color,
+                    Cryolock.cryolock_color,
+                    Embryo.date_of_vitrification,
+                    func.string_agg(
+                        func.coalesce(Embryo.embryo_grading, ''), 
+                        ', '
+                    ).label('embryo_grading')
+                )
+                .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
+                .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .filter(Embryo.is_active == True)
+                .group_by(
+                    IVFPatient.his_number,
+                    Cryolock.cryolock_id,
+                    Cryolock.cryolock_number,
+                    Canister.canister_number,
+                    Tank.tank_id,
+                    Tank.tank_code,
+                    Cane.cane_id,
+                    Cane.cane_code,
+                    Cane.goblet_color,
+                    Cryolock.cryolock_color,
+                    Embryo.date_of_vitrification
+                )
+                .order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+            )
+            
+            results = query.all()
+            
+            tracking_list = []
+            
+            for row in results:
+                # Format tank_id: use tank_code if available, otherwise "Tank {tank_id}"
+                tank_display = row.tank_code if row.tank_code else f"Tank {row.tank_id}"
+                
+                # Format cane_id: use cane_code if available, otherwise format as "Cane-{cane_id}"
+                cane_display = row.cane_code if row.cane_code else f"Cane-{row.cane_id}"
+                
+                tracking_data = {
+                    "his_number": row.his_number or "",
+                    "cryolock_number": row.cryolock_number or "",
+                    "canister_number": row.canister_number,
+                    "tank_id": tank_display,
+                    "cane_id": cane_display,
+                    "goblet_color": row.goblet_color or "",
+                    "cryolock_color": row.cryolock_color or "",
+                    "date_of_vitrification": row.date_of_vitrification,
+                    "embryo_grading": row.embryo_grading or ""
+                }
+                
+                tracking_list.append(tracking_data)
+            
+            return {
+                "data": tracking_list,
+                "total": len(tracking_list)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error fetching embryo tracking data: {str(e)}")
 

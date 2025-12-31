@@ -1,4 +1,11 @@
 # IVF Models package
 from .hospital_model import Hospital
 from .hospital_branch_model import HospitalBranch
+from .tank_model import Tank
+from .canister_model import Canister
+from .canister_ln2_log_model import CanisterLn2Log
+from .cane_model import Cane
+from .cryolock_model import Cryolock
+from .patient_model import IVFPatient
+from .embryo_model import Embryo
 
