@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import MyGrapeLogo from "../assets/logo.svg";
+import MyGrapeLogo from "../assets/mGScale.svg";
 import IsolationModeBanner from "../assets/Isolation_Mode.svg";
 
 // Dashboard Icons
@@ -54,17 +54,17 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
       </div>
 
       {/* Header */}
-      <header className="flex items-center gap-[7px] px-6 py-4 flex-shrink-0 relative z-10">
+      <header className="flex items-center gap-[7px] px-6 pt-0 pb-6 flex-shrink-0 relative z-10">
         <img
-          className="w-[22px] h-[31px]"
+          className="w-[150px] h-[100px]"
           alt="myGrape logo icon"
           src={MyGrapeLogo}
         />
-        <h1 className="font-semibold text-[30px] text-white">myGrape</h1>
+        {/* <h1 className="font-semibold text-[30px] text-white">myGrape</h1> */}
       </header>
 
       {/* Nav Buttons */}
-      <nav className="flex flex-col gap-[18px] mt-8 px-6 flex-shrink-0 relative z-10">
+      <nav className="flex flex-col gap-[18px] px-6 flex-shrink-0 relative z-10">
         {navigationItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           const iconSrc = (() => {
