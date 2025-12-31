@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { GoogleMap, Marker, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { shipmentService } from '../services/shipmentService';
+import MarkerGreen from '../assets/ControlTower/MarkerGreen.svg';
+import MarkerRed from '../assets/ControlTower/MarkerRed.svg';
+import MarkerYellow from '../assets/ControlTower/MarkerYellow.svg';
 
 type MapRoute = {
   shipment_id: number | string;
@@ -21,6 +24,21 @@ type MapRoute = {
 
   route_status?: string;
 
+};
+
+type IVFBranch = {
+  branch_name: string;
+  branch_status: string;
+  address: {
+    area: string;
+    district: string;
+    pincode: string;
+  };
+  geoLocation: {
+    latitude: number;
+    longitude: number;
+  };
+  state: string;
 };
 
 interface ControlTowerMapFilters {
@@ -90,6 +108,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
   const [shouldLoadRoutes, setShouldLoadRoutes] = useState<boolean>(false);
+  const [ivfBranches, setIvfBranches] = useState<IVFBranch[]>([]);
 
 
 
@@ -126,6 +145,37 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
 
 
+  // Fetch IVF Control Tower data
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const data = await shipmentService.getIVFControlTower();
+        if (mounted && data.states) {
+          // Transform the nested state structure into a flat array of branches
+          const branches: IVFBranch[] = [];
+          Object.entries(data.states).forEach(([stateName, stateBranches]) => {
+            stateBranches.forEach((branch) => {
+              branches.push({
+                ...branch,
+                state: stateName,
+              });
+            });
+          });
+          setIvfBranches(branches);
+        }
+      } catch (e: any) {
+        // Silently fail for IVF data - it's optional
+        if (mounted) {
+          console.warn('Failed to load IVF control tower data:', e?.message);
+        }
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, []);
+
   useEffect(() => {
 
     // Only load routes if the flag is enabled
@@ -135,13 +185,17 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
     let mounted = true;
 
-    // Clear existing markers and polylines when filters change
-    markersRef.current.forEach((marker) => {
-      try {
-        google.maps.event.clearInstanceListeners(marker);
-        marker.setMap(null);
-      } catch(error) {
-        return;
+    // Clear existing route markers and polylines when filters change (but keep IVF branch markers)
+    markersRef.current.forEach((marker, key) => {
+      // Only clear route-related markers, not IVF branch markers
+      if (!key.startsWith('ivf-')) {
+        try {
+          google.maps.event.clearInstanceListeners(marker);
+          marker.setMap(null);
+          markersRef.current.delete(key);
+        } catch(error) {
+          return;
+        }
       }
     });
     polylinesRef.current.forEach((polyline) => {
@@ -152,7 +206,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
         return;
       }
     });
-    markersRef.current.clear();
     polylinesRef.current.clear();
 
     // Immediately clear routes state to prevent old routes from being rendered
@@ -288,6 +341,24 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
     };
   }, []);
 
+  // Cleanup IVF branch markers when branches change
+  useEffect(() => {
+    return () => {
+      // Cleanup IVF markers when component unmounts or branches change
+      markersRef.current.forEach((marker, key) => {
+        if (key.startsWith('ivf-')) {
+          try {
+            google.maps.event.clearInstanceListeners(marker);
+            marker.setMap(null);
+            markersRef.current.delete(key);
+          } catch (error) {
+            return;
+          }
+        }
+      });
+    };
+  }, [ivfBranches]);
+
 
   const handleUnmount = useCallback(() => {
 
@@ -302,6 +373,26 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
     if (status === 'safe') return '#22DC0E'; // Green
     if (status === 'high_risk' || status === 'failed') return '#E80000'; // Red
     if (status === 'delayed') return '#FFD901'; // Yellow
+    return '#22DC0E'; // Default to safe (green)
+  }, []);
+
+  // Helper function to get marker image based on branch status
+  const getBranchMarkerIcon = useCallback((branchStatus?: string): string => {
+    if (!branchStatus) return MarkerGreen; // Default to safe (green)
+    const status = branchStatus.toLowerCase();
+    if (status === 'safe') return MarkerGreen;
+    if (status === 'critical' || status === 'risk') return MarkerRed;
+    if (status === 'delayed' || status === 'medium') return MarkerYellow;
+    return MarkerGreen; // Default to safe (green)
+  }, []);
+
+  // Helper function to get status color for dot indicator
+  const getBranchStatusColor = useCallback((branchStatus?: string): string => {
+    if (!branchStatus) return '#22DC0E'; // Default to safe (green)
+    const status = branchStatus.toLowerCase();
+    if (status === 'safe') return '#22DC0E'; // Green
+    if (status === 'critical' || status === 'risk') return '#E80000'; // Red
+    if (status === 'delayed' || status === 'medium') return '#FFD901'; // Yellow
     return '#22DC0E'; // Default to safe (green)
   }, []);
 
@@ -478,13 +569,13 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                     {activeTooltip === routeKey && mapRef && (
                       <OverlayView
                         position={tooltipPosition.get(routeKey) || midpoint}
-                        mapPaneName={OverlayView.OVERLAY_LAYER}
+                        mapPaneName={OverlayView.FLOAT_PANE}
                         getPixelPositionOffset={(width, height) => ({
                           x: -(width / 2),
                           y: -(height + 10),
                         })}
                       >
-                        <div className="bg-[#272626] text-white px-3 py-2 rounded text-xs whitespace-nowrap min-w-[200px] pointer-events-none z-50 shadow-lg">
+                        <div className="bg-[#272626] text-white px-3 py-2 rounded text-xs whitespace-nowrap min-w-[200px] pointer-events-none shadow-lg" style={{ zIndex: 9999 }}>
                           {r.source_location} → {r.destination_location}
                         </div>
                       </OverlayView>
@@ -493,6 +584,68 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
                 );
 
+              })}
+
+              {/* IVF Branch Markers */}
+              {ivfBranches.map((branch) => {
+                const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
+                const branchPosition = {
+                  lat: branch.geoLocation.latitude,
+                  lng: branch.geoLocation.longitude,
+                } as google.maps.LatLngLiteral;
+                const markerIconUrl = getBranchMarkerIcon(branch.branch_status);
+
+                return (
+                  <React.Fragment key={branchKey}>
+                    <Marker
+                      position={branchPosition}
+                      icon={{
+                        url: markerIconUrl,
+                        scaledSize: new google.maps.Size(24, 24),
+                        anchor: new google.maps.Point(12, 24),
+                      }}
+                      onLoad={(marker) => {
+                        if (marker) {
+                          markersRef.current.set(branchKey, marker);
+                          google.maps.event.addListener(marker, 'mouseover', () => {
+                            setTooltipPosition(prev => {
+                              const newMap = new Map(prev);
+                              newMap.set(branchKey, branchPosition);
+                              return newMap;
+                            });
+                            setActiveTooltip(branchKey);
+                          });
+                          google.maps.event.addListener(marker, 'mouseout', () => {
+                            setActiveTooltip(null);
+                          });
+                        }
+                      }}
+                    />
+                    {activeTooltip === branchKey && mapRef && (
+                      <OverlayView
+                        position={tooltipPosition.get(branchKey) || branchPosition}
+                        mapPaneName={OverlayView.FLOAT_PANE}
+                        getPixelPositionOffset={(width, height) => ({
+                          x: -(width / 2),
+                          y: -(height + 10),
+                        })}
+                      >
+                        <div className="bg-white text-black px-3 py-2 rounded text-xs whitespace-nowrap min-w-[200px] pointer-events-none shadow-lg" style={{ zIndex: 9999 }}>
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: getBranchStatusColor(branch.branch_status) }}
+                            />
+                            <div className="font-semibold text-base">{branch.address.district}</div>
+                          </div>
+                          <div className="text-[10px] text-gray-600 mt-1 ml-4">
+                            {branch.branch_name} | {new Date().toLocaleDateString('en-GB')}
+                          </div>
+                        </div>
+                      </OverlayView>
+                    )}
+                  </React.Fragment>
+                );
               })}
 
             </GoogleMap>

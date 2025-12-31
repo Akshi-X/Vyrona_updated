@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
-import MyGrapeLogo from "../../assets/logo.svg";
+import MyGrapeLogo from "../../assets/mGScale.svg";
 import EyeOffIcon from "../../assets/eye-off.svg";
 import EyeOpenIcon from "../../assets/EyeOpen.svg";
 import { authService } from "../../services/authService";
@@ -195,8 +195,7 @@ const Signup: React.FC = () => {
                 </div>
 
                 <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
-                    <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
-                    <h1 className="font-semibold text-[30px]">myGrape</h1>
+                    <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
                 </div>
 
                 <div className="flex-1 relative z-0"></div>
