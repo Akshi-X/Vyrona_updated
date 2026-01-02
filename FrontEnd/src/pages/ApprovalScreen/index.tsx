@@ -5,7 +5,7 @@ import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
 import { userService } from "../../services/userService";
 import type { UserProfileDto } from "../../services/userService";
-import MyGrapeLogo from "../../assets/logo.svg";
+import MyGrapeLogo from "../../assets/mGScale.svg";
 import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
 
 const ApprovalScreen: React.FC = () => {
@@ -154,15 +154,15 @@ const ApprovalScreen: React.FC = () => {
     // Preserve the full approval URL (pathname + search params) for redirect after login
     // Construct the full path as a string to ensure it's preserved correctly
     const approvalPath = `${location.pathname}${location.search}${location.hash || ""}`;
-    
+
     // Store in sessionStorage as backup in case state doesn't persist
     try {
       sessionStorage.setItem('approval_redirect_path', approvalPath);
     } catch (e) {
       // Silently handle sessionStorage errors
     }
-    
-    return <Navigate to="/login" replace state={{ from: { pathname: location.pathname, search: location.search, hash: location.hash }, fromPath: approvalPath } } />;
+
+    return <Navigate to="/login" replace state={{ from: { pathname: location.pathname, search: location.search, hash: location.hash }, fromPath: approvalPath }} />;
   }
 
   return (
@@ -224,15 +224,14 @@ const ApprovalScreen: React.FC = () => {
           </div>
 
           <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
-            <img src={MyGrapeLogo} alt="logo" className="w-[41.87px] h-[55px]" />
-            <h1 className="font-semibold text-[30px]">myGrape</h1>
+            <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
           </div>
 
           <div className="flex-1 relative z-0"></div>
 
           <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
             <h2 className="text-2xl font-bold leading-snug mt-8">
-            <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
+              <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
               One Smart Solution At a Time
             </h2>
             <p className="mt-1 font-[12px] text-white">

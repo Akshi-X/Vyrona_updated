@@ -19,11 +19,11 @@ function RiskScaleBar({ riskScale }: { riskScale: string }) {
       <div className="relative w-[120px] h-[8px] rounded-sm overflow-visible group">
         {/* Color segments: red, orange, yellow, light green, dark green */}
         <div className="absolute inset-0 flex rounded-sm overflow-hidden">
-          <div className="w-1/5 bg-red-500"></div>
-          <div className="w-1/5 bg-orange-500"></div>
-          <div className="w-1/5 bg-yellow-400"></div>
-          <div className="w-1/5 bg-green-300"></div>
-          <div className="w-1/5 bg-green-600"></div>
+          <div className="w-1/5 bg-[#DB4B33]"></div>
+          <div className="w-1/5 bg-[#E38E39]"></div>
+          <div className="w-1/5 bg-[#F0DC51]"></div>
+          <div className="w-1/5 bg-[#9BC354]"></div>
+          <div className="w-1/5 bg-[#6DB354]"></div>
         </div>
         {/* Black vertical line marker with tooltip */}
         <div

@@ -276,6 +276,32 @@ class ShipmentService extends BaseApiService {
   async getAvailableRegions(): Promise<string[]> {
     return this.get<string[]>('/api/shipment/regions');
   }
+
+  /**
+   * Get IVF Control Tower data
+   * GET /api/ivf/control_tower
+   */
+  async getIVFControlTower(): Promise<{
+    hospitalName: string;
+    hospital_type: string;
+    states: {
+      [stateName: string]: Array<{
+        branch_name: string;
+        branch_status: string;
+        address: {
+          area: string;
+          district: string;
+          pincode: string;
+        };
+        geoLocation: {
+          latitude: number;
+          longitude: number;
+        };
+      }>;
+    };
+  }> {
+    return this.get('/api/ivf/control_tower');
+  }
 }
 
 export interface ShipmentLegDetail {
