@@ -19,6 +19,7 @@ class HospitalBranch(Base):
     branch_name = Column(String(20), nullable=True)
     district_name = Column(String(20), nullable=True)
     state_name = Column(String(20), nullable=True)
+    country_name = Column(String(50), nullable=True)
     area = Column(Text, nullable=True)
     pincode = Column(String(10), nullable=True)
     
