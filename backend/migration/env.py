@@ -66,6 +66,30 @@ from app.models.task_model import Tasks
 from app.models.chat_model import ChatMessage
 from app.models.chat_read_status import ChatReadStatus
 
+# Import IVF model modules
+from app.models.IVF import (
+    hospital_model,
+    hospital_branch_model,
+    tank_model,
+    canister_model,
+    canister_ln2_log_model,
+    cane_model,
+    cryolock_model,
+    patient_model as ivf_patient_model,
+    embryo_model
+)
+
+# Import IVF model classes explicitly
+from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.tank_model import Tank
+from app.models.IVF.canister_model import Canister
+from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
+from app.models.IVF.cane_model import Cane
+from app.models.IVF.cryolock_model import Cryolock
+from app.models.IVF.patient_model import Patient as IVFPatient
+from app.models.IVF.embryo_model import Embryo
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

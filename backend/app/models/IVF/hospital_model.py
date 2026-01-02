@@ -7,14 +7,15 @@ from ...config.database import Base
 
 class Hospital(Base):
     __tablename__ = "hospitals"
+    __table_args__ = {'schema': 'ivf'}
 
     # Primary Key
     hospital_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Hospital Information
     hospital_name = Column(String(255), nullable=False)
-    hospital_type = Column(String(10), nullable=True)
-    hospital_head_email = Column(String(10), nullable=True)
+    hospital_type = Column(String(255), nullable=True)
+    hospital_head_email = Column(String(255), nullable=True)
     
     # Relationships
     branches = relationship("HospitalBranch", back_populates="hospital", cascade="all, delete-orphan")
