@@ -87,7 +87,7 @@ from app.models.IVF.canister_model import Canister
 from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
 from app.models.IVF.cane_model import Cane
 from app.models.IVF.cryolock_model import Cryolock
-from app.models.IVF.patient_model import Patient as IVFPatient
+from app.models.IVF.patient_model import IVFPatient
 from app.models.IVF.embryo_model import Embryo
 
 # this is the Alembic Config object, which provides
