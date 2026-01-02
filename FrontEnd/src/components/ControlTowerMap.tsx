@@ -29,6 +29,7 @@ type MapRoute = {
 type IVFBranch = {
   branch_name: string;
   branch_status: string;
+  country_name?: string;
   address: {
     area: string;
     district: string;
@@ -51,6 +52,7 @@ interface ControlTowerMapFilters {
 interface ControlTowerMapProps {
   filters?: ControlTowerMapFilters;
   direction?: 'inbound' | 'outbound';
+  zoomToLocation?: google.maps.LatLngLiteral | null;
 }
 
 const darkWorldStyle: google.maps.MapTypeStyle[] = [
@@ -97,7 +99,7 @@ const darkWorldStyle: google.maps.MapTypeStyle[] = [
 
 
 
-const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 'outbound' }) => {
+const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 'outbound', zoomToLocation }) => {
 
   const [routes, setRoutes] = useState<MapRoute[]>([]);
 
@@ -111,6 +113,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
   const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
   const [shouldLoadRoutes, setShouldLoadRoutes] = useState<boolean>(false);
   const [ivfBranches, setIvfBranches] = useState<IVFBranch[]>([]);
+  const [highestBranchCountCountry, setHighestBranchCountCountry] = useState<string | null>(null);
 
 
 
@@ -192,6 +195,10 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
         try {
           const data = await shipmentService.getIVFControlTower();
           if (mounted && data.states) {
+            // Extract highest branch count country
+            const highestCountry = data.highest_branch_count_country || null;
+            setHighestBranchCountCountry(highestCountry);
+            
             // Transform the nested state structure into a flat array of branches
             let branches: IVFBranch[] = [];
             Object.entries(data.states).forEach(([stateName, stateBranches]) => {
@@ -202,10 +209,32 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
                 });
               });
             });
+            
             // Filter by branch name if filter is set
             if (filters?.selectedBranch && filters.selectedBranch !== 'All') {
               branches = branches.filter(b => b.branch_name === filters.selectedBranch);
             }
+            
+            // Filter by status if filter is set
+            if (filters?.selectedStatus && filters.selectedStatus !== 'All') {
+              const normalizedFilterStatus = filters.selectedStatus.toLowerCase();
+              branches = branches.filter(b => {
+                const branchStatus = b.branch_status?.toLowerCase() || '';
+                // Map filter status to branch status
+                // Filter "Safe" -> show branches with status "safe"
+                // Filter "Risk" -> show branches with status "risk" or "critical"
+                // Filter "Critical" -> show branches with status "critical"
+                if (normalizedFilterStatus === 'safe') {
+                  return branchStatus === 'safe';
+                } else if (normalizedFilterStatus === 'risk') {
+                  return branchStatus === 'risk' || branchStatus === 'critical';
+                } else if (normalizedFilterStatus === 'critical') {
+                  return branchStatus === 'critical';
+                }
+                return false;
+              });
+            }
+            
             setIvfBranches(branches);
           }
         } catch (e: any) {
@@ -317,6 +346,42 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
 
   }, []);
 
+  // Auto-zoom to highest branch count country when inbound
+  useEffect(() => {
+    if (direction === 'inbound' && mapRef && highestBranchCountCountry && ivfBranches.length > 0) {
+      // Filter branches by the highest branch count country
+      const countryBranches = ivfBranches.filter(b => b.country_name === highestBranchCountCountry);
+      
+      if (countryBranches.length > 0) {
+        // Calculate bounds for all branches in that country
+        const bounds = new google.maps.LatLngBounds();
+        countryBranches.forEach(branch => {
+          bounds.extend({
+            lat: branch.geoLocation.latitude,
+            lng: branch.geoLocation.longitude,
+          });
+        });
+        
+        // Fit bounds with padding
+        mapRef.fitBounds(bounds, {
+          top: 50,
+          right: 50,
+          bottom: 50,
+          left: 50,
+        });
+      }
+    }
+  }, [direction, mapRef, highestBranchCountCountry, ivfBranches]);
+
+  // Handle zoom to location from table row click
+  useEffect(() => {
+    if (zoomToLocation && mapRef) {
+      mapRef.panTo(zoomToLocation);
+      const currentZoom = mapRef.getZoom() ?? 3;
+      const targetZoom = Math.min(currentZoom + 3, 9);
+      mapRef.setZoom(targetZoom);
+    }
+  }, [zoomToLocation, mapRef]);
 
   // Cleanup all markers & polylines on unmount
   useEffect(() => {

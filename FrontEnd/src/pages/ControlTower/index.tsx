@@ -13,7 +13,8 @@ const ControlTower = () => {
   const navigate = useNavigate();
 
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
-  const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [selectedStatusInbound, setSelectedStatusInbound] = useState<string>('All');
+  const [selectedStatusOutbound, setSelectedStatusOutbound] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [direction, setDirection] = useState<'inbound' | 'outbound'>('outbound');
@@ -47,6 +48,19 @@ const ControlTower = () => {
   }>>([]);
   const [loadingCanisters, setLoadingCanisters] = useState(false);
   const [canistersError, setCanistersError] = useState<string | null>(null);
+  const [zoomToLocation, setZoomToLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapRoutes, setMapRoutes] = useState<Array<{
+    patient_id: string;
+    source_latitude: number;
+    source_longitude: number;
+    destination_latitude: number;
+    destination_longitude: number;
+  }>>([]);
+  const [mapIvfBranches, setMapIvfBranches] = useState<Array<{
+    branch_name: string;
+    latitude: number;
+    longitude: number;
+  }>>([]);
 
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -64,6 +78,64 @@ const ControlTower = () => {
     };
     if (isAuthenticated) fetchRoutes();
   }, [isAuthenticated]);
+
+  // Fetch map routes data for coordinates (outbound)
+  useEffect(() => {
+    const fetchMapRoutes = async () => {
+      if (direction === 'outbound') {
+        try {
+          const data = await shipmentService.getControlTowerMapRoutes({
+            region: selectedRegion !== 'All' ? selectedRegion : undefined,
+            routeStatus: selectedStatusOutbound !== 'All' ? selectedStatusOutbound.toLowerCase() : undefined,
+            carrier: selectedCarrier !== 'All' ? selectedCarrier : undefined,
+          });
+          setMapRoutes(data.map(r => ({
+            patient_id: String(r.patient_id),
+            source_latitude: r.source_latitude,
+            source_longitude: r.source_longitude,
+            destination_latitude: r.destination_latitude,
+            destination_longitude: r.destination_longitude,
+          })));
+        } catch (e: any) {
+          console.warn('Failed to load map routes:', e?.message);
+          setMapRoutes([]);
+        }
+      }
+    };
+    if (isAuthenticated && direction === 'outbound') {
+      fetchMapRoutes();
+    }
+  }, [isAuthenticated, direction, selectedRegion, selectedStatusOutbound, selectedCarrier]);
+
+  // Fetch IVF branches data for coordinates (inbound)
+  useEffect(() => {
+    const fetchIvfBranches = async () => {
+      if (direction === 'inbound') {
+        try {
+          const data = await shipmentService.getIVFControlTower();
+          if (data.states) {
+            const branches: Array<{ branch_name: string; latitude: number; longitude: number }> = [];
+            Object.entries(data.states).forEach(([, stateBranches]) => {
+              stateBranches.forEach((branch: any) => {
+                branches.push({
+                  branch_name: branch.branch_name,
+                  latitude: branch.geoLocation.latitude,
+                  longitude: branch.geoLocation.longitude,
+                });
+              });
+            });
+            setMapIvfBranches(branches);
+          }
+        } catch (e: any) {
+          console.warn('Failed to load IVF branches:', e?.message);
+          setMapIvfBranches([]);
+        }
+      }
+    };
+    if (isAuthenticated && direction === 'inbound') {
+      fetchIvfBranches();
+    }
+  }, [isAuthenticated, direction]);
 
   useEffect(() => {
     const fetchCanisters = async () => {
@@ -199,17 +271,24 @@ const ControlTower = () => {
     return ['All', ...Array.from(set).sort()];
   }, [routes]);
 
-  const statusOptions = useMemo(() => {
+  // Status options for inbound (from canisters)
+  const statusOptionsInbound = useMemo(() => {
     const set = new Set<string>();
-    if (direction === 'inbound') {
-      // For inbound: get statuses from canisters
-      canisters.forEach(c => { if (c?.status && String(c.status).trim()) set.add(String(c.status)); });
-    } else {
-      // For outbound: get statuses from routes
-      routes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
-    }
+    canisters.forEach(c => { if (c?.status && String(c.status).trim()) set.add(String(c.status)); });
     return ['All', ...Array.from(set).sort()];
-  }, [direction, routes, canisters]);
+  }, [canisters]);
+
+  // Status options for outbound (from routes)
+  const statusOptionsOutbound = useMemo(() => {
+    const set = new Set<string>();
+    routes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
+    return ['All', ...Array.from(set).sort()];
+  }, [routes]);
+
+  // Current status options based on direction
+  const statusOptions = useMemo(() => {
+    return direction === 'inbound' ? statusOptionsInbound : statusOptionsOutbound;
+  }, [direction, statusOptionsInbound, statusOptionsOutbound]);
 
   const carrierOptions = useMemo(() => {
     const set = new Set<string>();
@@ -234,20 +313,30 @@ const ControlTower = () => {
       const matchRegion = selectedRegion === 'All' || 
         r.sourceRegion === selectedRegion || 
         r.destinationRegion === selectedRegion;
-      const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
+      const matchStatus = selectedStatusOutbound === 'All' || r.status === selectedStatusOutbound;
       const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
       return matchRegion && matchStatus && matchCarrier;
     });
-  }, [routes, selectedRegion, selectedStatus, selectedCarrier]);
+  }, [routes, selectedRegion, selectedStatusOutbound, selectedCarrier]);
 
   // Apply filters to canisters (inbound only)
   const filteredCanisters = useMemo(() => {
     return (canisters || []).filter(c => {
       const matchBranch = selectedBranch === 'All' || c.branchName === selectedBranch;
-      const matchStatus = selectedStatus === 'All' || c.status === selectedStatus;
+      const matchStatus = selectedStatusInbound === 'All' || c.status === selectedStatusInbound;
       return matchBranch && matchStatus;
     });
-  }, [canisters, selectedBranch, selectedStatus]);
+  }, [canisters, selectedBranch, selectedStatusInbound]);
+
+  // Reset zoomToLocation after it's been used
+  useEffect(() => {
+    if (zoomToLocation) {
+      const timer = setTimeout(() => {
+        setZoomToLocation(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [zoomToLocation]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -315,7 +404,7 @@ const ControlTower = () => {
             {/* Left Panel - Filters and Routes */}
             <div className="flex flex-col gap-6 min-w-0">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] h-[340px] flex-shrink-0 flex flex-col justify-center">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
                   {/* Direction Toggle */}
                   <div>
@@ -406,48 +495,48 @@ const ControlTower = () => {
                         Region
                       </label>
                       <div className="relative" ref={regionDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsRegionDropdownOpen(!isRegionDropdownOpen);
-                          }}
-                          className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsRegionDropdownOpen(!isRegionDropdownOpen);
+                        }}
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      >
+                        <span className={selectedRegion !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {selectedRegion === 'All' ? 'All Regions' : selectedRegion}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isRegionDropdownOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          <span className={selectedRegion !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                            {selectedRegion === 'All' ? 'All Regions' : selectedRegion}
-                          </span>
-                          <svg
-                            className={`w-4 h-4 transition-transform ${isRegionDropdownOpen ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {isRegionDropdownOpen && (
-                          <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                            {regionOptions.map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedRegion(option);
-                                  setIsRegionDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                  selectedRegion === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
-                                }`}
-                              >
-                                {option === 'All' ? 'All Regions' : option}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isRegionDropdownOpen && (
+                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          {regionOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRegion(option);
+                                setIsRegionDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                selectedRegion === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                              }`}
+                            >
+                              {option === 'All' ? 'All Regions' : option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  </div>
                   )}
 
                   {/* Status Filter */}
@@ -464,8 +553,8 @@ const ControlTower = () => {
                         }}
                         className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
                       >
-                        <span className={selectedStatus !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                          {selectedStatus === 'All' ? 'All Status' : selectedStatus}
+                        <span className={(direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound) !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {(direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound) === 'All' ? 'All Status' : (direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound)}
                         </span>
                         <svg
                           className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
@@ -478,22 +567,29 @@ const ControlTower = () => {
                       </button>
                       {isStatusDropdownOpen && (
                         <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                          {statusOptions.map((option) => (
+                          {statusOptions.map((option) => {
+                            const currentStatus = direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound;
+                            return (
                             <button
                               key={option}
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedStatus(option);
+                                  if (direction === 'inbound') {
+                                    setSelectedStatusInbound(option);
+                                  } else {
+                                    setSelectedStatusOutbound(option);
+                                  }
                                 setIsStatusDropdownOpen(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                selectedStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                  currentStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                               }`}
                             >
                               {option === 'All' ? 'All Status' : option}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -501,59 +597,59 @@ const ControlTower = () => {
 
                   {/* Carrier Filter (Outbound only) */}
                   {direction === 'outbound' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Carrier
-                      </label>
-                      <div className="relative" ref={carrierDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsCarrierDropdownOpen(!isCarrierDropdownOpen);
-                          }}
-                          className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Carrier
+                    </label>
+                    <div className="relative" ref={carrierDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCarrierDropdownOpen(!isCarrierDropdownOpen);
+                        }}
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      >
+                        <span className={selectedCarrier !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {selectedCarrier === 'All' ? 'All Carriers' : selectedCarrier}
+                        </span>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isCarrierDropdownOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          <span className={selectedCarrier !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                            {selectedCarrier === 'All' ? 'All Carriers' : selectedCarrier}
-                          </span>
-                          <svg
-                            className={`w-4 h-4 transition-transform ${isCarrierDropdownOpen ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {isCarrierDropdownOpen && (
-                          <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                            {carrierOptions.map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedCarrier(option);
-                                  setIsCarrierDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                  selectedCarrier === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
-                                }`}
-                              >
-                                {option === 'All' ? 'All Carriers' : option}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isCarrierDropdownOpen && (
+                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                          {carrierOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCarrier(option);
+                                setIsCarrierDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                selectedCarrier === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                              }`}
+                            >
+                              {option === 'All' ? 'All Carriers' : option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  </div>
                   )}
                 </div>
               </div>
 
               {/* Active Routes List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
+              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${direction === 'inbound' ? 'h-[544px]' : 'h-[460px]'}`}>
                 <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                   <div className="text-left">Route/Canisters ID</div>
@@ -577,53 +673,72 @@ const ControlTower = () => {
                       {/* Display Routes (Outbound only) */}
                       {direction === 'outbound' && filteredRoutes && filteredRoutes.length > 0 && (
                         filteredRoutes.map((route) => {
-                          const statusText = route?.status || 'N/A';
-                          const statusColor = statusText === 'Safe'
-                            ? 'text-[#00B050]'
-                            : statusText === 'Risk'
-                              ? 'text-[#FF0000]'
-                              : statusText === 'Delayed'
-                                ? 'text-[#FFA500]'
+                      const statusText = route?.status || 'N/A';
+                      const statusColor = statusText === 'Safe'
+                        ? 'text-[#00B050]'
+                        : statusText === 'Risk'
+                          ? 'text-[#FF0000]'
+                          : statusText === 'Delayed'
+                            ? 'text-[#FFA500]'
                                 : statusText === 'Critical'
                                   ? 'text-[#FF0000]'
-                                  : 'text-gray-500';
-                          return (
-                            <div key={route?.id ?? Math.random()} className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3">
-                              <div className="min-w-0 text-left overflow-hidden">
-                                {route?.patientId ? (
-                                  <Link 
-                                    to={`/track/${route.patientId}`}
-                                    className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
-                                  >
-                                    {route.patientId}
-                                  </Link>
-                                ) : (
-                                  <span className="text-[#6b1176] text-xs font-bold">N/A</span>
-                                )}
-                                <div 
-                                  className="text-xs text-gray-900 leading-snug"
-                                  title={(route?.origin && route?.destination) 
-                                    ? `${route.origin} → ${route.destination}` 
-                                    : (route?.routeText || '')}
-                                >
-                                  {(route?.origin && route?.destination) ? (
-                                    <>
-                                      <div className="truncate">{route?.origin || '-'}</div>
-                                      <div className="truncate">→ {route?.destination || '-'}</div>
-                                    </>
-                                  ) : (
-                                    <div className="truncate">{route?.routeText || '-'}</div>
-                                  )}
-                                </div>
-                                {route?.supplyChain && (
-                                  <div className="text-[10px] text-gray-400 truncate">{route?.supplyChain}</div>
-                                )}
-                              </div>
-                              <div className={`text-left text-xs font-medium ${statusColor}`}>{statusText}</div>
-                              <div className="text-left text-xs font-bold text-gray-600 truncate">{route?.date || '-'}</div>
+                            : 'text-gray-500';
+                      const handleRouteClick = (e: React.MouseEvent) => {
+                        // Don't zoom if clicking on the link
+                        if ((e.target as HTMLElement).tagName === 'A') {
+                          return;
+                        }
+                        const mapRoute = mapRoutes.find(r => r.patient_id === route.patientId);
+                        if (mapRoute) {
+                          setZoomToLocation({
+                            lat: mapRoute.source_latitude,
+                            lng: mapRoute.source_longitude,
+                          });
+                        }
+                      };
+
+                      return (
+                        <div 
+                          key={route?.id ?? Math.random()} 
+                          className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                          onClick={handleRouteClick}
+                        >
+                          <div className="min-w-0 text-left overflow-hidden">
+                            {route?.patientId ? (
+                              <Link 
+                                to={`/track/${route.patientId}`}
+                                className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {route.patientId}
+                              </Link>
+                            ) : (
+                              <span className="text-[#6b1176] text-xs font-bold">N/A</span>
+                            )}
+                            <div 
+                              className="text-xs text-gray-900 leading-snug"
+                              title={(route?.origin && route?.destination) 
+                                ? `${route.origin} → ${route.destination}` 
+                                : (route?.routeText || '')}
+                            >
+                              {(route?.origin && route?.destination) ? (
+                                <>
+                                  <div className="truncate">{route?.origin || '-'}</div>
+                                  <div className="truncate">→ {route?.destination || '-'}</div>
+                                </>
+                              ) : (
+                                <div className="truncate">{route?.routeText || '-'}</div>
+                              )}
                             </div>
-                          );
-                        })
+                            {route?.supplyChain && (
+                              <div className="text-[10px] text-gray-400 truncate">{route?.supplyChain}</div>
+                            )}
+                          </div>
+                          <div className={`text-left text-xs font-medium ${statusColor}`}>{statusText}</div>
+                          <div className="text-left text-xs font-bold text-gray-600 truncate">{route?.date || '-'}</div>
+                        </div>
+                      );
+                    })
                       )}
                       {/* Display Canisters (Inbound only) */}
                       {direction === 'inbound' && filteredCanisters && filteredCanisters.length > 0 && (
@@ -635,8 +750,22 @@ const ControlTower = () => {
                               : canister.status === 'Critical'
                                 ? 'text-[#FF0000]'
                                 : 'text-gray-500';
+                          const handleCanisterClick = () => {
+                            const branch = mapIvfBranches.find(b => b.branch_name === canister.branchName);
+                            if (branch) {
+                              setZoomToLocation({
+                                lat: branch.latitude,
+                                lng: branch.longitude,
+                              });
+                            }
+                          };
+
                           return (
-                            <div key={canister.id} className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3">
+                            <div 
+                              key={canister.id} 
+                              className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                              onClick={handleCanisterClick}
+                            >
                               <div className="min-w-0 text-left overflow-hidden">
                                 <span className="text-[#6b1176] text-xs font-bold">
                                   Canister {canister.canisterId}
@@ -657,7 +786,7 @@ const ControlTower = () => {
                         <div className="p-4 text-xs text-gray-500">No active canisters found.</div>
                       )}
                       {direction === 'outbound' && (!filteredRoutes || filteredRoutes.length === 0) && (
-                        <div className="p-4 text-xs text-gray-500">No active routes found.</div>
+                    <div className="p-4 text-xs text-gray-500">No active routes found.</div>
                       )}
                     </>
                   )}
@@ -670,11 +799,12 @@ const ControlTower = () => {
               <ControlTowerMap 
                 filters={{
                   selectedRegion,
-                  selectedStatus,
+                  selectedStatus: direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound,
                   selectedCarrier,
                   selectedBranch,
                 }}
                 direction={direction}
+                zoomToLocation={zoomToLocation}
               />
             </div>
           </div>

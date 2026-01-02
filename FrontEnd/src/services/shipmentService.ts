@@ -284,10 +284,12 @@ class ShipmentService extends BaseApiService {
   async getIVFControlTower(): Promise<{
     hospitalName: string;
     hospital_type: string;
+    highest_branch_count_country?: string;
     states: {
       [stateName: string]: Array<{
         branch_name: string;
         branch_status: string;
+        country_name?: string;
         address: {
           area: string;
           district: string;
