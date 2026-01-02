@@ -1,24 +1,22 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
 
 
-class Hospital(Base):
-    __tablename__ = "hospitals"
+class IVFPatient(Base):
+    __tablename__ = "patients"
     __table_args__ = {'schema': 'ivf'}
 
     # Primary Key
-    hospital_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    patient_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Hospital Information
-    hospital_name = Column(String(255), nullable=False)
-    hospital_type = Column(String(255), nullable=True)
-    hospital_head_email = Column(String(255), nullable=True)
+    # Patient Information
+    his_number = Column(String(255), nullable=True)
     
     # Relationships
-    branches = relationship("HospitalBranch", back_populates="hospital", cascade="all, delete-orphan")
+    embryos = relationship("Embryo", back_populates="patient", cascade="all, delete-orphan")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

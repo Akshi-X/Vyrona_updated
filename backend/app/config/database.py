@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import logging
@@ -73,5 +73,22 @@ def init_db():
         geolocation_model,
     )
     # Import IVF models
-    from ..models.IVF import hospital_model, hospital_branch_model
+    from ..models.IVF import (
+        hospital_model,
+        hospital_branch_model,
+        tank_model,
+        canister_model,
+        canister_ln2_log_model,
+        cane_model,
+        cryolock_model,
+        patient_model as ivf_patient_model,
+        embryo_model
+    )
+    
+    # Create IVF schema if it doesn't exist
+    with engine.connect() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS ivf"))
+        conn.commit()
+    
+    # Create all tables (main tables in public schema, IVF tables in ivf schema)
     Base.metadata.create_all(bind=engine)

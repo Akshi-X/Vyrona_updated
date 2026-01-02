@@ -5,20 +5,23 @@ from sqlalchemy.orm import relationship
 from ...config.database import Base
 
 
-class Hospital(Base):
-    __tablename__ = "hospitals"
+class Cryolock(Base):
+    __tablename__ = "cryolocks"
     __table_args__ = {'schema': 'ivf'}
 
     # Primary Key
-    hospital_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    cryolock_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Hospital Information
-    hospital_name = Column(String(255), nullable=False)
-    hospital_type = Column(String(255), nullable=True)
-    hospital_head_email = Column(String(255), nullable=True)
+    # Foreign Key
+    cane_id = Column(Integer, ForeignKey("ivf.canes.cane_id"), nullable=False)
+    
+    # Cryolock Information
+    cryolock_number = Column(String(255), nullable=True)
+    cryolock_color = Column(String(255), nullable=True)
     
     # Relationships
-    branches = relationship("HospitalBranch", back_populates="hospital", cascade="all, delete-orphan")
+    cane = relationship("Cane", back_populates="cryolocks")
+    embryos = relationship("Embryo", back_populates="cryolock", cascade="all, delete-orphan")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
