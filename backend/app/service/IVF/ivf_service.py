@@ -46,7 +46,8 @@ class IVFService:
                 return {
                     "hospitalName": "",
                     "hospital_type": None,
-                    "states": {}
+                    "states": {},
+                    "highest_branch_count_country": None
                 }
             
             # Get hospital info from first branch (assuming all branches belong to same hospital)
@@ -54,6 +55,8 @@ class IVFService:
             
             # Group branches by state
             states_dict = defaultdict(list)
+            # Track branch counts by country
+            country_branch_counts = defaultdict(int)
             
             for branch in branches:
                 # Convert Decimal to float for JSON serialization
@@ -67,6 +70,7 @@ class IVFService:
                 branch_data = {
                     "branch_name": branch.branch_name,
                     "branch_status": branch_status,
+                    "country_name": branch.country_name,
                     "address": {
                         "area": branch.area,
                         "district": branch.district_name,
@@ -81,14 +85,27 @@ class IVFService:
                 # Group by state name
                 state_name = branch.state_name or "Unknown"
                 states_dict[state_name].append(branch_data)
+                
+                # Count branches by country using country_name from model
+                country = branch.country_name or "Unknown"
+                country_branch_counts[country] += 1
             
             # Convert defaultdict to regular dict for JSON serialization
             states_dict = dict(states_dict)
             
+            # Find country with highest branch count
+            highest_branch_count_country = None
+            if country_branch_counts:
+                highest_branch_count_country = max(
+                    country_branch_counts.items(),
+                    key=lambda x: x[1]
+                )[0]
+            
             return {
                 "hospitalName": hospital.hospital_name,
                 "hospital_type": hospital.hospital_type,
-                "states": states_dict
+                "states": states_dict,
+                "highest_branch_count_country": highest_branch_count_country
             }
             
         except Exception as e:
@@ -96,32 +113,68 @@ class IVFService:
     
     def get_active_canisters(self) -> Dict[str, Any]:
         """
-        Get active canisters with their status and last updated time from LN2 logs.
+        Get active canisters grouped by branch with their status and last updated time.
         
         Returns:
             Dictionary containing:
-            - canisters: List of active canisters with:
-                - canister_id: Canister ID
-                - canister_status: Status (safe, risk, critical)
-                - updated_at: Last updated date and time from LN2 logs
-            - total: Total number of active canisters
+            - branches: List of branches with their canisters:
+                - branch_id: Branch ID
+                - branch_name: Branch name
+                - canisters: List of active canisters with:
+                    - canister_id: Canister ID
+                    - canister_status: Status (safe, risk, critical)
+                    - updated_at: Last updated date and time from canister log opened_at (if available),
+                                  otherwise from canisters table created_at
+            - total: Total number of active canisters across all branches
         """
         try:
-            # Query active canisters
-            active_canisters = self.db.query(Canister).filter(
-                Canister.is_active == True
-            ).all()
+            # Query active canisters with branch information
+            active_canisters = (
+                self.db.query(Canister)
+                .join(Tank)
+                .join(HospitalBranch)
+                .filter(Canister.is_active == True)
+                .all()
+            )
             
-            canister_list = []
+            # Group canisters by branch
+            branches_dict = defaultdict(lambda: {
+                "branch_id": None,
+                "branch_name": None,
+                "canisters": []
+            })
+            
+            total_canisters = 0
             
             for canister in active_canisters:
-                # Get the latest LN2 log entry for this canister
-                latest_log = self.db.query(CanisterLn2Log).filter(
-                    CanisterLn2Log.canister_id == canister.canister_id
-                ).order_by(desc(CanisterLn2Log.created_at)).first()
+                # Get branch information from tank
+                branch = canister.tank.branch
+                branch_id = branch.branch_id
+                branch_name = branch.branch_name or "Unknown"
                 
-                # Use updated_at from latest log, or None if no logs exist
-                updated_at = latest_log.created_at if latest_log else None
+                # Initialize branch if not already in dict
+                if branches_dict[branch_id]["branch_id"] is None:
+                    branches_dict[branch_id]["branch_id"] = branch_id
+                    branches_dict[branch_id]["branch_name"] = branch_name
+                
+                # Get the most recent log entry with opened_at for this canister
+                # If opened_at exists in log, use it; otherwise use created_at from canisters table
+                latest_log_with_opened = (
+                    self.db.query(CanisterLn2Log)
+                    .filter(
+                        CanisterLn2Log.canister_id == canister.canister_id,
+                        CanisterLn2Log.opened_at.isnot(None)
+                    )
+                    .order_by(desc(CanisterLn2Log.opened_at))
+                    .first()
+                )
+                
+                # Use opened_at from log if available, otherwise use created_at from canisters table
+                if latest_log_with_opened:
+                    updated_at = latest_log_with_opened.opened_at
+                else:
+                    # Fallback to created_at from the canisters table (not from log table)
+                    updated_at = canister.created_at
                 
                 canister_data = {
                     "canister_id": canister.canister_id,
@@ -129,11 +182,18 @@ class IVFService:
                     "updated_at": updated_at
                 }
                 
-                canister_list.append(canister_data)
+                branches_dict[branch_id]["canisters"].append(canister_data)
+                total_canisters += 1
+            
+            # Convert to list and sort by branch name
+            branches_list = sorted(
+                list(branches_dict.values()),
+                key=lambda x: x["branch_name"]
+            )
             
             return {
-                "canisters": canister_list,
-                "total": len(canister_list)
+                "branches": branches_list,
+                "total": total_canisters
             }
             
         except Exception as e:

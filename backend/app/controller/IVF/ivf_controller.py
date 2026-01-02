@@ -41,7 +41,8 @@ def get_ivf_control_tower_map(
             ],
             "Karnataka": [...],
             ...
-        }
+        },
+        "highest_branch_count_country": "India"
     }
     """
     try:
@@ -57,29 +58,49 @@ def get_active_canisters(
     db: Session = Depends(get_db)
 ):
     """
-    Get active canisters with their status and last updated time from LN2 logs.
+    Get active canisters grouped by branch with their status and last updated time.
     
-    This endpoint returns all active canisters (is_active = True) with:
-    - canister_id: The ID of the canister
-    - canister_status: Status (safe, risk, or critical)
-    - updated_at: Last updated date and time from the most recent LN2 log entry
+    This endpoint returns all active canisters (is_active = True) grouped by branch with:
+    - branch_id: The ID of the branch
+    - branch_name: The name of the branch
+    - canisters: List of canisters for this branch with:
+        - canister_id: The ID of the canister
+        - canister_status: Status (safe, risk, or critical)
+        - updated_at: Last updated date and time from the most recent canister log opened_at column (if available),
+                      otherwise from canisters table created_at
     
     Response format:
     {
-        "canisters": [
+        "branches": [
             {
-                "canister_id": 1,
-                "canister_status": "safe",
-                "updated_at": "2024-01-15T10:30:00Z"
+                "branch_id": 1,
+                "branch_name": "Egmore",
+                "canisters": [
+                    {
+                        "canister_id": 1,
+                        "canister_status": "safe",
+                        "updated_at": "2024-01-15T10:30:00Z"
+                    },
+                    {
+                        "canister_id": 2,
+                        "canister_status": "risk",
+                        "updated_at": "2024-01-15T09:15:00Z"
+                    }
+                ]
             },
             {
-                "canister_id": 2,
-                "canister_status": "risk",
-                "updated_at": "2024-01-15T09:15:00Z"
-            },
-            ...
+                "branch_id": 2,
+                "branch_name": "Anna Nagar",
+                "canisters": [
+                    {
+                        "canister_id": 3,
+                        "canister_status": "safe",
+                        "updated_at": "2024-01-15T11:00:00Z"
+                    }
+                ]
+            }
         ],
-        "total": 10
+        "total": 3
     }
     """
     try:

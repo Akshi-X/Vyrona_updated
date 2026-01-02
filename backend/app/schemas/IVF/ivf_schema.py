@@ -52,6 +52,7 @@ class HospitalBranchBase(BaseModel):
     area: Optional[str] = Field(None, description="Area/Street address")
     district_name: Optional[str] = Field(None, description="District name")
     state_name: Optional[str] = Field(None, description="State name")
+    country_name: Optional[str] = Field(None, description="Country name")
     pincode: Optional[str] = Field(None, description="Pincode")
     latitude: Optional[float] = Field(None, description="Latitude coordinate")
     longitude: Optional[float] = Field(None, description="Longitude coordinate")
@@ -70,6 +71,7 @@ class HospitalBranchUpdate(BaseModel):
     area: Optional[str] = Field(None, description="Area/Street address")
     district_name: Optional[str] = Field(None, description="District name")
     state_name: Optional[str] = Field(None, description="State name")
+    country_name: Optional[str] = Field(None, description="Country name")
     pincode: Optional[str] = Field(None, description="Pincode")
     latitude: Optional[float] = Field(None, description="Latitude coordinate")
     longitude: Optional[float] = Field(None, description="Longitude coordinate")
@@ -373,6 +375,7 @@ class BranchSchema(BaseModel):
     """Schema for a single branch within a state"""
     branch_name: Optional[str] = Field(None, description="Branch name")
     branch_status: str = Field(default="safe", description="Branch status")
+    country_name: Optional[str] = Field(None, description="Country name where the branch is located")
     address: AddressSchema = Field(..., description="Branch address details")
     geoLocation: GeoLocationSchema = Field(..., description="Geographic coordinates")
     
@@ -385,6 +388,7 @@ class IVFControlTowerResponse(BaseModel):
     hospitalName: str = Field(..., description="Hospital name")
     hospital_type: Optional[str] = Field(None, description="Hospital type")
     states: Dict[str, List[BranchSchema]] = Field(..., description="Branches organized by state name")
+    highest_branch_count_country: Optional[str] = Field(None, description="Country with the highest number of branches")
     
     class Config:
         from_attributes = True
@@ -398,16 +402,26 @@ class ActiveCanisterItem(BaseModel):
     """Schema for a single active canister in control tower"""
     canister_id: int = Field(..., description="Canister ID")
     canister_status: CanisterStatus = Field(..., description="Canister status (safe, risk, critical)")
-    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from LN2 logs")
+    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log opened_at")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchCanisters(BaseModel):
+    """Schema for canisters grouped by branch"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: str = Field(..., description="Branch name")
+    canisters: List[ActiveCanisterItem] = Field(..., description="List of active canisters for this branch")
     
     class Config:
         from_attributes = True
 
 
 class ActiveCanistersResponse(BaseModel):
-    """Schema for active canisters control tower API response"""
-    canisters: List[ActiveCanisterItem] = Field(..., description="List of active canisters with their status")
-    total: int = Field(..., description="Total number of active canisters")
+    """Schema for active canisters control tower API response grouped by branch"""
+    branches: List[BranchCanisters] = Field(..., description="List of branches with their active canisters")
+    total: int = Field(..., description="Total number of active canisters across all branches")
     
     class Config:
         from_attributes = True
