@@ -388,6 +388,18 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
     return '#22DC0E'; // Default to safe (green)
   }, []);
 
+  // Helper function to zoom in to a marker position
+  const zoomToMarker = useCallback((position: google.maps.LatLngLiteral) => {
+    if (!mapRef) return;
+    
+    const currentZoom = mapRef.getZoom() ?? 3;
+    const targetZoom = Math.min(currentZoom + 3, 9); // Zoom in by 3 levels, max zoom is 9
+    
+    // Pan to position and zoom
+    mapRef.panTo(position);
+    mapRef.setZoom(targetZoom);
+  }, [mapRef]);
+
 
 
   return (
@@ -476,6 +488,10 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                     <Marker
                       position={origin}
                       icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: routeColor, fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
+                      options={{ clickable: true }}
+                      onClick={() => {
+                        zoomToMarker(origin);
+                      }}
                       onLoad={(marker) => {
                         if (marker) {
                           markersRef.current.set(`${routeKey}-origin`, marker);
@@ -496,6 +512,10 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                     <Marker
                       position={dest}
                       icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: routeColor, fillOpacity: 1, strokeColor: '#FFFFFF', strokeOpacity: 1, strokeWeight: 2 }}
+                      options={{ clickable: true }}
+                      onClick={() => {
+                        zoomToMarker(dest);
+                      }}
                       onLoad={(marker) => {
                         if (marker) {
                           markersRef.current.set(`${routeKey}-dest`, marker);
@@ -595,6 +615,10 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
                         url: markerIconUrl,
                         scaledSize: new google.maps.Size(24, 24),
                         anchor: new google.maps.Point(12, 24),
+                      }}
+                      options={{ clickable: true }}
+                      onClick={() => {
+                        zoomToMarker(branchPosition);
                       }}
                       onLoad={(marker) => {
                         if (marker) {
