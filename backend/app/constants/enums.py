@@ -174,3 +174,14 @@ class RouteStatus(str, Enum):
     @classmethod
     def list(cls):
         return [status.value for status in cls]
+
+
+class CanisterStatus(str, Enum):
+    """Enum for canister status"""
+    SAFE = "safe"
+    RISK = "risk"
+    CRITICAL = "critical"
+    
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]
