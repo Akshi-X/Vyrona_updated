@@ -45,10 +45,12 @@ interface ControlTowerMapFilters {
   selectedRegion?: string;
   selectedStatus?: string;
   selectedCarrier?: string;
+  selectedBranch?: string;
 }
 
 interface ControlTowerMapProps {
   filters?: ControlTowerMapFilters;
+  direction?: 'inbound' | 'outbound';
 }
 
 const darkWorldStyle: google.maps.MapTypeStyle[] = [
@@ -95,7 +97,7 @@ const darkWorldStyle: google.maps.MapTypeStyle[] = [
 
 
 
-const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
+const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 'outbound' }) => {
 
   const [routes, setRoutes] = useState<MapRoute[]>([]);
 
@@ -154,32 +156,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
     let mounted = true;
 
-    // Fetch IVF Control Tower data
-    (async () => {
-      try {
-        const data = await shipmentService.getIVFControlTower();
-        if (mounted && data.states) {
-          // Transform the nested state structure into a flat array of branches
-          const branches: IVFBranch[] = [];
-          Object.entries(data.states).forEach(([stateName, stateBranches]) => {
-            stateBranches.forEach((branch) => {
-              branches.push({
-                ...branch,
-                state: stateName,
-              });
-            });
-          });
-          setIvfBranches(branches);
-        }
-      } catch (e: any) {
-        // Silently fail for IVF data - it's optional
-        if (mounted) {
-          console.warn('Failed to load IVF control tower data:', e?.message);
-        }
-      }
-    })();
-
-    // Clear existing markers and polylines when filters change
+    // Clear existing markers and polylines when filters or direction change
     markersRef.current.forEach((marker, key) => {
       try {
         google.maps.event.clearInstanceListeners(marker);
@@ -208,44 +185,73 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
     // Clear any previous errors
     setError(null);
 
-    (async () => {
-
-      try {
-        // Map UI status labels to API route_status values: safe, delayed, high_risk
-        const normalizeStatusForApi = (status: string | undefined) => {
-          if (!status || status === 'All') return undefined;
-          const s = status.toLowerCase();
-          if (s.includes('safe')) return 'safe';
-          if (s.includes('delay')) return 'delayed';
-          if (s.includes('risk')) return 'high_risk';
-          return undefined;
-        };
-
-        // Build filter object for API call
-        const apiFilters = {
-          region: filters?.selectedRegion && filters.selectedRegion !== 'All' ? filters.selectedRegion : undefined,
-          routeStatus: normalizeStatusForApi(filters?.selectedStatus),
-          carrier: filters?.selectedCarrier && filters.selectedCarrier !== 'All' ? filters.selectedCarrier : undefined,
-        };
-
-        const data = await shipmentService.getControlTowerMapRoutes(apiFilters);
-
-        if (mounted) {
-          // Handle both direct array and object with routes property
-          const routesData = Array.isArray(data) ? data : (data as any)?.routes || [];
-          setRoutes(routesData);
+    // Load data based on direction
+    if (direction === 'inbound') {
+      // Fetch IVF Control Tower data for inbound
+      (async () => {
+        try {
+          const data = await shipmentService.getIVFControlTower();
+          if (mounted && data.states) {
+            // Transform the nested state structure into a flat array of branches
+            let branches: IVFBranch[] = [];
+            Object.entries(data.states).forEach(([stateName, stateBranches]) => {
+              stateBranches.forEach((branch) => {
+                branches.push({
+                  ...branch,
+                  state: stateName,
+                });
+              });
+            });
+            // Filter by branch name if filter is set
+            if (filters?.selectedBranch && filters.selectedBranch !== 'All') {
+              branches = branches.filter(b => b.branch_name === filters.selectedBranch);
+            }
+            setIvfBranches(branches);
+          }
+        } catch (e: any) {
+          // Silently fail for IVF data - it's optional
+          if (mounted) {
+            console.warn('Failed to load IVF control tower data:', e?.message);
+          }
         }
-      } catch (e: any) {
+      })();
+    } else {
+      // Fetch routes for outbound
+      (async () => {
+        try {
+          // Map UI status labels to API route_status values: safe, delayed, high_risk
+          const normalizeStatusForApi = (status: string | undefined) => {
+            if (!status || status === 'All') return undefined;
+            const s = status.toLowerCase();
+            if (s.includes('safe')) return 'safe';
+            if (s.includes('delay')) return 'delayed';
+            if (s.includes('risk')) return 'high_risk';
+            return undefined;
+          };
 
-        if (mounted) setError(e?.message || 'Failed to load map routes');
+          // Build filter object for API call
+          const apiFilters = {
+            region: filters?.selectedRegion && filters.selectedRegion !== 'All' ? filters.selectedRegion : undefined,
+            routeStatus: normalizeStatusForApi(filters?.selectedStatus),
+            carrier: filters?.selectedCarrier && filters.selectedCarrier !== 'All' ? filters.selectedCarrier : undefined,
+          };
 
-      }
+          const data = await shipmentService.getControlTowerMapRoutes(apiFilters);
 
-    })();
+          if (mounted) {
+            // Handle both direct array and object with routes property
+            const routesData = Array.isArray(data) ? data : (data as any)?.routes || [];
+            setRoutes(routesData);
+          }
+        } catch (e: any) {
+          if (mounted) setError(e?.message || 'Failed to load map routes');
+        }
+      })();
+    }
 
     return () => { mounted = false; };
 
-  }, [shouldLoadRoutes, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier]);
+  }, [shouldLoadRoutes, direction, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier, filters?.selectedBranch]);
 
 
 
@@ -275,17 +281,20 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
   }), []);
 
-  // Force remount of GoogleMap when filters or route set changes to ensure
+  // Force remount of GoogleMap when filters, direction, or route set changes to ensure
   // any stale polylines/markers are fully removed from the map instance.
   const mapInstanceKey = useMemo(
     () =>
       [
+        direction || 'outbound',
         filters?.selectedRegion || 'all-region',
         filters?.selectedStatus || 'all-status',
         filters?.selectedCarrier || 'all-carrier',
+        filters?.selectedBranch || 'all-branch',
         routes.length,
+        ivfBranches.length,
       ].join('|'),
-    [filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier, routes.length],
+    [direction, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier, filters?.selectedBranch, routes.length, ivfBranches.length],
   );
 
 
@@ -466,7 +475,8 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
             >
 
-              {routes.map((r) => {
+              {/* Render Routes (Outbound only) */}
+              {direction === 'outbound' && routes.map((r) => {
 
                 const origin = { lat: r.source_latitude, lng: r.source_longitude } as google.maps.LatLngLiteral;
 
@@ -598,8 +608,8 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters }) => {
 
               })}
 
-              {/* IVF Branch Markers */}
-              {ivfBranches.map((branch) => {
+              {/* IVF Branch Markers (Inbound only) */}
+              {direction === 'inbound' && ivfBranches.map((branch) => {
                 const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
                 const branchPosition = {
                   lat: branch.geoLocation.latitude,

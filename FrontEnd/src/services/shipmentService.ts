@@ -302,6 +302,40 @@ class ShipmentService extends BaseApiService {
   }> {
     return this.get('/api/ivf/control_tower');
   }
+
+  /**
+   * Get Active Canisters (flat format)
+   * GET /api/ivf/control_tower/active_canisters
+   */
+  async getActiveCanisters(): Promise<{
+    canisters: Array<{
+      canister_id: number;
+      canister_status: string;
+      updated_at: string | null;
+    }>;
+    total: number;
+  }> {
+    return this.get('/api/ivf/control_tower/active_canisters');
+  }
+
+  /**
+   * Get Active Canisters by Branch (nested format)
+   * GET /api/ivf/control_tower/active_canisters (alternative format)
+   */
+  async getActiveCanistersByBranch(): Promise<{
+    branches: Array<{
+      branch_id: number;
+      branch_name: string;
+      canisters: Array<{
+        canister_id: number;
+        canister_status: string;
+        updated_at: string;
+      }>;
+    }>;
+    total: number;
+  }> {
+    return this.get('/api/ivf/control_tower/active_canisters');
+  }
 }
 
 export interface ShipmentLegDetail {
