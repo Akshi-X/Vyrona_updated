@@ -113,16 +113,26 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
 # Logout endpoint
 # ---------------------------
 @router.post("/logout", response_model=LogoutResponse)
-def logout_user(current_user: user_model.User = Depends(get_current_user)):
+def logout_user(request: Request):
     """
     User logout endpoint.
     
-    Protected endpoint. Any authenticated user can logout.
+    Protected endpoint. Works for both regular users and branch logins.
     
     Note: Since JWT tokens are stateless, the actual token invalidation 
     happens on the client side by removing the token from storage.
     This endpoint serves to acknowledge the logout action.
     """
+    # Check if it's a branch login or regular user
+    if hasattr(request.state, "branch_login") and request.state.branch_login is not None:
+        logger.info(f"Branch logout: login_id={request.state.branch_login.login_id}, email={request.state.branch_login.email}")
+    elif hasattr(request.state, "current_user") and request.state.current_user is not None:
+        logger.info(f"User logout: user_id={request.state.current_user.user_id}, email={request.state.current_user.email}")
+    else:
+        # This shouldn't happen if middleware ran correctly, but handle gracefully
+        from ..exceptions import InvalidCredentialsException
+        raise InvalidCredentialsException(email="unknown")
+    
     return LogoutResponse(
         status="success",
         message=SuccessMessages.LOGOUT_SUCCESS
