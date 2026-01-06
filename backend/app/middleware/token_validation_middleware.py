@@ -15,6 +15,7 @@ from ..auth.auth import verify_token
 from ..config.database import SessionLocal
 from ..config.permissions import EndpointPermissions
 from ..models.user_model import User
+from ..models.IVF.branch_login_model import BranchLogin
 from ..constants.error_codes import ERROR_CODES
 from ..constants.app_constants import COMMON_API_HEADERS
 from ..exceptions import (
@@ -25,6 +26,7 @@ from ..exceptions import (
     UserNotApprovedException,
     AppException
 )
+from ..exceptions.custom_exceptions import DatabaseQueryException
 
 
 class TokenValidationMiddleware(BaseHTTPMiddleware):
@@ -85,37 +87,71 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             # Verify token and get payload
             payload = verify_token(token)
             
-            # Get user from database
-            user_id = payload.get("sub")
-            if not user_id:
+            # Check token type to determine authentication method
+            token_type = payload.get("type")
+            subject_id = payload.get("sub")
+            
+            if not subject_id:
                 raise InvalidTokenException()
             
-            # Load user from database
+            # Load from database based on token type
             db = SessionLocal()
             try:
-                user = db.query(User).filter(User.user_id == user_id).first()
-                
-                if not user:
-                    db.close()
-                    raise UserFromTokenNotFoundException(user_id=user_id)
-                
-                # Check if user is still active and approved
-                if not user.status:
-                    db.close()
-                    raise AccountInactiveException(user_id=user.user_id)
-                
-                if user.approved_status != 'approved':
-                    db.close()
-                    raise UserNotApprovedException(user_id=user.user_id)
-                
-                # Token valid - inject authenticated user and pharma_id into request
-                request.state.current_user = user
-                request.state.db_session = db
-                
-                # Extract pharma_id from token payload for easy access
-                pharma_id = payload.get("pharma_id")
-                if pharma_id is not None:
-                    request.state.pharma_id = pharma_id
+                if token_type == "branch_login":
+                    # Handle branch login token
+                    login_id = int(subject_id) if subject_id.isdigit() else None
+                    if not login_id:
+                        db.close()
+                        raise InvalidTokenException()
+                    
+                    branch_login = db.query(BranchLogin).filter(BranchLogin.login_id == login_id).first()
+                    
+                    if not branch_login:
+                        db.close()
+                        raise UserFromTokenNotFoundException(user_id=str(login_id))
+                    
+                    # Check if branch login is active and verified
+                    if not branch_login.is_active or not branch_login.is_verified:
+                        db.close()
+                        raise AccountInactiveException(user_id=str(login_id))
+                    
+                    # Token valid - inject branch login info into request
+                    request.state.current_user = None  # No User model for branch logins
+                    request.state.branch_login = branch_login
+                    request.state.db_session = db
+                    
+                    # Extract branch/hospital info from token payload for easy access
+                    request.state.hospital_id = payload.get("hospital_id")
+                    request.state.branch_id = payload.get("branch_id")
+                    request.state.hospital_type = payload.get("hospital_type")
+                    request.state.login_id = branch_login.login_id
+                    
+                else:
+                    # Handle regular user token (default behavior)
+                    user = db.query(User).filter(User.user_id == subject_id).first()
+                    
+                    if not user:
+                        db.close()
+                        raise UserFromTokenNotFoundException(user_id=subject_id)
+                    
+                    # Check if user is still active and approved
+                    if not user.status:
+                        db.close()
+                        raise AccountInactiveException(user_id=user.user_id)
+                    
+                    if user.approved_status != 'approved':
+                        db.close()
+                        raise UserNotApprovedException(user_id=user.user_id)
+                    
+                    # Token valid - inject authenticated user and pharma_id into request
+                    request.state.current_user = user
+                    request.state.branch_login = None  # No branch login for regular users
+                    request.state.db_session = db
+                    
+                    # Extract pharma_id from token payload for easy access
+                    pharma_id = payload.get("pharma_id")
+                    if pharma_id is not None:
+                        request.state.pharma_id = pharma_id
                 
             except AppException:
                 db.close()

@@ -48,6 +48,11 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
     # Quality loss email decision endpoint (email buttons)
     ("PUT", "/api/quality/loss/decision"),
+    # Branch authentication endpoints - public
+    ("POST", "/api/ivf/branch/signup"),
+    ("POST", "/api/ivf/branch/login"),
+    ("POST", "/api/ivf/branch/verify-email"),
+    ("GET", "/api/ivf/branch/verify-email"),  # Support GET for email links
 }
 
 
