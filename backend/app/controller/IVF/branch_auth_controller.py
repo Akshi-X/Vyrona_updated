@@ -22,7 +22,7 @@ from ...exceptions.custom_exceptions import DatabaseQueryException
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/ivf/branch", tags=["Branch Authentication"])
+router = APIRouter(prefix="/ivf/branch", tags=["Branch Authentication"])
 
 
 @router.post("/signup", response_model=BranchSignupResponse, status_code=status.HTTP_201_CREATED)
