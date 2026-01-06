@@ -30,6 +30,7 @@ class HospitalBranch(Base):
     # Relationships
     hospital = relationship("Hospital", back_populates="branches")
     tanks = relationship("Tank", back_populates="branch", cascade="all, delete-orphan")
+    branch_logins = relationship("BranchLogin", back_populates="branch", cascade="all, delete-orphan")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

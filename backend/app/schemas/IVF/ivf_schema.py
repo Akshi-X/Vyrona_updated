@@ -455,3 +455,85 @@ class EmbryoTrackingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================
+# BRANCH LOGIN SCHEMAS
+# ============================================
+
+class BranchSignupRequest(BaseModel):
+    """Schema for branch signup request"""
+    email: str = Field(..., description="Official branch email")
+    password: str = Field(..., description="Password")
+    confirm_password: str = Field(..., description="Confirm password")
+    hospital_name: str = Field(..., description="Hospital name")
+    department: str = Field(..., description="Department/Hospital type (IVF, CGT, Oncology, etc.)")
+    branch_id: int = Field(..., description="Selected branch ID")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchLoginRequest(BaseModel):
+    """Schema for branch login request"""
+    email: str = Field(..., description="Branch email")
+    password: str = Field(..., description="Password")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchLoginResponse(BaseModel):
+    """Schema for branch login response"""
+    login_id: int
+    email: str
+    hospital_id: int
+    hospital_name: str
+    branch_id: int
+    branch_name: Optional[str]
+    department: str
+    auth_token: str
+    expires_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchSignupResponse(BaseModel):
+    """Schema for branch signup response"""
+    login_id: int
+    email: str
+    hospital_id: int
+    hospital_name: str
+    branch_id: int
+    branch_name: Optional[str]
+    department: str
+    message: str
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchVerifyRequest(BaseModel):
+    """Schema for branch email verification request"""
+    token: str = Field(..., description="Verification token from email link")
+
+
+class BranchVerifyResponse(BaseModel):
+    """Schema for branch email verification response"""
+    message: str
+    login_id: int
+    email: str
+    hospital_id: int
+    branch_id: int
+    department: str
+
+
+class HospitalBranchesResponse(BaseModel):
+    """Schema for hospital branches response"""
+    hospital_id: int
+    hospital_name: str
+    hospital_type: Optional[str]
+    branches: List[HospitalBranchResponse]
+    
+    class Config:
+        from_attributes = True
