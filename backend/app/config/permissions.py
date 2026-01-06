@@ -16,6 +16,7 @@ Examples:
 """
 
 from typing import Set, Tuple
+import re
 
 
 # Type alias for clarity
@@ -53,6 +54,9 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("POST", "/api/ivf/branch/login"),
     ("POST", "/api/ivf/branch/verify-email"),
     ("GET", "/api/ivf/branch/verify-email"),  # Support GET for email links
+    # Hospital search and branches endpoints - public (used during signup)
+    ("GET", "/api/ivf/branch/hospitals/search"),
+    ("GET", "/api/ivf/branch/hospitals/{hospital_id}/branches"),
 }
 
 
@@ -198,6 +202,11 @@ class EndpointPermissions:
         """
         Check if endpoint is public
         
+        Supports:
+        - Exact matches: ("GET", "/api/users")
+        - Wildcard methods: ("*", "/api/login")
+        - Path parameters: ("GET", "/api/user/{id}") matches "/api/user/123"
+        
         Args:
             method: HTTP method (GET, POST, etc.)
             path: Request path
@@ -205,12 +214,30 @@ class EndpointPermissions:
         Returns:
             True if endpoint is public, False otherwise
         """
-        # Check for exact match with specific method
-        if (method, path) in PUBLIC_ENDPOINTS:
-            return True
+        # Normalize path (remove trailing slash for consistent matching)
+        path = path.rstrip('/')
         
-        # Check for wildcard method match
-        if ("*", path) in PUBLIC_ENDPOINTS:
-            return True
+        for endpoint_method, endpoint_path in PUBLIC_ENDPOINTS:
+            # Normalize endpoint path too
+            endpoint_path = endpoint_path.rstrip('/')
+            
+            # Check if methods match (or wildcard)
+            if endpoint_method != "*" and endpoint_method != method:
+                continue
+            
+            # Check exact path match
+            if endpoint_path == path:
+                return True
+            
+            # Check pattern match (for paths with {parameters})
+            if "{" in endpoint_path:
+                # Convert path template to regex pattern
+                # Replace {user_id}, {id}, {any_param} with regex
+                pattern = re.escape(endpoint_path)
+                pattern = re.sub(r'\\{[^}]+\\}', r'[^/]+', pattern)
+                pattern = f"^{pattern}$"
+                
+                if re.match(pattern, path):
+                    return True
         
         return False
