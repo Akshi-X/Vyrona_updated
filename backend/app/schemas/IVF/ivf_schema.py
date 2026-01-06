@@ -528,12 +528,21 @@ class BranchVerifyResponse(BaseModel):
     department: str
 
 
+class BranchListItem(BaseModel):
+    """Simplified schema for branch list item (only id and name)"""
+    branch_id: int
+    branch_name: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
 class HospitalBranchesResponse(BaseModel):
     """Schema for hospital branches response"""
     hospital_id: int
     hospital_name: str
     hospital_type: Optional[str]
-    branches: List[HospitalBranchResponse]
+    branches: List[BranchListItem]
     
     class Config:
         from_attributes = True
