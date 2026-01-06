@@ -15,7 +15,7 @@ from ...schemas.IVF.ivf_schema import (
     BranchVerifyRequest,
     BranchVerifyResponse,
     HospitalBranchesResponse,
-    HospitalBranchResponse
+    BranchListItem
 )
 from ...service.IVF.branch_auth_service import BranchAuthService
 from ...exceptions.custom_exceptions import DatabaseQueryException
@@ -176,22 +176,11 @@ def get_hospital_branches(
         # Get branches
         branches = BranchAuthService.get_branches_by_hospital(hospital_id, db)
         
+        # Return only branch_id and branch_name
         branch_responses = [
-            HospitalBranchResponse(
+            BranchListItem(
                 branch_id=branch.branch_id,
-                hospital_id=branch.hospital_id,
-                branch_name=branch.branch_name,
-                district_name=branch.district_name,
-                state_name=branch.state_name,
-                country_name=branch.country_name,
-                area=branch.area,
-                pincode=branch.pincode,
-                latitude=float(branch.latitude) if branch.latitude else None,
-                longitude=float(branch.longitude) if branch.longitude else None,
-                created_at=branch.created_at,
-                updated_at=branch.updated_at,
-                created_by=branch.created_by,
-                updated_by=branch.updated_by
+                branch_name=branch.branch_name
             )
             for branch in branches
         ]
