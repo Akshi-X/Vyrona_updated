@@ -17,7 +17,7 @@ const ControlTower = () => {
   const [selectedStatusOutbound, setSelectedStatusOutbound] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
-  const [direction, setDirection] = useState<'inbound' | 'outbound'>('outbound');
+  const [direction, setDirection] = useState<'inbound' | 'outbound'>('inbound');
   const [userInitials, setUserInitials] = useState<string>('');
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
