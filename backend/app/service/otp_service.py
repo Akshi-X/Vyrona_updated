@@ -251,7 +251,7 @@ def resend_otp_to_user(user_id: str, email: str, db: Session) -> dict:
         return {
             "user_id": str(user.user_id),
             "email": user.email,
-            "otp_expiry": otp.expires_at
+            "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
         }
     except Exception as e:
         raise ResendOTPFailedException(email=user.email, reason=str(e))
