@@ -52,11 +52,12 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     # Branch authentication endpoints - public
     ("POST", "/api/ivf/branch/signup"),
     ("POST", "/api/ivf/branch/login"),
-    ("POST", "/api/ivf/branch/verify-email"),
-    ("GET", "/api/ivf/branch/verify-email"),  # Support GET for email links
+    ("GET", "/api/ivf/branch/verify-email"),  # Email verification link (GET only)
     # Hospital search and branches endpoints - public (used during signup)
     ("GET", "/api/ivf/branch/hospitals/search"),
     ("GET", "/api/ivf/branch/hospitals/{hospital_id}/branches"),
+    ("GET", "/api/ivf/branch/hospitals/by-name/{hospital_name}/branches"),  # Get branches by hospital name
+    ("GET", "/api/ivf/branch/check-domain"),  # Check email domain for domain-based login
 }
 
 
