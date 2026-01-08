@@ -195,9 +195,14 @@ class BranchAuthService:
                 status_code=400
             )
         
-        # Create verification token
+        # Generate secure verification token
         verification_token = secrets.token_urlsafe(48)
-        verification_expiry = datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_TOKEN_MINUTES)
+        verification_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+        
+        logger.info(
+            f"Creating branch login: email={email}, hospital={hospital_name}, "
+            f"branch_id={branch_id}"
+        )
 
         # Create branch login (inactive until verified)
         branch_login = BranchLogin(
@@ -205,9 +210,9 @@ class BranchAuthService:
             email=email,
             password_hash=get_password_hash(password),
             department=department,
-            is_active=False,
-            is_verified=False,
-            approved_status="pending",
+            is_active=False,  # Must remain False until email verification
+            is_verified=False,  # Must remain False until email verification
+            approved_status="pending",  # PENDING status
             verification_token=verification_token,
             verification_token_expiry=verification_expiry,
             created_by="system"
@@ -217,19 +222,26 @@ class BranchAuthService:
         db.commit()
         db.refresh(branch_login)
         
-        logger.info(f"Branch login created (pending verification): login_id={branch_login.login_id}")
+        logger.info(
+            f"Branch login created: login_id={branch_login.login_id}, email={email}"
+        )
 
         # Send verification email
         try:
-            verify_url = f"{settings.FRONTEND_URL}/branch/verify?token={verification_token}"
+            from urllib.parse import quote
+            encoded_token = quote(verification_token, safe='-_')
+            verify_url = f"{settings.FRONTEND_URL}/branch/verify?token={encoded_token}"
+            
             subject = "Verify your branch login"
             html_body = f"""
                 <p>Hello,</p>
                 <p>Please verify your branch login for <b>{hospital.hospital_name}</b>, branch <b>{branch.branch_name}</b>.</p>
                 <p><a href="{verify_url}">Click here to verify</a></p>
                 <p>This link expires in 24 hours.</p>
+                <p>If you did not request this, please ignore this email.</p>
             """
             send_email(branch_login.email, subject, html_body)
+            logger.info(f"Verification email sent: email={email}, login_id={branch_login.login_id}")
         except Exception as e:
             # If email fails, rollback the creation to avoid unusable accounts
             logger.error(f"Failed to send verification email: {str(e)}")
@@ -362,60 +374,65 @@ class BranchAuthService:
         """
         Verify branch login email using a verification token.
         
-        - Token must exist and not be expired
-        - Marks the login as verified/active
-        - Clears token fields and sets verified_at
+        Production-ready verification flow following strict order:
+        1. Validate token presence → 400 if missing
+        2. Fetch record by verification_token → 400 if not found
+        3. Check if already verified → 200 "Email already verified"
+        4. Check token expiry (UTC-safe) → 400 if expired
+        5. Mark as verified, set verified_at, clear token (prevent reuse), commit
+        
+        Note: Does NOT check is_active during verification.
+        Email verification and account activation are separate concerns.
+        
+        Returns:
+            Dict with message, login_id, email, hospital_id, branch_id, department
         """
-        logger.info("Branch email verification request received")
+        # Step 1: Validate token presence
+        if not token or not token.strip():
+            raise DatabaseQueryException(
+                operation="branch verify",
+                reason="Missing token",
+                custom_message="Invalid verification link",
+                status_code=400
+            )
 
+        # Step 2: Fetch record by verification_token
+        normalized_token = token.strip()
         branch_login = db.query(BranchLogin).filter(
-            BranchLogin.verification_token == token
+            BranchLogin.verification_token == normalized_token
         ).first()
 
         if not branch_login:
-            logger.error("Invalid verification token")
+            logger.warning(f"Token not found: email lookup failed")
             raise DatabaseQueryException(
                 operation="branch verify",
-                reason="Invalid token",
+                reason="Token not found",
                 custom_message="Invalid or expired verification link",
                 status_code=400
             )
 
-        # Check expiry
-        now = datetime.now(timezone.utc)
-        if not branch_login.verification_token_expiry or branch_login.verification_token_expiry < now:
-            logger.error("Verification token expired")
-            raise DatabaseQueryException(
-                operation="branch verify",
-                reason="Token expired",
-                custom_message="Verification link has expired",
-                status_code=400
-            )
-
-        # Fetch branch and hospital for response context
-        branch = BranchAuthService.get_branch_by_id(branch_login.branch_id, db)
-        if not branch:
-            logger.error(f"Branch not found during verification: {branch_login.branch_id}")
-            raise DatabaseQueryException(
-                operation="branch verify",
-                reason="Branch not found",
-                custom_message="Branch not found",
-                status_code=404
-            )
-
-        hospital = db.query(Hospital).filter(Hospital.hospital_id == branch.hospital_id).first()
-        if not hospital:
-            logger.error(f"Hospital not found during verification: {branch.hospital_id}")
-            raise DatabaseQueryException(
-                operation="branch verify",
-                reason="Hospital not found",
-                custom_message="Hospital not found",
-                status_code=404
-            )
-
-        # If already verified, just ensure active and return success
-        if branch_login.is_verified and branch_login.is_active:
-            logger.info(f"Branch login already verified: login_id={branch_login.login_id}")
+        # Step 3: Check if already verified
+        if branch_login.is_verified:
+            logger.info(f"Email already verified: login_id={branch_login.login_id}, email={branch_login.email}")
+            # Fetch branch and hospital for response context
+            branch = BranchAuthService.get_branch_by_id(branch_login.branch_id, db)
+            if not branch:
+                logger.error(f"Branch not found during verification: {branch_login.branch_id}")
+                raise DatabaseQueryException(
+                    operation="branch verify",
+                    reason="Branch not found",
+                    custom_message="Branch not found",
+                    status_code=404
+                )
+            hospital = db.query(Hospital).filter(Hospital.hospital_id == branch.hospital_id).first()
+            if not hospital:
+                logger.error(f"Hospital not found during verification: {branch.hospital_id}")
+                raise DatabaseQueryException(
+                    operation="branch verify",
+                    reason="Hospital not found",
+                    custom_message="Hospital not found",
+                    status_code=404
+                )
             return {
                 "message": "Email already verified",
                 "login_id": branch_login.login_id,
@@ -425,18 +442,63 @@ class BranchAuthService:
                 "department": branch_login.department
             }
 
+        # Step 4: Check token expiry
+        now_utc = datetime.now(timezone.utc)
+        token_expiry = branch_login.verification_token_expiry
+        
+        if not token_expiry or token_expiry < now_utc:
+            raise DatabaseQueryException(
+                operation="branch verify",
+                reason="Token expired or missing expiry",
+                custom_message="Verification link expired",
+                status_code=400
+            )
+
+        # Step 5: Mark as verified, activate account, and clear token
         branch_login.is_verified = True
-        branch_login.is_active = True
-        branch_login.verified_at = now
+        branch_login.is_active = True  # Activate account after email verification
+        branch_login.verified_at = now_utc
         branch_login.verification_token = None
         branch_login.verification_token_expiry = None
         branch_login.login_attempts = 0
-        db.commit()
+        
+        try:
+            db.commit()
+            db.refresh(branch_login)
+            logger.info(
+                f"Email verified successfully: login_id={branch_login.login_id}, "
+                f"email={branch_login.email}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to commit verification: {str(e)}")
+            db.rollback()
+            raise DatabaseQueryException(
+                operation="branch verify",
+                reason="Database commit failed",
+                custom_message="Verification failed. Please try again.",
+                status_code=500
+            )
 
-        logger.info(f"Branch email verified successfully: login_id={branch_login.login_id}")
+        # Fetch branch and hospital for response
+        branch = BranchAuthService.get_branch_by_id(branch_login.branch_id, db)
+        if not branch:
+            raise DatabaseQueryException(
+                operation="branch verify",
+                reason="Branch not found",
+                custom_message="Branch not found",
+                status_code=404
+            )
+        hospital = db.query(Hospital).filter(Hospital.hospital_id == branch.hospital_id).first()
+        if not hospital:
+            raise DatabaseQueryException(
+                operation="branch verify",
+                reason="Hospital not found",
+                custom_message="Hospital not found",
+                status_code=404
+            )
 
         return {
-            "message": "Email verified successfully. You can now log in.",
+            "message": "Email verified successfully",
             "login_id": branch_login.login_id,
             "email": branch_login.email,
             "hospital_id": hospital.hospital_id,
