@@ -63,7 +63,7 @@ def get_current_user(request: Request) -> User:
         def get_profile(current_user: User = Depends(get_current_user)):
             return {"name": current_user.name}
     """
-    if not hasattr(request.state, "current_user"):
+    if not hasattr(request.state, "current_user") or request.state.current_user is None:
         raise InvalidCredentialsException(email="unknown")
     
     return request.state.current_user
