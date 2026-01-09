@@ -3,10 +3,13 @@ Branch Authentication Controller
 Handles branch-level signup and login endpoints
 """
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from ...config.database import get_db
+from ...models.IVF.branch_login_model import BranchLogin
+from ...dependencies.auth_dependencies import get_current_branch_login
 from ...schemas.IVF.ivf_schema import (
     BranchSignupRequest,
     BranchSignupResponse,
@@ -15,7 +18,11 @@ from ...schemas.IVF.ivf_schema import (
     BranchVerifyRequest,
     BranchVerifyResponse,
     HospitalBranchesResponse,
-    BranchListItem
+    BranchListItem,
+    IVFVerifyOTPRequest,
+    IVFVerifyOTPSuccessResponse,
+    IVFResendOTPRequest,
+    IVFResendOTPSuccessResponse
 )
 from ...service.IVF.branch_auth_service import BranchAuthService
 from ...exceptions.custom_exceptions import DatabaseQueryException
@@ -72,6 +79,9 @@ def signup_branch(
         result = BranchAuthService.signup_branch(
             email=email_lower,
             password=request.password,
+            first_name=request.first_name,
+            last_name=request.last_name,
+            role=request.role,
             hospital_name=hospital_name,
             department=request.department,
             branch_id=request.branch_id,
@@ -391,5 +401,269 @@ def check_email_domain(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while checking email domain"
+        )
+
+
+@router.post("/verify-otp", response_model=IVFVerifyOTPSuccessResponse, status_code=status.HTTP_200_OK)
+def verify_ivf_otp(
+    request: IVFVerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify OTP for IVF branch login
+    
+    After successful OTP verification, returns JWT token with role, branch_id, department
+    """
+    try:
+        from ...service.ivf_otp_service import verify_ivf_otp_and_create_token
+        from ...constants.messages import SuccessMessages
+        
+        result = verify_ivf_otp_and_create_token(request.login_id, request.otp, db)
+        
+        return IVFVerifyOTPSuccessResponse(
+            login_id=result["login_id"],
+            email=result["email"],
+            status="Logged In",
+            auth_token=result["auth_token"],
+            expires_at=result["expires_at"],
+            message=SuccessMessages.OTP_VERIFIED,
+            role=result["role"],
+            branch_id=result["branch_id"],
+            department=result["department"],
+            hospital_id=result.get("hospital_id"),
+            hospital_name=result.get("hospital_name")
+        )
+    
+    except DatabaseQueryException as e:
+        logger.error(f"Database error during OTP verification: {str(e)}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.custom_message or str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during OTP verification: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during OTP verification"
+        )
+
+
+@router.post("/resend-otp", response_model=IVFResendOTPSuccessResponse, status_code=status.HTTP_200_OK)
+def resend_ivf_otp(
+    request: IVFResendOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Resend OTP for IVF branch login
+    """
+    try:
+        from ...service.ivf_otp_service import resend_ivf_otp_to_user
+        from ...constants.messages import SuccessMessages
+        
+        result = resend_ivf_otp_to_user(request.login_id, request.email, db)
+        
+        return IVFResendOTPSuccessResponse(
+            login_id=result["login_id"],
+            email=result["email"],
+            status="OTP Sent",
+            otp_expiry=result["otp_expiry"],
+            message=SuccessMessages.OTP_SENT
+        )
+    
+    except DatabaseQueryException as e:
+        logger.error(f"Database error during OTP resend: {str(e)}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.custom_message or str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during OTP resend: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during OTP resend"
+        )
+
+
+@router.post("/approve", status_code=status.HTTP_200_OK)
+def approve_ivf_user(
+    registration_id: int,
+    current_branch_login: BranchLogin = Depends(get_current_branch_login),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve IVF user registration
+    
+    - Manager can approve Users (from same branch and department)
+    - Admin (ARC Admin) can approve Managers
+    """
+    try:
+        from ...service.IVF.branch_auth_service import BranchAuthService
+        from ...constants.messages import SuccessMessages
+        
+        # Get branch login to approve
+        branch_login = db.query(BranchLogin).filter(BranchLogin.login_id == registration_id).first()
+        if not branch_login:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Registration not found"
+            )
+        
+        # Validate approval permissions
+        if branch_login.role.lower() == 'user':
+            # User registration - only Manager from same branch and department can approve
+            if current_branch_login.role.lower() != 'manager':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only Managers can approve User registrations"
+                )
+            
+            # Check if current Manager is from the same branch and department
+            if (current_branch_login.branch_id != branch_login.branch_id or 
+                current_branch_login.department != branch_login.department):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only Managers from the same branch and department can approve User registrations"
+                )
+                
+        elif branch_login.role.lower() == 'manager':
+            # Manager registration - only Admin (ARC Admin) can approve
+            if current_branch_login.role.lower() != 'admin':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only ARC Admin can approve Manager registrations"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid role for approval"
+            )
+        
+        # Approve the registration
+        branch_login.approved_status = 'approved'
+        branch_login.is_active = True
+        branch_login.approved_by = str(current_branch_login.login_id)
+        branch_login.approved_on = datetime.now(timezone.utc)
+        branch_login.updated_by = str(current_branch_login.login_id)
+        branch_login.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        db.refresh(branch_login)
+        
+        # Send approval notification email
+        from ...service.email_service import send_user_approved_notification
+        from ...models.IVF.hospital_branch_model import HospitalBranch
+        from ...models.IVF.hospital_model import Hospital
+        
+        # Get hospital name for the company field
+        branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == branch_login.branch_id).first()
+        hospital = db.query(Hospital).filter(Hospital.hospital_id == branch.hospital_id).first() if branch else None
+        company_name = hospital.hospital_name if hospital else f"Branch {branch_login.branch_id}"
+        
+        # Format approved date
+        approved_date_utc = branch_login.approved_on
+        if approved_date_utc.tzinfo is None:
+            approved_date_utc = approved_date_utc.replace(tzinfo=timezone.utc)
+        else:
+            approved_date_utc = approved_date_utc.astimezone(timezone.utc)
+        approved_date = approved_date_utc.strftime("%B %d, %Y at %I:%M %p UTC")
+        
+        send_user_approved_notification(
+            user_email=branch_login.email,
+            first_name=branch_login.first_name,
+            last_name=branch_login.last_name,
+            role=branch_login.role,
+            company=company_name,
+            approved_date=approved_date
+        )
+        
+        return {
+            "detail": f"User registration approved: {branch_login.email}",
+            "approved_by": current_branch_login.login_id,
+            "approved_on": branch_login.approved_on.isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving IVF user: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during approval"
+        )
+
+
+@router.post("/reject", status_code=status.HTTP_200_OK)
+def reject_ivf_user(
+    registration_id: int,
+    current_branch_login: BranchLogin = Depends(get_current_branch_login),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject IVF user registration
+    
+    - Manager can reject Users (from same branch and department)
+    - Admin (ARC Admin) can reject Managers
+    """
+    try:
+        # Get branch login to reject
+        branch_login = db.query(BranchLogin).filter(BranchLogin.login_id == registration_id).first()
+        if not branch_login:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Registration not found"
+            )
+        
+        # Validate rejection permissions
+        if branch_login.role.lower() == 'user':
+            # User registration - only Manager from same branch and department can reject
+            if current_branch_login.role.lower() != 'manager':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only Managers can reject User registrations"
+                )
+            
+            # Check if current Manager is from the same branch and department
+            if (current_branch_login.branch_id != branch_login.branch_id or 
+                current_branch_login.department != branch_login.department):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only Managers from the same branch and department can reject User registrations"
+                )
+        elif branch_login.role.lower() == 'manager':
+            # Manager registration - only Admin (ARC Admin) can reject
+            if current_branch_login.role.lower() != 'admin':
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only ARC Admin can reject Manager registrations"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid role for rejection"
+            )
+        
+        # Reject the registration
+        branch_login.approved_status = 'rejected'
+        branch_login.is_active = False
+        branch_login.updated_by = str(current_branch_login.login_id)
+        branch_login.updated_at = datetime.now(timezone.utc)
+        
+        db.commit()
+        
+        return {
+            "detail": f"User registration rejected: {branch_login.email}",
+            "rejected_by": current_branch_login.login_id,
+            "rejected_on": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting IVF user: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during rejection"
         )
 

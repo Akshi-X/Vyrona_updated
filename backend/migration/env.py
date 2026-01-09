@@ -33,6 +33,7 @@ from app.config.config import settings
 from app.models import (
     user_model,
     otp_model,
+    ivf_otp_model,
     patient_model,
     patient_stage_model,
     feedback_model,
@@ -52,6 +53,7 @@ from app.models import (
 # This helps Alembic detect all models even if they're not directly used
 from app.models.user_model import User
 from app.models.otp_model import OTP
+from app.models.ivf_otp_model import IVFOTP
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
 from app.models.feedback_model import Feedback
