@@ -13,15 +13,20 @@ const ControlTower = () => {
   const navigate = useNavigate();
 
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
-  const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [selectedStatusInbound, setSelectedStatusInbound] = useState<string>('All');
+  const [selectedStatusOutbound, setSelectedStatusOutbound] = useState<string>('All');
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
+  const [selectedBranch, setSelectedBranch] = useState<string>('All');
+  const [direction, setDirection] = useState<'inbound' | 'outbound'>('inbound');
   const [userInitials, setUserInitials] = useState<string>('');
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const regionDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const carrierDropdownRef = useRef<HTMLDivElement>(null);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
@@ -32,6 +37,30 @@ const ControlTower = () => {
   const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [routesError, setRoutesError] = useState<string | null>(null);
+
+  // Active canisters via API
+  const [canisters, setCanisters] = useState<Array<{
+    id: string;
+    canisterId: string;
+    branchName: string;
+    status: string;
+    date: string;
+  }>>([]);
+  const [loadingCanisters, setLoadingCanisters] = useState(false);
+  const [canistersError, setCanistersError] = useState<string | null>(null);
+  const [zoomToLocation, setZoomToLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapRoutes, setMapRoutes] = useState<Array<{
+    patient_id: string;
+    source_latitude: number;
+    source_longitude: number;
+    destination_latitude: number;
+    destination_longitude: number;
+  }>>([]);
+  const [mapIvfBranches, setMapIvfBranches] = useState<Array<{
+    branch_name: string;
+    latitude: number;
+    longitude: number;
+  }>>([]);
 
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -50,6 +79,152 @@ const ControlTower = () => {
     if (isAuthenticated) fetchRoutes();
   }, [isAuthenticated]);
 
+  // Fetch map routes data for coordinates (outbound)
+  useEffect(() => {
+    const fetchMapRoutes = async () => {
+      if (direction === 'outbound') {
+        try {
+          const data = await shipmentService.getControlTowerMapRoutes({
+            region: selectedRegion !== 'All' ? selectedRegion : undefined,
+            routeStatus: selectedStatusOutbound !== 'All' ? selectedStatusOutbound.toLowerCase() : undefined,
+            carrier: selectedCarrier !== 'All' ? selectedCarrier : undefined,
+          });
+          setMapRoutes(data.map(r => ({
+            patient_id: String(r.patient_id),
+            source_latitude: r.source_latitude,
+            source_longitude: r.source_longitude,
+            destination_latitude: r.destination_latitude,
+            destination_longitude: r.destination_longitude,
+          })));
+        } catch (e: any) {
+          console.warn('Failed to load map routes:', e?.message);
+          setMapRoutes([]);
+        }
+      }
+    };
+    if (isAuthenticated && direction === 'outbound') {
+      fetchMapRoutes();
+    }
+  }, [isAuthenticated, direction, selectedRegion, selectedStatusOutbound, selectedCarrier]);
+
+  // Fetch IVF branches data for coordinates (inbound)
+  useEffect(() => {
+    const fetchIvfBranches = async () => {
+      if (direction === 'inbound') {
+        try {
+          const data = await shipmentService.getIVFControlTower();
+          if (data.states) {
+            const branches: Array<{ branch_name: string; latitude: number; longitude: number }> = [];
+            Object.entries(data.states).forEach(([, stateBranches]) => {
+              stateBranches.forEach((branch: any) => {
+                branches.push({
+                  branch_name: branch.branch_name,
+                  latitude: branch.geoLocation.latitude,
+                  longitude: branch.geoLocation.longitude,
+                });
+              });
+            });
+            setMapIvfBranches(branches);
+          }
+        } catch (e: any) {
+          console.warn('Failed to load IVF branches:', e?.message);
+          setMapIvfBranches([]);
+        }
+      }
+    };
+    if (isAuthenticated && direction === 'inbound') {
+      fetchIvfBranches();
+    }
+  }, [isAuthenticated, direction]);
+
+  useEffect(() => {
+    const fetchCanisters = async () => {
+      setLoadingCanisters(true);
+      setCanistersError(null);
+      try {
+        const data = await shipmentService.getActiveCanisters();
+        let flattenedCanisters: Array<{
+          id: string;
+          canisterId: string;
+          branchName: string;
+          status: string;
+          date: string;
+        }> = [];
+
+        // Handle flat format (canisters array)
+        if (data.canisters && Array.isArray(data.canisters)) {
+          flattenedCanisters = data.canisters.map(canister => {
+            // Normalize status
+            let statusText = 'Safe';
+            const status = canister.canister_status?.toLowerCase() || '';
+            if (status === 'risk' || status === 'critical') {
+              statusText = status === 'critical' ? 'Critical' : 'Risk';
+            } else if (status === 'safe') {
+              statusText = 'Safe';
+            }
+
+            // Format date - handle null updated_at
+            let date = '-';
+            if (canister.updated_at) {
+              const d = new Date(canister.updated_at);
+              if (!isNaN(d.getTime())) {
+                date = d.toLocaleDateString('en-GB');
+              }
+            }
+
+            return {
+              id: `canister-${canister.canister_id}`,
+              canisterId: String(canister.canister_id),
+              branchName: 'N/A', // Flat format doesn't have branch info
+              status: statusText,
+              date: date,
+            };
+          });
+        }
+        // Handle nested format (branches with canisters)
+        else if ((data as any).branches && Array.isArray((data as any).branches)) {
+          flattenedCanisters = (data as any).branches.flatMap((branch: any) => 
+            branch.canisters.map((canister: any) => {
+              // Normalize status
+              let statusText = 'Safe';
+              const status = canister.canister_status?.toLowerCase() || '';
+              if (status === 'risk' || status === 'critical') {
+                statusText = status === 'critical' ? 'Critical' : 'Risk';
+              } else if (status === 'safe') {
+                statusText = 'Safe';
+              }
+
+              // Format date
+              let date = '-';
+              if (canister.updated_at) {
+                const d = new Date(canister.updated_at);
+                if (!isNaN(d.getTime())) {
+                  date = d.toLocaleDateString('en-GB');
+                }
+              }
+
+              return {
+                id: `canister-${canister.canister_id}`,
+                canisterId: String(canister.canister_id),
+                branchName: branch.branch_name || 'N/A',
+                status: statusText,
+                date: date,
+              };
+            })
+          );
+        }
+
+        setCanisters(flattenedCanisters);
+      } catch (e: any) {
+        setCanistersError(e?.message || 'Failed to load active canisters');
+        setCanisters([]);
+      } finally {
+        setLoadingCanisters(false);
+      }
+    };
+    if (isAuthenticated) fetchCanisters();
+  }, [isAuthenticated]);
+
   // Fetch user profile to compute initials
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -85,19 +260,6 @@ const ControlTower = () => {
       fetchUserProfile();
     }
   }, [isAuthenticated]);
-  // Add 5 more rows based on present values (for demo/population)
-  const augmentedRoutes = useMemo(() => {
-    if (!routes || routes.length === 0) return [] as ActiveRouteItem[];
-    const result: ActiveRouteItem[] = [...routes];
-    for (let i = 0; i < 5; i++) {
-      const base = routes[i % routes.length];
-      result.push({
-        ...base,
-        id: `${base.id}-x${i + 1}`,
-      });
-    }
-    return result;
-  }, [routes]);
 
   // Build filter option lists from routes data
   const regionOptions = useMemo(() => {
@@ -109,11 +271,24 @@ const ControlTower = () => {
     return ['All', ...Array.from(set).sort()];
   }, [routes]);
 
-  const statusOptions = useMemo(() => {
+  // Status options for inbound (from canisters)
+  const statusOptionsInbound = useMemo(() => {
+    const set = new Set<string>();
+    canisters.forEach(c => { if (c?.status && String(c.status).trim()) set.add(String(c.status)); });
+    return ['All', ...Array.from(set).sort()];
+  }, [canisters]);
+
+  // Status options for outbound (from routes)
+  const statusOptionsOutbound = useMemo(() => {
     const set = new Set<string>();
     routes.forEach(r => { if (r?.status && String(r.status).trim()) set.add(String(r.status)); });
     return ['All', ...Array.from(set).sort()];
   }, [routes]);
+
+  // Current status options based on direction
+  const statusOptions = useMemo(() => {
+    return direction === 'inbound' ? statusOptionsInbound : statusOptionsOutbound;
+  }, [direction, statusOptionsInbound, statusOptionsOutbound]);
 
   const carrierOptions = useMemo(() => {
     const set = new Set<string>();
@@ -121,17 +296,47 @@ const ControlTower = () => {
     return ['All', ...Array.from(set).sort()];
   }, [routes]);
 
-  // Apply filters to routes
+  // Build branch options from canisters data (for inbound)
+  const branchOptions = useMemo(() => {
+    const set = new Set<string>();
+    canisters.forEach(c => {
+      if (c?.branchName && c.branchName.trim() && c.branchName !== 'N/A') {
+        set.add(c.branchName.trim());
+      }
+    });
+    return ['All', ...Array.from(set).sort()];
+  }, [canisters]);
+
+  // Apply filters to routes (outbound only)
   const filteredRoutes = useMemo(() => {
     return (routes || []).filter(r => {
       const matchRegion = selectedRegion === 'All' || 
         r.sourceRegion === selectedRegion || 
         r.destinationRegion === selectedRegion;
-      const matchStatus = selectedStatus === 'All' || r.status === selectedStatus;
+      const matchStatus = selectedStatusOutbound === 'All' || r.status === selectedStatusOutbound;
       const matchCarrier = selectedCarrier === 'All' || r.supplyChain === selectedCarrier;
       return matchRegion && matchStatus && matchCarrier;
     });
-  }, [routes, selectedRegion, selectedStatus, selectedCarrier]);
+  }, [routes, selectedRegion, selectedStatusOutbound, selectedCarrier]);
+
+  // Apply filters to canisters (inbound only)
+  const filteredCanisters = useMemo(() => {
+    return (canisters || []).filter(c => {
+      const matchBranch = selectedBranch === 'All' || c.branchName === selectedBranch;
+      const matchStatus = selectedStatusInbound === 'All' || c.status === selectedStatusInbound;
+      return matchBranch && matchStatus;
+    });
+  }, [canisters, selectedBranch, selectedStatusInbound]);
+
+  // Reset zoomToLocation after it's been used
+  useEffect(() => {
+    if (zoomToLocation) {
+      const timer = setTimeout(() => {
+        setZoomToLocation(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [zoomToLocation]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -144,6 +349,9 @@ const ControlTower = () => {
       }
       if (carrierDropdownRef.current && !carrierDropdownRef.current.contains(event.target as Node)) {
         setIsCarrierDropdownOpen(false);
+      }
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setIsBranchDropdownOpen(false);
       }
     };
 
@@ -192,18 +400,101 @@ const ControlTower = () => {
           </h1>
 
           {/* Main Content Grid */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[280px_544px] gap-6 min-h-0 items-start">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_544px] gap-6 min-h-0 items-start">
             {/* Left Panel - Filters and Routes */}
             <div className="flex flex-col gap-6 min-w-0">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] h-[280px] flex-shrink-0 flex flex-col justify-center">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
-                  {/* Region Filter */}
+                  {/* Direction Toggle */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Region
+                      Direction
                     </label>
-                    <div className="relative" ref={regionDropdownRef}>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDirection('inbound')}
+                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
+                          direction === 'inbound'
+                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
+                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
+                        }`}
+                      >
+                        Inbound
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDirection('outbound')}
+                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
+                          direction === 'outbound'
+                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
+                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
+                        }`}
+                      >
+                        Outbound
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Branch Filter (Inbound only) */}
+                  {direction === 'inbound' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Branch
+                      </label>
+                      <div className="relative" ref={branchDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsBranchDropdownOpen(!isBranchDropdownOpen);
+                          }}
+                          className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                        >
+                          <span className={selectedBranch !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                            {selectedBranch === 'All' ? 'All Branches' : selectedBranch}
+                          </span>
+                          <svg
+                            className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isBranchDropdownOpen && (
+                          <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                            {branchOptions.map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedBranch(option);
+                                  setIsBranchDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                  selectedBranch === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                }`}
+                              >
+                                {option === 'All' ? 'All Branches' : option}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Region Filter (Outbound only) */}
+                  {direction === 'outbound' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Region
+                      </label>
+                      <div className="relative" ref={regionDropdownRef}>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -246,6 +537,7 @@ const ControlTower = () => {
                       )}
                     </div>
                   </div>
+                  )}
 
                   {/* Status Filter */}
                   <div>
@@ -261,8 +553,8 @@ const ControlTower = () => {
                         }}
                         className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
                       >
-                        <span className={selectedStatus !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                          {selectedStatus === 'All' ? 'All Status' : selectedStatus}
+                        <span className={(direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound) !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
+                          {(direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound) === 'All' ? 'All Status' : (direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound)}
                         </span>
                         <svg
                           className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
@@ -275,28 +567,36 @@ const ControlTower = () => {
                       </button>
                       {isStatusDropdownOpen && (
                         <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                          {statusOptions.map((option) => (
+                          {statusOptions.map((option) => {
+                            const currentStatus = direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound;
+                            return (
                             <button
                               key={option}
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedStatus(option);
+                                  if (direction === 'inbound') {
+                                    setSelectedStatusInbound(option);
+                                  } else {
+                                    setSelectedStatusOutbound(option);
+                                  }
                                 setIsStatusDropdownOpen(false);
                               }}
                               className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                selectedStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
+                                  currentStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
                               }`}
                             >
                               {option === 'All' ? 'All Status' : option}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Carrier Filter */}
+                  {/* Carrier Filter (Outbound only) */}
+                  {direction === 'outbound' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Carrier
@@ -344,16 +644,15 @@ const ControlTower = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* Network Hubs removed per request */}
+                  )}
                 </div>
               </div>
 
               {/* Active Routes List */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] h-[544px] flex-shrink-0 flex flex-col overflow-hidden">
+              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${direction === 'inbound' ? 'h-[544px]' : 'h-[460px]'}`}>
                 <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">Route</div>
+                  <div className="text-left">Route/Canisters ID</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
@@ -363,14 +662,17 @@ const ControlTower = () => {
                     scrollbarWidth: 'thin'
                   }}
                 >
-                  {loadingRoutes && (
-                    <div className="p-4 text-xs text-gray-500">Loading routes...</div>
+                  {(loadingRoutes || loadingCanisters) && (
+                    <div className="p-4 text-xs text-gray-500">Loading...</div>
                   )}
-                  {!loadingRoutes && routesError && (
+                  {!loadingRoutes && !loadingCanisters && routesError && canistersError && (
                     <div className="p-4 text-xs text-red-600">{routesError}</div>
                   )}
-                  {!loadingRoutes && !routesError && (filteredRoutes && filteredRoutes.length > 0 ? (
-                    (filteredRoutes || []).map((route) => {
+                  {!loadingRoutes && !loadingCanisters && (!routesError || !canistersError) && (
+                    <>
+                      {/* Display Routes (Outbound only) */}
+                      {direction === 'outbound' && filteredRoutes && filteredRoutes.length > 0 && (
+                        filteredRoutes.map((route) => {
                       const statusText = route?.status || 'N/A';
                       const statusColor = statusText === 'Safe'
                         ? 'text-[#00B050]'
@@ -378,14 +680,35 @@ const ControlTower = () => {
                           ? 'text-[#FF0000]'
                           : statusText === 'Delayed'
                             ? 'text-[#FFA500]'
+                                : statusText === 'Critical'
+                                  ? 'text-[#FF0000]'
                             : 'text-gray-500';
+                      const handleRouteClick = (e: React.MouseEvent) => {
+                        // Don't zoom if clicking on the link
+                        if ((e.target as HTMLElement).tagName === 'A') {
+                          return;
+                        }
+                        const mapRoute = mapRoutes.find(r => r.patient_id === route.patientId);
+                        if (mapRoute) {
+                          setZoomToLocation({
+                            lat: mapRoute.source_latitude,
+                            lng: mapRoute.source_longitude,
+                          });
+                        }
+                      };
+
                       return (
-                        <div key={route?.id ?? Math.random()} className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3">
+                        <div 
+                          key={route?.id ?? Math.random()} 
+                          className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                          onClick={handleRouteClick}
+                        >
                           <div className="min-w-0 text-left overflow-hidden">
                             {route?.patientId ? (
                               <Link 
                                 to={`/track/${route.patientId}`}
                                 className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {route.patientId}
                               </Link>
@@ -416,9 +739,57 @@ const ControlTower = () => {
                         </div>
                       );
                     })
-                  ) : (
+                      )}
+                      {/* Display Canisters (Inbound only) */}
+                      {direction === 'inbound' && filteredCanisters && filteredCanisters.length > 0 && (
+                        filteredCanisters.map((canister) => {
+                          const statusColor = canister.status === 'Safe'
+                            ? 'text-[#00B050]'
+                            : canister.status === 'Risk'
+                              ? 'text-[#FF0000]'
+                              : canister.status === 'Critical'
+                                ? 'text-[#FF0000]'
+                                : 'text-gray-500';
+                          const handleCanisterClick = () => {
+                            const branch = mapIvfBranches.find(b => b.branch_name === canister.branchName);
+                            if (branch) {
+                              setZoomToLocation({
+                                lat: branch.latitude,
+                                lng: branch.longitude,
+                              });
+                            }
+                          };
+
+                          return (
+                            <div 
+                              key={canister.id} 
+                              className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                              onClick={handleCanisterClick}
+                            >
+                              <div className="min-w-0 text-left overflow-hidden">
+                                <span className="text-[#6b1176] text-xs font-bold">
+                                  Canister {canister.canisterId}
+                                </span>
+                                {canister.branchName && canister.branchName !== 'N/A' && (
+                                  <div className="text-xs text-gray-900 leading-snug">
+                                    <div className="truncate">{canister.branchName}</div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className={`text-left text-xs font-medium ${statusColor}`}>{canister.status}</div>
+                              <div className="text-left text-xs font-bold text-gray-600 truncate">{canister.date || '-'}</div>
+                            </div>
+                          );
+                        })
+                      )}
+                      {direction === 'inbound' && (!filteredCanisters || filteredCanisters.length === 0) && (
+                        <div className="p-4 text-xs text-gray-500">No active canisters found.</div>
+                      )}
+                      {direction === 'outbound' && (!filteredRoutes || filteredRoutes.length === 0) && (
                     <div className="p-4 text-xs text-gray-500">No active routes found.</div>
-                  ))}
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -428,9 +799,12 @@ const ControlTower = () => {
               <ControlTowerMap 
                 filters={{
                   selectedRegion,
-                  selectedStatus,
+                  selectedStatus: direction === 'inbound' ? selectedStatusInbound : selectedStatusOutbound,
                   selectedCarrier,
+                  selectedBranch,
                 }}
+                direction={direction}
+                zoomToLocation={zoomToLocation}
               />
             </div>
           </div>

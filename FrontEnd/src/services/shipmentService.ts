@@ -284,10 +284,12 @@ class ShipmentService extends BaseApiService {
   async getIVFControlTower(): Promise<{
     hospitalName: string;
     hospital_type: string;
+    highest_branch_count_country?: string;
     states: {
       [stateName: string]: Array<{
         branch_name: string;
         branch_status: string;
+        country_name?: string;
         address: {
           area: string;
           district: string;
@@ -301,6 +303,40 @@ class ShipmentService extends BaseApiService {
     };
   }> {
     return this.get('/api/ivf/control_tower');
+  }
+
+  /**
+   * Get Active Canisters (flat format)
+   * GET /api/ivf/control_tower/active_canisters
+   */
+  async getActiveCanisters(): Promise<{
+    canisters: Array<{
+      canister_id: number;
+      canister_status: string;
+      updated_at: string | null;
+    }>;
+    total: number;
+  }> {
+    return this.get('/api/ivf/control_tower/active_canisters');
+  }
+
+  /**
+   * Get Active Canisters by Branch (nested format)
+   * GET /api/ivf/control_tower/active_canisters (alternative format)
+   */
+  async getActiveCanistersByBranch(): Promise<{
+    branches: Array<{
+      branch_id: number;
+      branch_name: string;
+      canisters: Array<{
+        canister_id: number;
+        canister_status: string;
+        updated_at: string;
+      }>;
+    }>;
+    total: number;
+  }> {
+    return this.get('/api/ivf/control_tower/active_canisters');
   }
 }
 
