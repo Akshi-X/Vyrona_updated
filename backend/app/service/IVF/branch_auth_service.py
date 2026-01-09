@@ -9,6 +9,7 @@ import secrets
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
@@ -133,9 +134,58 @@ class BranchAuthService:
         return branch
     
     @staticmethod
+    def get_branch_manager_email(branch_id: int, department: str, db: Session) -> Optional[str]:
+        """
+        Get the email of an approved manager from the specified branch and department.
+        
+        Used for approval: Users need approval from their branch manager.
+        
+        Args:
+            branch_id: Branch ID to search for
+            department: Department to search for
+            db: Database session
+            
+        Returns:
+            Manager's email if found, None otherwise
+        """
+        manager = db.query(BranchLogin).filter(
+            BranchLogin.branch_id == branch_id,
+            BranchLogin.department == department,
+            BranchLogin.role == 'Manager',
+            BranchLogin.approved_status == 'approved',
+            BranchLogin.is_active == True
+        ).first()
+        
+        return manager.email if manager else None
+    
+    @staticmethod
+    def get_arc_admin_email(db: Session) -> Optional[str]:
+        """
+        Get the email of ARC admin (Admin role in branch_logins).
+        
+        Used for approval: Managers need approval from ARC admin.
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            ARC admin's email if found, None otherwise
+        """
+        arc_admin = db.query(BranchLogin).filter(
+            BranchLogin.role == 'Admin',
+            BranchLogin.approved_status == 'approved',
+            BranchLogin.is_active == True
+        ).first()
+        
+        return arc_admin.email if arc_admin else None
+    
+    @staticmethod
     def signup_branch(
         email: str,
         password: str,
+        first_name: str,
+        last_name: str,
+        role: str,
         hospital_name: str,
         department: str,
         branch_id: int,
@@ -168,23 +218,7 @@ class BranchAuthService:
             branch_id, hospital.hospital_id, db
         )
         
-        # Check if login already exists for this branch + department
-        existing_login = BranchAuthService.get_branch_login_by_branch_and_department(
-            branch_id, department, db
-        )
-        
-        if existing_login:
-            logger.error(
-                f"Login already exists for branch {branch_id} and department {department}"
-            )
-            raise DatabaseQueryException(
-                operation="branch signup",
-                reason="One login per branch + department already exists",
-                custom_message="A login already exists for this branch and department",
-                status_code=400
-            )
-        
-        # Check if email already exists
+        # Check if email already exists (only email needs to be unique)
         existing_email = BranchAuthService.get_branch_login_by_email(email, db)
         if existing_email:
             logger.error(f"Email already exists: {email}")
@@ -195,64 +229,137 @@ class BranchAuthService:
                 status_code=400
             )
         
-        # Generate secure verification token
-        verification_token = secrets.token_urlsafe(48)
-        verification_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+        # Validate role
+        role_lower = role.lower()
+        if role_lower not in ['user', 'manager']:
+            raise DatabaseQueryException(
+                operation="branch signup",
+                reason="Invalid role",
+                custom_message="Role must be either 'User' or 'Manager'",
+                status_code=400
+            )
         
         logger.info(
-            f"Creating branch login: email={email}, hospital={hospital_name}, "
+            f"Creating branch login: email={email}, role={role}, hospital={hospital_name}, "
             f"branch_id={branch_id}"
         )
 
-        # Create branch login (inactive until verified)
+        # Create branch login (inactive until approved)
         branch_login = BranchLogin(
             branch_id=branch_id,
             email=email,
             password_hash=get_password_hash(password),
+            first_name=first_name,
+            last_name=last_name,
+            role=role.capitalize(),  # Normalize to title case
             department=department,
-            is_active=False,  # Must remain False until email verification
-            is_verified=False,  # Must remain False until email verification
+            is_active=False,  # Must remain False until approved
             approved_status="pending",  # PENDING status
-            verification_token=verification_token,
-            verification_token_expiry=verification_expiry,
             created_by="system"
         )
         
-        db.add(branch_login)
-        db.commit()
-        db.refresh(branch_login)
-        
-        logger.info(
-            f"Branch login created: login_id={branch_login.login_id}, email={email}"
-        )
-
-        # Send verification email
         try:
-            from urllib.parse import quote
-            encoded_token = quote(verification_token, safe='-_')
-            verify_url = f"{settings.FRONTEND_URL}/branch/verify?token={encoded_token}"
+            db.add(branch_login)
+            db.flush()  # Flush but don't commit yet - validate first
+            logger.debug(f"Branch login flushed to DB (not committed): login_id={branch_login.login_id}")
             
-            subject = "Verify your branch login"
-            html_body = f"""
-                <p>Hello,</p>
-                <p>Please verify your branch login for <b>{hospital.hospital_name}</b>, branch <b>{branch.branch_name}</b>.</p>
-                <p><a href="{verify_url}">Click here to verify</a></p>
-                <p>This link expires in 24 hours.</p>
-                <p>If you did not request this, please ignore this email.</p>
-            """
-            send_email(branch_login.email, subject, html_body)
-            logger.info(f"Verification email sent: email={email}, login_id={branch_login.login_id}")
-        except Exception as e:
-            # If email fails, rollback the creation to avoid unusable accounts
-            logger.error(f"Failed to send verification email: {str(e)}")
-            db.delete(branch_login)
-            db.commit()
-            raise DatabaseQueryException(
-                operation="branch signup",
-                reason="Email sending failed",
-                custom_message="Failed to send verification email",
-                status_code=500
+            # Determine recipient for approval email based on role
+            recipient_email = None
+            
+            if role_lower == 'user':
+                # User registration → send to Manager
+                manager_email = BranchAuthService.get_branch_manager_email(branch_id, department, db)
+                if not manager_email:
+                    db.rollback()
+                    logger.error(f"No approved manager found for branch_id: {branch_id}, department: {department}")
+                    raise DatabaseQueryException(
+                        operation="branch signup",
+                        reason="No manager found",
+                        custom_message="No approved manager found for this branch and department. Please contact administrator.",
+                        status_code=400
+                    )
+                recipient_email = manager_email
+                logger.info(f"User registration: Sending approval email to Manager ({recipient_email})")
+            elif role_lower == 'manager':
+                # Manager registration → send to ARC admin
+                arc_admin_email = BranchAuthService.get_arc_admin_email(db)
+                if not arc_admin_email:
+                    db.rollback()
+                    logger.error(f"No ARC admin found")
+                    raise DatabaseQueryException(
+                        operation="branch signup",
+                        reason="No ARC admin found",
+                        custom_message="No ARC admin found. Please contact administrator.",
+                        status_code=400
+                    )
+                recipient_email = arc_admin_email
+                logger.info(f"Manager registration: Sending approval email to ARC Admin ({recipient_email})")
+            
+            # Send approval email BEFORE committing
+            # If email fails, transaction will rollback
+            from ...service.email_service import send_approval_email
+            send_approval_email(
+                registration_id=str(branch_login.login_id),
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                role=role.capitalize(),
+                company=f"{hospital.hospital_name} - {branch.branch_name}",
+                recipient_email=recipient_email
             )
+            logger.info("Approval email sent successfully")
+            
+            # Email sent successfully, NOW commit the transaction
+            db.commit()
+            db.refresh(branch_login)
+            logger.info(f"Branch login created successfully: login_id={branch_login.login_id}")
+            
+        except IntegrityError as e:
+            db.rollback()
+            logger.error(f"IntegrityError during branch signup: {str(e)}")
+            if 'email' in str(e).lower() or 'unique' in str(e).lower():
+                raise DatabaseQueryException(
+                    operation="branch signup",
+                    reason="Email already exists",
+                    custom_message="This email is already registered",
+                    status_code=400
+                )
+            else:
+                raise DatabaseQueryException(
+                    operation="branch signup",
+                    reason=str(e),
+                    custom_message="Registration failed",
+                    status_code=400
+                )
+        except Exception as e:
+            # Rollback on ANY error (including email failure)
+            db.rollback()
+            logger.error(f"Branch signup failed, rolling back: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            # If it's already a custom exception, re-raise it
+            if hasattr(e, 'status_code'):
+                raise e
+            
+            # If it's an email error, raise a more specific exception
+            if 'email' in str(e).lower() or 'smtp' in str(e).lower():
+                raise DatabaseQueryException(
+                    operation="branch signup",
+                    reason="Email sending failed",
+                    custom_message="Failed to send approval email",
+                    status_code=500
+                )
+            else:
+                raise DatabaseQueryException(
+                    operation="branch signup",
+                    reason=str(e),
+                    custom_message="Registration failed",
+                    status_code=500
+                )
+        
+        # Build response message
+        approval_message = f"Registration request sent to {recipient_email} for approval."
         
         return {
             "login_id": branch_login.login_id,
@@ -262,7 +369,9 @@ class BranchAuthService:
             "branch_id": branch.branch_id,
             "branch_name": branch.branch_name,
             "department": branch_login.department,
-            "message": "Branch login created. Please verify your email to activate the account."
+            "role": branch_login.role,
+            "message": approval_message,
+            "approval_sent_to": recipient_email
         }
     
     @staticmethod
@@ -321,13 +430,13 @@ class BranchAuthService:
         
         hospital = db.query(Hospital).filter(Hospital.hospital_id == branch.hospital_id).first()
         
-        # Check if account is active
-        if not branch_login.is_verified or not branch_login.is_active:
-            logger.error(f"Account not verified/active: {email}")
+        # Check if account is approved and active
+        if branch_login.approved_status != 'approved' or not branch_login.is_active:
+            logger.error(f"Account not approved/active: {email}, status: {branch_login.approved_status}")
             raise DatabaseQueryException(
                 operation="branch login",
-                reason="Account not verified",
-                custom_message="Please verify your email to activate the account",
+                reason="Account not approved",
+                custom_message="Your account is pending approval. Please wait for approval to login.",
                 status_code=403
             )
         
@@ -336,23 +445,24 @@ class BranchAuthService:
         branch_login.last_login = datetime.now(timezone.utc)
         db.commit()
         
-        # Create JWT token with hospital_id, branch_id, hospital_type
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={
-                "sub": str(branch_login.login_id),
-                "type": "branch_login",
-                "hospital_id": hospital.hospital_id,
-                "branch_id": branch.branch_id,
-                "hospital_type": branch_login.department,
-                "email": branch_login.email
-            },
-            expires_delta=access_token_expires
-        )
+        # Send OTP to user email after successful login
+        from ...service.ivf_otp_service import send_ivf_otp_to_user
         
-        expires_at = datetime.now(timezone.utc) + access_token_expires
+        try:
+            otp = send_ivf_otp_to_user(db, branch_login.login_id, branch_login.email, remember_me=False)
+            logger.info(f"OTP sent to {branch_login.email} for login_id: {branch_login.login_id}")
+        except Exception as e:
+            logger.error(f"Failed to send OTP: {str(e)}")
+            import traceback
+            logger.error(f"OTP sending error traceback: {traceback.format_exc()}")
+            raise DatabaseQueryException(
+                operation="branch login",
+                reason=f"OTP sending failed: {str(e)}",
+                custom_message=f"Failed to send OTP: {str(e)}",
+                status_code=500
+            )
         
-        logger.info(f"Branch login successful: login_id={branch_login.login_id}")
+        logger.info(f"Branch login successful: login_id={branch_login.login_id}, OTP sent")
         
         return {
             "login_id": branch_login.login_id,
@@ -362,8 +472,8 @@ class BranchAuthService:
             "branch_id": branch.branch_id,
             "branch_name": branch.branch_name,
             "department": branch_login.department,
-            "auth_token": access_token,
-            "expires_at": expires_at
+            "otp_expiry": otp.expires_at,
+            "message": "Login successful. Please check your email for OTP."
         }
 
     @staticmethod

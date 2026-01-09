@@ -52,6 +52,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     # Branch authentication endpoints - public
     ("POST", "/api/ivf/branch/signup"),
     ("POST", "/api/ivf/branch/login"),
+    ("POST", "/api/ivf/branch/verify-otp"),  # OTP verification for IVF login
+    ("POST", "/api/ivf/branch/resend-otp"),  # Resend OTP for IVF login
     ("GET", "/api/ivf/branch/verify-email"),  # Email verification link (GET only)
     # Hospital search and branches endpoints - public (used during signup)
     ("GET", "/api/ivf/branch/hospitals/search"),

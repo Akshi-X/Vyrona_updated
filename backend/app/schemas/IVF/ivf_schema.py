@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
 from datetime import datetime, date
 
@@ -462,9 +462,12 @@ class EmbryoTrackingResponse(BaseModel):
 
 class BranchSignupRequest(BaseModel):
     """Schema for branch signup request"""
+    first_name: str = Field(..., description="First name")
+    last_name: str = Field(..., description="Last name")
     email: str = Field(..., description="Official branch email")
     password: str = Field(..., description="Password")
     confirm_password: str = Field(..., description="Confirm password")
+    role: str = Field(..., description="User role (User or Manager)")
     hospital_name: str = Field(..., description="Hospital name")
     department: str = Field(..., description="Department/Hospital type (IVF, CGT, Oncology, etc.)")
     branch_id: int = Field(..., description="Selected branch ID")
@@ -491,8 +494,8 @@ class BranchLoginResponse(BaseModel):
     branch_id: int
     branch_name: Optional[str]
     department: str
-    auth_token: str
-    expires_at: datetime
+    otp_expiry: datetime
+    message: str
     
     class Config:
         from_attributes = True
@@ -502,12 +505,14 @@ class BranchSignupResponse(BaseModel):
     """Schema for branch signup response"""
     login_id: int
     email: str
+    role: str
     hospital_id: int
     hospital_name: str
     branch_id: int
     branch_name: Optional[str]
     department: str
     message: str
+    approval_sent_to: str
     
     class Config:
         from_attributes = True
@@ -543,6 +548,116 @@ class HospitalBranchesResponse(BaseModel):
     hospital_name: str
     hospital_type: Optional[str]
     branches: List[BranchListItem]
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# IVF USER AUTHENTICATION SCHEMAS
+# ============================================
+
+class IVFUserSignupRequest(BaseModel):
+    """Schema for IVF user signup request"""
+    first_name: str = Field(..., description="First name")
+    last_name: str = Field(..., description="Last name")
+    email: EmailStr = Field(..., description="User email")
+    password: str = Field(..., description="Password")
+    confirm_password: str = Field(..., description="Confirm password")
+    role: str = Field(..., description="User role (User or Manager)")
+    branch_id: int = Field(..., description="Branch ID")
+    department: str = Field(..., description="Department")
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFUserSignupResponse(BaseModel):
+    """Schema for IVF user signup response"""
+    message: str
+    login_id: int
+    email: str
+    role: str
+    branch_id: int
+    department: str
+    hospital_id: int
+    hospital_name: str
+    branch_name: Optional[str]
+    approval_sent_to: str  # Who the approval email was sent to
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFUserLoginRequest(BaseModel):
+    """Schema for IVF user login request"""
+    email: EmailStr = Field(..., description="User email")
+    password: str = Field(..., description="Password")
+    remember_me: bool = Field(default=False, description="Remember Me preference")
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFUserLoginResponse(BaseModel):
+    """Schema for IVF user login response"""
+    login_id: int
+    email: str
+    hospital_id: int
+    hospital_name: str
+    branch_id: int
+    branch_name: Optional[str]
+    department: str
+    otp_expiry: datetime
+    message: str
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFVerifyOTPRequest(BaseModel):
+    """Schema for IVF OTP verification request"""
+    login_id: int = Field(..., description="Branch login ID")
+    otp: str = Field(..., description="OTP code")
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFVerifyOTPSuccessResponse(BaseModel):
+    """Schema for IVF OTP verification success response"""
+    login_id: int
+    email: str
+    status: str
+    auth_token: str
+    expires_at: datetime
+    message: str
+    role: str
+    branch_id: int
+    department: str
+    hospital_id: Optional[int]
+    hospital_name: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFResendOTPRequest(BaseModel):
+    """Schema for IVF resend OTP request"""
+    login_id: int = Field(..., description="Branch login ID")
+    email: EmailStr = Field(..., description="User email")
+    
+    class Config:
+        from_attributes = True
+
+
+class IVFResendOTPSuccessResponse(BaseModel):
+    """Schema for IVF resend OTP success response"""
+    login_id: int
+    email: str
+    status: str
+    otp_expiry: datetime
+    message: str
     
     class Config:
         from_attributes = True

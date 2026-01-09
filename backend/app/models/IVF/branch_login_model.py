@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -9,12 +9,11 @@ from ...constants.enums import ApprovalStatus
 class BranchLogin(Base):
     """
     Branch-level login accounts for hospital branches.
-    Enforces one login per branch + department combination.
+    Multiple users/managers can exist for the same branch and department.
     Each branch login is associated with a branch and department.
     """
     __tablename__ = "branch_logins"
     __table_args__ = (
-        UniqueConstraint('branch_id', 'department', name='uq_branch_login_branch_department'),
         {'schema': 'ivf'}
     )
 
@@ -28,16 +27,19 @@ class BranchLogin(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)  # Official branch email
     password_hash = Column(String(255), nullable=False)
     
+    # User Information
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    role = Column(String(50), nullable=False)  # User or Manager
+    
     # Department/Specialization
     department = Column(String(100), nullable=False)  # IVF, Oncology, CGT, etc.
     
-    # Account Status / Verification
-    is_active = Column(Boolean, default=False, nullable=False)  # Activated after email verification
-    is_verified = Column(Boolean, default=False, nullable=False)
+    # Account Status / Approval
+    is_active = Column(Boolean, default=False, nullable=False)  # Activated after approval
     approved_status = Column(String(20), default=ApprovalStatus.PENDING.value, nullable=False)
-    verification_token = Column(String(255), nullable=True, index=True)
-    verification_token_expiry = Column(DateTime(timezone=True), nullable=True)
-    verified_at = Column(DateTime(timezone=True), nullable=True)
+    approved_by = Column(String, nullable=True)  # User ID of approver
+    approved_on = Column(DateTime(timezone=True), nullable=True)  # When approved
     
     # Security - Account Locking
     is_locked = Column(Boolean, default=False)

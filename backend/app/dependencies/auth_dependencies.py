@@ -69,6 +69,27 @@ def get_current_user(request: Request) -> User:
     return request.state.current_user
 
 
+def get_current_branch_login(request: Request):
+    """
+    Get current authenticated BranchLogin user from request state.
+    
+    This is set by TokenValidationMiddleware when a BranchLogin token is used.
+    Use this in IVF endpoints that require BranchLogin authentication.
+    
+    Usage:
+        @router.post("/approve")
+        def approve_user(current_branch_login = Depends(get_current_branch_login)):
+            return {"message": "Approved"}
+    """
+    from ..models.IVF.branch_login_model import BranchLogin
+    from ..exceptions.custom_exceptions import InvalidCredentialsException
+    
+    if not hasattr(request.state, "branch_login") or request.state.branch_login is None:
+        raise InvalidCredentialsException(email="unknown")
+    
+    return request.state.branch_login
+
+
 def get_current_user_pharma_id(request: Request) -> int:
     """
     Get pharma_id for the current authenticated user from JWT token.

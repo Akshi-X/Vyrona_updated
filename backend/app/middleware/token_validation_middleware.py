@@ -97,7 +97,7 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             # Load from database based on token type
             db = SessionLocal()
             try:
-                if token_type == "branch_login":
+                if token_type == "ivf_branch_login" or token_type == "branch_login":
                     # Handle branch login token
                     login_id = int(subject_id) if subject_id.isdigit() else None
                     if not login_id:
@@ -110,8 +110,8 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                         db.close()
                         raise UserFromTokenNotFoundException(user_id=str(login_id))
                     
-                    # Check if branch login is active and verified
-                    if not branch_login.is_active or not branch_login.is_verified:
+                    # Check if branch login is active and approved
+                    if not branch_login.is_active or branch_login.approved_status != 'approved':
                         db.close()
                         raise AccountInactiveException(user_id=str(login_id))
                     
