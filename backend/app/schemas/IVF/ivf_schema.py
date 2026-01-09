@@ -489,11 +489,6 @@ class BranchLoginResponse(BaseModel):
     """Schema for branch login response"""
     login_id: int
     email: str
-    hospital_id: int
-    hospital_name: str
-    branch_id: int
-    branch_name: Optional[str]
-    department: str
     otp_expiry: datetime
     message: str
     

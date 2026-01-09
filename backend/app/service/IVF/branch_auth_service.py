@@ -467,13 +467,8 @@ class BranchAuthService:
         return {
             "login_id": branch_login.login_id,
             "email": branch_login.email,
-            "hospital_id": hospital.hospital_id,
-            "hospital_name": hospital.hospital_name,
-            "branch_id": branch.branch_id,
-            "branch_name": branch.branch_name,
-            "department": branch_login.department,
             "otp_expiry": otp.expires_at,
-            "message": "Login successful. Please check your email for OTP."
+            "message": "Please check your email for OTP"
         }
 
     @staticmethod
