@@ -13,7 +13,7 @@ class LoginResponse(BaseModel):
     user_id: str
     email: str
     status: str
-    otp_expiry: datetime
+    otp_expiry: Optional[datetime] = None  # Optional - frontend uses 10-minute countdown
     message: str
 
 
@@ -53,7 +53,7 @@ class ResendOTPSuccessResponse(BaseModel):
     user_id: str
     email: str
     status: str
-    otp_expiry: datetime
+    otp_expiry: Optional[datetime] = None  # Optional - frontend uses 10-minute countdown
     message: str
 
 
