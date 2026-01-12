@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, Literal, List
 from datetime import datetime
+from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
 
 class UserRegister(BaseModel):
     first_name: str
@@ -40,8 +41,6 @@ class UserRegister(BaseModel):
     @model_validator(mode='after')
     def validate_fields(self):
         """Validate required fields based on email domain and department."""
-        from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
-        
         email_lower = self.email.lower().strip()
         is_hospital = is_hospital_email(email_lower)
         
@@ -147,3 +146,13 @@ class UserUpdateResponse(BaseModel):
     first_name: str
     last_name: str
     updated_at: datetime
+
+
+class HospitalInfoByEmailResponse(BaseModel):
+    """Response for getting hospital info by email"""
+    is_hospital_email: bool
+    hospital_name: Optional[str] = None
+    hospital_id: Optional[int] = None
+    hospital_type: Optional[str] = None  # e.g., "IVF", "Oncology"
+    departments: List[str] = []  # Available departments based on hospital_type
+    branches: List[dict] = []  # List of branches with branch_id and branch_name
