@@ -19,7 +19,7 @@ class UserRegister(BaseModel):
     
     # Hospital fields (auto-detected from email domain, but can be provided)
     hospital_name: Optional[str] = None
-    branch_id: Optional[int] = None
+    branch_name: Optional[str] = None
     
     @field_validator('role')
     @classmethod
@@ -45,11 +45,11 @@ class UserRegister(BaseModel):
         is_hospital = is_hospital_email(email_lower)
         
         if is_hospital:
-            # Hospital user - department, branch_id required
+            # Hospital user - department, branch_name required
             if not self.department:
                 raise ValueError("department is required for hospital users")
-            if self.branch_id is None:
-                raise ValueError("branch_id is required for hospital users")
+            if not self.branch_name:
+                raise ValueError("branch_name is required for hospital users")
             # Auto-detect hospital name from email if not provided
             if not self.hospital_name:
                 self.hospital_name = get_hospital_name_from_email(email_lower)
