@@ -34,8 +34,16 @@ class VerifyOTPSuccessResponse(BaseModel):
     auth_token: str
     expires_at: datetime
     message: str
-    pharma_id: Optional[int] = None  # User's pharma ID (integer)
-    role: str  # User's role
+    role: str
+    
+    # Pharma fields (for CGT users)
+    pharma_id: Optional[int] = None
+    
+    # Hospital fields (for IVF, Oncology users)
+    branch_id: Optional[int] = None
+    department: Optional[str] = None
+    hospital_id: Optional[int] = None
+    hospital_name: Optional[str] = None
 
 
 class VerifyOTPFailureResponse(BaseModel):

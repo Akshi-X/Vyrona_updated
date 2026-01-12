@@ -180,21 +180,35 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             remember_me = False
             logger.info(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
 
-        # Get user's pharma_id directly from user.pharma_id field
-        pharma_id = user.pharma_id
-        logger.debug(f"User pharma_id: {pharma_id}")
+        # Determine if hospital user based on department
+        from ..utils.user_helpers import is_hospital_department
+        is_hospital_user = is_hospital_department(user.department) if user.department else False
 
-        # Business Logic: Create JWT token with remember_me flag and pharma_id in payload
+        # Build token payload
+        token_data = {
+            "sub": str(user.user_id),
+            "remember_me": remember_me,
+        }
+
+        # Add type-specific fields to token
+        if is_hospital_user:
+            # Hospital user (IVF, Oncology, etc.)
+            token_data["branch_id"] = user.branch_id
+            token_data["department"] = user.department
+            token_data["hospital_id"] = user.hospital_id
+            token_data["type"] = "hospital_user"
+        else:
+            # Pharma user (CGT, etc.)
+            token_data["pharma_id"] = user.pharma_id
+            token_data["type"] = "pharma_user"
+
+        # Business Logic: Create JWT token with remember_me flag and type-specific fields
         logger.debug(f"Creating JWT token with session duration: {session_duration} minutes")
         access_token_expires = timedelta(minutes=session_duration)
-        logger.debug(f"Token data: sub={user.user_id}, remember_me={remember_me}, pharma_id={pharma_id}")
+        logger.debug(f"Token data: {token_data}")
 
         access_token = create_access_token(
-            data={
-                "sub": str(user.user_id),
-                "remember_me": remember_me,
-                "pharma_id": pharma_id
-            },
+            data=token_data,
             expires_delta=access_token_expires
         )
         logger.debug(f"JWT token created successfully")
@@ -204,14 +218,35 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
 
         from ..utils.utils import normalize_role_to_title_case
         
+        # Build response based on department
         result = {
             "user_id": str(user.user_id),
             "email": user.email,
             "auth_token": access_token,
             "expires_at": expires_at,
-            "pharma_id": pharma_id,
-            "role": normalize_role_to_title_case(user.role)
+            "role": normalize_role_to_title_case(user.role),
         }
+
+        # Add type-specific fields to response
+        if is_hospital_user:
+            # Hospital response (IVF, Oncology, etc.)
+            result["branch_id"] = user.branch_id
+            result["department"] = user.department
+            result["hospital_id"] = user.hospital_id
+            # Get hospital name for response
+            from ..models.IVF.hospital_branch_model import HospitalBranch
+            from ..models.IVF.hospital_model import Hospital
+            branch = db.query(HospitalBranch).filter(
+                HospitalBranch.branch_id == user.branch_id
+            ).first()
+            hospital = db.query(Hospital).filter(
+                Hospital.hospital_id == branch.hospital_id
+            ).first() if branch else None
+            result["hospital_name"] = hospital.hospital_name if hospital else None
+        else:
+            # Pharma response (CGT, etc.) - existing response format
+            result["pharma_id"] = user.pharma_id
+        
         logger.debug(f"Returning result: {result}")
         return result
 

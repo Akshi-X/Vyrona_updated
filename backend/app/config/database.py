@@ -85,10 +85,10 @@ def init_db():
         embryo_model
     )
     
-    # Create IVF schema if it doesn't exist
-    with engine.connect() as conn:
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS ivf"))
-        conn.commit()
+    # Note: IVF schema separation has been removed
+    # All tables (including IVF tables) are now in public schema
+    # If you need to migrate existing tables from ivf schema to public schema,
+    # run the migration script: migrations/move_ivf_schema_to_public.sql
     
-    # Create all tables (main tables in public schema, IVF tables in ivf schema)
+    # Create all tables in public schema
     Base.metadata.create_all(bind=engine)
