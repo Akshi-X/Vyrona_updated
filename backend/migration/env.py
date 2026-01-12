@@ -33,6 +33,7 @@ from app.config.config import settings
 from app.models import (
     user_model,
     otp_model,
+    ivf_otp_model,
     patient_model,
     patient_stage_model,
     feedback_model,
@@ -52,6 +53,7 @@ from app.models import (
 # This helps Alembic detect all models even if they're not directly used
 from app.models.user_model import User
 from app.models.otp_model import OTP
+from app.models.ivf_otp_model import IVFOTP
 from app.models.patient_model import Patient
 from app.models.patient_stage_model import PatientStage
 from app.models.feedback_model import Feedback
@@ -70,6 +72,7 @@ from app.models.chat_read_status import ChatReadStatus
 from app.models.IVF import (
     hospital_model,
     hospital_branch_model,
+    branch_login_model,
     tank_model,
     canister_model,
     canister_ln2_log_model,
@@ -82,6 +85,7 @@ from app.models.IVF import (
 # Import IVF model classes explicitly
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.branch_login_model import BranchLogin
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.canister_model import Canister
 from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
