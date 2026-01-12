@@ -226,20 +226,22 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         hospital_id = hospital.hospital_id
         company_name = hospital.hospital_name
         
-        # Validate branch belongs to hospital
+        # Validate branch belongs to hospital (lookup by branch_name)
         branch = db.query(HospitalBranch).filter(
-            HospitalBranch.branch_id == request.branch_id,
+            HospitalBranch.branch_name == request.branch_name,
             HospitalBranch.hospital_id == hospital_id
         ).first()
         
         if not branch:
-            logger.error(f"Branch {request.branch_id} not found for hospital {hospital_name}")
+            logger.error(f"Branch '{request.branch_name}' not found for hospital {hospital_name}")
             raise DatabaseQueryException(
                 operation="user registration",
                 reason="Branch not found",
-                custom_message=f"Branch not found for hospital '{hospital_name}'",
+                custom_message=f"Branch '{request.branch_name}' not found for hospital '{hospital_name}'",
                 status_code=404
             )
+        
+        branch_id = branch.branch_id
         
         # Validate department matches hospital_type
         if hospital.hospital_type and hospital.hospital_type.upper() != department.upper():
@@ -250,7 +252,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             # Allow if hospital_type is None or if they match (case-insensitive)
             # This is a soft validation - you may want to make it stricter
         
-        branch_id = request.branch_id
+        # branch_id is already set from branch.branch_id above
         # Department is already set from request (validated in schema)
         
         # Determine email recipient based on role
