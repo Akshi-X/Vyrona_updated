@@ -1,6 +1,7 @@
 # IVF Models package
 from .hospital_model import Hospital
 from .hospital_branch_model import HospitalBranch
+from .branch_login_model import BranchLogin
 from .tank_model import Tank
 from .canister_model import Canister
 from .canister_ln2_log_model import CanisterLn2Log
