@@ -35,7 +35,17 @@ from app.constants.app_constants import (
     DEFAULT_SESSION_TIMEOUT_MINUTES
 )
 from app.constants.messages import SuccessMessages, ErrorMessages
-from app.config.config import settings
+from app.config.config import settings, get_settings
+from app.models.pharma_model import Pharma
+from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.utils.user_helpers import (
+    is_hospital_email,
+    get_hospital_name_from_email,
+    is_hospital_department
+)
+from app.utils.utils import normalize_role_to_title_case
+import traceback
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -86,9 +96,8 @@ def get_mygrape_admin_email() -> str:
     Returns:
         MyGrape admin email from configuration
     """
-    from ..config.config import get_settings
-    settings = get_settings()
-    return settings.MYGRAPE_ADMIN_EMAIL
+    settings_obj = get_settings()
+    return settings_obj.MYGRAPE_ADMIN_EMAIL
 
 
 def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
@@ -125,8 +134,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
     """
-    from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
-    
     # Role is already validated and in title case from schema
     role = request.role
     
@@ -150,8 +157,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # ============================================
     if not is_hospital:
         # Check if pharma exists
-        from app.models.pharma_model import Pharma
-        
         existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
         
         if existing_pharma:
@@ -193,9 +198,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # HOSPITAL REGISTRATION LOGIC (NEW)
     # ============================================
     else:  # is_hospital == True
-        from app.models.IVF.hospital_model import Hospital
-        from app.models.IVF.hospital_branch_model import HospitalBranch
-        
         # Auto-detect hospital name from email if not provided
         hospital_name = request.hospital_name or get_hospital_name_from_email(email_lower)
         
@@ -374,7 +376,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         # Rollback on ANY error (including email failure)
         db.rollback()
         logger.error(f"Registration failed, rolling back: {type(e).__name__}: {str(e)}")
-        import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         
         # If it's already a custom exception, re-raise it
@@ -390,8 +391,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Build response message using constants
     # If we reach here, email was sent successfully (otherwise exception would have been raised)
     message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
-    
-    from ..utils.utils import normalize_role_to_title_case
     
     # Build structured response
     response = UserRegistrationResponse(
@@ -430,8 +429,6 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         UserApproveNotFoundException: If user not found
         CompanyAccessForbiddenException: If approver cannot approve this user
     """
-    from ..utils.user_helpers import is_hospital_department
-    
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
@@ -509,18 +506,14 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     db.refresh(user)
     
     # Get company name for email
-    from ..utils.user_helpers import is_hospital_department
     is_hospital_user = is_hospital_department(user.department) if user.department else False
     
     if not is_hospital_user:
         # Get company name from pharma table
-        from app.models.pharma_model import Pharma
         pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
         company_name = pharma.pharma_name if pharma else "Unknown"
     else:
         # Get hospital name from branch
-        from app.models.IVF.hospital_branch_model import HospitalBranch
-        from app.models.IVF.hospital_model import Hospital
         branch = db.query(HospitalBranch).filter(
             HospitalBranch.branch_id == user.branch_id
         ).first()
@@ -558,8 +551,6 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     # Build response object
     # company_name already retrieved above for email
-    
-    from ..utils.utils import normalize_role_to_title_case
     
     response = UserApprovalResponse(
         detail=f"{SuccessMessages.USER_APPROVED}: {user.first_name}",
@@ -660,8 +651,6 @@ def get_user_details_by_id(user_id: str, current_user: User, db: Session) -> Use
             )
     
     # Get company name from pharma table
-    from app.models.pharma_model import Pharma
-    from ..utils.utils import normalize_role_to_title_case
     pharma = db.query(Pharma).filter(Pharma.id == target_user.pharma_id).first()
     company_name = pharma.pharma_name if pharma else None
     
@@ -696,11 +685,8 @@ def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
         UserProfileResponse DTO with all profile fields
     """
     # Get company name from pharma table
-    from app.models.pharma_model import Pharma
     pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
     company_name = pharma.pharma_name if pharma else None
-    
-    from ..utils.utils import normalize_role_to_title_case
     
     # Build response object
     response = UserProfileResponse(
@@ -743,11 +729,8 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         ).all()
         
         # Get company names from pharma table
-        from app.models.pharma_model import Pharma
         pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
         company_name = pharma.pharma_name if pharma else None
-        
-        from ..utils.utils import normalize_role_to_title_case
         
         # Convert to UserListItem
         user_items = [
