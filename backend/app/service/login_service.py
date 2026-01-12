@@ -45,7 +45,7 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
         return {
             "user_id": str(user.user_id),
             "email": user.email,
-            "otp_expiry": otp.expires_at
+            "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
         }
     except Exception as e:
         raise OTPSendFailedException(email=user.email, reason=str(e))
