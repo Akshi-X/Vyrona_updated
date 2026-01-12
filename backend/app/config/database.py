@@ -53,7 +53,6 @@ def init_db():
     from ..models import (
         user_model,
         otp_model,
-        ivf_otp_model,
         patient_model,
         patient_stage_model,
         feedback_model,
@@ -77,7 +76,6 @@ def init_db():
     from ..models.IVF import (
         hospital_model,
         hospital_branch_model,
-        branch_login_model,
         tank_model,
         canister_model,
         canister_ln2_log_model,
@@ -86,8 +84,6 @@ def init_db():
         patient_model as ivf_patient_model,
         embryo_model
     )
-    # Explicitly import IVFOTP to ensure it's registered
-    from ..models.ivf_otp_model import IVFOTP
     
     # Create IVF schema if it doesn't exist
     with engine.connect() as conn:
