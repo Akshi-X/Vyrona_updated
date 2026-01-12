@@ -7,13 +7,13 @@ from ...config.database import Base
 
 class Cryolock(Base):
     __tablename__ = "cryolocks"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     cryolock_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key
-    cane_id = Column(Integer, ForeignKey("ivf.canes.cane_id"), nullable=False)
+    # Foreign Key - reference to canes table (no schema prefix)
+    cane_id = Column(Integer, ForeignKey("canes.cane_id"), nullable=False)
     
     # Cryolock Information
     cryolock_number = Column(String(255), nullable=True)

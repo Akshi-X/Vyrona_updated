@@ -87,7 +87,7 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
         result = verify_otp_and_create_token(request.user_id, request.otp, db)
         logger.debug(f"Controller: Service returned result: {result}")
 
-        # Return DTO
+        # Return DTO - supports both pharma and hospital responses
         response = VerifyOTPSuccessResponse(
             user_id=result["user_id"],
             email=result["email"],
@@ -95,8 +95,14 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
             auth_token=result["auth_token"],
             expires_at=result["expires_at"],
             message=SuccessMessages.OTP_VERIFIED,
-            pharma_id=result.get("pharma_id"),  # Include pharma_id in response
-            role=result["role"]  # Include role in response
+            role=result["role"],
+            # Pharma fields (for CGT users)
+            pharma_id=result.get("pharma_id"),
+            # Hospital fields (for IVF, Oncology users)
+            branch_id=result.get("branch_id"),
+            department=result.get("department"),
+            hospital_id=result.get("hospital_id"),
+            hospital_name=result.get("hospital_name")
         )
         logger.debug(f"Controller: Returning response: {response}")
         return response

@@ -93,6 +93,9 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             # Load user from database
             db = SessionLocal()
             try:
+                # Get token type from payload
+                token_type = payload.get("type")
+                
                 user = db.query(User).filter(User.user_id == user_id).first()
                 
                 if not user:
@@ -108,14 +111,44 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                     db.close()
                     raise UserNotApprovedException(user_id=user.user_id)
                 
-                # Token valid - inject authenticated user and pharma_id into request
+                # Validate token type matches user's department
+                from ..utils.user_helpers import is_hospital_department
+                is_hospital_user = is_hospital_department(user.department) if user.department else False
+                
+                # Token valid - inject authenticated user into request
                 request.state.current_user = user
                 request.state.db_session = db
                 
-                # Extract pharma_id from token payload for easy access
-                pharma_id = payload.get("pharma_id")
-                if pharma_id is not None:
-                    request.state.pharma_id = pharma_id
+                # Extract type-specific fields from token payload
+                if token_type == "hospital_user":
+                    # Hospital user token (department: IVF, Oncology, etc.)
+                    if not is_hospital_user:
+                        db.close()
+                        raise InvalidTokenException("Token type mismatch: expected hospital user")
+                    
+                    # Inject hospital-specific fields
+                    request.state.hospital_id = payload.get("hospital_id")
+                    request.state.branch_id = payload.get("branch_id")
+                    request.state.department = payload.get("department")
+                    request.state.pharma_id = None
+                    
+                elif token_type == "pharma_user" or token_type is None:
+                    # Pharma user token (department: CGT, etc.) or legacy token
+                    if is_hospital_user:
+                        db.close()
+                        raise InvalidTokenException("Token type mismatch: expected pharma user")
+                    
+                    # Inject pharma-specific fields
+                    pharma_id = payload.get("pharma_id")
+                    if pharma_id is not None:
+                        request.state.pharma_id = pharma_id
+                    request.state.hospital_id = None
+                    request.state.branch_id = None
+                    request.state.department = None
+                else:
+                    # Unknown token type
+                    db.close()
+                    raise InvalidTokenException(f"Unknown token type: {token_type}")
                 
             except AppException:
                 db.close()

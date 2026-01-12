@@ -116,43 +116,203 @@ def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
 
 def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistrationResponse:
     """
-    Register a new user with proper transaction handling.
+    Register a new user with proper transaction handling (supports both pharma and hospital).
+    
+    Uses email domain detection:
+    - @zucisystems.com or @mygrape.org = hospital (department: IVF, Oncology, etc.)
+    - Other domains = pharma (department: CGT, etc.)
     
     If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
     """
+    from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
+    
     # Role is already validated and in title case from schema
     role = request.role
     
-    # Generate custom user ID (USR-XXXXXX format)
+    # Generate custom user ID (USR-XXXXXX format) - same format for both types
     user_id = utils.generate_user_id()
     
-    # ============================================
-    # PHARMA VALIDATION LOGIC
-    # ============================================
-    # Check if pharma exists
-    from app.models.pharma_model import Pharma
+    # Detect user type from email domain
+    email_lower = request.email.lower().strip()
+    is_hospital = is_hospital_email(email_lower)
     
-    existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
-    
-    if existing_pharma:
-        # Pharma exists, use existing pharma_id
-        pharma_id = existing_pharma.id
-        logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
-    else:
-        # Pharma doesn't exist - reject registration
-        logger.error(f"Pharma '{request.company_name}' doesn't exist - registration not allowed")
-        raise DatabaseQueryException(
-            operation="user registration", 
-            reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
-            custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
-            status_code=400
-        )
+    # Initialize variables
+    pharma_id = None
+    branch_id = None
+    department = request.department  # Will be set to CGT for pharma if not provided
+    hospital_id = None
+    recipient_email = None
+    company_name = None
     
     # ============================================
-    # END PHARMA VALIDATION LOGIC
+    # PHARMA REGISTRATION LOGIC (EXISTING - NO CHANGES)
     # ============================================
+    if not is_hospital:
+        # Check if pharma exists
+        from app.models.pharma_model import Pharma
+        
+        existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
+        
+        if existing_pharma:
+            # Pharma exists, use existing pharma_id
+            pharma_id = existing_pharma.id
+            company_name = existing_pharma.pharma_name
+            logger.info(f"Using existing pharma: {existing_pharma.pharma_name} (ID: {pharma_id})")
+        else:
+            # Pharma doesn't exist - reject registration
+            logger.error(f"Pharma '{request.company_name}' doesn't exist - registration not allowed")
+            raise DatabaseQueryException(
+                operation="user registration", 
+                reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+                custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+                status_code=400
+            )
+        
+        # Set default department to CGT for pharma users if not provided
+        if not department:
+            department = "CGT"
+        
+        # Check if pharma admin exists for this pharma
+        pharma_admin_email = get_pharma_admin_email(pharma_id, db)
+        
+        if not pharma_admin_email:
+            logger.error(f"No pharma admin found for pharma_id: {pharma_id}")
+            raise DatabaseQueryException(
+                operation="user registration", 
+                reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+                custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
+                status_code=400
+            )
+        
+        # Both manager and user registrations go to pharma admin
+        recipient_email = pharma_admin_email
+        logger.info(f"Registration: Sending approval email to Pharma Admin ({recipient_email}) for pharma_id: {pharma_id}")
     
+    # ============================================
+    # HOSPITAL REGISTRATION LOGIC (NEW)
+    # ============================================
+    else:  # is_hospital == True
+        from app.models.IVF.hospital_model import Hospital
+        from app.models.IVF.hospital_branch_model import HospitalBranch
+        
+        # Auto-detect hospital name from email if not provided
+        hospital_name = request.hospital_name or get_hospital_name_from_email(email_lower)
+        
+        if not hospital_name:
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Hospital name required",
+                custom_message="Hospital name is required for hospital users",
+                status_code=400
+            )
+        
+        # Validate hospital exists
+        hospital = db.query(Hospital).filter(
+            Hospital.hospital_name == hospital_name
+        ).first()
+        
+        if not hospital:
+            logger.error(f"Hospital '{hospital_name}' not found")
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Hospital not found",
+                custom_message=f"Hospital '{hospital_name}' not found",
+                status_code=404
+            )
+        
+        hospital_id = hospital.hospital_id
+        company_name = hospital.hospital_name
+        
+        # Validate branch belongs to hospital
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_id == request.branch_id,
+            HospitalBranch.hospital_id == hospital_id
+        ).first()
+        
+        if not branch:
+            logger.error(f"Branch {request.branch_id} not found for hospital {hospital_name}")
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Branch not found",
+                custom_message=f"Branch not found for hospital '{hospital_name}'",
+                status_code=404
+            )
+        
+        # Validate department matches hospital_type
+        if hospital.hospital_type and hospital.hospital_type.upper() != department.upper():
+            logger.warning(
+                f"Department mismatch: hospital_type={hospital.hospital_type}, "
+                f"requested department={department}"
+            )
+            # Allow if hospital_type is None or if they match (case-insensitive)
+            # This is a soft validation - you may want to make it stricter
+        
+        branch_id = request.branch_id
+        # Department is already set from request (validated in schema)
+        
+        # Determine email recipient based on role
+        role_lower = role.lower()
+        if role_lower == 'user':
+            # User registration → send to Manager from same branch and department
+            manager = db.query(user_model.User).filter(
+                user_model.User.department == department,
+                user_model.User.branch_id == branch_id,
+                user_model.User.role == 'Manager',
+                user_model.User.approved_status == 'approved',
+                user_model.User.status == True
+            ).first()
+            
+            if manager:
+                recipient_email = manager.email
+                logger.info(f"User registration: Sending approval email to Manager ({recipient_email})")
+            else:
+                # No manager found - send to admin
+                admin = db.query(user_model.User).filter(
+                    user_model.User.department == department,
+                    user_model.User.role == 'Admin',
+                    user_model.User.approved_status == 'approved',
+                    user_model.User.status == True
+                ).first()
+                
+                if admin:
+                    recipient_email = admin.email
+                    logger.info(f"User registration: No manager found, sending to Admin ({recipient_email})")
+                else:
+                    db.rollback()
+                    logger.error(f"No approver found for hospital user registration")
+                    raise DatabaseQueryException(
+                        operation="user registration",
+                        reason="No approver found",
+                        custom_message="No approver found for this registration. Please contact administrator.",
+                        status_code=400
+                    )
+        
+        elif role_lower == 'manager':
+            # Manager registration → send to Admin
+            admin = db.query(user_model.User).filter(
+                user_model.User.department == department,
+                user_model.User.role == 'Admin',
+                user_model.User.approved_status == 'approved',
+                user_model.User.status == True
+            ).first()
+            
+            if admin:
+                recipient_email = admin.email
+                logger.info(f"Manager registration: Sending approval email to Admin ({recipient_email})")
+            else:
+                db.rollback()
+                logger.error(f"No ARC admin found")
+                raise DatabaseQueryException(
+                    operation="user registration",
+                    reason="No ARC admin found",
+                    custom_message="No ARC admin found. Please contact administrator.",
+                    status_code=400
+                )
+    
+    # ============================================
+    # CREATE USER (UNIFIED)
+    # ============================================
     # Create user with custom user_id
     user = user_model.User(
         user_id=user_id,
@@ -162,6 +322,9 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         password_hash=utils.hash_password(request.password),
         role=role,
         pharma_id=pharma_id,
+        branch_id=branch_id,
+        department=department,
+        hospital_id=hospital_id,
     )
     
     # Set session timeout based on role (from constants)
@@ -181,28 +344,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         db.flush()  # Flush but don't commit yet - validate first
         logger.debug(f"User flushed to DB (not committed): {user.user_id}")
         
-        # Determine recipient for approval email
-        logger.info(f"Preparing to send approval email for role: {role_lower}")
-        recipient_email = None
-        
-        # Check if pharma admin exists for this pharma
-        pharma_admin_email = get_pharma_admin_email(pharma_id, db)
-        
-        if not pharma_admin_email:
-            # No pharma admin for this pharma - registration not allowed
-            db.rollback()
-            logger.error(f"No pharma admin found for pharma_id: {pharma_id}")
-            raise DatabaseQueryException(
-                operation="user registration", 
-                reason=ErrorMessages.REGISTRATION_NOT_ALLOWED,
-                custom_message=ErrorMessages.REGISTRATION_NOT_ALLOWED,
-                status_code=400
-            )
-        
-        # Both manager and user registrations go to pharma admin
-        recipient_email = pharma_admin_email
-        logger.info(f"Registration: Sending approval email to Pharma Admin ({recipient_email}) for pharma_id: {pharma_id}")
-        
         # Send approval email BEFORE committing
         # If email fails, transaction will rollback
         send_approval_email(
@@ -211,7 +352,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             last_name=request.last_name,
             email=request.email,
             role=request.role,
-            company=existing_pharma.pharma_name,
+            company=company_name,
             recipient_email=recipient_email
         )
         logger.info("Approval email sent successfully")
@@ -248,7 +389,6 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
 
     # Build response message using constants
     # If we reach here, email was sent successfully (otherwise exception would have been raised)
-    # Both manager and user registrations go to pharma admin
     message = SuccessMessages.REGISTRATION_SENT_TO_ADMIN
     
     from ..utils.utils import normalize_role_to_title_case
@@ -260,7 +400,10 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         email=user.email,
         role=normalize_role_to_title_case(user.role),
         pharma_id=user.pharma_id,
-        company_name=existing_pharma.pharma_name,
+        company_name=company_name,
+        hospital_id=user.hospital_id,
+        branch_id=user.branch_id,
+        department=user.department,
         approval_status=user.approved_status,
         approval_sent_to=recipient_email
     )
@@ -269,11 +412,15 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
 
 def approve_user(registration_id: str, approved_by_user_id: str, db: Session) -> UserApprovalResponse:
     """
-    Approve user registration with audit trail.
+    Approve user registration with audit trail (supports both pharma and hospital).
+    
+    Uses department to determine user type:
+    - CGT or other pharma departments = pharma user
+    - IVF, Oncology, etc. = hospital user
     
     Args:
         registration_id: User ID to approve
-        approved_by_user_id: Pharma Admin user ID
+        approved_by_user_id: Approver user ID (Pharma Admin for pharma, Manager/Admin for hospital)
         db: Database session
         
     Returns:
@@ -281,8 +428,10 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         
     Raises:
         UserApproveNotFoundException: If user not found
-        CompanyAccessForbiddenException: If pharma admin cannot approve this company
+        CompanyAccessForbiddenException: If approver cannot approve this user
     """
+    from ..utils.user_helpers import is_hospital_department
+    
     # Get user from database
     user = db.query(user_model.User).filter(user_model.User.user_id == registration_id).first()
     if not user:
@@ -293,12 +442,58 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     if not approver:
         raise UserApproveNotFoundException(registration_id=approved_by_user_id)
     
-    # Validate that approver is a pharma admin for the same pharma
-    if approver.role.lower() != 'pharma_admin' or approver.pharma_id != user.pharma_id:
-        raise CompanyAccessForbiddenException(
-            company_name=f"pharma_id_{user.pharma_id}",
-            reason=ErrorMessages.PHARMA_ADMIN_APPROVE_ONLY
-        )
+    # Determine user type from department
+    is_hospital_user = is_hospital_department(user.department) if user.department else False
+    
+    # ============================================
+    # PHARMA APPROVAL LOGIC (EXISTING - NO CHANGES)
+    # ============================================
+    if not is_hospital_user:
+        # Approver must be pharma admin from same pharma
+        if approver.role.lower() != 'pharma_admin':
+            raise CompanyAccessForbiddenException(
+                company_name=f"pharma_id_{user.pharma_id}",
+                reason="Only Pharma Admin can approve pharma users"
+            )
+        
+        if approver.pharma_id != user.pharma_id:
+            raise CompanyAccessForbiddenException(
+                company_name=f"pharma_id_{user.pharma_id}",
+                reason=ErrorMessages.PHARMA_ADMIN_APPROVE_ONLY
+            )
+    
+    # ============================================
+    # HOSPITAL APPROVAL LOGIC (NEW)
+    # ============================================
+    else:  # is_hospital_user == True
+        role_lower = user.role.lower()
+        
+        if role_lower == 'user':
+            # User approval: Manager from same branch and department
+            if approver.role.lower() != 'manager':
+                raise CompanyAccessForbiddenException(
+                    company_name=f"branch_id_{user.branch_id}",
+                    reason="Only Managers can approve User registrations"
+                )
+            
+            if (approver.branch_id != user.branch_id or 
+                approver.department != user.department):
+                raise CompanyAccessForbiddenException(
+                    company_name=f"branch_id_{user.branch_id}",
+                    reason="Only Managers from same branch and department can approve User registrations"
+                )
+        
+        elif role_lower == 'manager':
+            # Manager approval: Admin
+            if approver.role.lower() != 'admin':
+                raise CompanyAccessForbiddenException(
+                    company_name=f"branch_id_{user.branch_id}",
+                    reason="Only Admin can approve Manager registrations"
+                )
+    
+    # ============================================
+    # APPROVE USER (UNIFIED)
+    # ============================================
     
     # Business Logic: Set approval status and audit trail
     user.approved_status = 'approved'
@@ -313,12 +508,29 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     db.commit()
     db.refresh(user)
     
-    # Send approval notification email to the user
-    try:
+    # Get company name for email
+    from ..utils.user_helpers import is_hospital_department
+    is_hospital_user = is_hospital_department(user.department) if user.department else False
+    
+    if not is_hospital_user:
         # Get company name from pharma table
         from app.models.pharma_model import Pharma
         pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
-        company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
+        company_name = pharma.pharma_name if pharma else "Unknown"
+    else:
+        # Get hospital name from branch
+        from app.models.IVF.hospital_branch_model import HospitalBranch
+        from app.models.IVF.hospital_model import Hospital
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_id == user.branch_id
+        ).first()
+        hospital = db.query(Hospital).filter(
+            Hospital.hospital_id == branch.hospital_id
+        ).first() if branch else None
+        company_name = hospital.hospital_name if hospital else "Unknown"
+    
+    # Send approval notification email to the user
+    try:
         
         # Format approved date in UTC with UTC label
         # The datetime is stored as timezone-naive UTC, so we just add UTC timezone info
@@ -345,10 +557,7 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         logger.error(f"Failed to send approval notification email to {user.email}: {str(e)}")
     
     # Build response object
-    # Get company name from pharma table
-    from app.models.pharma_model import Pharma
-    pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
-    company_name = pharma.pharma_name if pharma else f"pharma_id_{user.pharma_id}"
+    # company_name already retrieved above for email
     
     from ..utils.utils import normalize_role_to_title_case
     
@@ -360,6 +569,10 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         last_name=user.last_name,
         role=normalize_role_to_title_case(user.role),
         company_name=company_name,
+        pharma_id=user.pharma_id,
+        hospital_id=user.hospital_id,
+        branch_id=user.branch_id,
+        department=user.department,
         approved_by=user.approved_by,
         approved_on=user.approved_on.isoformat()
     )

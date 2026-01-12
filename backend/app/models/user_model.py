@@ -25,6 +25,11 @@ class User(Base):
     role = sqlalchemy.Column(SQLEnum(UserRole, values_callable=lambda obj: [e.value for e in obj], name='user_role'), nullable=False, index=True)
     pharma_id = sqlalchemy.Column(Integer, ForeignKey("pharma.id"), nullable=True)
     
+    # Hospital/IVF fields (for hospital users)
+    branch_id = sqlalchemy.Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=True, index=True)
+    department = sqlalchemy.Column(sqlalchemy.String(100), nullable=True, index=True)  # CGT, IVF, Oncology, etc.
+    hospital_id = sqlalchemy.Column(Integer, nullable=True)  # Denormalized for quick access
+    
     # Account Status
     status = sqlalchemy.Column(sqlalchemy.Boolean, default=False)  # Account active/inactive
     approved_status = sqlalchemy.Column(SQLEnum(ApprovalStatus, values_callable=lambda obj: [e.value for e in obj], name='approval_status'), default=ApprovalStatus.PENDING)
@@ -56,3 +61,4 @@ class User(Base):
     # Relationships
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
     pharma_company = relationship("Pharma", foreign_keys="[User.pharma_id]", back_populates="users")
+    branch = relationship("HospitalBranch", foreign_keys="[User.branch_id]")
