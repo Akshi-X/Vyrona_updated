@@ -580,7 +580,6 @@ class DatabaseQueryException(AppException):
     
     def __init__(self, operation: str, reason: Optional[str] = None, custom_message: Optional[str] = None, status_code: int = 500):
         message = custom_message if custom_message else f"Database query failed: {operation}"
-        self.custom_message = custom_message  # Store custom_message as instance attribute
         super().__init__(
             message=message,
             error_code=ERROR_CODES["DB_QUERY_FAILED"],

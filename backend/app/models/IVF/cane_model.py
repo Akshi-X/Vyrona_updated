@@ -7,13 +7,13 @@ from ...config.database import Base
 
 class Cane(Base):
     __tablename__ = "canes"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     cane_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key
-    canister_id = Column(Integer, ForeignKey("ivf.canisters.canister_id"), nullable=False)
+    # Foreign Key - reference to canisters table (no schema prefix)
+    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=False)
     
     # Cane Information
     cane_code = Column(String(255), nullable=True)

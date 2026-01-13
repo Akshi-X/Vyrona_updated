@@ -16,7 +16,6 @@ Examples:
 """
 
 from typing import Set, Tuple
-import re
 
 
 # Type alias for clarity
@@ -49,17 +48,6 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
     # Quality loss email decision endpoint (email buttons)
     ("PUT", "/api/quality/loss/decision"),
-    # Branch authentication endpoints - public
-    ("POST", "/api/ivf/branch/signup"),
-    ("POST", "/api/ivf/branch/login"),
-    ("POST", "/api/ivf/branch/verify-otp"),  # OTP verification for IVF login
-    ("POST", "/api/ivf/branch/resend-otp"),  # Resend OTP for IVF login
-    ("GET", "/api/ivf/branch/verify-email"),  # Email verification link (GET only)
-    # Hospital search and branches endpoints - public (used during signup)
-    ("GET", "/api/ivf/branch/hospitals/search"),
-    ("GET", "/api/ivf/branch/hospitals/{hospital_id}/branches"),
-    ("GET", "/api/ivf/branch/hospitals/by-name/{hospital_name}/branches"),  # Get branches by hospital name
-    ("GET", "/api/ivf/branch/check-domain"),  # Check email domain for domain-based login
 }
 
 
@@ -205,11 +193,6 @@ class EndpointPermissions:
         """
         Check if endpoint is public
         
-        Supports:
-        - Exact matches: ("GET", "/api/users")
-        - Wildcard methods: ("*", "/api/login")
-        - Path parameters: ("GET", "/api/user/{id}") matches "/api/user/123"
-        
         Args:
             method: HTTP method (GET, POST, etc.)
             path: Request path
@@ -217,30 +200,12 @@ class EndpointPermissions:
         Returns:
             True if endpoint is public, False otherwise
         """
-        # Normalize path (remove trailing slash for consistent matching)
-        path = path.rstrip('/')
+        # Check for exact match with specific method
+        if (method, path) in PUBLIC_ENDPOINTS:
+            return True
         
-        for endpoint_method, endpoint_path in PUBLIC_ENDPOINTS:
-            # Normalize endpoint path too
-            endpoint_path = endpoint_path.rstrip('/')
-            
-            # Check if methods match (or wildcard)
-            if endpoint_method != "*" and endpoint_method != method:
-                continue
-            
-            # Check exact path match
-            if endpoint_path == path:
-                return True
-            
-            # Check pattern match (for paths with {parameters})
-            if "{" in endpoint_path:
-                # Convert path template to regex pattern
-                # Replace {user_id}, {id}, {any_param} with regex
-                pattern = re.escape(endpoint_path)
-                pattern = re.sub(r'\\{[^}]+\\}', r'[^/]+', pattern)
-                pattern = f"^{pattern}$"
-                
-                if re.match(pattern, path):
-                    return True
+        # Check for wildcard method match
+        if ("*", path) in PUBLIC_ENDPOINTS:
+            return True
         
         return False

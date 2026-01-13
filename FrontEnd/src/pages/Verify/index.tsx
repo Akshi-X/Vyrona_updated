@@ -64,47 +64,29 @@ const VerifyOtp: React.FC = () => {
 
     // Removed API_BASE_URL - now using authService
 
-    // Countdown for OTP Expiry (if backend sends expiry in ISO)
+    // Countdown for OTP Expiry - Simple 10 minute timer (avoids timezone issues)
     useEffect(() => {
         // Clear any existing interval
         clearTimer();
 
-        if (otpExpiry) {
-            const expiry = new Date(otpExpiry).getTime();
-            const now = new Date().getTime();
-            const initialRemaining = Math.max(0, Math.floor((expiry - now) / 1000));
-            setTimer(initialRemaining);
+        // Start with 10 minutes (600 seconds) - OTP expires in 10 minutes
+        setTimer(600);
 
-            const interval = setInterval(() => {
-                const currentTime = new Date().getTime();
-                const remaining = Math.max(0, Math.floor((expiry - currentTime) / 1000));
-                setTimer(remaining);
-                if (remaining <= 0) {
+        const interval = setInterval(() => {
+            setTimer(prev => {
+                if (prev === null || prev <= 1) {
                     clearTimer();
+                    return 0;
                 }
-            }, 1000);
-            intervalRef.current = interval;
-            return () => {
-                clearTimer();
-            };
-        } else {
-            // If no expiry provided, set a default timer (e.g., 5 minutes)
-            setTimer(300); // 5 minutes default
-            const interval = setInterval(() => {
-                setTimer(prev => {
-                    if (prev === null || prev <= 1) {
-                        clearTimer();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-            intervalRef.current = interval;
-            return () => {
-                clearTimer();
-            };
-        }
-    }, [otpExpiry]);
+                return prev - 1;
+            });
+        }, 1000);
+        
+        intervalRef.current = interval;
+        return () => {
+            clearTimer();
+        };
+    }, [otpExpiry]); // Re-start timer if OTP is resent (otpExpiry changes)
     
     // Handle redirect after OTP verification
     useEffect(() => {
