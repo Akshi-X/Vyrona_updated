@@ -8,13 +8,13 @@ from ...constants.enums import CanisterStatus
 
 class Canister(Base):
     __tablename__ = "canisters"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     canister_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key
-    tank_id = Column(Integer, ForeignKey("ivf.tanks.tank_id"), nullable=False)
+    # Foreign Key - reference to tanks table (no schema prefix)
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=False)
     
     # Canister Information
     canister_number = Column(Integer, nullable=True)

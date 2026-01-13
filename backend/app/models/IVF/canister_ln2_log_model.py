@@ -7,13 +7,13 @@ from ...config.database import Base
 
 class CanisterLn2Log(Base):
     __tablename__ = "canister_ln2_logs"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key
-    canister_id = Column(Integer, ForeignKey("ivf.canisters.canister_id"), nullable=False)
+    # Foreign Key - reference to canisters table (no schema prefix)
+    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=False)
     
     # Log Information
     opened_at = Column(DateTime, nullable=True)

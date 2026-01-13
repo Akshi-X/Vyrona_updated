@@ -7,7 +7,7 @@ from ...config.database import Base
 
 class IVFPatient(Base):
     __tablename__ = "patients"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     patient_id = Column(Integer, primary_key=True, index=True, autoincrement=True)

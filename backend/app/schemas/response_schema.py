@@ -16,7 +16,11 @@ class UserApprovalResponse(BaseModel):
     first_name: str
     last_name: str
     role: str
-    company_name: str
+    company_name: str  # Pharma company name or hospital name
+    pharma_id: Optional[int]  # For pharma users
+    hospital_id: Optional[int]  # For hospital/IVF users
+    branch_id: Optional[int]  # For hospital/IVF users
+    department: Optional[str]  # Department (IVF, Oncology, CGT, etc.)
     approved_by: str
     approved_on: str
 
