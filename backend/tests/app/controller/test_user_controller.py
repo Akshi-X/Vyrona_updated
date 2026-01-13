@@ -164,6 +164,9 @@ def test_register_user_success(client):
         role="Manager",
         pharma_id=42,
         company_name="Test Pharma",
+        hospital_id=None,
+        branch_id=None,
+        department="CGT",
         approval_status="pending",
         approval_sent_to="admin@pharma.com"
     )
@@ -405,6 +408,10 @@ def test_approve_user_success(client):
         last_name="Smith",
         role="manager",
         company_name="Test Pharma",
+        pharma_id=42,
+        hospital_id=None,
+        branch_id=None,
+        department="CGT",
         approved_by="ADMIN-123",
         approved_on="2024-01-01T12:00:00Z"
     )

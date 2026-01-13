@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, Literal, List
 from datetime import datetime
+from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
 
 class UserRegister(BaseModel):
     first_name: str
@@ -9,7 +10,16 @@ class UserRegister(BaseModel):
     password: str
     confirm_password: str
     role: str
-    company_name: str
+    
+    # Department - used for segregation (IVF, Oncology = hospital, CGT = pharma)
+    department: Optional[str] = None
+    
+    # Pharma fields (required if not hospital email)
+    company_name: Optional[str] = None
+    
+    # Hospital fields (auto-detected from email domain, but can be provided)
+    hospital_name: Optional[str] = None
+    branch_name: Optional[str] = None
     
     @field_validator('role')
     @classmethod
@@ -27,6 +37,31 @@ class UserRegister(BaseModel):
             raise ValueError("Role must be one of: admin, pharma_admin, mygrape_admin, manager, user")
         # Convert to title case: admin -> Admin, pharma_admin -> Pharma_admin, etc.
         return valid_roles[role_lower]
+    
+    @model_validator(mode='after')
+    def validate_fields(self):
+        """Validate required fields based on email domain and department."""
+        email_lower = self.email.lower().strip()
+        is_hospital = is_hospital_email(email_lower)
+        
+        if is_hospital:
+            # Hospital user - department, branch_name required
+            if not self.department:
+                raise ValueError("department is required for hospital users")
+            if not self.branch_name:
+                raise ValueError("branch_name is required for hospital users")
+            # Auto-detect hospital name from email if not provided
+            if not self.hospital_name:
+                self.hospital_name = get_hospital_name_from_email(email_lower)
+        else:
+            # Pharma user - company_name required
+            if not self.company_name:
+                raise ValueError("company_name is required for pharma users")
+            # Set department to CGT if not provided (default for pharma)
+            if not self.department:
+                self.department = "CGT"
+        
+        return self
 
 class UserResponse(BaseModel):
     user_id: str
@@ -57,8 +92,11 @@ class UserRegistrationResponse(BaseModel):
     user_id: str
     email: str
     role: str
-    pharma_id: Optional[int]
-    company_name: Optional[str]  # Will be populated from pharma table
+    pharma_id: Optional[int]  # For pharma users
+    company_name: Optional[str]  # Will be populated from pharma table for pharma users, hospital name for hospital users
+    hospital_id: Optional[int]  # For hospital/IVF users
+    branch_id: Optional[int]  # For hospital/IVF users
+    department: Optional[str]  # Department (IVF, Oncology, CGT, etc.)
     approval_status: str
     approval_sent_to: str  # Who the approval email was sent to
 
@@ -108,3 +146,13 @@ class UserUpdateResponse(BaseModel):
     first_name: str
     last_name: str
     updated_at: datetime
+
+
+class HospitalInfoByEmailResponse(BaseModel):
+    """Response for getting hospital info by email"""
+    is_hospital_email: bool
+    hospital_name: Optional[str] = None
+    hospital_id: Optional[int] = None
+    hospital_type: Optional[str] = None  # e.g., "IVF", "Oncology"
+    departments: List[str] = []  # Available departments based on hospital_type
+    branches: List[dict] = []  # List of branches with branch_id and branch_name

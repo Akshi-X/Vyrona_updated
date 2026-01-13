@@ -7,7 +7,7 @@ from ...config.database import Base
 
 class Hospital(Base):
     __tablename__ = "hospitals"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema for authentication models
 
     # Primary Key
     hospital_id = Column(Integer, primary_key=True, index=True, autoincrement=True)

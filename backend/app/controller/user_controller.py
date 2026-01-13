@@ -1,5 +1,6 @@
 import os
 import logging
+import traceback
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
@@ -8,11 +9,14 @@ from starlette.responses import FileResponse
 
 from app.config import database
 from app.models import user_model
+from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.service import user_service
 from app.service.login_service import handle_login
 from app.service.otp_service import verify_otp_and_create_token, resend_otp_to_user
 from app.service.password_reset_service import request_password_reset, reset_password
 from app.schemas import user_schema
+from app.utils.user_helpers import is_hospital_email, get_hospital_name_from_email
 from app.schemas.auth_schema import (
     LoginRequest, LoginResponse,
     VerifyOTPRequest, VerifyOTPSuccessResponse,
@@ -35,6 +39,96 @@ router = APIRouter(tags=["Users"])
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------
+# Get hospital info by email (for signup form)
+# ---------------------------
+@router.get("/hospital-info-by-email", response_model=user_schema.HospitalInfoByEmailResponse)
+def get_hospital_info_by_email(email: str, db: Session = Depends(database.get_db)):
+    """
+    Get hospital information (name, branches, departments) based on email domain.
+    Used by signup form to auto-populate fields when hospital email is detected.
+    """
+    email_lower = email.lower().strip()
+    is_hospital = is_hospital_email(email_lower)
+    
+    if not is_hospital:
+        return user_schema.HospitalInfoByEmailResponse(
+            is_hospital_email=False,
+            hospital_name=None,
+            hospital_id=None,
+            hospital_type=None,
+            departments=[],
+            branches=[]
+        )
+    
+    # Get hospital name from email
+    hospital_name = get_hospital_name_from_email(email_lower)
+    
+    if not hospital_name:
+        return user_schema.HospitalInfoByEmailResponse(
+            is_hospital_email=True,
+            hospital_name=None,
+            hospital_id=None,
+            hospital_type=None,
+            departments=[],
+            branches=[]
+        )
+    
+    # Query hospital from database
+    hospital = db.query(Hospital).filter(
+        Hospital.hospital_name == hospital_name
+    ).first()
+    
+    if not hospital:
+        return user_schema.HospitalInfoByEmailResponse(
+            is_hospital_email=True,
+            hospital_name=hospital_name,
+            hospital_id=None,
+            hospital_type=None,
+            departments=[],
+            branches=[]
+        )
+    
+    # Get all branches for this hospital
+    branches = db.query(HospitalBranch).filter(
+        HospitalBranch.hospital_id == hospital.hospital_id
+    ).all()
+    
+    branches_list = [
+        {
+            "branch_id": branch.branch_id,
+            "branch_name": branch.branch_name or f"Branch {branch.branch_id}",
+            "district_name": branch.district_name,
+            "state_name": branch.state_name
+        }
+        for branch in branches
+    ]
+    
+    # Determine available departments based on hospital_type
+    departments = []
+    if hospital.hospital_type:
+        hospital_type_upper = hospital.hospital_type.upper()
+        if hospital_type_upper == "IVF":
+            departments = ["IVF"]
+        elif hospital_type_upper == "ONCOLOGY":
+            departments = ["Oncology"]
+        else:
+            # If hospital_type is set but not recognized, use it as department
+            departments = [hospital.hospital_type]
+    else:
+        # Default: assume IVF if no type specified
+        departments = ["IVF"]
+    
+    return user_schema.HospitalInfoByEmailResponse(
+        is_hospital_email=True,
+        hospital_name=hospital.hospital_name,
+        hospital_id=hospital.hospital_id,
+        hospital_type=hospital.hospital_type,
+        departments=departments,
+        branches=branches_list
+    )
 
 
 # ---------------------------
@@ -87,7 +181,7 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
         result = verify_otp_and_create_token(request.user_id, request.otp, db)
         logger.debug(f"Controller: Service returned result: {result}")
 
-        # Return DTO
+        # Return DTO - supports both pharma and hospital responses
         response = VerifyOTPSuccessResponse(
             user_id=result["user_id"],
             email=result["email"],
@@ -95,8 +189,14 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
             auth_token=result["auth_token"],
             expires_at=result["expires_at"],
             message=SuccessMessages.OTP_VERIFIED,
-            pharma_id=result.get("pharma_id"),  # Include pharma_id in response
-            role=result["role"]  # Include role in response
+            role=result["role"],
+            # Pharma fields (for CGT users)
+            pharma_id=result.get("pharma_id"),
+            # Hospital fields (for IVF, Oncology users)
+            branch_id=result.get("branch_id"),
+            department=result.get("department"),
+            hospital_id=result.get("hospital_id"),
+            hospital_name=result.get("hospital_name")
         )
         logger.debug(f"Controller: Returning response: {response}")
         return response
@@ -104,7 +204,6 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
     except Exception as e:
         logger.error(f"Controller: Exception in verify_otp_endpoint: {e}")
         logger.error(f"Controller: Exception type: {type(e)}")
-        import traceback
         logger.error(f"Controller: Traceback: {traceback.format_exc()}")
         raise
 
