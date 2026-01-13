@@ -8,9 +8,19 @@ from sqlalchemy import and_
 
 from ..models.otp_model import OTP
 from ..models.user_model import User
+from ..models.IVF.hospital_branch_model import HospitalBranch
+from ..models.IVF.hospital_model import Hospital
 from ..auth.auth import create_access_token
-from ..exceptions import ResendOTPFailedException
-from ..utils.utils import get_user_by_email, get_user_by_id
+from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
+from ..exceptions import (
+    ResendOTPFailedException,
+    InvalidOTPException,
+    OTPUserNotFoundException,
+    ResendOTPInvalidUserException,
+    ResendOTPUserNotApprovedException
+)
+from ..utils.utils import get_user_by_email, get_user_by_id, normalize_role_to_title_case
+from ..utils.user_helpers import is_hospital_department
 from .email_service import send_otp_email
 
 # Configure logger
@@ -126,6 +136,45 @@ def verify_otp(db: Session, user_id: str, otp_code: str) -> bool:
         raise Exception(f"Failed to verify OTP: {str(e)}")
 
 
+def validate_otp_verification(user_id: str, otp: str, db: Session) -> User:
+    """
+    Validate OTP verification request.
+    
+    Returns:
+        Validated User object
+    """
+    # Validation 1: OTP is valid
+    is_valid = verify_otp(db, user_id, otp)
+    if not is_valid:
+        raise InvalidOTPException(user_id=user_id)
+    
+    # Validation 2: Get user details
+    user = get_user_by_id(user_id, db)
+    if not user:
+        raise OTPUserNotFoundException(user_id=user_id)
+    
+    return user
+
+
+def get_validated_user(email: str, user_id: str, db: Session) -> User:
+    """
+    Validate user for resend OTP.
+    
+    Returns:
+        Validated User object
+    """
+    # Get user
+    user = get_user_by_id(user_id, db)
+    
+    # Validate user exists and email matches
+    if not user or user.email != email:
+        raise ResendOTPInvalidUserException(user_id=user_id, email=email)
+    
+    # Validate user is approved and active
+    if not user.status or user.approved_status != 'approved':
+        raise ResendOTPUserNotApprovedException(user_id=user_id)
+    
+    return user
 
 
 def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
@@ -146,10 +195,6 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
         dict with user_id, email, auth_token, expires_at
     """
     try:
-        # Import here to avoid circular dependency
-        from ..dependencies.auth_dependencies import validate_otp_verification
-        from ..constants.app_constants import REMEMBER_ME_SESSION_DURATION_MINUTES, NO_REMEMBER_ME_SESSION_DURATION_MINUTES
-
         logger.info(f"Verifying OTP for user_id: {user_id}")
         logger.debug(f"OTP code: {otp}")
 
@@ -181,7 +226,6 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             logger.info(f"Remember Me disabled: Session expires in {session_duration} minutes (1 hour)")
 
         # Determine if hospital user based on department
-        from ..utils.user_helpers import is_hospital_department
         is_hospital_user = is_hospital_department(user.department) if user.department else False
 
         # Build token payload
@@ -215,8 +259,6 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
 
         expires_at = datetime.now(timezone.utc) + access_token_expires
         logger.debug(f"Token expires at: {expires_at}")
-
-        from ..utils.utils import normalize_role_to_title_case
         
         # Build response based on department
         result = {
@@ -234,8 +276,6 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             result["department"] = user.department
             result["hospital_id"] = user.hospital_id
             # Get hospital name for response
-            from ..models.IVF.hospital_branch_model import HospitalBranch
-            from ..models.IVF.hospital_model import Hospital
             branch = db.query(HospitalBranch).filter(
                 HospitalBranch.branch_id == user.branch_id
             ).first()
@@ -273,9 +313,6 @@ def resend_otp_to_user(user_id: str, email: str, db: Session) -> dict:
     Returns:
         dict with user_id, email, otp_expiry
     """
-    # Import here to avoid circular dependency
-    from ..dependencies.auth_dependencies import get_validated_user
-    
     # Validation
     user = get_validated_user(email, user_id, db)
     
