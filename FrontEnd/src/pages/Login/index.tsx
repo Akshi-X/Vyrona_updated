@@ -166,6 +166,7 @@ const Login: React.FC = () => {
                         email: response.email,
                         otpExpiry: response.otp_expiry,
                         fromPath,
+                        rememberMe,
                     },
                 });
             } else {

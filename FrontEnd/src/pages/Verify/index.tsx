@@ -11,7 +11,7 @@ const VerifyOtp: React.FC = () => {
     const navigate = useNavigate();
     const { login, isAuthenticated } = useAuth();
 
-    const { userId, otpExpiry, fromPath: fromPathFromState } = location.state || {};
+    const { userId, otpExpiry, fromPath: fromPathFromState, rememberMe } = location.state || {};
     
     // Get fromPath from state or sessionStorage
     const getFromPath = () => {
@@ -137,10 +137,11 @@ const VerifyOtp: React.FC = () => {
 
         try {
             setLoading(true);
+            const shouldRemember = rememberMe === true;
             const response = await authService.verifyOTP({
                 user_id: userId,
                 otp,
-            });
+            }, shouldRemember);
 
             if (response.status === "Logged In") {
                 setSuccess("OTP verified successfully!");
@@ -148,9 +149,10 @@ const VerifyOtp: React.FC = () => {
                 clearTimer();
                 // Save auth token using context
                 if (response.auth_token) {
-                    // Set token with proper expiration (1 hour for non-remember me)
-                    authUtils.setToken(response.auth_token, false);
-                    login(response.auth_token, response.role);
+                    // Set token with proper expiration based on rememberMe setting
+                    const shouldRemember = rememberMe === true;
+                    authUtils.setToken(response.auth_token, shouldRemember);
+                    login(response.auth_token, response.role, shouldRemember);
                 }
                 // Persist user id for pages that need it (e.g., My Tickets)
                 try {

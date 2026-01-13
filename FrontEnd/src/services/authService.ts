@@ -69,7 +69,7 @@ export class AuthService extends BaseApiService {
   /**
    * Verify OTP
    */
-  async verifyOTP(data: OTPData): Promise<AuthResponse> {
+  async verifyOTP(data: OTPData, rememberMe: boolean = false): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/api/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -77,7 +77,7 @@ export class AuthService extends BaseApiService {
 
     // Store token in cookie if provided
     if (response.auth_token) {
-      authUtils.setToken(response.auth_token);
+      authUtils.setToken(response.auth_token, rememberMe);
     }
 
     return response;
