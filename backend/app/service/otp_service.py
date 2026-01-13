@@ -244,6 +244,7 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
         else:
             # Pharma user (CGT, etc.)
             token_data["pharma_id"] = user.pharma_id
+            token_data["department"] = user.department  # Include department (CGT) for pharma users
             token_data["type"] = "pharma_user"
 
         # Business Logic: Create JWT token with remember_me flag and type-specific fields
@@ -284,8 +285,9 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             ).first() if branch else None
             result["hospital_name"] = hospital.hospital_name if hospital else None
         else:
-            # Pharma response (CGT, etc.) - existing response format
+            # Pharma response (CGT, etc.) - include department
             result["pharma_id"] = user.pharma_id
+            result["department"] = user.department  # Include department (CGT) for pharma users
         
         logger.debug(f"Returning result: {result}")
         return result
