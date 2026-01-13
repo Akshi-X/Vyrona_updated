@@ -7,14 +7,14 @@ from ...config.database import Base
 
 class Embryo(Base):
     __tablename__ = "embryos"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     embryo_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Keys
-    patient_id = Column(Integer, ForeignKey("ivf.patients.patient_id"), nullable=False)
-    cryolock_id = Column(Integer, ForeignKey("ivf.cryolocks.cryolock_id"), nullable=False)
+    # Foreign Keys - references to tables (no schema prefix)
+    patient_id = Column(Integer, ForeignKey("patients.patient_id"), nullable=False)
+    cryolock_id = Column(Integer, ForeignKey("cryolocks.cryolock_id"), nullable=False)
     
     # Embryo Information
     date_of_vitrification = Column(Date, nullable=True)

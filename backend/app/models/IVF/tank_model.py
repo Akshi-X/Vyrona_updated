@@ -7,13 +7,13 @@ from ...config.database import Base
 
 class Tank(Base):
     __tablename__ = "tanks"
-    __table_args__ = {'schema': 'ivf'}
+    # Removed schema separation - using default schema
 
     # Primary Key
     tank_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key
-    branch_id = Column(Integer, ForeignKey("ivf.hospital_branches.branch_id"), nullable=False)
+    # Foreign Key - reference to hospital_branches table (no schema prefix)
+    branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False)
     
     # Tank Information
     tank_code = Column(String(255), nullable=True)
