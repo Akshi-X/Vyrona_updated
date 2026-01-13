@@ -8,10 +8,12 @@ export const authUtils = {
     // Set expiration based on remember me setting
     // If remember me is true: 9 hours, if false: 1 hour
     const expirationHours = rememberMe ? 9 : 1;
-    const expirationDays = expirationHours / 24; // Convert hours to days for js-cookie
+    // Calculate expiration date from now
+    const expirationDate = new Date();
+    expirationDate.setTime(expirationDate.getTime() + (expirationHours * 60 * 60 * 1000));
     
     Cookies.set(AUTH_TOKEN_KEY, token, {
-      expires: expirationDays,
+      expires: expirationDate,
       secure: true, // Only send over HTTPS
       sameSite: 'strict' // CSRF protection
     });
