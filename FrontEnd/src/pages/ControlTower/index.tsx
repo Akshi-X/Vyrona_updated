@@ -18,6 +18,7 @@ const ControlTower = () => {
   const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [direction, setDirection] = useState<'inbound' | 'outbound'>('inbound');
+  const [department, setDepartment] = useState<string | null>(null);
   const [userInitials, setUserInitials] = useState<string>('');
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -49,6 +50,7 @@ const ControlTower = () => {
   const [loadingCanisters, setLoadingCanisters] = useState(false);
   const [canistersError, setCanistersError] = useState<string | null>(null);
   const [zoomToLocation, setZoomToLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [zoomToBranchName, setZoomToBranchName] = useState<string | null>(null);
   const [mapRoutes, setMapRoutes] = useState<Array<{
     patient_id: string;
     source_latitude: number;
@@ -56,11 +58,33 @@ const ControlTower = () => {
     destination_latitude: number;
     destination_longitude: number;
   }>>([]);
-  const [mapIvfBranches, setMapIvfBranches] = useState<Array<{
-    branch_name: string;
-    latitude: number;
-    longitude: number;
-  }>>([]);
+
+  // Read department from localStorage (set after OTP verification)
+  useEffect(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      setDepartment(dept);
+    } catch {
+      setDepartment(null);
+    }
+  }, []);
+
+  const isIvfUser = (department || '').toUpperCase() === 'IVF';
+  const isCgtUser = (department || '').toUpperCase() === 'CGT';
+
+  // Force IVF users to stay on inbound view
+  useEffect(() => {
+    if (isIvfUser && direction !== 'inbound') {
+      setDirection('inbound');
+    }
+  }, [isIvfUser, direction]);
+
+  // Force CGT users to stay on outbound view
+  useEffect(() => {
+    if (isCgtUser && direction !== 'outbound') {
+      setDirection('outbound');
+    }
+  }, [isCgtUser, direction]);
 
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -106,36 +130,6 @@ const ControlTower = () => {
       fetchMapRoutes();
     }
   }, [isAuthenticated, direction, selectedRegion, selectedStatusOutbound, selectedCarrier]);
-
-  // Fetch IVF branches data for coordinates (inbound)
-  useEffect(() => {
-    const fetchIvfBranches = async () => {
-      if (direction === 'inbound') {
-        try {
-          const data = await shipmentService.getIVFControlTower();
-          if (data.states) {
-            const branches: Array<{ branch_name: string; latitude: number; longitude: number }> = [];
-            Object.entries(data.states).forEach(([, stateBranches]) => {
-              stateBranches.forEach((branch: any) => {
-                branches.push({
-                  branch_name: branch.branch_name,
-                  latitude: branch.geoLocation.latitude,
-                  longitude: branch.geoLocation.longitude,
-                });
-              });
-            });
-            setMapIvfBranches(branches);
-          }
-        } catch (e: any) {
-          console.warn('Failed to load IVF branches:', e?.message);
-          setMapIvfBranches([]);
-        }
-      }
-    };
-    if (isAuthenticated && direction === 'inbound') {
-      fetchIvfBranches();
-    }
-  }, [isAuthenticated, direction]);
 
   useEffect(() => {
     const fetchCanisters = async () => {
@@ -330,13 +324,14 @@ const ControlTower = () => {
 
   // Reset zoomToLocation after it's been used
   useEffect(() => {
-    if (zoomToLocation) {
+    if (zoomToLocation || zoomToBranchName) {
       const timer = setTimeout(() => {
         setZoomToLocation(null);
+        setZoomToBranchName(null);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [zoomToLocation]);
+  }, [zoomToLocation, zoomToBranchName]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -406,36 +401,43 @@ const ControlTower = () => {
               {/* Filters Section */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
-                  {/* Direction Toggle */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Direction
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDirection('inbound')}
-                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                          direction === 'inbound'
-                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
-                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
-                        }`}
-                      >
-                        Inbound
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDirection('outbound')}
-                        className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                          direction === 'outbound'
-                            ? 'bg-[#6b1176] text-white border-[#6b1176]'
-                            : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
-                        }`}
-                      >
-                        Outbound
-                      </button>
+                  {/* Direction Toggle - Only show for IVF department */}
+                  {isIvfUser && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Direction
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDirection('inbound')}
+                          className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
+                            direction === 'inbound'
+                              ? 'bg-[#6b1176] text-white border-[#6b1176]'
+                              : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
+                          }`}
+                        >
+                          Inbound
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isIvfUser) {
+                              setDirection('outbound');
+                            }
+                          }}
+                          disabled={isIvfUser}
+                          className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
+                            direction === 'outbound'
+                              ? 'bg-[#6b1176] text白 border-[#6b1176]'
+                              : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
+                          } ${isIvfUser ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''}`}
+                        >
+                          Outbound
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Branch Filter (Inbound only) */}
                   {direction === 'inbound' && (
@@ -650,9 +652,11 @@ const ControlTower = () => {
 
               {/* Active Routes List */}
               <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${direction === 'inbound' ? 'h-[544px]' : 'h-[460px]'}`}>
-                <h2 className="font-bold text-black text-base mb-2">Active Routes</h2>
+                <h2 className="font-bold text-black text-base mb-2">
+                  {direction === 'inbound' ? 'Active Canisters' : 'Active Routes'}
+                </h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">Route/Canisters ID</div>
+                  <div className="text-left">{direction === 'inbound' ? 'Canisters ID' : 'Routes ID'}</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
@@ -751,12 +755,8 @@ const ControlTower = () => {
                                 ? 'text-[#FF0000]'
                                 : 'text-gray-500';
                           const handleCanisterClick = () => {
-                            const branch = mapIvfBranches.find(b => b.branch_name === canister.branchName);
-                            if (branch) {
-                              setZoomToLocation({
-                                lat: branch.latitude,
-                                lng: branch.longitude,
-                              });
+                            if (canister.branchName && canister.branchName !== 'N/A') {
+                              setZoomToBranchName(canister.branchName);
                             }
                           };
 
@@ -805,6 +805,7 @@ const ControlTower = () => {
                 }}
                 direction={direction}
                 zoomToLocation={zoomToLocation}
+                zoomToBranchName={zoomToBranchName}
               />
             </div>
           </div>

@@ -12,6 +12,8 @@ const Signup: React.FC = () => {
     const [email, setEmail] = useState("");
     const [role, setrole] = useState("");
     const [organization, setOrganization] = useState("");
+    const [department, setDepartment] = useState("");
+    const [branch, setBranch] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -20,6 +22,8 @@ const Signup: React.FC = () => {
     const [emailError, setEmailError] = useState("");
     const [roleError, setroleError] = useState("");
     const [organizationError, setOrganizationError] = useState("");
+    const [departmentError, setDepartmentError] = useState("");
+    const [branchError, setBranchError] = useState("");
     const [passwordError, setPasswordError] = useState("");
     const [confirmPasswordError, setConfirmPasswordError] = useState("");
 
@@ -30,15 +34,23 @@ const Signup: React.FC = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const branchDropdownRef = useRef<HTMLDivElement>(null);
+    const [branchOptions, setBranchOptions] = useState<Array<{ branch_id: number; branch_name: string }>>([]);
+    const [hospitalName, setHospitalName] = useState("");
+    const [isHospitalEmail, setIsHospitalEmail] = useState(false);
 
     // navigate removed; success panel no longer shows login button
 
-    // Handle clicks outside dropdown
+    // Handle clicks outside dropdowns
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
+            }
+            if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+                setIsBranchDropdownOpen(false);
             }
         };
 
@@ -47,6 +59,70 @@ const Signup: React.FC = () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    // Fetch hospital info when email changes
+    useEffect(() => {
+        const fetchHospitalInfo = async () => {
+            if (!email || !validateEmail(email)) {
+                setIsHospitalEmail(false);
+                setBranchOptions([]);
+                setHospitalName("");
+                setDepartment("");
+                setBranch("");
+                return;
+            }
+
+            try {
+                const hospitalInfo = await authService.getHospitalInfoByEmail(email);
+                setIsHospitalEmail(hospitalInfo.is_hospital_email);
+                
+                if (hospitalInfo.is_hospital_email) {
+                    const hospitalNameValue = hospitalInfo.hospital_name || "";
+                    setHospitalName(hospitalNameValue);
+                    setBranchOptions(hospitalInfo.branches || []);
+                    
+                    // Auto-fill organization field with hospital name
+                    setOrganization(hospitalNameValue);
+                    
+                    // Set department value from API response
+                    const apiDepartments = hospitalInfo.departments || [];
+                    const validDepartmentNames = ["IVF", "Oncology", "CGT"];
+                    
+                    // Filter out invalid department names (like "public" which is hospital_type, not department)
+                    const validApiDepartments = apiDepartments.filter(dept => 
+                        validDepartmentNames.includes(dept)
+                    );
+                    
+                    // Set department value based on API response
+                    if (validApiDepartments.length === 1) {
+                        setDepartment(validApiDepartments[0]);
+                    } else {
+                        // If no valid departments from API, default to "IVF" (most common)
+                        setDepartment("IVF");
+                    }
+                } else {
+                    setBranchOptions([]);
+                    setHospitalName("");
+                    setDepartment("");
+                    setBranch("");
+                    // Clear organization field when switching to non-hospital email
+                    setOrganization("");
+                }
+            } catch (error) {
+                // Silently handle errors - user might be entering pharma email
+                setIsHospitalEmail(false);
+                setBranchOptions([]);
+                setHospitalName("");
+            }
+        };
+
+        // Debounce the API call
+        const timeoutId = setTimeout(() => {
+            fetchHospitalInfo();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [email]);
 
     const validateEmail = (value: string) =>
         /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(value);
@@ -68,6 +144,13 @@ const Signup: React.FC = () => {
         if (roleError) setroleError("");
     };
 
+    const handleBranchSelect = (selectedBranch: string) => {
+        setBranch(selectedBranch);
+        setIsBranchDropdownOpen(false);
+        if (branchError) setBranchError("");
+    };
+
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setApiError("");
@@ -79,6 +162,8 @@ const Signup: React.FC = () => {
         setEmailError("");
         setroleError("");
         setOrganizationError("");
+        setDepartmentError("");
+        setBranchError("");
         setPasswordError("");
         setConfirmPasswordError("");
 
@@ -113,9 +198,19 @@ const Signup: React.FC = () => {
             setroleError("role is required");
             valid = false;
         }
-        if (!organization) {
+        if (!organization && !isHospitalEmail) {
             setOrganizationError("Organization is required");
             valid = false;
+        }
+        if (isHospitalEmail) {
+            if (!department) {
+                setDepartmentError("Department is required");
+                valid = false;
+            }
+            if (!branch) {
+                setBranchError("Branch is required");
+                valid = false;
+            }
         }
         if (!password) {
             setPasswordError("Password is required");
@@ -135,15 +230,23 @@ const Signup: React.FC = () => {
         if (!valid) return;
 
         // Prepare request payload
-        const payload = {
+        const payload: any = {
             email,
             password,
             confirm_password: confirmPassword,
             first_name: firstName,
             last_name: lastName,
             role: role.toLowerCase(), // "manager" or "user" → match backend roles
-            company_name: organization,
         };
+
+        if (isHospitalEmail) {
+            payload.department = department;
+            payload.hospital_name = hospitalName;
+            payload.branch_name = branch;
+            payload.company_name = ""; // Empty for hospital users
+        } else {
+            payload.company_name = organization;
+        }
 
         try {
             setLoading(true);
@@ -296,64 +399,127 @@ const Signup: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Role Dropdown */}
-                                <div className="relative w-full" ref={dropdownRef}>
-                                    <div
-                                        className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
-                                            } ${!role ? "text-gray-400" : "text-black"}`}
-                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span>{role || "Role"}</span>
-                                            <svg
-                                                className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
+                                {/* Role, Organization, Department, Branch - 2x2 Grid */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {/* Role Dropdown */}
+                                    <div className="relative w-full" ref={dropdownRef}>
+                                        <div
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${roleError ? "border-red-500" : "border-gray-300"
+                                                } ${!role ? "text-gray-400" : "text-black"}`}
+                                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span>{role || "Role"}</span>
+                                                <svg
+                                                    className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
                                         </div>
+
+                                        {isDropdownOpen && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
+                                                {roleOptions.map((option) => (
+                                                    <div
+                                                        key={option.value}
+                                                        className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
+                                                            }`}
+                                                        onClick={() => handleRoleSelect(option.value)}
+                                                    >
+                                                        {option.label}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {roleError && (
+                                            <p className="text-xs text-red-500 mt-1">{roleError}</p>
+                                        )}
                                     </div>
 
-                                    {isDropdownOpen && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
-                                            {roleOptions.map((option) => (
-                                                <div
-                                                    key={option.value}
-                                                    className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${role === option.value ? "bg-[#8b2a96] text-white" : "text-black"
-                                                        }`}
-                                                    onClick={() => handleRoleSelect(option.value)}
-                                                >
-                                                    {option.label}
-                                                </div>
-                                            ))}
+                                    {/* Organization */}
+                                    <div className="relative w-full">
+                                        <input
+                                            type="text"
+                                            value={organization}
+                                            onChange={(e) => {
+                                                setOrganization(e.target.value);
+                                                if (organizationError) setOrganizationError("");
+                                            }}
+                                            placeholder="Organization"
+                                            disabled={isHospitalEmail}
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${organizationError ? "border-red-500" : "border-gray-300"
+                                                } ${isHospitalEmail ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                                        />
+                                        {organizationError && (
+                                            <p className="text-xs text-red-500 mt-1">
+                                                {organizationError}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Department - Non-editable text field */}
+                                    <div className="relative w-full">
+                                        <input
+                                            type="text"
+                                            value={department}
+                                            placeholder="Department"
+                                            disabled={true}
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${departmentError ? "border-red-500" : "border-gray-300"
+                                                } bg-gray-100 cursor-not-allowed text-gray-600`}
+                                        />
+                                        {departmentError && (
+                                            <p className="text-xs text-red-500 mt-1">
+                                                {departmentError}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Branch Dropdown */}
+                                    <div className="relative w-full" ref={branchDropdownRef}>
+                                        <div
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${branchError ? "border-red-500" : "border-gray-300"
+                                                } ${!branch ? "text-gray-400" : "text-black"} ${!isHospitalEmail ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                                            onClick={() => isHospitalEmail && setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span>{branch || "Branch"}</span>
+                                                {isHospitalEmail && (
+                                                    <svg
+                                                        className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`}
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                )}
+                                            </div>
                                         </div>
-                                    )}
 
-                                    {roleError && (
-                                        <p className="text-xs text-red-500 mt-1">{roleError}</p>
-                                    )}
-                                </div>
+                                        {isBranchDropdownOpen && branchOptions.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-60 overflow-y-auto">
+                                                {branchOptions.map((option) => (
+                                                    <div
+                                                        key={option.branch_id}
+                                                        className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${branch === option.branch_name ? "bg-[#8b2a96] text-white" : "text-black"
+                                                            }`}
+                                                        onClick={() => handleBranchSelect(option.branch_name)}
+                                                    >
+                                                        {option.branch_name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
 
-                                {/* Organization */}
-                                <div className="relative w-full">
-                                    <input
-                                        type="text"
-                                        value={organization}
-                                        onChange={(e) => {
-                                            setOrganization(e.target.value);
-                                            if (organizationError) setOrganizationError("");
-                                        }}
-                                        placeholder="Organization"
-                                        className={`peer w-full border rounded-[10px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${organizationError ? "border-red-500" : "border-gray-300"
-                                            }`}
-                                    />
-                                    {organizationError && (
-                                        <p className="text-xs text-red-500 mt-1">
-                                            {organizationError}
-                                        </p>
-                                    )}
+                                        {branchError && (
+                                            <p className="text-xs text-red-500 mt-1">{branchError}</p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Passwords */}
