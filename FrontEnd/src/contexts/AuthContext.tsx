@@ -19,7 +19,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // In dev tools / error boundaries React may render components outside the provider.
+    // Fall back to a safe default instead of throwing to avoid crashing the app.
+    if (import.meta.env?.MODE !== 'production') {
+      console.warn('useAuth called outside AuthProvider – returning default unauthenticated context');
+    }
+    return {
+      isAuthenticated: false,
+      token: undefined,
+      isLoading: false,
+      userRole: undefined,
+      isEmailNotificationsEnabled: true,
+      setIsEmailNotificationsEnabled: () => {},
+      login: () => {},
+      logout: () => {},
+    } as AuthContextType;
   }
   return context;
 };

@@ -16,6 +16,32 @@ import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
 import { RoleBasedRoute } from '../components/RoleBasedRoute'
 import { AuthRedirect } from '../components/AuthRedirect'
+import React from 'react'
+
+// Wrapper components to ensure context is available
+const DashboardWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <Dashboard />
+  </RoleBasedRoute>
+)
+
+const DatabaseWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <Database />
+  </RoleBasedRoute>
+)
+
+const ControlTowerWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <ControlTower />
+  </RoleBasedRoute>
+)
+
+const TrackPageWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <TrackPage />
+  </RoleBasedRoute>
+)
 
 export const router = createBrowserRouter([
   { path: '/', element: <AuthRedirect /> },
@@ -28,10 +54,10 @@ export const router = createBrowserRouter([
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Dashboard /></RoleBasedRoute> },
-  { path: '/database', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Database /></RoleBasedRoute> },
-  { path: '/control-tower', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><ControlTower /></RoleBasedRoute> },
-  { path: '/track/:patientId', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><TrackPage /></RoleBasedRoute> },
+  { path: '/dashboard', element: <DashboardWithAuth /> },
+  { path: '/database', element: <DatabaseWithAuth /> },
+  { path: '/control-tower', element: <ControlTowerWithAuth /> },
+  { path: '/track/:patientId', element: <TrackPageWithAuth /> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])

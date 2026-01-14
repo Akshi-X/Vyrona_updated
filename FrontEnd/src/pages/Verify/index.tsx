@@ -129,6 +129,16 @@ const VerifyOtp: React.FC = () => {
                 setSuccess("OTP verified successfully!");
                 // Stop the timer when verification is successful
                 clearTimer();
+
+                // Persist department for feature gating (e.g., IVF Control Tower)
+                try {
+                    if (response.department) {
+                        localStorage.setItem('department', response.department);
+                    } else {
+                        localStorage.removeItem('department');
+                    }
+                } catch { }
+
                 // Save auth token using context
                 if (response.auth_token) {
                     // Set token with proper expiration based on rememberMe setting
