@@ -429,7 +429,7 @@ const ControlTower = () => {
                           disabled={isIvfUser}
                           className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
                             direction === 'outbound'
-                              ? 'bg-[#6b1176] text白 border-[#6b1176]'
+                              ? 'bg-[#6b1176] text-white border-[#6b1176]'
                               : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
                           } ${isIvfUser ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''}`}
                         >
