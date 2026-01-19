@@ -33,7 +33,7 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("*", "/api/forgot-password"),
     ("*", "/api/reset-password"),
     ("*", "/api/approval-screen"),
-    ("*", "/api/hospital-info-by-email"),  # Public endpoint used during signup
+    ("*", "/api/hospital-info-by-email"),  
     ("*", "/api/dashboard/performance"),
     ("*", "/api/dashboard/risk"),
     ("*", "/api/dashboard/compliance"),
