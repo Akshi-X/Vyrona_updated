@@ -441,7 +441,9 @@ class EmbryoTrackingItem(BaseModel):
     goblet_color: Optional[str] = Field(None, description="Goblet Color")
     cryolock_color: Optional[str] = Field(None, description="Cryolock Color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of Vitrification")
-    embryo_grading: Optional[str] = Field(None, description="Comma-separated embryo gradings")
+    embryo_grading: Optional[str] = Field(None, description="Comma-separated embryo gradings (User role only)")
+    site_name: Optional[str] = Field(None, description="Branch name (Manager/Admin roles only)")
+    status: Optional[str] = Field(None, description="Embryo status (Manager/Admin roles only)")
     
     class Config:
         from_attributes = True
