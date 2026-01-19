@@ -144,7 +144,8 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                         request.state.pharma_id = pharma_id
                     request.state.hospital_id = None
                     request.state.branch_id = None
-                    request.state.department = None
+                    # Include department from token for pharma users (CGT)
+                    request.state.department = payload.get("department")
                 else:
                     # Unknown token type
                     db.close()
