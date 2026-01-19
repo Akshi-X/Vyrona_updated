@@ -13,7 +13,11 @@ from typing import Tuple
 import logging
 
 from ..config.database import get_db, SessionLocal
-from ..service.otp_service import verify_otp as verify_otp_service
+from ..service.otp_service import (
+    verify_otp as verify_otp_service,
+    validate_otp_verification,
+    get_validated_user
+)
 from ..utils.utils import get_user_by_email, get_user_by_id
 from ..auth.auth import verify_password
 from ..service.account_locking_service import (
@@ -200,47 +204,6 @@ def validate_registration_request(request: UserRegister, db: Session) -> UserReg
         raise EmailAlreadyExistsException(email=request.email)
     
     return request
-
-
-def validate_otp_verification(user_id: str, otp: str, db: Session) -> User:
-    """
-    Validate OTP verification request.
-    
-    Returns:
-        Validated User object
-    """
-    # Validation 1: OTP is valid
-    is_valid = verify_otp_service(db, user_id, otp)
-    if not is_valid:
-        raise InvalidOTPException(user_id=user_id)
-    
-    # Validation 2: Get user details
-    user = get_user_by_id(user_id, db)
-    if not user:
-        raise OTPUserNotFoundException(user_id=user_id)
-    
-    return user
-
-
-def get_validated_user(email: str, user_id: str, db: Session) -> User:
-    """
-    Validate user for resend OTP.
-    
-    Returns:
-        Validated User object
-    """
-    # Get user
-    user = get_user_by_id(user_id, db)
-    
-    # Validate user exists and email matches
-    if not user or user.email != email:
-        raise ResendOTPInvalidUserException(user_id=user_id, email=email)
-    
-    # Validate user is approved and active
-    if not user.status or user.approved_status != 'approved':
-        raise ResendOTPUserNotApprovedException(user_id=user_id)
-    
-    return user
 
 
 def validate_get_user_request(user_id: str, db: Session) -> User:

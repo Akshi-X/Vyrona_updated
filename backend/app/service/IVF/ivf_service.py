@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
-from typing import List, Dict, Any
+from sqlalchemy import desc, func, and_
+from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from collections import defaultdict
 
@@ -15,6 +15,9 @@ from ...models.IVF.patient_model import IVFPatient
 from ...models.IVF.embryo_model import Embryo
 from ...constants.enums import CanisterStatus
 
+# Roles that should be filtered by branch (User and Manager)
+ROLES_WITH_BRANCH_FILTER = ["User", "Manager"]
+
 
 class IVFService:
     """Service for IVF control tower operations"""
@@ -22,10 +25,14 @@ class IVFService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_control_tower_map_locations(self) -> Dict[str, Any]:
+    def get_control_tower_map_locations(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Get IVF control tower map locations with hospital and branch information.
         Returns data organized by states.
+        
+        Args:
+            branch_id: Optional branch ID to filter by. If provided, only returns data for that branch.
+                      If None, returns data for all branches (Admin role).
         
         Returns:
             Dictionary containing:
@@ -38,8 +45,14 @@ class IVFService:
             - geoLocation: Dictionary with latitude and longitude
         """
         try:
-            # Query all hospital branches with their parent hospitals
-            branches = self.db.query(HospitalBranch).join(Hospital).all()
+            # Query hospital branches with optional branch filtering
+            query = self.db.query(HospitalBranch).join(Hospital)
+            
+            # Apply branch filter if provided (User/Manager roles)
+            if branch_id is not None:
+                query = query.filter(HospitalBranch.branch_id == branch_id)
+            
+            branches = query.all()
             
             if not branches:
                 # Return empty structure if no branches found
@@ -111,9 +124,13 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching IVF control tower map locations: {str(e)}")
     
-    def get_active_canisters(self) -> Dict[str, Any]:
+    def get_active_canisters(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Get active canisters grouped by branch with their status and last updated time.
+        
+        Args:
+            branch_id: Optional branch ID to filter by. If provided, only returns canisters for that branch.
+                      If None, returns canisters for all branches (Admin role).
         
         Returns:
             Dictionary containing:
@@ -128,14 +145,40 @@ class IVFService:
             - total: Total number of active canisters across all branches
         """
         try:
-            # Query active canisters with branch information
-            active_canisters = (
-                self.db.query(Canister)
-                .join(Tank)
-                .join(HospitalBranch)
-                .filter(Canister.is_active == True)
-                .all()
+            # Optimized query: Use subquery to get latest log per canister in one query
+            # This eliminates N+1 query problem
+            latest_logs_subquery = (
+                self.db.query(
+                    CanisterLn2Log.canister_id,
+                    func.max(CanisterLn2Log.opened_at).label('latest_opened_at')
+                )
+                .filter(CanisterLn2Log.opened_at.isnot(None))
+                .group_by(CanisterLn2Log.canister_id)
+                .subquery()
             )
+            
+            # Query active canisters with branch information and latest log
+            query = (
+                self.db.query(
+                    Canister,
+                    HospitalBranch.branch_id,
+                    HospitalBranch.branch_name,
+                    latest_logs_subquery.c.latest_opened_at
+                )
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .outerjoin(
+                    latest_logs_subquery,
+                    Canister.canister_id == latest_logs_subquery.c.canister_id
+                )
+                .filter(Canister.is_active == True)
+            )
+            
+            # Apply branch filter if provided (User/Manager roles)
+            if branch_id is not None:
+                query = query.filter(HospitalBranch.branch_id == branch_id)
+            
+            results = query.all()
             
             # Group canisters by branch
             branches_dict = defaultdict(lambda: {
@@ -146,35 +189,14 @@ class IVFService:
             
             total_canisters = 0
             
-            for canister in active_canisters:
-                # Get branch information from tank
-                branch = canister.tank.branch
-                branch_id = branch.branch_id
-                branch_name = branch.branch_name or "Unknown"
-                
+            for canister, branch_id_val, branch_name, latest_opened_at in results:
                 # Initialize branch if not already in dict
-                if branches_dict[branch_id]["branch_id"] is None:
-                    branches_dict[branch_id]["branch_id"] = branch_id
-                    branches_dict[branch_id]["branch_name"] = branch_name
-                
-                # Get the most recent log entry with opened_at for this canister
-                # If opened_at exists in log, use it; otherwise use created_at from canisters table
-                latest_log_with_opened = (
-                    self.db.query(CanisterLn2Log)
-                    .filter(
-                        CanisterLn2Log.canister_id == canister.canister_id,
-                        CanisterLn2Log.opened_at.isnot(None)
-                    )
-                    .order_by(desc(CanisterLn2Log.opened_at))
-                    .first()
-                )
+                if branches_dict[branch_id_val]["branch_id"] is None:
+                    branches_dict[branch_id_val]["branch_id"] = branch_id_val
+                    branches_dict[branch_id_val]["branch_name"] = branch_name or "Unknown"
                 
                 # Use opened_at from log if available, otherwise use created_at from canisters table
-                if latest_log_with_opened:
-                    updated_at = latest_log_with_opened.opened_at
-                else:
-                    # Fallback to created_at from the canisters table (not from log table)
-                    updated_at = canister.created_at
+                updated_at = latest_opened_at if latest_opened_at else canister.created_at
                 
                 canister_data = {
                     "canister_id": canister.canister_id,
@@ -182,7 +204,7 @@ class IVFService:
                     "updated_at": updated_at
                 }
                 
-                branches_dict[branch_id]["canisters"].append(canister_data)
+                branches_dict[branch_id_val]["canisters"].append(canister_data)
                 total_canisters += 1
             
             # Convert to list and sort by branch name
@@ -243,10 +265,15 @@ class IVFService:
             # If there's an error calculating status, default to safe
             return "safe"
     
-    def get_embryo_tracking(self) -> Dict[str, Any]:
+    def get_embryo_tracking(self, branch_id: Optional[int] = None, user_role: Optional[str] = None) -> Dict[str, Any]:
         """
         Get embryo tracking data grouped by cryolock.
         Returns data in the format matching the table structure.
+        
+        Args:
+            branch_id: Optional branch ID to filter by. If provided, only returns embryos for that branch.
+                      If None, returns embryos for all branches (Admin role).
+            user_role: User's role ("User", "Manager", "Admin") to determine field visibility.
         
         Returns:
             Dictionary containing:
@@ -259,36 +286,54 @@ class IVFService:
                 - goblet_color: Goblet Color
                 - cryolock_color: Cryolock Color
                 - date_of_vitrification: Date of Vitrification
-                - embryo_grading: Comma-separated embryo gradings
+                - embryo_grading: Comma-separated embryo gradings (User role only)
+                - site_name: Branch name (Manager/Admin roles only)
+                - status: Embryo status (Manager/Admin roles only)
             - total: Total number of records
         """
         try:
+            # Determine which fields to include based on role
+            is_user_role = user_role and user_role.title() == "User"
+            
             # Query embryos with all related data
-            # Join: Embryo -> Patient, Cryolock -> Cane -> Canister -> Tank
-            query = (
-                self.db.query(
-                    IVFPatient.his_number,
-                    Cryolock.cryolock_number,
-                    Canister.canister_number,
-                    Tank.tank_id,
-                    Tank.tank_code,
-                    Cane.cane_id,
-                    Cane.cane_code,
-                    Cane.goblet_color,
-                    Cryolock.cryolock_color,
-                    Embryo.date_of_vitrification,
-                    func.string_agg(
-                        func.coalesce(Embryo.embryo_grading, ''), 
-                        ', '
-                    ).label('embryo_grading')
+            # Join: Embryo -> Patient, Cryolock -> Cane -> Canister -> Tank -> Branch
+            if is_user_role:
+                # User role: Aggregate embryo_grading by cryolock
+                query = (
+                    self.db.query(
+                        IVFPatient.his_number,
+                        Cryolock.cryolock_id,
+                        Cryolock.cryolock_number,
+                        Canister.canister_number,
+                        Tank.tank_id,
+                        Tank.tank_code,
+                        Cane.cane_id,
+                        Cane.cane_code,
+                        Cane.goblet_color,
+                        Cryolock.cryolock_color,
+                        Embryo.date_of_vitrification,
+                        HospitalBranch.branch_name,
+                        # Aggregate embryo_grading for grouping by cryolock
+                        func.string_agg(
+                            func.coalesce(Embryo.embryo_grading, ''), 
+                            ', '
+                        ).label('embryo_grading')
+                    )
+                    .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
+                    .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
+                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                    .join(Canister, Cane.canister_id == Canister.canister_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(Embryo.is_active == True)
                 )
-                .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-                .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .filter(Embryo.is_active == True)
-                .group_by(
+                
+                # Apply branch filter if provided (User role)
+                if branch_id is not None:
+                    query = query.filter(HospitalBranch.branch_id == branch_id)
+                
+                # Group by cryolock to aggregate embryo_grading
+                query = query.group_by(
                     IVFPatient.his_number,
                     Cryolock.cryolock_id,
                     Cryolock.cryolock_number,
@@ -299,10 +344,43 @@ class IVFService:
                     Cane.cane_code,
                     Cane.goblet_color,
                     Cryolock.cryolock_color,
-                    Embryo.date_of_vitrification
+                    Embryo.date_of_vitrification,
+                    HospitalBranch.branch_name
+                ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+            else:
+                # Manager/Admin roles: Show individual embryos with status (no aggregation)
+                query = (
+                    self.db.query(
+                        IVFPatient.his_number,
+                        Cryolock.cryolock_id,
+                        Cryolock.cryolock_number,
+                        Canister.canister_number,
+                        Tank.tank_id,
+                        Tank.tank_code,
+                        Cane.cane_id,
+                        Cane.cane_code,
+                        Cane.goblet_color,
+                        Cryolock.cryolock_color,
+                        Embryo.date_of_vitrification,
+                        Embryo.status,
+                        HospitalBranch.branch_name,
+                        Embryo.embryo_grading  # Individual grading, not aggregated
+                    )
+                    .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
+                    .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
+                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                    .join(Canister, Cane.canister_id == Canister.canister_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(Embryo.is_active == True)
                 )
-                .order_by(IVFPatient.his_number, Cryolock.cryolock_number)
-            )
+                
+                # Apply branch filter if provided (Manager role)
+                if branch_id is not None:
+                    query = query.filter(HospitalBranch.branch_id == branch_id)
+                
+                # No grouping - show individual embryos
+                query = query.order_by(IVFPatient.his_number, Cryolock.cryolock_number)
             
             results = query.all()
             
@@ -324,9 +402,19 @@ class IVFService:
                     "goblet_color": row.goblet_color or "",
                     "cryolock_color": row.cryolock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,
-                    "embryo_grading": row.embryo_grading or ""
                 }
                 
+                # Role-based field visibility
+                if is_user_role:
+                    # User role: Include embryo_grading (aggregated), exclude site_name and status
+                    tracking_data["embryo_grading"] = row.embryo_grading or ""
+                else:
+                    # Manager/Admin roles: Include site_name and status, exclude embryo_grading
+                    tracking_data["site_name"] = row.branch_name or ""
+                    # Status is selected in the query for Manager/Admin roles
+                    tracking_data["status"] = getattr(row, 'status', None) or ""
+                
+                # Append the tracking data to the list
                 tracking_list.append(tracking_data)
             
             return {
