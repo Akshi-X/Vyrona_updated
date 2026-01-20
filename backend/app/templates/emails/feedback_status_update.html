@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8F9FA;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .content {
+            padding: 30px;
+            color: #374151;
+        }
+        .content h2 {
+            color: #6B1176;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        .status-update-card {
+            background-color: #F2E4FF;
+            border-left: 4px solid #6B1176;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .status-update-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .status-update-label {
+            color: #6B1176;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .status-update-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .status-change {
+            background-color: #EFF6FF;
+            border-left: 4px solid #2563EB;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .status-change-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .status-change-label {
+            color: #1E40AF;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .status-change-value {
+            color: #1E40AF;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .footer {
+            background-color: #F8F9FA;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            border-top: 1px solid #E5E7EB;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #E5E7EB;
+            margin: 20px 0;
+        }
+        .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">📊</div>
+            <h1>{{ subject }}</h1>
+        </div>
+        
+        <div class="content">
+            <h2>Ticket Status Update</h2>
+            <p>Hello,</p>
+            <p>Your support ticket status has been updated. Here are the details:</p>
+            
+            <div class="status-update-card">
+                <table class="status-update-table">
+                    <tr class="status-update-row">
+                        <td class="status-update-label">🎫 Ticket ID:</td>
+                        <td class="status-update-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📧 Subject:</td>
+                        <td class="status-update-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">📅 Updated:</td>
+                        <td class="status-update-value">{{ updated_on }}</td>
+                    </tr>
+                    <tr class="status-update-row">
+                        <td class="status-update-label">👤 Updated By:</td>
+                        <td class="status-update-value">{{ updated_by_name }}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="status-change">
+                <table class="status-change-table">
+                    <tr class="status-change-row">
+                        <td class="status-change-label">Previous Status:</td>
+                        <td class="status-change-value">{{ old_status }}</td>
+                    </tr>
+                    <tr class="status-change-row">
+                        <td class="status-change-label">New Status:</td>
+                        <td class="status-change-value">{{ new_status }}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p style="font-size: 14px; color: #6B7280;">
+                You can view your ticket at: 
+                <a href="{{ ticket_url }}" style="color: #2563EB;">{{ ticket_url }}</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>myGrape</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

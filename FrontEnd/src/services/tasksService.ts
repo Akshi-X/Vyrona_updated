@@ -1,0 +1,131 @@
+/**
+ * Tasks Service
+ * Handles all tasks-related API calls
+ */
+
+import { BaseApiService } from './baseApiService';
+
+export interface Task {
+  id: number;
+  task_name: string;
+  description?: string;
+  assignee: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+  };
+  created_by: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+  };
+  patient_id?: string;
+  due_date?: string;
+  priority: 'Low' | 'Medium' | 'High';
+  status: 'Not started' | 'In progress' | 'Done';
+  created_at: string;
+  updated_at?: string;
+  permissions?: {
+    can_edit_all: boolean;
+    can_edit_status_only: boolean;
+  };
+}
+
+export interface TaskListResponse {
+  created_tasks?: Task[];
+  assigned_tasks?: Task[];
+  total_created: number;
+  total_assigned: number;
+}
+
+export class TasksService extends BaseApiService {
+  /**
+   * Get all tasks for current user
+   */
+  async getMyTasks(): Promise<TaskListResponse> {
+    return await this.request<TaskListResponse>('/api/tasks', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get tasks for a specific patient
+   * Returns PatientTaskListResponse with tasks array inside
+   */
+  async getPatientTasks(patientId: string): Promise<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }> {
+    return await this.request<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get task by ID
+   */
+  async getTask(taskId: number): Promise<Task> {
+    return await this.request<Task>(`/api/tasks/${taskId}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create new task (Manager only)
+   */
+  async createTask(taskData: {
+    task_name: string;
+    description?: string;
+    assignee_id: string;
+    patient_id?: string;
+    due_date?: string;
+    priority: 'Low' | 'Medium' | 'High';
+    status?: 'Not started' | 'In progress' | 'Done';
+  }): Promise<{ message: string; task_id: number }> {
+    return await this.request<{ message: string; task_id: number }>('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  /**
+   * Update task
+   */
+  async updateTask(taskId: number, taskData: {
+    task_name?: string;
+    description?: string;
+    assignee_id?: string;
+    patient_id?: string;
+    due_date?: string;
+    priority?: 'Low' | 'Medium' | 'High';
+    status?: 'Not started' | 'In progress' | 'Done';
+  }): Promise<{ message: string; task_id: number }> {
+    return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  /**
+   * Update task status
+   */
+  async updateTaskStatus(taskId: number, status: 'Not started' | 'In progress' | 'Done'): Promise<{ message: string; task_id: number }> {
+    return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  /**
+   * Delete task
+   */
+  async deleteTask(taskId: number): Promise<{ message: string; task_id: number }> {
+    return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+}
+
+// Export singleton instance
+export const tasksService = new TasksService();

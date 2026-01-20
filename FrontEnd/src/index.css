@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Font configuration */
+body {
+  font-family: 'Open Sans', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Work Sans', sans-serif;
+}
+
+/* Hide Microsoft Edge's default password reveal and clear icons
+   so only our custom eye icon is shown */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
