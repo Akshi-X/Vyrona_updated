@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { authUtils } from '../utils/auth';
 import { authService } from '../services/authService';
@@ -19,7 +19,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // In dev tools / error boundaries React may render components outside the provider.
+    // Fall back to a safe default instead of throwing to avoid crashing the app.
+    if (import.meta.env?.MODE !== 'production') {
+      console.warn('useAuth called outside AuthProvider – returning default unauthenticated context');
+    }
+    return {
+      isAuthenticated: false,
+      token: undefined,
+      isLoading: false,
+      userRole: undefined,
+      isEmailNotificationsEnabled: true,
+      setIsEmailNotificationsEnabled: () => {},
+      login: () => {},
+      logout: () => {},
+    } as AuthContextType;
   }
   return context;
 };
@@ -33,7 +47,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | undefined>(undefined);
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [sessionTimeout, setSessionTimeout] = useState<number | null>(null);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
+  const sessionTimeoutRef = useRef<number | null>(null);
+  const rememberMeRef = useRef<boolean>(false);
   const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('email_notify_pref');
@@ -43,21 +59,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   });
 
-  // Function to set session timeout
-  const setSessionTimeoutHandler = (rememberMe: boolean = false) => {
-    // Clear existing timeout
-    if (sessionTimeout) {
-      clearTimeout(sessionTimeout);
+  // Function to clear session timeout
+  const clearSessionTimeout = () => {
+    if (sessionTimeoutRef.current) {
+      clearTimeout(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
+  };
+
+  // Function to reset inactivity timeout (only when rememberMe is false)
+  const resetInactivityTimeout = React.useCallback(() => {
+    // Only reset timeout when rememberMe is false and user is authenticated
+    if (rememberMeRef.current || !isAuthenticated) {
+      return;
     }
     
-    // Set new timeout based on remember me setting
-    const timeoutDuration = rememberMe ? 9 * 60 * 60 * 1000 : 60 * 60 * 1000; // 9 hours or 1 hour in milliseconds
-    const timeout = setTimeout(() => {
-      logout();
-    }, timeoutDuration);
+    // Clear existing timeout
+    clearSessionTimeout();
     
-    setSessionTimeout(timeout);
-  };
+    // Set new timeout for 1 hour of inactivity
+    const timeoutDuration = 60 * 60 * 1000; // 1 hour in milliseconds
+    sessionTimeoutRef.current = window.setTimeout(() => {
+      // Access logout through the ref pattern to avoid circular dependency
+      clearSessionTimeout();
+      authService.logout();
+      setToken(undefined);
+      setUserRole(undefined);
+      setIsAuthenticated(false);
+      setRememberMe(false);
+      rememberMeRef.current = false;
+      localStorage.removeItem('user_role');
+    }, timeoutDuration);
+  }, [isAuthenticated]);
+
+  // Function to set session timeout
+  const setSessionTimeoutHandler = React.useCallback((rememberMeValue: boolean = false) => {
+    // Clear existing timeout
+    clearSessionTimeout();
+    
+    setRememberMe(rememberMeValue);
+    rememberMeRef.current = rememberMeValue;
+    
+    if (rememberMeValue) {
+      // Fixed 9-hour timer when remember me is enabled
+      const timeoutDuration = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
+      sessionTimeoutRef.current = window.setTimeout(() => {
+        clearSessionTimeout();
+        authService.logout();
+        setToken(undefined);
+        setUserRole(undefined);
+        setIsAuthenticated(false);
+        setRememberMe(false);
+        rememberMeRef.current = false;
+        localStorage.removeItem('user_role');
+      }, timeoutDuration);
+    } else {
+      // Inactivity-based 1-hour timeout when remember me is disabled
+      // Will be set up by the activity tracking useEffect
+      resetInactivityTimeout();
+    }
+  }, [resetInactivityTimeout]);
 
   useEffect(() => {
     // Check for existing token on mount
@@ -139,14 +200,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch {}
   }, [isEmailNotificationsEnabled]);
 
+  // Activity tracking for inactivity timeout (only when rememberMe is false)
+  useEffect(() => {
+    if (!rememberMe && isAuthenticated) {
+      // List of events that indicate user activity
+      const activityEvents = [
+        'mousedown',
+        'mousemove',
+        'keypress',
+        'scroll',
+        'touchstart',
+        'click',
+        'keydown'
+      ];
+
+      // Throttle function to limit how often we reset the timeout
+      let throttleTimer: number | null = null;
+      const handleActivity = () => {
+        // Only reset if rememberMe is still false
+        if (rememberMeRef.current) {
+          return;
+        }
+        
+        if (throttleTimer) {
+          return;
+        }
+        
+        throttleTimer = window.setTimeout(() => {
+          resetInactivityTimeout();
+          throttleTimer = null;
+        }, 1000); // Reset timeout at most once per second
+      };
+
+      // Add event listeners
+      activityEvents.forEach(event => {
+        document.addEventListener(event, handleActivity, true);
+      });
+
+      // Initial timeout setup
+      resetInactivityTimeout();
+
+      // Cleanup
+      return () => {
+        activityEvents.forEach(event => {
+          document.removeEventListener(event, handleActivity, true);
+        });
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+        }
+      };
+    }
+  }, [rememberMe, isAuthenticated, resetInactivityTimeout]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (sessionTimeout) {
-        clearTimeout(sessionTimeout);
-      }
+      clearSessionTimeout();
     };
-  }, [sessionTimeout]);
+  }, []);
 
   const login = (newToken: string, role?: string, rememberMe: boolean = false) => {
     authUtils.setToken(newToken, rememberMe);
@@ -164,11 +275,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     // Clear session timeout
-    if (sessionTimeout) {
-      clearTimeout(sessionTimeout);
-      setSessionTimeout(null);
-    }
+    clearSessionTimeout();
     
+    setRememberMe(false);
+    rememberMeRef.current = false;
     authService.logout();
     setToken(undefined);
     setUserRole(undefined);

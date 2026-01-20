@@ -11,7 +11,11 @@ export interface UserProfileDto {
   last_name: string;
   email: string;
   role: string;
-  company_name: string;
+  company_name: string | null;
+  pharma_id?: number | null;
+  hospital_id?: number | null;
+  branch_id?: number | null;
+  department?: string | null;
   approved_status: string;
   status: boolean;
   is_locked: boolean;

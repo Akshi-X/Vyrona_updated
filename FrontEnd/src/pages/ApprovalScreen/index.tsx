@@ -282,8 +282,15 @@ const ApprovalScreen: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 font-medium">Organization:</span>
-                    <span className="text-gray-800">{userInfo.company_name}</span>
+                    <span className="text-gray-800">{userInfo.company_name || '-'}</span>
                   </div>
+                  {/* Show Department only for IVF/hospital users (not CGT/pharma) */}
+                  {userInfo.department && userInfo.department.toUpperCase() !== 'CGT' && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 font-medium">Department:</span>
+                      <span className="text-gray-800">{userInfo.department}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600 font-medium">Status:</span>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${userInfo.approved_status === 'pending'
