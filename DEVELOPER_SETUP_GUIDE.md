@@ -377,19 +377,10 @@ SECRET_KEY=your-secret-key-minimum-32-characters-long-generate-random-string
 # ============================================
 # Email Configuration
 # ============================================
-SENDER_EMAIL=your-email@example.com
 ADMIN_EMAIL=admin@example.com
-EMAIL_SERVICE=smtp
-# Options: "smtp" or "sendgrid"
-
-# SMTP Configuration (if EMAIL_SERVICE=smtp)
-SENDER_PASSWORD=your-email-app-password
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-
-# SendGrid Configuration (if EMAIL_SERVICE=sendgrid)
-# SENDGRID_API_KEY=your-sendgrid-api-key
-# SENDGRID_FROM_EMAIL=your-email@example.com
+# SendGrid Configuration
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_FROM_EMAIL=your-email@example.com
 
 # ============================================
 # Admin Account Configuration
@@ -424,10 +415,6 @@ RELOAD=True
 **Important Notes:**
 - Replace `your_postgres_password_here` with your actual PostgreSQL password
 - Generate a secure `SECRET_KEY` using: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
-- For Gmail SMTP, you need to:
-  1. Enable 2-factor authentication
-  2. Generate an App Password (not your regular password)
-  3. Use the App Password in `SENDER_PASSWORD`
 
 ### Step 6: Configure Pharma Admins
 
@@ -998,20 +985,12 @@ poetry install
 
 #### 6. Email Service Issues
 
-**SMTP Authentication Failed**
+**SendGrid Authentication Failed**
 
 ```bash
-# Solution for Gmail:
-# 1. Enable 2-factor authentication
-# 2. Generate App Password (not regular password)
-# 3. Use App Password in SENDER_PASSWORD
-
 # Check .env file:
-EMAIL_SERVICE=smtp
-SENDER_EMAIL=your-email@gmail.com
-SENDER_PASSWORD=your-app-password-here
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_FROM_EMAIL=your-verified-email@example.com
 ```
 
 #### 7. CORS Errors in Browser

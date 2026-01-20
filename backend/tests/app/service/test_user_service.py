@@ -316,7 +316,7 @@ def test_register_user_email_failure(
     mock_generate_id.return_value = "USR-123456"
     mock_hash.return_value = "hashed_password"
     mock_get_admin.return_value = "admin@pharma.com"
-    mock_send_email.side_effect = Exception("SMTP error")
+    mock_send_email.side_effect = Exception("SendGrid error")
     
     # Mock pharma query
     pharma_query = MagicMock()
