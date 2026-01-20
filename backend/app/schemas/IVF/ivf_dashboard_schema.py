@@ -3,7 +3,7 @@ IVF Dashboard Schemas
 Response models for IVF dashboard metrics
 """
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 
 
@@ -49,6 +49,26 @@ class OutboundShipmentsResponse(BaseModel):
     status: str = Field(default="success", description="Response status")
 
 
+class AvgQualityLossPerContainerResponse(BaseModel):
+    """Response for average quality loss per container metric"""
+    avg_quality_loss_per_container: float = Field(
+        ...,
+        description="Average quality loss per container from IVF quality logs for current month"
+    )
+    total_containers: int = Field(..., description="Total containers included in the calculation")
+    last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    status: str = Field(default="success", description="Response status")
+
+
+class DeviationsGraphResponse(BaseModel):
+    """Response for deviations graph metric"""
+    view_level: str = Field(..., description="View level: container (user) or site (manager/admin)")
+    top_deviation_type: str = Field(..., description="Top contributing deviation type overall")
+    data: List[Dict[str, Any]] = Field(..., description="Deviation data for charting")
+    last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    status: str = Field(default="success", description="Response status")
+
+
 class IVFDashboardMetricsResponse(BaseModel):
     """Response for all IVF dashboard metrics"""
     total_embryos_cryolocks: Dict = Field(..., description="Total embryos and cryolocks metric")
@@ -56,5 +76,7 @@ class IVFDashboardMetricsResponse(BaseModel):
     quality_deviations_flagged: Dict = Field(..., description="Quality deviations flagged metric")
     top_deviation_driver: Dict = Field(..., description="Top deviation driver metric")
     outbound_shipments: Dict = Field(..., description="Outbound shipments metric")
+    avg_quality_loss_per_container: Dict = Field(..., description="Average quality loss per container metric")
+    deviations_graph: Dict = Field(..., description="Deviations graph metric")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
