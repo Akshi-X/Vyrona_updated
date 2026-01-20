@@ -17,6 +17,7 @@ from ..config.permissions import EndpointPermissions
 from ..models.user_model import User
 from ..constants.error_codes import ERROR_CODES
 from ..constants.app_constants import COMMON_API_HEADERS
+from ..utils.user_helpers import is_hospital_department
 from ..exceptions import (
     InvalidTokenException,
     TokenExpiredException,
@@ -112,7 +113,6 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                     raise UserNotApprovedException(user_id=user.user_id)
                 
                 # Validate token type matches user's department
-                from ..utils.user_helpers import is_hospital_department
                 is_hospital_user = is_hospital_department(user.department) if user.department else False
                 
                 # Token valid - inject authenticated user into request
@@ -144,7 +144,8 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
                         request.state.pharma_id = pharma_id
                     request.state.hospital_id = None
                     request.state.branch_id = None
-                    request.state.department = None
+                    # Include department from token for pharma users (CGT)
+                    request.state.department = payload.get("department")
                 else:
                     # Unknown token type
                     db.close()

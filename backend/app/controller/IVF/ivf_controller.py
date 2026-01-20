@@ -1,19 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
 from app.service.IVF.ivf_service import IVFService
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
+from app.utils.ivf_helpers import get_branch_filter_info
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
 
 
 @router.get("/control_tower", response_model=IVFControlTowerResponse)
 def get_ivf_control_tower_map(
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Get IVF control tower map locations with hospital and branch information.
+    
+    Role-based access:
+    - User/Manager: Only see data from their assigned branch
+    - Admin: See data from all branches
     
     This endpoint returns hospital branch locations organized by states with their 
     geographic coordinates for display on the control tower map.
@@ -46,8 +52,11 @@ def get_ivf_control_tower_map(
     }
     """
     try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
         service = IVFService(db)
-        map_data = service.get_control_tower_map_locations()
+        map_data = service.get_control_tower_map_locations(branch_id=branch_id)
         return IVFControlTowerResponse(**map_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting IVF control tower map data: {str(e)}")
@@ -55,10 +64,15 @@ def get_ivf_control_tower_map(
 
 @router.get("/control_tower/active_canisters", response_model=ActiveCanistersResponse)
 def get_active_canisters(
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Get active canisters grouped by branch with their status and last updated time.
+    
+    Role-based access:
+    - User/Manager: Only see canisters from their assigned branch
+    - Admin: See canisters from all branches
     
     This endpoint returns all active canisters (is_active = True) grouped by branch with:
     - branch_id: The ID of the branch
@@ -104,8 +118,11 @@ def get_active_canisters(
     }
     """
     try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
         service = IVFService(db)
-        canisters_data = service.get_active_canisters()
+        canisters_data = service.get_active_canisters(branch_id=branch_id)
         return ActiveCanistersResponse(**canisters_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting active canisters: {str(e)}")
@@ -113,10 +130,16 @@ def get_active_canisters(
 
 @router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
 def get_embryo_tracking(
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Get embryo tracking data grouped by cryolock.
+    
+    Role-based access and field visibility:
+    - User: Only see data from their assigned branch. Includes embryo_grading, excludes site_name and status.
+    - Manager: Only see data from their assigned branch. Includes site_name and status, excludes embryo_grading.
+    - Admin: See data from all branches. Includes site_name and status, excludes embryo_grading.
     
     This endpoint returns embryo tracking information in a table format showing:
     - HIS Number (Patient identifier)
@@ -127,12 +150,11 @@ def get_embryo_tracking(
     - Goblet Color
     - Cryolock Color
     - Date of Vitrification
-    - Embryo Grading (comma-separated for multiple embryos in same cryolock)
+    - Embryo Grading (User role only - comma-separated for multiple embryos in same cryolock)
+    - Site Name (Manager/Admin roles only - branch name)
+    - Status (Manager/Admin roles only - embryo status)
     
-    The data is grouped by cryolock, so multiple embryos in the same cryolock
-    will have their gradings aggregated into a comma-separated list.
-    
-    Response format:
+    Response format (User role):
     {
         "data": [
             {
@@ -150,10 +172,33 @@ def get_embryo_tracking(
         ],
         "total": 10
     }
+    
+    Response format (Manager/Admin roles):
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "CL-01",
+                "canister_number": 6,
+                "tank_id": "Tank 8",
+                "cane_id": "Cane-A 12",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "site_name": "Egmore",
+                "status": "Active"
+            },
+            ...
+        ],
+        "total": 10
+    }
     """
     try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
         service = IVFService(db)
-        tracking_data = service.get_embryo_tracking()
+        tracking_data = service.get_embryo_tracking(branch_id=branch_id, user_role=role)
         return EmbryoTrackingResponse(**tracking_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting embryo tracking data: {str(e)}")
