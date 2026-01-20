@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8F9FA;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        .content {
+            padding: 30px;
+            color: #374151;
+        }
+        .content h2 {
+            color: #6B1176;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        .user-details-card {
+            background-color: #F2E4FF;
+            border-left: 4px solid #6B1176;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .user-details-card p {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-details-card strong {
+            color: #6B1176;
+            display: inline-flex;
+            align-items: center;
+            min-width: 140px;
+        }
+        .urgent-notice {
+            background-color: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .urgent-notice p {
+            margin: 6px 0;
+            font-size: 14px;
+            color: #92400E;
+        }
+        .footer {
+            background-color: #F8F9FA;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            border-top: 1px solid #E5E7EB;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #E5E7EB;
+            margin: 20px 0;
+        }
+        .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .action-buttons {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 18px 45px;
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF !important;
+            text-decoration: none !important;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 12px rgba(107, 17, 118, 0.4);
+            transition: all 0.2s ease;
+            border: 2px solid #6B1176;
+            cursor: pointer;
+            text-align: center;
+            min-width: 200px;
+        }
+        .button:hover {
+            background: linear-gradient(135deg, #5A0F66 0%, #632F88 100%);
+            color: #FFFFFF !important;
+            box-shadow: 0 6px 16px rgba(107, 17, 118, 0.5);
+            transform: translateY(-2px);
+            border-color: #5A0F66;
+        }
+        .button:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 8px rgba(107, 17, 118, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">🔔</div>
+            <h1>{{ subject }}</h1>
+            <p class="subtitle">myGrape</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello Admin,</h2>
+            <p>A new user has registered and is awaiting your approval. Please review the details below:</p>
+            
+            <div class="user-details-card">
+                <p><strong>👤 Name:</strong> {{ first_name }} {{ last_name }}</p>
+                <p><strong>📧 Email:</strong> {{ email }}</p>
+                <p><strong>🏢 Role:</strong> {{ role|capitalize }}</p>
+                <p><strong>🏢 Organisation:</strong> {{ company }}</p>
+            </div>
+            
+            <div class="urgent-notice">
+                <p><strong>⏰ Action Required:</strong> This registration is waiting for your approval.</p>
+                <p>Please review and approve or reject within 24 hours.</p>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="{{ approval_url }}" class="button" style="color: #FFFFFF !important; text-decoration: none !important;">
+                    REVIEW APPLICATION
+                </a>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p style="font-size: 14px; color: #6B7280;">
+                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="{{ approval_url }}" style="color: #2563EB; word-break: break-all;">{{ approval_url }}</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>myGrape</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

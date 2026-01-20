@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8F9FA;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .content {
+            padding: 30px;
+            color: #374151;
+        }
+        .content h2 {
+            color: #6B1176;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        .comment-details-card {
+            background-color: #F2E4FF;
+            border-left: 4px solid #6B1176;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .comment-details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .comment-details-label {
+            color: #6B1176;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-details-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .comment-box {
+            background-color: #F8F9FA;
+            border: 1px solid #E5E7EB;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .comment-box-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .comment-box-label {
+            color: #6B1176;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 12px 8px 0;
+            text-align: left;
+            vertical-align: top;
+            width: 140px;
+            white-space: nowrap;
+        }
+        .comment-box-value {
+            color: #374151;
+            font-size: 14px;
+            padding: 8px 0 8px 12px;
+            vertical-align: top;
+            text-align: left;
+            font-style: italic;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .footer {
+            background-color: #F8F9FA;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            border-top: 1px solid #E5E7EB;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #E5E7EB;
+            margin: 20px 0;
+        }
+        .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">💬</div>
+            <h1>{{ subject }}</h1>
+        </div>
+        
+        <div class="content">
+            <h2>New Comment Added</h2>
+            <p>Hello,</p>
+            <p>A new comment has been added to your support ticket.</p>
+            
+            <div class="comment-details-card">
+                <table class="comment-details-table">
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">🎫 Ticket ID:</td>
+                        <td class="comment-details-value">{{ ticket_id }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📧 Subject:</td>
+                        <td class="comment-details-value">{{ feedback_subject }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">👤 Commented By:</td>
+                        <td class="comment-details-value">{{ commented_by_name }}</td>
+                    </tr>
+                    <tr class="comment-details-row">
+                        <td class="comment-details-label">📅 Commented:</td>
+                        <td class="comment-details-value">{{ commented_on }}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="comment-box">
+                <table class="comment-box-table">
+                    <tr class="comment-box-row">
+                        <td class="comment-box-label">💬 Comment:</td>
+                        <td class="comment-box-value">"{{ comment }}"</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p style="font-size: 14px; color: #6B7280;">
+                You can view the full conversation at: 
+                <a href="{{ ticket_url }}" style="color: #2563EB;">{{ ticket_url }}</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>myGrape</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

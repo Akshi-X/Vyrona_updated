@@ -1,0 +1,270 @@
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, Optional, Any, List, Set
+from passlib.context import CryptContext
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+import bcrypt
+try:
+    import country_converter as coco
+except ImportError:
+    coco = None  # Optional dependency
+from ..models.pharma_model import Pharma
+from ..models.user_model import User
+from ..constants.status_constants import STATUS_FAILED
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ============================================
+# COMMON RESPONSE HEADERS
+# ============================================
+
+COMMON_RESPONSE_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization"
+}
+
+
+# ============================================
+# RESPONSE BUILDER UTILITIES
+# ============================================
+
+def create_error_response(
+    status_code: int,
+    error_code: str,
+    message: str,
+    details: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> JSONResponse:
+    """
+    Create a standardized error response with common structure and headers.
+    
+    Args:
+        status_code: HTTP status code
+        error_code: Application error code
+        message: Error message
+        details: Optional additional details (e.g., remaining_attempts)
+        headers: Optional additional headers (merged with common headers)
+        
+    Returns:
+        JSONResponse with standardized error format
+    """
+    content = {
+        "error_code": error_code,
+        "message": message,
+        "status": STATUS_FAILED,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Add optional details
+    if details:
+        content.update(details)
+    
+    # Merge headers
+    response_headers = COMMON_RESPONSE_HEADERS.copy()
+    if headers:
+        response_headers.update(headers)
+    
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers=response_headers
+    )
+
+def generate_user_id():
+    return f"USR-{uuid.uuid4().hex[:6].upper()}"
+
+
+
+def generate_patient_id():
+    """Generate unique patient ID"""
+    return f"PAT-{uuid.uuid4().hex[:8].upper()}"
+
+def hash_password(password: str) -> str:
+    try:
+        return pwd_context.hash(password)
+    except ValueError as e:
+        if "password cannot be longer than 72 bytes" in str(e):
+
+            # Use bcrypt directly with a fixed salt
+            salt = bcrypt.gensalt()
+            hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+            return hashed.decode('utf-8')
+        else:
+            raise e
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # If passlib verification fails, try direct bcrypt verification
+        try:
+
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        except Exception:
+            return False
+
+
+def ensure_timezone_aware(dt: datetime) -> datetime:
+    """
+    Ensure datetime is timezone-aware (UTC if naive)
+    
+    Args:
+        dt: Datetime object (naive or aware)
+        
+    Returns:
+        Timezone-aware datetime (UTC)
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+# ============================================
+# DATABASE QUERY UTILITIES
+# ============================================
+
+def get_user_by_email(email: str, db) -> User:
+    """
+    Get user by email address (common utility)
+    
+    Args:
+        email: User's email address
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        User object if found, None otherwise
+    """
+    return db.query(User).filter(User.email == email).first()
+
+
+def get_user_by_id(user_id: str, db) -> User:
+    """
+    Get user by user ID (common utility)
+    
+    Args:
+        user_id: User's ID
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        User object if found, None otherwise
+    """
+    return db.query(User).filter(User.user_id == user_id).first()
+
+
+def get_pharma_id_by_company_name(company_name: str, db: Session) -> Optional[int]:
+    """
+    Get pharma ID by company name (pharma_name)
+    
+    Args:
+        company_name: The company/pharma name
+        db: Database session (SQLAlchemy Session)
+        
+    Returns:
+        Pharma ID if found, None otherwise
+    """
+
+    
+    pharma = db.query(Pharma).filter(Pharma.pharma_name == company_name).first()
+    return pharma.id if pharma else None
+
+
+# ============================================
+# COUNTRY AND REGION UTILITIES
+# ============================================
+
+# Initialize country converter instance (singleton pattern for performance)
+_cc = coco.CountryConverter() if coco else None
+
+def country_to_region(country_code: Optional[str]) -> Optional[str]:
+    """
+    Convert a country code to its region using country_converter.
+    
+    Args:
+        country_code: Country code (ISO 3166-1 alpha-2, alpha-3, or country name)
+                      Examples: 'US', 'USA', 'United States', 'DE', 'DEU', 'Germany'
+        
+    Returns:
+        Region name (e.g., 'North America', 'Europe', 'Asia') or None if conversion fails
+    """
+    if not country_code or not _cc:
+        return None
+    
+    try:
+        # Convert country code to region using country_converter
+        # Using 'UNregion' which provides UN geoscheme regions
+        region = _cc.convert(country_code, to='UNregion', not_found=None)
+        return region if region else None
+    except Exception:
+        # If conversion fails, return None
+        return None
+
+
+def normalize_role_to_title_case(role: str) -> str:
+    """
+    Normalize role string to title case (first letter capital).
+    Ensures consistent role formatting in API responses.
+    
+    Args:
+        role: Role string (can be any case)
+        
+    Returns:
+        Role string in title case: Admin, Manager, User, Pharma_admin, Mygrape_admin
+    """
+    if not role:
+        return role
+    
+    role_lower = role.lower()
+    role_mapping = {
+        'admin': 'Admin',
+        'pharma_admin': 'Pharma_admin',
+        'mygrape_admin': 'Mygrape_admin',
+        'manager': 'Manager',
+        'user': 'User'
+    }
+    
+    return role_mapping.get(role_lower, role.capitalize())
+
+
+def get_countries_by_regions(regions: List[str]) -> Set[str]:
+    """
+    Get all country codes that belong to the specified regions.
+    This is optimized for filtering - pre-computes all countries in the regions.
+    
+    Args:
+        regions: List of region names (e.g., ['Europe', 'North America'])
+        
+    Returns:
+        Set of country codes (ISO 3166-1 alpha-2) that belong to the regions
+    """
+    if not regions:
+        return set()
+    
+    countries = set()
+    try:
+        # Get all available countries from country_converter
+        # Using the data attribute which contains a pandas DataFrame
+        if not _cc:
+            # Fallback: use a predefined list of common countries
+            all_countries = []
+        elif hasattr(_cc, 'data') and hasattr(_cc.data, 'ISO2'):
+            all_countries = _cc.data['ISO2'].dropna().unique().tolist()
+        else:
+            # Fallback: use a predefined list of common countries
+            all_countries = _cc.data_table['ISO2'].dropna().unique().tolist() if hasattr(_cc, 'data_table') else []
+        
+        # Convert to set for faster lookup
+        regions_set = set(regions)
+        
+        for country_code in all_countries:
+            region = country_to_region(country_code)
+            if region and region in regions_set:
+                countries.add(country_code)
+    except Exception:
+        # If conversion fails, return empty set
+        pass
+    
+    return countries
