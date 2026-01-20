@@ -6,7 +6,6 @@ _DEFAULT_ENV = {
     "DB_HOST": "localhost",
     "DB_NAME": "pytest",
     "SECRET_KEY": "test-secret",
-    "SENDER_EMAIL": "tester@example.com",
     "ADMIN_EMAIL": "admin@example.com",
     "ADMIN_DEFAULT_PASSWORD": "changeme",
     "MYGRAPE_ADMIN_EMAIL": "mygrape@example.com",
