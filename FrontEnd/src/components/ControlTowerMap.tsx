@@ -53,6 +53,8 @@ interface ControlTowerMapProps {
   filters?: ControlTowerMapFilters;
   direction?: 'inbound' | 'outbound';
   zoomToLocation?: google.maps.LatLngLiteral | null;
+  // Optional: zoom to IVF branch by name (used for canister list clicks)
+  zoomToBranchName?: string | null;
 }
 
 const darkWorldStyle: google.maps.MapTypeStyle[] = [
@@ -99,7 +101,12 @@ const darkWorldStyle: google.maps.MapTypeStyle[] = [
 
 
 
-const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 'outbound', zoomToLocation }) => {
+const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
+  filters,
+  direction = 'outbound',
+  zoomToLocation,
+  zoomToBranchName,
+}) => {
 
   const [routes, setRoutes] = useState<MapRoute[]>([]);
 
@@ -190,6 +197,19 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
 
     // Load data based on direction
     if (direction === 'inbound') {
+      // Only skip IVF data when department is explicitly non-IVF
+      let department: string | null = null;
+      try {
+        department = localStorage.getItem('department');
+      } catch {
+        department = null;
+      }
+      if (department && department.toUpperCase() !== 'IVF') {
+        setIvfBranches([]);
+        setHighestBranchCountCountry(null);
+        return;
+      }
+
       // Fetch IVF Control Tower data for inbound
       (async () => {
         try {
@@ -382,6 +402,24 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({ filters, direction = 
       mapRef.setZoom(targetZoom);
     }
   }, [zoomToLocation, mapRef]);
+
+  // Handle zoom to IVF branch by branch name (for canister list clicks)
+  useEffect(() => {
+    if (!zoomToBranchName || !mapRef || ivfBranches.length === 0) return;
+
+    const branch = ivfBranches.find(b => b.branch_name === zoomToBranchName);
+    if (!branch) return;
+
+    const position = {
+      lat: branch.geoLocation.latitude,
+      lng: branch.geoLocation.longitude,
+    };
+
+    mapRef.panTo(position);
+    const currentZoom = mapRef.getZoom() ?? 3;
+    const targetZoom = Math.min(currentZoom + 3, 9);
+    mapRef.setZoom(targetZoom);
+  }, [zoomToBranchName, ivfBranches, mapRef]);
 
   // Cleanup all markers & polylines on unmount
   useEffect(() => {

@@ -3,6 +3,7 @@ import Login from '../pages/Login'
 import Signup from '../pages/Signup'
 import TrackAndTrace from '../pages/TrackAndTrace'
 import TrackPage from '../pages/Track'
+import IVFTrackShipmentPage from '../pages/IVFTrackShipment'
 import UserProfilePage from '../pages/UserProfilePage'
 import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
@@ -17,6 +18,37 @@ import SuccessAlert from '../pages/SuccessAlert'
 import { RoleBasedRoute } from '../components/RoleBasedRoute'
 import { AuthRedirect } from '../components/AuthRedirect'
 
+// Wrapper components to ensure context is available
+const DashboardWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <Dashboard />
+  </RoleBasedRoute>
+)
+
+const DatabaseWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <Database />
+  </RoleBasedRoute>
+)
+
+const ControlTowerWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <ControlTower />
+  </RoleBasedRoute>
+)
+
+const TrackPageWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <TrackPage />
+  </RoleBasedRoute>
+)
+
+const IVFTrackShipmentWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <IVFTrackShipmentPage />
+  </RoleBasedRoute>
+)
+
 export const router = createBrowserRouter([
   { path: '/', element: <AuthRedirect /> },
   { path: '/login', element: <Login /> },
@@ -28,10 +60,12 @@ export const router = createBrowserRouter([
   { path: '/verify-otp', element: <VerifyOtp /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/dashboard', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Dashboard /></RoleBasedRoute> },
-  { path: '/database', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><Database /></RoleBasedRoute> },
-  { path: '/control-tower', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><ControlTower /></RoleBasedRoute> },
-  { path: '/track/:patientId', element: <RoleBasedRoute restrictedRoles={['mygrape_admin']}><TrackPage /></RoleBasedRoute> },
+  { path: '/dashboard', element: <DashboardWithAuth /> },
+  { path: '/database', element: <DatabaseWithAuth /> },
+  { path: '/control-tower', element: <ControlTowerWithAuth /> },
+  { path: '/track/:patientId', element: <TrackPageWithAuth /> },
+  { path: '/ivf-track-shipment/:patientId', element: <IVFTrackShipmentWithAuth /> },
+  { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])

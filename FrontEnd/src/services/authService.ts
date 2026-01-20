@@ -19,7 +19,24 @@ export interface RegisterData {
   password: string;
   confirm_password: string;
   role: string;
-  company_name: string;
+  company_name?: string;
+  department?: string;
+  hospital_name?: string;
+  branch_name?: string;
+}
+
+export interface HospitalInfoResponse {
+  is_hospital_email: boolean;
+  hospital_name: string | null;
+  hospital_id: number | null;
+  hospital_type: string | null;
+  departments: string[];
+  branches: Array<{
+    branch_id: number;
+    branch_name: string;
+    district_name: string;
+    state_name: string;
+  }>;
 }
 
 export interface AuthResponse {
@@ -31,6 +48,12 @@ export interface AuthResponse {
   otp_expiry?: string;
   auth_token?: string;
   role?: string;
+  // Extended fields from Verify OTP success response
+  pharma_id?: number | null;
+  hospital_id?: number | null;
+  branch_id?: number | null;
+  hospital_name?: string | null;
+  department?: string | null;
 }
 
 export interface OTPData {
@@ -69,7 +92,7 @@ export class AuthService extends BaseApiService {
   /**
    * Verify OTP
    */
-  async verifyOTP(data: OTPData): Promise<AuthResponse> {
+  async verifyOTP(data: OTPData, rememberMe: boolean = false): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/api/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -77,7 +100,7 @@ export class AuthService extends BaseApiService {
 
     // Store token in cookie if provided
     if (response.auth_token) {
-      authUtils.setToken(response.auth_token);
+      authUtils.setToken(response.auth_token, rememberMe);
     }
 
     return response;
@@ -185,6 +208,16 @@ export class AuthService extends BaseApiService {
    */
   getAuthToken(): string | null {
     return authUtils.getToken() || null;
+  }
+
+  /**
+   * Get hospital info by email
+   */
+  async getHospitalInfoByEmail(email: string): Promise<HospitalInfoResponse> {
+    const encodedEmail = encodeURIComponent(email);
+    return await this.unauthenticatedRequest<HospitalInfoResponse>(`/api/hospital-info-by-email?email=${encodedEmail}`, {
+      method: 'GET',
+    });
   }
 }
 
