@@ -385,7 +385,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             raise e
         
         # If it's an email error, raise a more specific exception
-        if 'email' in str(e).lower() or 'smtp' in str(e).lower():
+        if 'email' in str(e).lower() or 'sendgrid' in str(e).lower():
             raise RegistrationEmailFailedException(email=request.email, reason=str(e))
         else:
             raise DatabaseQueryException(operation="user registration", reason=str(e))
