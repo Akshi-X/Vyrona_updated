@@ -2,11 +2,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
+import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
 import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import QualityDeviationChart from '../../components/QualityDeviationChart';
 import { patientService } from '../../services/patientService';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
@@ -33,6 +35,18 @@ import LogisticsChainIcon from '../../assets/DashBoardIcons/Logistics_Chain.svg'
 import LogisticsQualityIcon from '../../assets/DashBoardIcons/Logistics_Quality.svg';
 import FailuresIcon from '../../assets/DashBoardIcons/Failure.svg';
 import NextIcon from '../../assets/DashBoardIcons/NextIcon.svg';
+// IVF Icons
+import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
+import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
+import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
+import OutboundQualityTrackingIcon from '../../assets/DashBoardIcons/OutboundQualityTracking.svg';
+import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
+import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
+import DeviationDriverIcon from '../../assets/DashBoardIcons/DeviationDriver.svg';
+import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.svg';
+import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
+// Mock data
+import ivfDashboardMock from '../../data/ivfDashboardMock.json';
 
 interface StakeholderChat {
   id: string;
@@ -72,8 +86,25 @@ export default function Dashboard({ }: DashboardProps) {
 
   // User initials for avatar
   const [userInitials, setUserInitials] = useState<string>('');
-
-
+  // User department (CGT or IVF) - initialize from localStorage
+  const [userDepartment, setUserDepartment] = useState<string | null>(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      return dept ? dept.toUpperCase() : null;
+    } catch {
+      return null;
+    }
+  });
+  // IVF mock data
+  const [ivfData, setIvfData] = useState<any>(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      if (dept?.toUpperCase() === 'IVF') {
+        return ivfDashboardMock;
+      }
+    } catch {}
+    return null;
+  });
 
   // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
@@ -172,7 +203,7 @@ export default function Dashboard({ }: DashboardProps) {
     }
   }, [showStakeholderChats, isAuthenticated]);
 
-  // Fetch user profile to compute initials
+  // Fetch user profile to compute initials and get department
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -181,7 +212,39 @@ export default function Dashboard({ }: DashboardProps) {
         const last = profile.last_name?.trim?.() || '';
         const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
         setUserInitials(initials);
+        
+        // Get department (CGT or IVF) - check localStorage first, then API
+        let department: string | null = null;
+        try {
+          const storedDept = localStorage.getItem('department');
+          if (storedDept) {
+            department = storedDept.toUpperCase();
+          }
+        } catch {}
+        
+        // Fall back to API if not in localStorage
+        if (!department) {
+          department = profile.department?.toUpperCase() || null;
+        }
+        
+        setUserDepartment(department);
+        
+        // Load IVF mock data if user is IVF
+        if (department === 'IVF') {
+          setIvfData(ivfDashboardMock);
+        }
       } catch {
+        // Try to get department from localStorage even if API fails
+        try {
+          const storedDept = localStorage.getItem('department');
+          if (storedDept) {
+            const department = storedDept.toUpperCase();
+            setUserDepartment(department);
+            if (department === 'IVF') {
+              setIvfData(ivfDashboardMock);
+            }
+          }
+        } catch {}
         setUserInitials('U');
       }
     };
@@ -381,10 +444,362 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {userDepartment === 'IVF' && ivfData ? (
+            // IVF Dashboard Layout
+            <>
+              <div className="flex gap-6 flex-1 flex-col lg:flex-row">
+                {/* Left Column */}
+                <div className="flex-1 flex flex-col gap-6 min-w-0">
+                  <h1 className="font-semibold text-black text-lg">Monthly Summary</h1>
 
+                  {/* Volume Section */}
+                  <section>
+                    <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Total Embryos/Cryolocks */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Total Embryos/Cryolocks
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.monthlySummary?.volume?.totalEmbryosCryolocks || '0'}
+                          </div>
+                        </div>
+                      </div>
 
-          <div className="flex gap-6 flex-1 flex-col lg:flex-row">
-            {/* Left Column */}
+                      {/* Total number of Containers */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Total number of Containers
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.monthlySummary?.volume?.totalContainers || '0'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Performance Section */}
+                  <section>
+                    <h2 className="font-semibold text-black text-base mb-4">Performance</h2>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Quality Deviations Flagged */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={QualityDeviationsIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Quality Deviations Flagged
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.performance?.qualityDeviationsFlagged || '0'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top Deviation Driver */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Top Deviation Driver
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.performance?.topDeviationDriver?.count || '0'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Outbound Shipments Section */}
+                  <section>
+                    <h2 className="font-semibold text-black text-base mb-4">Outbound Shipments</h2>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Outbound Shipments */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Outbound Shipment" src={OutboundShipmentIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Outbound Shipments
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.performance?.outboundShipments || '0'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Avg Quality Lost/Patient */}
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                        <div className="flex flex-col items-start mb-2 ml-3">
+                          <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
+                            <img className="w-[18px] h-[18px]" alt="Avg Quality Lost Patient" src={AvgQualityLostPatientIcon} />
+                          </div>
+                          <div className="font-normal text-[#656565] text-[11px] mt-2">
+                            Avg Quality Lost/Patient:
+                          </div>
+                          <div className="font-semibold text-black text-[28px] mt-1">
+                            {ivfData.performance?.avgQualityLostPerPatient || '0'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                {/* Right Column */}
+                <div className="flex-1 flex flex-col gap-6 min-w-0">
+                  {/* Notifications Section - Fixed at top */}
+                  <section className="w-full">
+                    <div className="flex justify-end gap-8">
+                      {/* Critical Alerts */}
+                      <div className="relative group">
+                        <img
+                          className="w-[25px] h-[25px] cursor-pointer"
+                          alt="Critical Alerts"
+                          src={CriticalAlertsIcon}
+                          onClick={() => {
+                            fetchCriticalAlerts();
+                            setShowCriticalAlerts(true);
+                          }}
+                        />
+                        {criticalAlertsCount > 0 && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stakeholder Chats */}
+                      <div className="relative group">
+                        <img
+                          className="w-[25px] h-[25px] cursor-pointer"
+                          alt="Stakeholder Chats"
+                          src={StakeholderChatsIcon}
+                          onClick={() => {
+                            refreshUnread();
+                            fetchStakeholderChats();
+                            setShowStakeholderChats(true);
+                          }}
+                        />
+                        {stakeholderChatCount > 0 && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* My Tasks */}
+                      <div className="relative group">
+                        <img
+                          className="w-[25px] h-[25px] cursor-pointer"
+                          alt="My Tasks"
+                          src={MyTasksIcon}
+                          onClick={() => {
+                            fetchMyTasks();
+                            setShowMyTasks(true);
+                          }}
+                        />
+                        {myTasksCount > 0 && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Quality Tracking Links - Above the chart */}
+                  <section>
+                    <div className="flex gap-6 mt-11">
+                      {/* Container Quality Tracking */}
+                      <div 
+                        className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        onClick={() => {
+                          // Navigate to IVF Track Shipment page
+                          // For now, navigate without patientId - the page will handle it
+                          navigate('/ivf-track-shipment');
+                        }}
+                      >
+                        {/* Background Graphic - Subtle Icon */}
+                        <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
+                          <img
+                            className="w-24 h-24"
+                            alt="Container Quality Tracking background"
+                            src={ContainerQualityTrackingIcon}
+                          />
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="relative h-full px-3 py-4">
+                          {/* Icon at Top Left */}
+                          <div className="absolute top-4 left-4">
+                            <img
+                              className="w-[18px] h-[18px]"
+                              alt="Container Quality Tracking"
+                              src={ContainerQualityTrackingIcon}
+                            />
+                          </div>
+                          
+                          {/* Title - Left aligned */}
+                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                            Container 
+                            <br />
+                            Quality Tracking
+                          </div>
+                          
+                          {/* Arrow Button at Bottom Right */}
+                          <div className="absolute bottom-0 right-0">
+                            <button
+                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/ivf-track-shipment');
+                              }}
+                            >
+                              <img
+                                className="w-[14px] h-[14px]"
+                                alt="Next"
+                                src={NextIcon}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Outbound Quality Tracking */}
+                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden">
+                        {/* Background Graphic - Subtle Icon */}
+                        <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
+                          <img
+                            className="w-24 h-24"
+                            alt="Outbound Quality Tracking background"
+                            src={OutboundQualityTrackingIcon}
+                          />
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="relative h-full px-3 py-4">
+                          {/* Icon at Top Left */}
+                          <div className="absolute top-4 left-4">
+                            <img
+                              className="w-[18px] h-[18px]"
+                              alt="Outbound Quality Tracking"
+                              src={OutboundQualityTrackingIcon}
+                            />
+                          </div>
+                          
+                          {/* Title - Left aligned */}
+                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                            Outbound <br /> Quality Tracking
+                          </div>
+                          
+                          {/* Arrow Button at Bottom Right */}
+                          <div className="absolute bottom-0 right-0">
+                            <button
+                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                            >
+                              <img
+                                className="w-[14px] h-[14px]"
+                                alt="Next"
+                                src={NextIcon}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Incubator Quality Tracking */}
+                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden">
+                        {/* Background Graphic - Subtle Icon */}
+                        <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
+                          <img
+                            className="w-24 h-24"
+                            alt="Incubator Quality Tracking background"
+                            src={IncubatorQualityTrackingIcon}
+                          />
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="relative h-full px-3 py-4">
+                          {/* Icon at Top Left */}
+                          <div className="absolute top-4 left-4">
+                            <img
+                              className="w-[18px] h-[18px]"
+                              alt="Incubator Quality Tracking"
+                              src={IncubatorQualityTrackingIcon}
+                            />
+                          </div>
+                          
+                          {/* Title - Left aligned */}
+                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                            Incubator <br /> Quality Tracking
+                          </div>
+                          
+                          {/* Arrow Button at Bottom Right */}
+                          <div className="absolute bottom-0 right-0">
+                            <button
+                              className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                            >
+                              <img
+                                className="w-[14px] h-[14px]"
+                                alt="Next"
+                                src={NextIcon}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Quality Deviation Chart - Below Quality Tracking */}
+                  <section className="flex-1 h-[347px]">
+                    {ivfData.qualityDeviation && (
+                      <QualityDeviationChart
+                        timestamps={ivfData.qualityDeviation.timestamps}
+                        metrics={ivfData.qualityDeviation.metrics}
+                      />
+                    )}
+                  </section>
+                </div>
+              </div>
+
+              {/* Ongoing Treatments Section */}
+              <section>
+                <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
+                <h2 className="font-semibold text-black text-base mb-4">Ongoing Treatments</h2>
+                {ivfData.ongoingTreatments && (
+                  <IVFOngoingTreatments treatments={ivfData.ongoingTreatments} />
+                )}
+                </div>
+              </section>
+            </>
+          ) : (
+            // CGT Dashboard Layout (existing)
+            <>
+              <div className="flex gap-6 flex-1 flex-col lg:flex-row">
+                {/* Left Column */}
             <div className="flex-1 flex flex-col gap-6 min-w-0">
               <h1 className="font-semibold text-black text-lg">
                 Monthly Summary
@@ -826,13 +1241,15 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
             </div>
           </div>
-          {/* Ongoing Treatments Section */}
-          <section>
-            <h2 className="font-semibold text-black text-base mb-4">
-              Ongoing Treatments
-            </h2>
-            <OngoingTreatments />
-          </section>
+              {/* Ongoing Treatments Section */}
+              <section>
+                <h2 className="font-semibold text-black text-base mb-4">
+                  Ongoing Treatments
+                </h2>
+                <OngoingTreatments />
+              </section>
+            </>
+          )}
         </div>
       </main>
 

@@ -3,6 +3,7 @@ import Login from '../pages/Login'
 import Signup from '../pages/Signup'
 import TrackAndTrace from '../pages/TrackAndTrace'
 import TrackPage from '../pages/Track'
+import IVFTrackShipmentPage from '../pages/IVFTrackShipment'
 import UserProfilePage from '../pages/UserProfilePage'
 import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
@@ -16,7 +17,6 @@ import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
 import { RoleBasedRoute } from '../components/RoleBasedRoute'
 import { AuthRedirect } from '../components/AuthRedirect'
-import React from 'react'
 
 // Wrapper components to ensure context is available
 const DashboardWithAuth = () => (
@@ -43,6 +43,12 @@ const TrackPageWithAuth = () => (
   </RoleBasedRoute>
 )
 
+const IVFTrackShipmentWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <IVFTrackShipmentPage />
+  </RoleBasedRoute>
+)
+
 export const router = createBrowserRouter([
   { path: '/', element: <AuthRedirect /> },
   { path: '/login', element: <Login /> },
@@ -58,6 +64,8 @@ export const router = createBrowserRouter([
   { path: '/database', element: <DatabaseWithAuth /> },
   { path: '/control-tower', element: <ControlTowerWithAuth /> },
   { path: '/track/:patientId', element: <TrackPageWithAuth /> },
+  { path: '/ivf-track-shipment/:patientId', element: <IVFTrackShipmentWithAuth /> },
+  { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])
