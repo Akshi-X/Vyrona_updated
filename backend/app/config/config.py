@@ -28,19 +28,12 @@ class Settings(BaseSettings):
     # Security - MUST be provided in .env file
     SECRET_KEY: str
     # Email - Basic Configuration
-    SENDER_EMAIL: str
     ADMIN_EMAIL: str
     # Super Admin Setup (required in .env)
     ADMIN_DEFAULT_PASSWORD: str
     # MyGrape Platform Admin (required in .env)
     MYGRAPE_ADMIN_EMAIL: str
     MYGRAPE_ADMIN_PASSWORD: str
-    # Email Service Type
-    EMAIL_SERVICE: str = "smtp"  # "smtp" or "sendgrid"
-    # SMTP (Optional - for backward compatibility)
-    SENDER_PASSWORD: Optional[str] = None
-    SMTP_SERVER: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
     # SendGrid (Optional - for enhanced email delivery)
     SENDGRID_API_KEY: Optional[str] = None
     SENDGRID_FROM_EMAIL: Optional[str] = None

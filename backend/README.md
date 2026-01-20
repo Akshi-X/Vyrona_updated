@@ -151,16 +151,7 @@ SECRET_KEY=your-secret-key-minimum-32-characters-long-for-jwt-tokens
 # ============================================
 # Email Configuration
 # ============================================
-SENDER_EMAIL=your-email@example.com
 ADMIN_EMAIL=admin@example.com
-EMAIL_SERVICE=smtp  # Options: "smtp" or "sendgrid"
-
-# SMTP Configuration (if EMAIL_SERVICE=smtp)
-SENDER_PASSWORD=your-email-app-password
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-
-# SendGrid Configuration (if EMAIL_SERVICE=sendgrid)
 SENDGRID_API_KEY=your-sendgrid-api-key
 SENDGRID_FROM_EMAIL=your-email@example.com
 
@@ -701,25 +692,9 @@ alembic downgrade -1
 
 ## 📧 Email Configuration
 
-### SMTP Configuration (Gmail Example)
-
-```env
-EMAIL_SERVICE=smtp
-SENDER_EMAIL=your-email@gmail.com
-SENDER_PASSWORD=your-app-password  # Use App Password, not regular password
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-```
-
-**Note**: For Gmail, you need to:
-1. Enable 2-factor authentication
-2. Generate an App Password
-3. Use the App Password in `SENDER_PASSWORD`
-
 ### SendGrid Configuration
 
 ```env
-EMAIL_SERVICE=sendgrid
 SENDGRID_API_KEY=your-sendgrid-api-key
 SENDGRID_FROM_EMAIL=your-verified-email@example.com
 ```
@@ -837,9 +812,8 @@ poetry shell
 
 #### Email Service Not Working
 
-1. **SMTP**: Verify credentials and App Password (for Gmail)
-2. **SendGrid**: Verify API key and sender email verification
-3. Check email service logs in `logs/app.log`
+1. Verify SendGrid API key and sender email verification
+2. Check email service logs in `logs/app.log`
 
 #### Redis Connection Error
 
@@ -894,14 +868,9 @@ poetry shell
 | `REDIS_SSL` | No | `False` | Enable SSL for Redis connection |
 | `REDIS_DECODE_RESPONSES` | No | `True` | Automatically decode Redis responses |
 | `SECRET_KEY` | Yes | - | JWT secret key (min 32 chars) |
-| `SENDER_EMAIL` | Yes | - | Email sender address |
 | `ADMIN_EMAIL` | Yes | - | Admin email address |
-| `EMAIL_SERVICE` | No | `smtp` | Email service (`smtp` or `sendgrid`) |
-| `SENDER_PASSWORD` | Conditional | - | SMTP password (if using SMTP) |
-| `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
-| `SMTP_PORT` | No | `587` | SMTP port |
-| `SENDGRID_API_KEY` | Conditional | - | SendGrid API key (if using SendGrid) |
-| `SENDGRID_FROM_EMAIL` | Conditional | - | SendGrid sender email |
+| `SENDGRID_API_KEY` | Yes | - | SendGrid API key |
+| `SENDGRID_FROM_EMAIL` | Yes | - | SendGrid sender email |
 | `ADMIN_DEFAULT_PASSWORD` | Yes | - | Default admin password |
 | `MYGRAPE_ADMIN_EMAIL` | Yes | - | MyGrape admin email |
 | `MYGRAPE_ADMIN_PASSWORD` | Yes | - | MyGrape admin password |
@@ -921,12 +890,11 @@ poetry shell
 
 1. **Never commit `.env` file** - Add to `.gitignore`
 2. **Use strong SECRET_KEY** - Minimum 32 characters, random string
-3. **Use App Passwords** - For Gmail SMTP, use App Passwords, not regular passwords
-4. **Restrict CORS** - Don't use `*` in production
-5. **Use HTTPS** - In production, always use HTTPS
-6. **Regular Updates** - Keep dependencies updated
-7. **Database Security** - Use strong database passwords
-8. **Environment Variables** - Never hardcode secrets
+3. **Restrict CORS** - Don't use `*` in production
+4. **Use HTTPS** - In production, always use HTTPS
+5. **Regular Updates** - Keep dependencies updated
+6. **Database Security** - Use strong database passwords
+7. **Environment Variables** - Never hardcode secrets
 
 ## 📦 Dependencies
 

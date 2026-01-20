@@ -1,7 +1,4 @@
-import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
@@ -105,16 +102,10 @@ def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
         )
 
 
-# ============================================
-# SMTP FUNCTIONS (Backward Compatibility)
-# ============================================
-
-def send_email_via_smtp(recipient_email: str, subject: str, html_body: str):
+def send_email(recipient_email: str, subject: str, html_body: str):
     """
-    Send email using SMTP (Gmail)
-    
-    Fallback method if Azure AD fails
-    
+    Send email using SendGrid.
+
     Args:
         recipient_email: Email address to send to
         subject: Email subject
@@ -123,112 +114,8 @@ def send_email_via_smtp(recipient_email: str, subject: str, html_body: str):
     Raises:
         EmailServiceException if sending fails
     """
-    # Create email message
-    msg = MIMEMultipart("alternative")
-    msg["From"] = settings.SENDER_EMAIL
-    msg["To"] = recipient_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
-    
-    # Send email via SMTP with improved connection handling
-    server = None
-    try:
-        logger.info(f"Connecting to SMTP: {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
-        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=30)
-        server.ehlo()
-        
-        logger.info(f"Starting TLS...")
-        server.starttls()
-        server.ehlo()
-        
-        logger.info(f"Logging in as {settings.SENDER_EMAIL}...")
-        server.login(settings.SENDER_EMAIL, settings.SENDER_PASSWORD)
-        
-        logger.info(f"Sending email to {recipient_email}...")
-        server.sendmail(settings.SENDER_EMAIL, [recipient_email], msg.as_string())
-        
-        logger.info(f"Email sent successfully via SMTP to {recipient_email}")
-        
-    except EmailServiceException:
-        raise
-    except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"SMTP auth error: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"Authentication failed. Check SENDER_EMAIL and SENDER_PASSWORD in .env"
-        )
-    except smtplib.SMTPServerDisconnected as e:
-        logger.error(f"SMTP disconnected: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"SMTP server disconnected. Try regenerating Gmail app password."
-        )
-    except smtplib.SMTPException as e:
-        logger.error(f"SMTP error: {type(e).__name__}: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"SMTP error: {str(e)}"
-        )
-    except Exception as e:
-        logger.error(f"General error: {type(e).__name__}: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"Failed to send email: {str(e)}"
-        )
-    finally:
-        if server:
-            try:
-                server.quit()
-            except:
-                pass
-
-
-def send_email(recipient_email: str, subject: str, html_body: str):
-    """
-    Send email using configured service with fallback logic.
-    
-    Service priority based on EMAIL_SERVICE setting:
-    1. SendGrid (if configured and available)
-    2. SMTP (Gmail) - Fallback
-    
-    Args:
-        recipient_email: Email address to send to
-        subject: Email subject
-        html_body: HTML content of email
-        
-    Raises:
-        EmailServiceException if all services fail
-    """
-    logger.info(f"Attempting to send email to {recipient_email} using service: {settings.EMAIL_SERVICE}")
-    
-    # Try SendGrid first if configured
-    if settings.EMAIL_SERVICE == "sendgrid":
-        try:
-            logger.info("Trying SendGrid service...")
-            send_email_via_sendgrid(recipient_email, subject, html_body)
-            return
-            print(f"Email sent successfully via SendGrid to {recipient_email}")
-        except EmailServiceException as e:
-            reason = e.details.get('reason', 'Unknown error')
-            logger.warning(f"SendGrid failed: {reason}, falling back to SMTP")
-        except Exception as e:
-            logger.warning(f"SendGrid error: {str(e)}, falling back to SMTP")
-    
-    # Fallback to SMTP
-    try:
-        logger.info("Trying SMTP service...")
-        send_email_via_smtp(recipient_email, subject, html_body)
-        return
-    except EmailServiceException as e:
-        reason = e.details.get('reason', 'Unknown error')
-        logger.error(f"All email services failed. SMTP error: {reason}")
-        raise
-    except Exception as e:
-        logger.error(f"All email services failed. Final error: {str(e)}")
-        raise EmailServiceException(
-            recipient=recipient_email,
-            reason=f"All email services failed: {str(e)}"
-        )
+    logger.info(f"Attempting to send email to {recipient_email} using SendGrid")
+    send_email_via_sendgrid(recipient_email, subject, html_body)
 
 
 # ============================================
@@ -274,7 +161,7 @@ def send_approval_email(
     except TemplateError as e:
         raise TemplateRenderException(template_name="approval_email.html", reason=str(e))
     
-    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    # Send email using SendGrid
     send_email(recipient_email, subject, html_body)
 
 
@@ -300,7 +187,7 @@ def send_otp_email(user_email: str, otp_code: str):
     except TemplateError as e:
         raise TemplateRenderException(template_name="otp_email.html", reason=str(e))
     
-    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    # Send email using SendGrid
     send_email(user_email, subject, html_body)
 
 
@@ -478,7 +365,7 @@ def send_password_reset_email(user_email: str, reset_link: str, first_name: str)
     except TemplateError as e:
         raise TemplateRenderException(template_name="password_reset_email.html", reason=str(e))
     
-    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    # Send email using SendGrid
     send_email(user_email, subject, html_body)
 
 
@@ -529,5 +416,5 @@ def send_user_approved_notification(
     except TemplateError as e:
         raise TemplateRenderException(template_name="user_approved_notification.html", reason=str(e))
     
-    # Send email using configured service (Azure AD or SMTP with auto-fallback)
+    # Send email using SendGrid
     send_email(user_email, subject, html_body)
