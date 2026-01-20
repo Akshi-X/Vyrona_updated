@@ -14,6 +14,8 @@ from ...models.IVF.canister_model import Canister
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.ivf_quality_log_model import IVFQualityLog
+from ...models.shipment_model import Shipment
 from ...constants.enums import CanisterStatus
 
 
@@ -203,8 +205,6 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        current_month_start, next_month_start = self._get_current_month_bounds()
-        
         # Count canisters with risk or critical status
         canister_query = (
             self.db.query(func.count(Canister.canister_id))
@@ -219,8 +219,6 @@ class IVFDashboardService:
         log_query = (
             self.db.query(func.count(CanisterLn2Log.log_id))
             .filter(
-                CanisterLn2Log.opened_at >= current_month_start,
-                CanisterLn2Log.opened_at < next_month_start,
                 or_(
                     CanisterLn2Log.ln2_level_before < 50.0,
                     CanisterLn2Log.ln2_level_after < 50.0
@@ -280,8 +278,6 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        current_month_start, next_month_start = self._get_current_month_bounds()
-        
         # Count critical canisters
         critical_query = (
             self.db.query(func.count(Canister.canister_id))
@@ -304,8 +300,6 @@ class IVFDashboardService:
         ln2_query = (
             self.db.query(func.count(CanisterLn2Log.log_id))
             .filter(
-                CanisterLn2Log.opened_at >= current_month_start,
-                CanisterLn2Log.opened_at < next_month_start,
                 or_(
                     CanisterLn2Log.ln2_level_before < 50.0,
                     CanisterLn2Log.ln2_level_after < 50.0
@@ -377,11 +371,9 @@ class IVFDashboardService:
         
         Metric 5: # Outbound Shipments (For all Sites)
         
-        For IVF context, "outbound shipments" refers to canister movements or openings
-        tracked through canister LN2 logs. Each log entry with opened_at timestamp
-        represents an outbound movement/operation (shipment).
-        
-        If there are no shipments (no log entries with opened_at in current month), returns 0.
+        For IVF context, "outbound shipments" refers to patient shipments
+        between sites (source_location -> destination_location).
+        If there are no shipment details, returns 0.
         
         Args:
             branch_id: Optional branch ID to filter by
@@ -392,33 +384,33 @@ class IVFDashboardService:
         """
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        current_month_start, next_month_start = self._get_current_month_bounds()
-        
-        # Count canister log entries (opened events) in current month
-        # These represent outbound operations/movements (shipments)
-        log_query = (
-            self.db.query(func.count(CanisterLn2Log.log_id))
+
+        shipment_query = (
+            self.db.query(func.count(Shipment.id))
             .filter(
-                CanisterLn2Log.opened_at >= current_month_start,
-                CanisterLn2Log.opened_at < next_month_start,
-                CanisterLn2Log.opened_at.isnot(None)
+                Shipment.source_location.isnot(None),
+                Shipment.destination_location.isnot(None),
+                Shipment.source_location != Shipment.destination_location
             )
         )
         
-        # Apply branch filtering if needed
         if filter_branch_id is not None:
-            # Join through: CanisterLn2Log -> Canister -> Tank -> Branch
-            log_query = (
-                log_query
-                .join(Canister, CanisterLn2Log.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            branch_name = (
+                self.db.query(HospitalBranch.branch_name)
                 .filter(HospitalBranch.branch_id == filter_branch_id)
+                .scalar()
+            )
+            if not branch_name:
+                return {"total_outbound_shipments": 0}
+            
+            shipment_query = shipment_query.filter(
+                or_(
+                    Shipment.source_location == branch_name,
+                    Shipment.destination_location == branch_name
+                )
             )
         
-        # Get count - will return 0 if no shipments found
-        total_shipments = log_query.scalar()
+        total_shipments = shipment_query.scalar()
         
         # Explicitly return 0 if None (no shipments)
         if total_shipments is None:
@@ -432,8 +424,8 @@ class IVFDashboardService:
         """
         Calculate average quality loss per container.
         
-        Quality loss per container is calculated as the average LN2 level loss
-        (ln2_level_before - ln2_level_after) from canister LN2 logs for the current month.
+        Quality loss per container is calculated as the average quality_loss
+        from IVF quality logs for all time.
         
         Args:
             branch_id: Optional branch ID to filter by
@@ -443,34 +435,18 @@ class IVFDashboardService:
             Dictionary with avg_quality_loss_per_container and total_containers
         """
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        current_month_start, next_month_start = self._get_current_month_bounds()
-        
-        loss_expr = case(
-            (
-                and_(
-                    CanisterLn2Log.ln2_level_before.isnot(None),
-                    CanisterLn2Log.ln2_level_after.isnot(None),
-                    CanisterLn2Log.ln2_level_before >= CanisterLn2Log.ln2_level_after
-                ),
-                CanisterLn2Log.ln2_level_before - CanisterLn2Log.ln2_level_after
-            ),
-            else_=0
-        )
         
         per_container_query = (
             self.db.query(
-                CanisterLn2Log.canister_id.label("canister_id"),
-                func.avg(loss_expr).label("avg_loss")
+                IVFQualityLog.canister_id.label("canister_id"),
+                func.avg(IVFQualityLog.quality_loss).label("avg_loss")
             )
-            .join(Canister, CanisterLn2Log.canister_id == Canister.canister_id)
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
             .filter(
                 Canister.is_active == True,
-                CanisterLn2Log.opened_at >= current_month_start,
-                CanisterLn2Log.opened_at < next_month_start,
-                CanisterLn2Log.ln2_level_before.isnot(None),
-                CanisterLn2Log.ln2_level_after.isnot(None)
+                IVFQualityLog.quality_loss.isnot(None)
             )
-            .group_by(CanisterLn2Log.canister_id)
+            .group_by(IVFQualityLog.canister_id)
         )
         
         if filter_branch_id is not None:
@@ -507,22 +483,20 @@ class IVFDashboardService:
         User view: container-wise deviations within the site.
         Manager/Admin view: cumulative deviations per site.
         
-        Deviation types are mapped from canister LN2 logs:
-        - temperature: ln2_level_before < 50
-        - humidity: ln2_level_after < 50
-        - agitation: opened_count > 0
+        Deviation types are mapped from IVF quality logs:
+        - temperature: is_temp_loss
+        - humidity: is_humidity_loss
+        - agitation: is_agitation_loss
         """
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        current_month_start, next_month_start = self._get_current_month_bounds()
         
-        temperature_case = case((CanisterLn2Log.ln2_level_before < 50.0, 1), else_=0)
-        humidity_case = case((CanisterLn2Log.ln2_level_after < 50.0, 1), else_=0)
-        agitation_case = case((CanisterLn2Log.opened_count > 0, 1), else_=0)
+        temperature_case = case((IVFQualityLog.is_temp_loss.is_(True), 1), else_=0)
+        humidity_case = case((IVFQualityLog.is_humidity_loss.is_(True), 1), else_=0)
+        agitation_case = case((IVFQualityLog.is_agitation_loss.is_(True), 1), else_=0)
         
         log_join = and_(
-            CanisterLn2Log.canister_id == Canister.canister_id,
-            CanisterLn2Log.opened_at >= current_month_start,
-            CanisterLn2Log.opened_at < next_month_start
+            IVFQualityLog.canister_id == Canister.canister_id,
+            IVFQualityLog.reading_timestamp.isnot(None)
         )
         
         role_normalized = role.title() if role else None
@@ -540,7 +514,7 @@ class IVFDashboardService:
                 )
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .outerjoin(CanisterLn2Log, log_join)
+                .outerjoin(IVFQualityLog, log_join)
                 .filter(Canister.is_active == True)
             )
             
@@ -588,7 +562,7 @@ class IVFDashboardService:
             )
             .join(Tank, Tank.branch_id == HospitalBranch.branch_id)
             .join(Canister, Canister.tank_id == Tank.tank_id)
-            .outerjoin(CanisterLn2Log, log_join)
+            .outerjoin(IVFQualityLog, log_join)
             .filter(Canister.is_active == True)
             .group_by(HospitalBranch.branch_id, HospitalBranch.branch_name)
             .order_by(HospitalBranch.branch_name)

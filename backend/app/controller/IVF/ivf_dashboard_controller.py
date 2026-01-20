@@ -198,11 +198,10 @@ def get_outbound_shipments(
     
     Metric 5: # Outbound Shipments (For all Sites)
     
-    For IVF context, "outbound shipments" refers to canister movements or openings
-    tracked through canister LN2 logs. Each log entry with opened_at timestamp
-    represents an outbound movement/operation (shipment).
+    For IVF context, "outbound shipments" refers to patient shipments
+    between sites (source_location -> destination_location).
     
-    If there are no shipments (no log entries with opened_at in current month), returns 0.
+    If there are no shipment details, returns 0.
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -230,8 +229,8 @@ def get_avg_quality_loss_per_container(
     
     Metric 6: Avg quality loss per container (for all sites)
     
-    Quality loss is calculated as average LN2 level loss
-    (ln2_level_before - ln2_level_after) per container for the current month.
+    Quality loss is calculated as average quality_loss per container
+    from IVF quality logs for all time.
     
     Role-based access:
     - Manager (IVF): See metrics across all sites

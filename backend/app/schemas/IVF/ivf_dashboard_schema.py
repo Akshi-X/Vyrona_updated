@@ -53,7 +53,7 @@ class AvgQualityLossPerContainerResponse(BaseModel):
     """Response for average quality loss per container metric"""
     avg_quality_loss_per_container: float = Field(
         ...,
-        description="Average LN2 level loss per container (ln2_level_before - ln2_level_after) for current month"
+        description="Average quality loss per container from IVF quality logs for current month"
     )
     total_containers: int = Field(..., description="Total containers included in the calculation")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
