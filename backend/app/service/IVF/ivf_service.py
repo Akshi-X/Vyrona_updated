@@ -140,19 +140,23 @@ class IVFService:
                 - canisters: List of active canisters with:
                     - canister_id: Canister ID
                     - canister_status: Status (safe, risk, critical)
-                    - updated_at: Last updated date and time from canister log opened_at (if available),
+                    - updated_at: Last updated date and time from canister log refill_date+refill_time (if available),
                                   otherwise from canisters table created_at
             - total: Total number of active canisters across all branches
         """
         try:
             # Optimized query: Use subquery to get latest log per canister in one query
             # This eliminates N+1 query problem
+            # Get latest refill_date and refill_time separately, then combine in Python
+            from datetime import datetime as dt, date, time
+            
             latest_logs_subquery = (
                 self.db.query(
                     CanisterLn2Log.canister_id,
-                    func.max(CanisterLn2Log.opened_at).label('latest_opened_at')
+                    func.max(CanisterLn2Log.refill_date).label('latest_refill_date'),
+                    func.max(CanisterLn2Log.refill_time).label('latest_refill_time')
                 )
-                .filter(CanisterLn2Log.opened_at.isnot(None))
+                .filter(CanisterLn2Log.refill_date.isnot(None))
                 .group_by(CanisterLn2Log.canister_id)
                 .subquery()
             )
@@ -163,7 +167,8 @@ class IVFService:
                     Canister,
                     HospitalBranch.branch_id,
                     HospitalBranch.branch_name,
-                    latest_logs_subquery.c.latest_opened_at
+                    latest_logs_subquery.c.latest_refill_date,
+                    latest_logs_subquery.c.latest_refill_time
                 )
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
@@ -189,14 +194,17 @@ class IVFService:
             
             total_canisters = 0
             
-            for canister, branch_id_val, branch_name, latest_opened_at in results:
+            for canister, branch_id_val, branch_name, latest_refill_date, latest_refill_time in results:
                 # Initialize branch if not already in dict
                 if branches_dict[branch_id_val]["branch_id"] is None:
                     branches_dict[branch_id_val]["branch_id"] = branch_id_val
                     branches_dict[branch_id_val]["branch_name"] = branch_name or "Unknown"
                 
-                # Use opened_at from log if available, otherwise use created_at from canisters table
-                updated_at = latest_opened_at if latest_opened_at else canister.created_at
+                # Combine refill_date and refill_time if both are available, otherwise use created_at from canisters table
+                if latest_refill_date and latest_refill_time:
+                    updated_at = dt.combine(latest_refill_date, latest_refill_time)
+                else:
+                    updated_at = canister.created_at
                 
                 canister_data = {
                     "canister_id": canister.canister_id,
