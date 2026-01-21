@@ -2,13 +2,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
-import QualityTrackingChart from '../Track/sections/QualityTrackingChart';
-import QualityParametersTable from '../Track/sections/QualityParametersTable';
 import ContainerProcessFlow from './sections/ContainerProcessFlow';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import RiskFactorTable from './sections/RiskFactorTable';
 import RiskGraph from './sections/RiskGraph';
+import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
+import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
 import backButton from '../../assets/backButton.svg';
 import { userService } from '../../services/userService';
 
@@ -70,8 +70,8 @@ export default function IVFTrackShipmentPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Stacked Quality Tracking and Quality Parameter */}
                         <div className="flex flex-col gap-6">
-                            <QualityTrackingChart />
-                            <QualityParametersTable />
+                            <IVFQualityTrackingChart />
+                            <IVFQualityParametersTable />
                         </div>
                         {/* Right Column: Container Data */}
                         <div>
