@@ -10,12 +10,14 @@ from typing import Optional
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user
 from app.models.user_model import User
-from app.service.quality_tracking_service import QualityTrackingService
-from app.schemas.quality_tracking_schema import (
+from app.service.IVF.quality_tracking_service import QualityTrackingService
+from app.schemas.IVF.quality_tracking_schema import (
     RefillLogCreate,
     RefillLogStatusUpdate,
     RefillLogResponse,
-    RefillLogListResponse
+    RefillLogListResponse,
+    IVFQualityKpiResponse,
+    IVFCanisterTrackingResponse
 )
 from app.constants.enums import TaskStatus
 from app.utils.ivf_helpers import get_branch_filter_info
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/quality-tracking",
-    tags=["Quality Tracking"]
+    tags=["IVF Quality Tracking"]
 )
 
 
@@ -133,5 +135,51 @@ def update_refill_log_status(
         )
     except Exception as e:
         logger.error(f"Error in update_refill_log_status endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/canisters/{canister_id}/kpis", response_model=IVFQualityKpiResponse)
+def get_ivf_quality_kpis(
+    canister_id: int = Path(..., description="Canister ID from URL"),
+    limit: int = Query(50, ge=1, le=500, description="Max number of readings to include"),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch IVF container quality KPIs and tracking data.
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.get_ivf_quality_kpis(
+            canister_id=canister_id,
+            limit=limit,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in get_ivf_quality_kpis endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/canisters/{canister_id}/tracking-details", response_model=IVFCanisterTrackingResponse)
+def get_canister_tracking_details(
+    canister_id: int = Path(..., description="Canister ID from URL"),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch tracking details for a specific canister.
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.get_canister_tracking_details(
+            canister_id=canister_id,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in get_canister_tracking_details endpoint: {str(e)}", exc_info=True)
         raise
 
