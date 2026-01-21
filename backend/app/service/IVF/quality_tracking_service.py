@@ -7,17 +7,18 @@ from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 
-from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
-from app.models.IVF.ivf_quality_log_model import IVFQualityLog
-from app.models.IVF.canister_model import Canister
-from app.models.IVF.tank_model import Tank
-from app.models.IVF.hospital_branch_model import HospitalBranch
-from app.models.IVF.cane_model import Cane
-from app.models.IVF.cryolock_model import Cryolock
-from app.models.IVF.embryo_model import Embryo
-from app.models.IVF.patient_model import IVFPatient
-from app.models.shipment_model import Shipment
-from app.schemas.IVF.quality_tracking_schema import (
+# Import shared models (matching pattern from ivf_service.py)
+from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.ivf_quality_log_model import IVFQualityLog
+from ...models.IVF.canister_model import Canister
+from ...models.IVF.tank_model import Tank
+from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.cane_model import Cane
+from ...models.IVF.cryolock_model import Cryolock
+from ...models.IVF.embryo_model import Embryo
+from ...models.IVF.patient_model import IVFPatient
+from ...models.shipment_model import Shipment
+from ...schemas.IVF.quality_tracking_schema import (
     RefillLogCreate,
     RefillLogStatusUpdate,
     RefillLogResponse,
@@ -31,9 +32,9 @@ from app.schemas.IVF.quality_tracking_schema import (
     IVFCanisterTrackingItem,
     IVFCanisterTrackingResponse
 )
-from app.exceptions.custom_exceptions import AppException
-from app.constants.messages import ErrorMessages
-from app.constants.http_status import HTTPStatus
+from ...exceptions.custom_exceptions import AppException
+from ...constants.messages import ErrorMessages
+from ...constants.http_status import HTTPStatus
 
 logger = logging.getLogger(__name__)
 
