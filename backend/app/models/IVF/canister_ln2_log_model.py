@@ -14,8 +14,8 @@ class CanisterLn2Log(Base):
     log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Foreign Key - reference to canisters table (no schema prefix)
-    # Made nullable to support quality tracking containers that may not have canister_id
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=True)
+    # Required: Every refill log must be associated with a canister
+    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=False, index=True)
 
     # Branch ID for access control (hospital branches)
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=True, index=True)
