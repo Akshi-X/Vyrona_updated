@@ -47,7 +47,7 @@ import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.sv
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
 // Mock data
 import ivfDashboardMock from '../../data/ivfDashboardMock.json';
-import { ivfService, mapEmbryoTrackingApiItemToTreatment } from '../../services/ivfService';
+import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 
 interface StakeholderChat {
@@ -297,8 +297,7 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfEmbryoTrackingError(null);
       try {
         const response = await ivfService.getEmbryoTracking();
-        const mapped = (response?.data || []).map(mapEmbryoTrackingApiItemToTreatment);
-        if (!cancelled) setIvfEmbryoTracking(mapped);
+        if (!cancelled) setIvfEmbryoTracking(response?.data || []);
       } catch (e: any) {
         if (!cancelled) {
           setIvfEmbryoTracking([]);
@@ -757,7 +756,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Outbound Shipment" src={OutboundShipmentIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Outbond Shipments
+                            Outbound Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfOutboundShipments

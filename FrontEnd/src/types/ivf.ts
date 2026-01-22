@@ -13,22 +13,8 @@ export interface IVFTreatment {
   embryoGrading?: string;
 }
 
-export interface EmbryoTrackingApiItem {
-  his_number: string;
-  cryolock_number: string;
-  canister_number: number;
-  tank_id: string;
-  cane_id: string;
-  goblet_color: string;
-  cryolock_color: string;
-  date_of_vitrification: string;
-  embryo_grading?: string;
-  site_name: string;
-  status: string;
-}
-
 export interface EmbryoTrackingApiResponse {
-  data: EmbryoTrackingApiItem[];
+  data: IVFTreatment[];
   total: number;
 }
 
