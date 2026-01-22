@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
-from datetime import datetime, date
+from datetime import datetime, date, time
 
 from app.constants.enums import CanisterStatus
 
@@ -168,9 +168,11 @@ class CanisterResponse(CanisterBase):
 
 class CanisterLn2LogBase(BaseModel):
     """Base schema for canister LN2 log"""
-    canister_id: int = Field(..., description="Reference to canister")
-    opened_at: Optional[datetime] = Field(None, description="When the canister was opened")
-    opened_by: Optional[str] = Field(None, description="User who opened the canister")
+    canister_id: Optional[int] = Field(None, description="Reference to canister (for IVF)")
+    container_id: Optional[str] = Field(None, description="Container ID (for quality tracking)")
+    refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
+    refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
+    refilled_by: Optional[str] = Field(None, description="Name of person who performed the refill/opening")
     ln2_level_before: Optional[float] = Field(None, description="LN2 level before opening")
     ln2_level_after: Optional[float] = Field(None, description="LN2 level after opening")
     remarks: Optional[str] = Field(None, description="Remarks or notes")
@@ -186,8 +188,9 @@ class CanisterLn2LogCreate(CanisterLn2LogBase):
 
 class CanisterLn2LogUpdate(BaseModel):
     """Schema for updating canister LN2 log information"""
-    opened_at: Optional[datetime] = Field(None, description="When the canister was opened")
-    opened_by: Optional[str] = Field(None, description="User who opened the canister")
+    refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
+    refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
+    refilled_by: Optional[str] = Field(None, description="Name of person who performed the refill/opening")
     ln2_level_before: Optional[float] = Field(None, description="LN2 level before opening")
     ln2_level_after: Optional[float] = Field(None, description="LN2 level after opening")
     remarks: Optional[str] = Field(None, description="Remarks or notes")
@@ -402,7 +405,7 @@ class ActiveCanisterItem(BaseModel):
     """Schema for a single active canister in control tower"""
     canister_id: int = Field(..., description="Canister ID")
     canister_status: CanisterStatus = Field(..., description="Canister status (safe, risk, critical)")
-    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log opened_at")
+    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log refill_date+refill_time")
     
     class Config:
         from_attributes = True

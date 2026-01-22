@@ -80,7 +80,7 @@ def get_active_canisters(
     - canisters: List of canisters for this branch with:
         - canister_id: The ID of the canister
         - canister_status: Status (safe, risk, or critical)
-        - updated_at: Last updated date and time from the most recent canister log opened_at column (if available),
+        - updated_at: Last updated date and time from the most recent canister log refill_date+refill_time (if available),
                       otherwise from canisters table created_at
     
     Response format:
