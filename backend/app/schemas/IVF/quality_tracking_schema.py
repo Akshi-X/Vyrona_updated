@@ -105,17 +105,15 @@ class IVFQualityKpiResponse(BaseModel):
 
 
 class IVFCanisterTrackingItem(BaseModel):
-    """Tracking details for a specific canister"""
-    his_number: str = Field(..., description="Patient HIS Number")
+    """Tracking details for a specific canister - matches table structure"""
+    his_number: str = Field(..., description="Patient HIS Number (PK)")
     cryolock_number: str = Field(..., description="Cryolock number")
     canister_number: Optional[int] = Field(None, description="Canister number")
-    tank_id: str = Field(..., description="Tank display identifier")
-    cane_id: str = Field(..., description="Cane display identifier")
+    cane_id: str = Field(..., description="Cane ID (formatted)")
     goblet_color: str = Field(..., description="Goblet color")
     cryolock_color: str = Field(..., description="Cryolock color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
-    site_name: str = Field(..., description="Site or branch name")
-    status: str = Field(..., description="Shipment status derived from shipment records")
+    move_to: bool = Field(default=True, description="Indicates if item can be moved (UI action)")
 
 
 class IVFCanisterTrackingResponse(BaseModel):

@@ -171,6 +171,16 @@ def get_canister_tracking_details(
 ):
     """
     Fetch tracking details for a specific canister.
+    
+    Returns a table with the following columns:
+    - HIS # (PK): Patient HIS Number
+    - Cryolock #: Cryolock number
+    - Canister #: Canister number
+    - Cane ID: Cane identifier (formatted)
+    - Goblet Color: Goblet color
+    - Cryolock Color: Cryolock color
+    - Date of Vitrification: Date when vitrification was performed
+    - Move to: Indicates if item can be moved (UI action button)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)

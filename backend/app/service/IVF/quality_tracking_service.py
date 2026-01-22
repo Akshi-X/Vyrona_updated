@@ -285,6 +285,8 @@ class QualityTrackingService:
     ) -> IVFCanisterTrackingResponse:
         """
         Fetch tracking details for a specific canister.
+        Returns data matching the table structure: HIS #, Cryolock #, Canister #, 
+        Cane ID, Goblet Color, Cryolock Color, Date of Vitrification, and Move to.
         """
         try:
             query = (
@@ -292,15 +294,11 @@ class QualityTrackingService:
                     IVFPatient.his_number,
                     Cryolock.cryolock_number,
                     Canister.canister_number,
-                    Tank.tank_id,
-                    Tank.tank_code,
                     Cane.cane_id,
                     Cane.cane_code,
                     Cane.goblet_color,
                     Cryolock.cryolock_color,
-                    Embryo.date_of_vitrification,
-                    HospitalBranch.branch_name,
-                    func.count(Shipment.id).label("shipment_count")
+                    Embryo.date_of_vitrification
                 )
                 .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
                 .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
@@ -308,7 +306,6 @@ class QualityTrackingService:
                 .join(Canister, Cane.canister_id == Canister.canister_id)
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .outerjoin(Shipment, Shipment.patient_id == IVFPatient.his_number)
                 .filter(
                     Embryo.is_active == True,
                     Canister.canister_id == canister_id
@@ -318,40 +315,25 @@ class QualityTrackingService:
             if branch_id is not None:
                 query = query.filter(HospitalBranch.branch_id == branch_id)
 
-            query = query.group_by(
-                IVFPatient.his_number,
-                Cryolock.cryolock_number,
-                Canister.canister_number,
-                Tank.tank_id,
-                Tank.tank_code,
-                Cane.cane_id,
-                Cane.cane_code,
-                Cane.goblet_color,
-                Cryolock.cryolock_color,
-                Embryo.date_of_vitrification,
-                HospitalBranch.branch_name
-            ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+            query = query.order_by(IVFPatient.his_number, Cryolock.cryolock_number)
 
             results = query.all()
 
             tracking_rows: List[IVFCanisterTrackingItem] = []
             for row in results:
-                tank_display = row.tank_code if row.tank_code else f"Tank {row.tank_id}"
+                # Format Cane ID: use cane_code if available, otherwise format as "Cane-{cane_id}"
                 cane_display = row.cane_code if row.cane_code else f"Cane-{row.cane_id}"
-                status = "In Transit" if row.shipment_count > 0 else "Internal"
 
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
                         his_number=row.his_number or "",
                         cryolock_number=row.cryolock_number or "",
                         canister_number=row.canister_number,
-                        tank_id=tank_display,
                         cane_id=cane_display,
                         goblet_color=row.goblet_color or "",
                         cryolock_color=row.cryolock_color or "",
                         date_of_vitrification=row.date_of_vitrification,
-                        site_name=row.branch_name or "",
-                        status=status
+                        move_to=True  # All items can be moved (UI action)
                     )
                 )
 
