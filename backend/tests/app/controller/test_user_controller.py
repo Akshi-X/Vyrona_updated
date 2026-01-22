@@ -3371,11 +3371,11 @@ def test_feedback_email_send_failed_exception():
     """Test FeedbackEmailSendFailedException initialization (line 1006)"""
     from app.exceptions.custom_exceptions import FeedbackEmailSendFailedException
     
-    exc = FeedbackEmailSendFailedException(email_type="notification", recipient="user@example.com", reason="SMTP error")
+    exc = FeedbackEmailSendFailedException(email_type="notification", recipient="user@example.com", reason="SendGrid error")
     assert exc.status_code == 500
     assert exc.details.get("email_type") == "notification"
     assert exc.details.get("recipient") == "user@example.com"
-    assert exc.details.get("reason") == "SMTP error"
+    assert exc.details.get("reason") == "SendGrid error"
 
 
 def test_feedback_email_template_error_exception():

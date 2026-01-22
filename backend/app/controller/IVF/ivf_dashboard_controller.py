@@ -12,7 +12,9 @@ from app.schemas.IVF.ivf_dashboard_schema import (
     TotalContainersResponse,
     QualityDeviationsFlaggedResponse,
     TopDeviationDriverResponse,
-    OutboundShipmentsResponse
+    OutboundShipmentsResponse,
+    AvgQualityLossPerContainerResponse,
+    DeviationsGraphResponse
 )
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.utils.user_helpers import is_hospital_department
@@ -196,11 +198,10 @@ def get_outbound_shipments(
     
     Metric 5: # Outbound Shipments (For all Sites)
     
-    For IVF context, "outbound shipments" refers to canister movements or openings
-    tracked through canister LN2 logs. Each log entry with opened_at timestamp
-    represents an outbound movement/operation (shipment).
+    For IVF context, "outbound shipments" refers to patient shipments
+    between sites (source_location -> destination_location).
     
-    If there are no shipments (no log entries with opened_at in current month), returns 0.
+    If there are no shipment details, returns 0.
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -216,3 +217,59 @@ def get_outbound_shipments(
         return OutboundShipmentsResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting outbound shipments: {str(e)}")
+
+
+@router.get("/metrics/avg-quality-loss-per-container", response_model=AvgQualityLossPerContainerResponse)
+def get_avg_quality_loss_per_container(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get average quality loss per container.
+    
+    Metric 6: Avg quality loss per container (for all sites)
+    
+    Quality loss is calculated as average quality_loss per container
+    from IVF quality logs for all time.
+    
+    Role-based access:
+    - Manager (IVF): See metrics across all sites
+    - User (IVF): See metrics only for their assigned branch
+    - Admin: See metrics across all sites
+    """
+    try:
+        branch_id, role = get_dashboard_branch_filter(request)
+        
+        service = IVFDashboardService(db)
+        result = service.get_avg_quality_loss_per_container(branch_id=branch_id, role=role)
+        
+        return AvgQualityLossPerContainerResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting avg quality loss per container: {str(e)}")
+
+
+@router.get("/metrics/deviations-graph", response_model=DeviationsGraphResponse)
+def get_deviations_graph(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get deviations graph data.
+    
+    X-axis: Containers (User view) or Sites (Manager/Admin view)
+    Y-axis: Number of deviations
+    Graph type: Stacked bar chart (temperature, humidity, agitation)
+    
+    Role-based access:
+    - User (IVF): Container-wise deviations within the site
+    - Manager/Admin (IVF): Cumulative deviations per site with top deviation type
+    """
+    try:
+        branch_id, role = get_dashboard_branch_filter(request)
+        
+        service = IVFDashboardService(db)
+        result = service.get_deviations_graph(branch_id=branch_id, role=role)
+        
+        return DeviationsGraphResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting deviations graph: {str(e)}")

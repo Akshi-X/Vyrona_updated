@@ -1,8 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, Mock, patch, mock_open, ANY
 from jinja2.exceptions import TemplateNotFound, TemplateError
-import smtplib
-
 from app.service import email_service
 from app.exceptions import (
     EmailServiceException,
@@ -121,196 +119,12 @@ def test_send_email_via_sendgrid_exception(mock_sendgrid_client, mock_settings):
 
 
 # ==========================================
-# Tests for send_email_via_smtp
-# ==========================================
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_success(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP successfully"""
-    # Setup mocks
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    mock_smtp_class.return_value = mock_server
-    
-    # Call function
-    email_service.send_email_via_smtp(
-        recipient_email="recipient@example.com",
-        subject="Test Subject",
-        html_body="<html>Test Body</html>"
-    )
-    
-    # Verify SMTP was called correctly
-    mock_smtp_class.assert_called_once_with("smtp.gmail.com", 587, timeout=30)
-    mock_server.ehlo.assert_called()
-    mock_server.starttls.assert_called_once()
-    mock_server.login.assert_called_once_with("sender@example.com", "password123")
-    mock_server.sendmail.assert_called_once()
-    mock_server.quit.assert_called_once()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_auth_error(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when authentication fails"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "wrong_password"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    # SMTPAuthenticationError requires (code, msg) parameters
-    mock_server.login.side_effect = smtplib.SMTPAuthenticationError(535, "Authentication failed")
-    mock_smtp_class.return_value = mock_server
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email_via_smtp(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "authentication failed" in exc_info.value.details['reason'].lower()
-    mock_server.quit.assert_called_once()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_server_disconnected(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when server disconnects"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    # SMTPServerDisconnected can be initialized with just a message
-    mock_server.sendmail.side_effect = smtplib.SMTPServerDisconnected("Server disconnected")
-    mock_smtp_class.return_value = mock_server
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email_via_smtp(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "server disconnected" in exc_info.value.details['reason'].lower()
-    mock_server.quit.assert_called_once()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_smtp_exception(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when SMTPException occurs (not auth or disconnect)"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    # Use a generic SMTPException (not SMTPAuthenticationError or SMTPServerDisconnected)
-    mock_server.sendmail.side_effect = smtplib.SMTPException("SMTP error occurred")
-    mock_smtp_class.return_value = mock_server
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email_via_smtp(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "smtp error" in exc_info.value.details['reason'].lower()
-    mock_server.quit.assert_called_once()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_email_service_exception_re_raise(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when EmailServiceException is raised (should re-raise)"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    # Raise EmailServiceException directly (should be re-raised)
-    mock_server.starttls.side_effect = EmailServiceException(recipient="recipient@example.com", reason="Test error")
-    mock_smtp_class.return_value = mock_server
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email_via_smtp(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "test error" in exc_info.value.details['reason'].lower()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_quit_exception(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when server.quit() raises exception in finally block"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_server = MagicMock()
-    mock_server.quit.side_effect = Exception("Quit error")  # Exception in finally block
-    mock_smtp_class.return_value = mock_server
-    
-    # Should still succeed (quit error is caught)
-    email_service.send_email_via_smtp(
-        recipient_email="recipient@example.com",
-        subject="Test Subject",
-        html_body="<html>Test Body</html>"
-    )
-    
-    mock_server.quit.assert_called_once()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.smtplib.SMTP')
-def test_send_email_via_smtp_general_exception(mock_smtp_class, mock_settings):
-    """Test sending email via SMTP when general exception occurs"""
-    mock_settings.SENDER_EMAIL = "sender@example.com"
-    mock_settings.SENDER_PASSWORD = "password123"
-    mock_settings.SMTP_SERVER = "smtp.gmail.com"
-    mock_settings.SMTP_PORT = 587
-    
-    mock_smtp_class.side_effect = Exception("Connection error")
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email_via_smtp(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "failed to send email" in exc_info.value.details['reason'].lower()
-
-
-# ==========================================
 # Tests for send_email
 # ==========================================
 
-@patch('app.service.email_service.settings')
 @patch('app.service.email_service.send_email_via_sendgrid')
-def test_send_email_sendgrid_success(mock_sendgrid, mock_settings):
+def test_send_email_sendgrid_success(mock_sendgrid):
     """Test send_email using SendGrid successfully"""
-    mock_settings.EMAIL_SERVICE = "sendgrid"
-    
     email_service.send_email(
         recipient_email="recipient@example.com",
         subject="Test Subject",
@@ -320,47 +134,10 @@ def test_send_email_sendgrid_success(mock_sendgrid, mock_settings):
     mock_sendgrid.assert_called_once_with("recipient@example.com", "Test Subject", "<html>Test Body</html>")
 
 
-@patch('app.service.email_service.settings')
 @patch('app.service.email_service.send_email_via_sendgrid')
-@patch('app.service.email_service.send_email_via_smtp')
-def test_send_email_sendgrid_fallback_to_smtp(mock_smtp, mock_sendgrid, mock_settings):
-    """Test send_email falling back to SMTP when SendGrid fails"""
-    mock_settings.EMAIL_SERVICE = "sendgrid"
+def test_send_email_sendgrid_exception(mock_sendgrid):
+    """Test send_email when SendGrid fails"""
     mock_sendgrid.side_effect = EmailServiceException(recipient="recipient@example.com", reason="SendGrid error")
-    
-    email_service.send_email(
-        recipient_email="recipient@example.com",
-        subject="Test Subject",
-        html_body="<html>Test Body</html>"
-    )
-    
-    mock_sendgrid.assert_called_once()
-    mock_smtp.assert_called_once_with("recipient@example.com", "Test Subject", "<html>Test Body</html>")
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.send_email_via_smtp')
-def test_send_email_smtp_direct(mock_smtp, mock_settings):
-    """Test send_email using SMTP directly (when EMAIL_SERVICE is not sendgrid)"""
-    mock_settings.EMAIL_SERVICE = "smtp"
-    
-    email_service.send_email(
-        recipient_email="recipient@example.com",
-        subject="Test Subject",
-        html_body="<html>Test Body</html>"
-    )
-    
-    mock_smtp.assert_called_once_with("recipient@example.com", "Test Subject", "<html>Test Body</html>")
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.send_email_via_sendgrid')
-@patch('app.service.email_service.send_email_via_smtp')
-def test_send_email_all_services_fail(mock_smtp, mock_sendgrid, mock_settings):
-    """Test send_email when all services fail"""
-    mock_settings.EMAIL_SERVICE = "sendgrid"
-    mock_sendgrid.side_effect = EmailServiceException(recipient="recipient@example.com", reason="SendGrid error")
-    mock_smtp.side_effect = EmailServiceException(recipient="recipient@example.com", reason="SMTP error")
     
     with pytest.raises(EmailServiceException) as exc_info:
         email_service.send_email(
@@ -370,43 +147,7 @@ def test_send_email_all_services_fail(mock_smtp, mock_sendgrid, mock_settings):
         )
     
     assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "smtp error" in exc_info.value.details['reason'].lower()
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.send_email_via_sendgrid')
-@patch('app.service.email_service.send_email_via_smtp')
-def test_send_email_sendgrid_non_email_exception_fallback(mock_smtp, mock_sendgrid, mock_settings):
-    """Test send_email when SendGrid raises non-EmailServiceException (should fallback)"""
-    mock_settings.EMAIL_SERVICE = "sendgrid"
-    mock_sendgrid.side_effect = Exception("Connection error")  # Non-EmailServiceException
-    
-    email_service.send_email(
-        recipient_email="recipient@example.com",
-        subject="Test Subject",
-        html_body="<html>Test Body</html>"
-    )
-    
-    mock_sendgrid.assert_called_once()
-    mock_smtp.assert_called_once()  # Should fallback to SMTP
-
-
-@patch('app.service.email_service.settings')
-@patch('app.service.email_service.send_email_via_smtp')
-def test_send_email_smtp_non_email_exception(mock_smtp, mock_settings):
-    """Test send_email when SMTP raises non-EmailServiceException"""
-    mock_settings.EMAIL_SERVICE = "smtp"
-    mock_smtp.side_effect = Exception("Connection error")  # Non-EmailServiceException
-    
-    with pytest.raises(EmailServiceException) as exc_info:
-        email_service.send_email(
-            recipient_email="recipient@example.com",
-            subject="Test Subject",
-            html_body="<html>Test Body</html>"
-        )
-    
-    assert exc_info.value.details['recipient'] == "recipient@example.com"
-    assert "all email services failed" in exc_info.value.details['reason'].lower()
+    assert "sendgrid error" in exc_info.value.details['reason'].lower()
 
 
 # ==========================================
