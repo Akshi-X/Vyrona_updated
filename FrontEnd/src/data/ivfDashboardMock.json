@@ -1,19 +1,4 @@
 {
-  "monthlySummary": {
-    "volume": {
-      "totalEmbryosCryolocks": 65,
-      "totalContainers": 118
-    }
-  },
-  "performance": {
-    "qualityDeviationsFlagged": 87,
-    "topDeviationDriver": {
-      "name": "Temperature Fluctuation",
-      "count": 23
-    },
-    "outboundShipments": 40,
-    "avgQualityLostPerPatient": 23
-  },
   "qualityDeviation": {
     "timestamps": [
       "11:32:09 pm",
@@ -38,67 +23,5 @@
         "data": [1.5, 2.1, 1.8, 2.3]
       }
     ]
-  },
-  "ongoingTreatments": [
-    {
-      "hisNumber": "HIS-10234",
-      "cryolockNum": "CL-01",
-      "canisterNum": 6,
-      "tankId": "Tank 8",
-      "caneId": "Cane-A 12",
-      "gobletColor": "Yellow",
-      "cryolockColor": "Blue",
-      "dateOfVitrification": "2024-08-12",
-      "siteName": "Egmore",
-      "status": "Internal"
-    },
-    {
-      "hisNumber": "HIS-10234",
-      "cryolockNum": "CL-01",
-      "canisterNum": 6,
-      "tankId": "Tank 8",
-      "caneId": "Cane-A 12",
-      "gobletColor": "Yellow",
-      "cryolockColor": "Green",
-      "dateOfVitrification": "2024-08-12",
-      "siteName": "Egmore",
-      "status": "In Transit"
-    },
-    {
-      "hisNumber": "HIS-10234",
-      "cryolockNum": "CL-01",
-      "canisterNum": 6,
-      "tankId": "Tank 8",
-      "caneId": "Cane-A 12",
-      "gobletColor": "Yellow",
-      "cryolockColor": "Blue",
-      "dateOfVitrification": "2024-08-12",
-      "siteName": "Bangalore",
-      "status": "Internal"
-    },
-    {
-      "hisNumber": "HIS-10234",
-      "cryolockNum": "CL-01",
-      "canisterNum": 6,
-      "tankId": "Tank 8",
-      "caneId": "Cane-A 12",
-      "gobletColor": "Yellow",
-      "cryolockColor": "Blue",
-      "dateOfVitrification": "2024-08-12",
-      "siteName": "Bangalore",
-      "status": "Internal"
-    },
-    {
-      "hisNumber": "HIS-10234",
-      "cryolockNum": "CL-01",
-      "canisterNum": 6,
-      "tankId": "Tank 8",
-      "caneId": "Cane-A 12",
-      "gobletColor": "Yellow",
-      "cryolockColor": "Green",
-      "dateOfVitrification": "2024-08-12",
-      "siteName": "Egmore",
-      "status": "Internal"
-    }
-  ]
+  }
 }

@@ -47,6 +47,8 @@ import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.sv
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
 // Mock data
 import ivfDashboardMock from '../../data/ivfDashboardMock.json';
+import { ivfService } from '../../services/ivfService';
+import type { IVFTreatment } from '../../types/ivf.ts';
 
 interface StakeholderChat {
   id: string;
@@ -105,6 +107,37 @@ export default function Dashboard({ }: DashboardProps) {
     } catch {}
     return null;
   });
+
+  // IVF embryo tracking (live API data)
+  const [ivfEmbryoTracking, setIvfEmbryoTracking] = useState<IVFTreatment[]>([]);
+  const [loadingIvfEmbryoTracking, setLoadingIvfEmbryoTracking] = useState(false);
+  const [ivfEmbryoTrackingError, setIvfEmbryoTrackingError] = useState<string | null>(null);
+
+  // IVF total embryos/cryolocks metric (live API data)
+  const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
+  const [ivfTotalCryolocks, setIvfTotalCryolocks] = useState<number | null>(null);
+  const [loadingIvfTotals, setLoadingIvfTotals] = useState(false);
+  const [ivfTotalsError, setIvfTotalsError] = useState<string | null>(null);
+
+  // IVF total containers metric (live API data)
+  const [ivfTotalContainers, setIvfTotalContainers] = useState<number | null>(null);
+  const [loadingIvfContainers, setLoadingIvfContainers] = useState(false);
+  const [ivfContainersError, setIvfContainersError] = useState<string | null>(null);
+
+  // IVF quality deviations flagged metric (live API data)
+  const [ivfQualityDeviations, setIvfQualityDeviations] = useState<number | null>(null);
+  const [loadingIvfQualityDeviations, setLoadingIvfQualityDeviations] = useState(false);
+  const [ivfQualityDeviationsError, setIvfQualityDeviationsError] = useState<string | null>(null);
+
+  // IVF top deviation driver metric (live API data)
+  const [ivfTopDeviationDriverCount, setIvfTopDeviationDriverCount] = useState<number | null>(null);
+  const [loadingIvfTopDeviationDriver, setLoadingIvfTopDeviationDriver] = useState(false);
+  const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
+
+  // IVF outbound shipments metric (live API data)
+  const [ivfOutboundShipments, setIvfOutboundShipments] = useState<number | null>(null);
+  const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
+  const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
 
   // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
@@ -252,6 +285,178 @@ export default function Dashboard({ }: DashboardProps) {
       fetchUserProfile();
     }
   }, [isAuthenticated]);
+
+  // Fetch IVF embryo tracking (ongoing treatments) from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchEmbryoTracking = async () => {
+      setLoadingIvfEmbryoTracking(true);
+      setIvfEmbryoTrackingError(null);
+      try {
+        const response = await ivfService.getEmbryoTracking();
+        if (!cancelled) setIvfEmbryoTracking(response?.data || []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfEmbryoTracking([]);
+          setIvfEmbryoTrackingError(e?.message || 'Failed to load embryo tracking data');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfEmbryoTracking(false);
+      }
+    };
+
+    fetchEmbryoTracking();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF totals (Total Embryos/Cryolocks) from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotals = async () => {
+      setLoadingIvfTotals(true);
+      setIvfTotalsError(null);
+      try {
+        const response = await ivfService.getTotalEmbryosCryolocks();
+        if (!cancelled) {
+          setIvfTotalEmbryos(response?.total_embryos ?? 0);
+          setIvfTotalCryolocks(response?.total_cryolocks ?? 0);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalEmbryos(null);
+          setIvfTotalCryolocks(null);
+          setIvfTotalsError(e?.message || 'Failed to load totals');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTotals(false);
+      }
+    };
+
+    fetchTotals();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF total containers from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotalContainers = async () => {
+      setLoadingIvfContainers(true);
+      setIvfContainersError(null);
+      try {
+        const response = await ivfService.getTotalContainers();
+        if (!cancelled) setIvfTotalContainers(response?.total_containers ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalContainers(null);
+          setIvfContainersError(e?.message || 'Failed to load total containers');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfContainers(false);
+      }
+    };
+
+    fetchTotalContainers();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF quality deviations flagged from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchQualityDeviations = async () => {
+      setLoadingIvfQualityDeviations(true);
+      setIvfQualityDeviationsError(null);
+      try {
+        const response = await ivfService.getQualityDeviationsFlagged();
+        if (!cancelled) setIvfQualityDeviations(response?.total_quality_deviations ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfQualityDeviations(null);
+          setIvfQualityDeviationsError(e?.message || 'Failed to load quality deviations');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfQualityDeviations(false);
+      }
+    };
+
+    fetchQualityDeviations();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF top deviation driver from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTopDeviationDriver = async () => {
+      setLoadingIvfTopDeviationDriver(true);
+      setIvfTopDeviationDriverError(null);
+      try {
+        const response = await ivfService.getTopDeviationDriver();
+        if (!cancelled) setIvfTopDeviationDriverCount(response?.count ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTopDeviationDriverCount(null);
+          setIvfTopDeviationDriverError(e?.message || 'Failed to load top deviation driver');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTopDeviationDriver(false);
+      }
+    };
+
+    fetchTopDeviationDriver();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF outbound shipments from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchOutboundShipments = async () => {
+      setLoadingIvfOutboundShipments(true);
+      setIvfOutboundShipmentsError(null);
+      try {
+        const response = await ivfService.getOutboundShipments();
+        if (!cancelled) setIvfOutboundShipments(response?.total_outbound_shipments ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfOutboundShipments(null);
+          setIvfOutboundShipmentsError(e?.message || 'Failed to load outbound shipments');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfOutboundShipments(false);
+      }
+    };
+
+    fetchOutboundShipments();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
 
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
@@ -466,7 +671,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Total Embryos/Cryolocks
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.monthlySummary?.volume?.totalEmbryosCryolocks || '0'}
+                            {loadingIvfTotals
+                              ? '--/--'
+                              : ivfTotalsError
+                                ? '0/0'
+                                : `${ivfTotalEmbryos ?? 0}/${ivfTotalCryolocks ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -481,7 +690,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Total number of Containers
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.monthlySummary?.volume?.totalContainers || '0'}
+                            {loadingIvfContainers
+                              ? '--'
+                              : ivfContainersError
+                                ? '0'
+                                : `${ivfTotalContainers ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -502,7 +715,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.qualityDeviationsFlagged || '0'}
+                            {loadingIvfQualityDeviations
+                              ? '--'
+                              : ivfQualityDeviationsError
+                                ? '0'
+                                : `${ivfQualityDeviations ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -517,7 +734,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Top Deviation Driver
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.topDeviationDriver?.count || '0'}
+                            {loadingIvfTopDeviationDriver
+                              ? '--'
+                              : ivfTopDeviationDriverError
+                                ? '0'
+                                : `${ivfTopDeviationDriverCount ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -528,7 +749,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <section>
                     <h2 className="font-semibold text-black text-base mb-4">Outbound Shipments</h2>
                     <div className="grid grid-cols-2 gap-6">
-                      {/* Outbound Shipments */}
+                      {/* Outbond Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
@@ -538,7 +759,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Outbound Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.outboundShipments || '0'}
+                            {loadingIvfOutboundShipments
+                              ? '--'
+                              : ivfOutboundShipmentsError
+                                ? '0'
+                                : `${ivfOutboundShipments ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -788,9 +1013,13 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Ongoing Treatments Section */}
               <section>
                 <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
-                <h2 className="font-semibold text-black text-base mb-4">Ongoing Treatments</h2>
-                {ivfData.ongoingTreatments && (
-                  <IVFOngoingTreatments treatments={ivfData.ongoingTreatments} />
+                <h2 className="font-semibold text-black text-base mb-4">Embroyo Tracking</h2>
+                {loadingIvfEmbryoTracking ? (
+                  <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
+                ) : ivfEmbryoTrackingError ? (
+                  <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
+                ) : (
+                  <IVFOngoingTreatments treatments={ivfEmbryoTracking} />
                 )}
                 </div>
               </section>

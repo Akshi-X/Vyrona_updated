@@ -29,9 +29,11 @@ interface QualityPayload {
 }
 
 const mockQualityPayload: QualityPayload = {
+  // Temperature is intentionally outside range -> anomaly
   temperature: 11.8,
-  humidity: 72,
-  agitation: 18,
+  // Humidity and agitation are within their ranges -> normal
+  humidity: 55,
+  agitation: 6,
   thresholds: {
     temperature: { min: 2, max: 8, unit: '°C' },
     humidity: { min: 40, max: 60, unit: '%' },
@@ -39,8 +41,8 @@ const mockQualityPayload: QualityPayload = {
   },
   threshold_violations: {
     temperature: true,
-    humidity: true,
-    agitation: true,
+    humidity: false,
+    agitation: false,
   },
   quality_loss: 11.5,
   quality_status: 'Warning',
@@ -69,13 +71,22 @@ export function IVFQualityParametersTable() {
       { key: 'agitation', label: 'Agitation / Vibration', value: latest.agitation },
     ];
 
-    return mapping.map((m) => ({
-      key: m.key,
-      label: m.label,
-      value: m.value,
-      threshold: latest.thresholds[m.key],
-      violated: latest.threshold_violations[m.key],
-    }));
+    const isViolated = (value: number, t: Threshold) => {
+      const belowMin = t.min !== null && t.min !== undefined && value < t.min;
+      const aboveMax = t.max !== null && t.max !== undefined && value > t.max;
+      return belowMin || aboveMax;
+    };
+
+    return mapping.map((m) => {
+      const threshold = latest.thresholds[m.key];
+      return {
+        key: m.key,
+        label: m.label,
+        value: m.value,
+        threshold,
+        violated: isViolated(m.value, threshold),
+      };
+    });
   }, [latest]);
 
   const filteredRows = useMemo(() => {
@@ -209,7 +220,7 @@ export function IVFQualityParametersTable() {
         onClose={() => setShowQualityLossModal(false)}
         qualityLoss={latest?.quality_loss}
         qualityScore={latest?.quality_percentage}
-        activeAnomalies={latest ? Object.values(latest.threshold_violations || {}).filter(Boolean).length : 0}
+        activeAnomalies={filteredRows.filter((r) => r.violated).length}
       />
     </div>
   );
