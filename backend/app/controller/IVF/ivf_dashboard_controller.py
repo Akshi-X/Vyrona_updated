@@ -3,6 +3,7 @@ IVF Dashboard Controller
 Controller for IVF dashboard metrics endpoints with role-based access control.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.requests import Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
@@ -16,8 +17,6 @@ from app.schemas.IVF.ivf_dashboard_schema import (
     AvgQualityLossPerContainerResponse,
     DeviationsGraphResponse
 )
-from app.utils.ivf_helpers import get_branch_filter_info
-from app.utils.user_helpers import is_hospital_department
 
 router = APIRouter(prefix="/ivf/dashboard", tags=["IVF Dashboard"])
 
