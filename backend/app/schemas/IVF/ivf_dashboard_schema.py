@@ -61,10 +61,14 @@ class AvgQualityLossPerContainerResponse(BaseModel):
 
 
 class DeviationsGraphResponse(BaseModel):
-    """Response for deviations graph metric"""
+    """Response for deviations graph metric
+    
+    User view: Returns containers from user's branch/site with individual driver counts and top risk driver per container
+    Manager view: Returns sites with cumulative driver counts and top risk driver per site
+    """
     view_level: str = Field(..., description="View level: container (user) or site (manager/admin)")
-    top_deviation_type: str = Field(..., description="Top contributing deviation type overall")
-    data: List[Dict[str, Any]] = Field(..., description="Deviation data for charting")
+    data: List[Dict[str, Any]] = Field(..., description="Deviation data for charting. For user: list of containers. For manager: list of sites.")
+    top_deviation_type: Optional[str] = Field(None, description="Top contributing deviation type overall (deprecated, kept for backward compatibility)")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 
