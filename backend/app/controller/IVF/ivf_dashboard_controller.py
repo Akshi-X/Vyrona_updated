@@ -165,12 +165,13 @@ def get_top_deviation_driver(
     """
     Get top deviation driver.
     
-    Metric 4: Top Deviation Driver (For all Sites)
+    Metric 4: Top Deviation Driver
     
-    Deviation drivers considered:
-    - Critical canister status
-    - Risk canister status
-    - Low LN2 levels
+    Returns the KPI (Key Performance Indicator) with the highest deviation count.
+    KPIs tracked:
+    - Temperature deviations
+    - Humidity deviations
+    - Agitation deviations
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -254,11 +255,14 @@ def get_deviations_graph(
     db: Session = Depends(get_db)
 ):
     """
-    Get deviations graph data.
+    Get deviations graph data for Quality deviation chart.
     
-    X-axis: Containers (User view) or Sites (Manager/Admin view)
-    Y-axis: Number of deviations
-    Graph type: Stacked bar chart (temperature, humidity, agitation)
+    Chart structure (Horizontal bar chart):
+    - Y-axis: Containers (User view) or Sites (Manager/Admin view)
+    - X-axis: Deviation values (0-100)
+    - For each container/site: Two horizontal bars
+      1. Stacked bar: Temperature (purple), Humidity (grey), Agitation/Vibration (pink)
+      2. Solid bar: Top risk driver (blue) - maximum deviation value
     
     Role-based access:
     - User (IVF): Container-wise deviations within the site
