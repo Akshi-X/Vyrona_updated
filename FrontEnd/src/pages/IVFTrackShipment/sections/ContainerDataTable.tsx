@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ivfService, mapEmbryoTrackingApiItemToTreatment } from '../../../services/ivfService';
+import { ivfService } from '../../../services/ivfService';
 import type { IVFTreatment } from '../../../types/ivf.ts';
 
 export default function ContainerDataTable() {
@@ -14,8 +14,7 @@ export default function ContainerDataTable() {
       setError(null);
       try {
         const response = await ivfService.getEmbryoTracking();
-        const mapped = (response?.data || []).map(mapEmbryoTrackingApiItemToTreatment);
-        if (!cancelled) setRows(mapped);
+        if (!cancelled) setRows(response?.data || []);
       } catch (e: any) {
         if (!cancelled) {
           setRows([]);

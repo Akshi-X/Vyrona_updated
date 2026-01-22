@@ -1,6 +1,5 @@
 import { BaseApiService } from './baseApiService';
 import type {
-  EmbryoTrackingApiItem,
   EmbryoTrackingApiResponse,
   IVFTreatment,
 } from '../types/ivf.ts';
@@ -42,7 +41,27 @@ export interface OutboundShipmentsResponse {
   status: string;
 }
 
-export const mapEmbryoTrackingApiItemToTreatment = (item: EmbryoTrackingApiItem): IVFTreatment => ({
+// Internal type for raw API response (snake_case)
+interface RawEmbryoTrackingApiItem {
+  his_number: string;
+  cryolock_number: string;
+  canister_number: number;
+  tank_id: string;
+  cane_id: string;
+  goblet_color: string;
+  cryolock_color: string;
+  date_of_vitrification: string;
+  embryo_grading?: string;
+  site_name: string;
+  status: string;
+}
+
+interface RawEmbryoTrackingApiResponse {
+  data: RawEmbryoTrackingApiItem[];
+  total: number;
+}
+
+const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => ({
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
   canisterNum: item.canister_number,
@@ -58,9 +77,13 @@ export const mapEmbryoTrackingApiItemToTreatment = (item: EmbryoTrackingApiItem)
 
 export class IvfService extends BaseApiService {
   async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
-    return await this.request<EmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
+    const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
       method: 'GET',
     });
+    return {
+      data: response.data.map(mapApiItemToTreatment),
+      total: response.total,
+    };
   }
 
   async getTotalEmbryosCryolocks(): Promise<TotalEmbryosCryolocksResponse> {

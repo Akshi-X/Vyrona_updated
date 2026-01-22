@@ -65,7 +65,7 @@ export default function IVFTrackShipmentPage() {
                         </button>
                         <span>Container ID: {patientId || 'Canister 1'}</span>
                     </div>
-                    <ContainerProcessFlow />
+                    {/* <ContainerProcessFlow /> */}
                     {/* Row 1: Quality Tracking + Quality Parameter (left) | Container Data (right) */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Stacked Quality Tracking and Quality Parameter */}
