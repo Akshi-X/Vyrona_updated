@@ -63,7 +63,7 @@ export default function IVFTrackShipmentPage() {
                         >
                             <img src={backButton} alt="" className="w-4 h-4" />
                         </button>
-                        <span>Container ID: {patientId || 'N/A'}</span>
+                        <span>Container ID: {patientId || 'Canister 1'}</span>
                     </div>
                     <ContainerProcessFlow />
                     {/* Row 1: Quality Tracking + Quality Parameter (left) | Container Data (right) */}
