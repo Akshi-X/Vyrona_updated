@@ -17,7 +17,10 @@ from app.schemas.IVF.quality_tracking_schema import (
     RefillLogResponse,
     RefillLogListResponse,
     IVFQualityKpiResponse,
-    IVFCanisterTrackingResponse
+    IVFCanisterTrackingResponse,
+    GobletColorUpdate,
+    CryolockColorUpdate,
+    ColorUpdateResponse
 )
 from app.constants.enums import TaskStatus
 from app.utils.ivf_helpers import get_branch_filter_info
@@ -192,4 +195,89 @@ def get_canister_tracking_details(
     except Exception as e:
         logger.error(f"Error in get_canister_tracking_details endpoint: {str(e)}", exc_info=True)
         raise
+
+
+@router.patch("/canisters/{canister_id}/goblet-color", response_model=ColorUpdateResponse)
+def update_goblet_color(
+    canister_id: int = Path(..., description="Canister ID from URL"),
+    color_update: GobletColorUpdate = ...,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update goblet color for a specific cane within a canister.
+    
+    Use this endpoint to update the goblet color from the tracking table.
+    The goblet color is stored in the 'canes' table.
+    
+    WHERE TO GET cane_identifier:
+    - Use the "Cane ID" column value directly from the table row
+    - Examples: "Cane-A 12", "Cane-5", or just "5" (numeric part)
+    
+    Request Body:
+    - cane_identifier: Cane ID from the "Cane ID" column in the table (e.g., "Cane-A 12")
+    - goblet_color: The goblet color value to set (e.g., "Yellow", "Red", "Blue")
+    
+    Example Request:
+    {
+        "cane_identifier": "Cane-A 12",
+        "goblet_color": "Yellow"
+    }
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.update_goblet_color(
+            canister_id=canister_id,
+            color_update=color_update,
+            updated_by=current_user.email if current_user else None,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in update_goblet_color endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.patch("/canisters/{canister_id}/cryolock-color", response_model=ColorUpdateResponse)
+def update_cryolock_color(
+    canister_id: int = Path(..., description="Canister ID from URL"),
+    color_update: CryolockColorUpdate = ...,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update cryolock color for a specific cryolock within a canister.
+    
+    Use this endpoint to update the cryolock color from the tracking table.
+    The cryolock color is stored in the 'cryolocks' table.
+    
+    WHERE TO GET cryolock_number:
+    - Use the "Cryolock Num" column value directly from the table row
+    - Example: "CL-01"
+    
+    Request Body:
+    - cryolock_number: Cryolock number from the "Cryolock Num" column in the table (e.g., "CL-01")
+    - cryolock_color: The cryolock color value to set (e.g., "Blue", "Green", "Red")
+    
+    Example Request:
+    {
+        "cryolock_number": "CL-01",
+        "cryolock_color": "Blue"
+    }
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.update_cryolock_color(
+            canister_id=canister_id,
+            color_update=color_update,
+            updated_by=current_user.email if current_user else None,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in update_cryolock_color endpoint: {str(e)}", exc_info=True)
+        raise
+
 
