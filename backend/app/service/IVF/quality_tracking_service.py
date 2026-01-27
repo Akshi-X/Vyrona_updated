@@ -9,7 +9,6 @@ from sqlalchemy import desc, func
 
 # Import shared models (matching pattern from ivf_service.py)
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
-from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.canister_model import Canister
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
@@ -23,12 +22,6 @@ from ...schemas.IVF.quality_tracking_schema import (
     RefillLogStatusUpdate,
     RefillLogResponse,
     RefillLogListResponse,
-    IVFQualityThreshold,
-    IVFQualityDataPoint,
-    IVFQualityTrackingSeries,
-    IVFQualityParameterStatus,
-    IVFQualityKpiSummary,
-    IVFQualityKpiResponse,
     IVFCanisterTrackingItem,
     IVFCanisterTrackingResponse,
     GobletColorUpdate,
@@ -44,12 +37,6 @@ logger = logging.getLogger(__name__)
 
 class QualityTrackingService:
     """Service for quality tracking operations"""
-
-    DEFAULT_THRESHOLDS: Dict[str, IVFQualityThreshold] = {
-        "temperature": IVFQualityThreshold(min=2.0, max=8.0, unit="C"),
-        "humidity": IVFQualityThreshold(min=30.0, max=70.0, unit="%"),
-        "agitation": IVFQualityThreshold(min=0.0, max=5.0, unit="%")
-    }
     
     def __init__(self, db: Session):
         self.db = db
@@ -92,7 +79,6 @@ class QualityTrackingService:
                 refill_date=refill_log_data.refill_date,
                 refill_time=refill_log_data.refill_time,
                 refilled_by=refill_log_data.refilled_by,
-                liquid_nitrogen_volume=refill_log_data.liquid_nitrogen_volume,
                 description=refill_log_data.description,
                 status=refill_log_data.status,
                 created_by=created_by,
@@ -230,57 +216,6 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
-    def get_ivf_quality_kpis(
-        self,
-        canister_id: int,
-        limit: int = 50,
-        branch_id: Optional[int] = None
-    ) -> IVFQualityKpiResponse:
-        """
-        Get IVF container quality KPIs and tracking data.
-        """
-        try:
-            query = self.db.query(IVFQualityLog).filter(
-                IVFQualityLog.canister_id == canister_id
-            )
-
-            if branch_id is not None:
-                query = (
-                    query.join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == branch_id)
-                )
-
-            logs = (
-                query.order_by(desc(IVFQualityLog.reading_timestamp))
-                .limit(limit)
-                .all()
-            )
-
-            tracking_series = self._build_tracking_series(logs)
-            last_log = logs[0] if logs else None
-
-            thresholds = dict(self.DEFAULT_THRESHOLDS)
-            parameters = self._build_parameter_statuses(last_log, thresholds)
-            kpi_summary = self._build_kpi_summary(logs, thresholds)
-
-            return IVFQualityKpiResponse(
-                container_id=canister_id,
-                last_reading_timestamp=last_log.reading_timestamp if last_log else None,
-                thresholds=thresholds,
-                tracking=tracking_series,
-                parameters=parameters,
-                kpi_summary=kpi_summary
-            )
-        except Exception as e:
-            logger.error(f"Error fetching IVF quality KPIs: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to fetch IVF quality KPIs: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-            )
-
     def get_canister_tracking_details(
         self,
         canister_id: int,
@@ -351,124 +286,6 @@ class QualityTrackingService:
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
-
-    def _build_tracking_series(self, logs: List[IVFQualityLog]) -> IVFQualityTrackingSeries:
-        ordered_logs = list(reversed(logs))
-        data_points = [
-            IVFQualityDataPoint(
-                timestamp=log.reading_timestamp,
-                temperature=log.temperature,
-                humidity=log.humidity,
-                agitation=log.agitation
-            )
-            for log in ordered_logs
-        ]
-        return IVFQualityTrackingSeries(
-            data_points=data_points,
-            count=len(data_points)
-        )
-
-    def _build_parameter_statuses(
-        self,
-        last_log: Optional[IVFQualityLog],
-        thresholds: Dict[str, IVFQualityThreshold]
-    ) -> List[IVFQualityParameterStatus]:
-        if not last_log:
-            return [
-                IVFQualityParameterStatus(
-                    parameter=param,
-                    current_value=None,
-                    unit=threshold.unit,
-                    status="No Data",
-                    acceptable_range=threshold,
-                    is_anomaly=False
-                )
-                for param, threshold in thresholds.items()
-            ]
-
-        values = {
-            "temperature": last_log.temperature,
-            "humidity": last_log.humidity,
-            "agitation": last_log.agitation
-        }
-
-        statuses: List[IVFQualityParameterStatus] = []
-        for param, threshold in thresholds.items():
-            value = values.get(param)
-            if value is None:
-                status = "No Data"
-                is_anomaly = False
-            else:
-                is_anomaly = self._is_outside_threshold(value, threshold)
-                status = "Anomaly" if is_anomaly else "Normal"
-
-            statuses.append(
-                IVFQualityParameterStatus(
-                    parameter=param.replace("_", " ").title(),
-                    current_value=value,
-                    unit=threshold.unit,
-                    status=status,
-                    acceptable_range=threshold,
-                    is_anomaly=is_anomaly
-                )
-            )
-
-        return statuses
-
-    def _build_kpi_summary(
-        self,
-        logs: List[IVFQualityLog],
-        thresholds: Dict[str, IVFQualityThreshold]
-    ) -> IVFQualityKpiSummary:
-        temp_values = [log.temperature for log in logs if log.temperature is not None]
-        humidity_values = [log.humidity for log in logs if log.humidity is not None]
-        agitation_values = [log.agitation for log in logs if log.agitation is not None]
-
-        anomaly_counts = {
-            "temperature": self._count_anomalies(logs, "temperature", thresholds["temperature"]),
-            "humidity": self._count_anomalies(logs, "humidity", thresholds["humidity"]),
-            "agitation": self._count_anomalies(logs, "agitation", thresholds["agitation"])
-        }
-
-        last_quality_loss = logs[0].quality_loss if logs else None
-
-        return IVFQualityKpiSummary(
-            avg_temperature=self._safe_average(temp_values),
-            avg_humidity=self._safe_average(humidity_values),
-            avg_agitation=self._safe_average(agitation_values),
-            anomaly_counts=anomaly_counts,
-            total_readings=len(logs),
-            quality_loss=round(float(last_quality_loss), 2) if last_quality_loss is not None else 0.0
-        )
-
-    @staticmethod
-    def _is_outside_threshold(value: float, threshold: IVFQualityThreshold) -> bool:
-        if threshold.min is not None and value < threshold.min:
-            return True
-        if threshold.max is not None and value > threshold.max:
-            return True
-        return False
-
-    def _count_anomalies(
-        self,
-        logs: List[IVFQualityLog],
-        attribute: str,
-        threshold: IVFQualityThreshold
-    ) -> int:
-        count = 0
-        for log in logs:
-            value = getattr(log, attribute)
-            if value is None:
-                continue
-            if self._is_outside_threshold(value, threshold):
-                count += 1
-        return count
-
-    @staticmethod
-    def _safe_average(values: List[float]) -> Optional[float]:
-        if not values:
-            return None
-        return round(sum(values) / len(values), 2)
     
     def update_goblet_color(
         self,

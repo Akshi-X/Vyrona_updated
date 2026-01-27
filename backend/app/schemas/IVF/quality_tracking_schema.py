@@ -15,7 +15,6 @@ class RefillLogBase(BaseModel):
     refill_date: date = Field(..., description="Date when refill was performed")
     refill_time: time = Field(..., description="Time when refill was performed")
     refilled_by: str = Field(..., description="Name of person who performed the refill")
-    liquid_nitrogen_volume: float = Field(..., ge=0, le=100, description="Liquid Nitrogen volume percentage (0-100)")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
 
@@ -25,7 +24,6 @@ class RefillLogCreate(BaseModel):
     refill_date: date = Field(..., description="Date when refill was performed")
     refill_time: time = Field(..., description="Time when refill was performed")
     refilled_by: str = Field(..., description="Name of person who performed the refill")
-    liquid_nitrogen_volume: float = Field(..., ge=0, le=100, description="Liquid Nitrogen volume percentage (0-100)")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
 
@@ -51,57 +49,6 @@ class RefillLogListResponse(BaseModel):
     """Schema for list of refill logs response"""
     refill_logs: List[RefillLogResponse] = Field(..., description="List of refill logs")
     count: int = Field(..., description="Total number of refill logs")
-
-
-class IVFQualityThreshold(BaseModel):
-    """Threshold configuration for IVF quality parameters"""
-    min: Optional[float] = Field(None, description="Minimum acceptable value")
-    max: Optional[float] = Field(None, description="Maximum acceptable value")
-    unit: str = Field(..., description="Unit of measurement")
-
-
-class IVFQualityDataPoint(BaseModel):
-    """Single IVF quality data point for tracking chart"""
-    timestamp: datetime = Field(..., description="Timestamp of the reading")
-    temperature: Optional[float] = Field(None, description="Temperature in C")
-    humidity: Optional[float] = Field(None, description="Humidity in %")
-    agitation: Optional[float] = Field(None, description="Agitation/Vibration in %")
-
-
-class IVFQualityTrackingSeries(BaseModel):
-    """Series of IVF quality data points"""
-    data_points: List[IVFQualityDataPoint] = Field(default_factory=list, description="Ordered data points")
-    count: int = Field(..., description="Number of data points returned")
-
-
-class IVFQualityParameterStatus(BaseModel):
-    """Current quality parameter status and threshold evaluation"""
-    parameter: str = Field(..., description="Parameter name")
-    current_value: Optional[float] = Field(None, description="Latest value for the parameter")
-    unit: str = Field(..., description="Unit of the parameter")
-    status: str = Field(..., description="Status based on thresholds (Normal, Anomaly, No Data)")
-    acceptable_range: IVFQualityThreshold = Field(..., description="Threshold range used for evaluation")
-    is_anomaly: bool = Field(..., description="True if value violates threshold")
-
-
-class IVFQualityKpiSummary(BaseModel):
-    """KPI summary for IVF container quality"""
-    avg_temperature: Optional[float] = Field(None, description="Average temperature over the window")
-    avg_humidity: Optional[float] = Field(None, description="Average humidity over the window")
-    avg_agitation: Optional[float] = Field(None, description="Average agitation over the window")
-    anomaly_counts: Dict[str, int] = Field(default_factory=dict, description="Count of anomalies per parameter")
-    total_readings: int = Field(..., description="Total readings used for KPIs")
-    quality_loss: float = Field(..., description="Latest quality loss percentage")
-
-
-class IVFQualityKpiResponse(BaseModel):
-    """Response for IVF container quality KPIs and tracking"""
-    container_id: int = Field(..., description="Container (canister) ID")
-    last_reading_timestamp: Optional[datetime] = Field(None, description="Timestamp of the latest reading")
-    thresholds: Dict[str, IVFQualityThreshold] = Field(default_factory=dict, description="Thresholds used")
-    tracking: IVFQualityTrackingSeries = Field(..., description="Tracking data for charting")
-    parameters: List[IVFQualityParameterStatus] = Field(default_factory=list, description="Latest parameter statuses")
-    kpi_summary: IVFQualityKpiSummary = Field(..., description="KPI summary for the container")
 
 
 class IVFCanisterTrackingItem(BaseModel):
