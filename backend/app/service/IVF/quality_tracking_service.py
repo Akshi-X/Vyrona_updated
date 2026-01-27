@@ -30,7 +30,10 @@ from ...schemas.IVF.quality_tracking_schema import (
     IVFQualityKpiSummary,
     IVFQualityKpiResponse,
     IVFCanisterTrackingItem,
-    IVFCanisterTrackingResponse
+    IVFCanisterTrackingResponse,
+    GobletColorUpdate,
+    CryolockColorUpdate,
+    ColorUpdateResponse
 )
 from ...exceptions.custom_exceptions import AppException
 from ...constants.messages import ErrorMessages
@@ -110,9 +113,9 @@ class QualityTrackingService:
             self.db.rollback()
             logger.error(f"Error creating refill log: {str(e)}", exc_info=True)
             raise AppException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=f"Failed to create refill log: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create refill log: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
     
     def get_refill_logs(
@@ -169,9 +172,9 @@ class QualityTrackingService:
         except Exception as e:
             logger.error(f"Error fetching refill logs: {str(e)}", exc_info=True)
             raise AppException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=f"Failed to fetch refill logs: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch refill logs: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def update_refill_log_status(
@@ -197,9 +200,9 @@ class QualityTrackingService:
             refill_log = query.first()
             if not refill_log:
                 raise AppException(
-                    status_code=HTTPStatus.NOT_FOUND,
+                    message=f"Refill log with ID {log_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
-                    detail=f"Refill log with ID {log_id} not found"
+                    status_code=HTTPStatus.NOT_FOUND
                 )
 
             refill_log.status = status_update.status
@@ -222,9 +225,9 @@ class QualityTrackingService:
             self.db.rollback()
             logger.error(f"Error updating refill log status: {str(e)}", exc_info=True)
             raise AppException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=f"Failed to update refill log status: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                detail=f"Failed to update refill log status: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def get_ivf_quality_kpis(
@@ -273,9 +276,9 @@ class QualityTrackingService:
         except Exception as e:
             logger.error(f"Error fetching IVF quality KPIs: {str(e)}", exc_info=True)
             raise AppException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=f"Failed to fetch IVF quality KPIs: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch IVF quality KPIs: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def get_canister_tracking_details(
@@ -344,9 +347,9 @@ class QualityTrackingService:
         except Exception as e:
             logger.error(f"Error fetching canister tracking details: {str(e)}", exc_info=True)
             raise AppException(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                message=f"Failed to fetch canister tracking details: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch canister tracking details: {str(e)}"
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
     def _build_tracking_series(self, logs: List[IVFQualityLog]) -> IVFQualityTrackingSeries:
@@ -466,4 +469,182 @@ class QualityTrackingService:
         if not values:
             return None
         return round(sum(values) / len(values), 2)
+    
+    def update_goblet_color(
+        self,
+        canister_id: int,
+        color_update: GobletColorUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> ColorUpdateResponse:
+        """
+        Update goblet color for a specific cane within a canister.
+        
+        Args:
+            canister_id: Canister ID from URL path
+            color_update: Goblet color update data containing cane_identifier and goblet_color
+            updated_by: Username of the user updating the color
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            ColorUpdateResponse with update details
+            
+        Raises:
+            AppException: If update fails or cane not found
+        """
+        try:
+            # Find the cane by canister_id and cane_identifier
+            # cane_identifier can be either cane_code or numeric part of "Cane-{id}"
+            cane_identifier = color_update.cane_identifier.strip()
+            
+            # Try to find by cane_code first
+            query = self.db.query(Cane).filter(
+                Cane.canister_id == canister_id
+            )
+            
+            # Check if identifier looks like a numeric ID (from "Cane-{id}" format)
+            if cane_identifier.isdigit():
+                cane_id = int(cane_identifier)
+                query = query.filter(Cane.cane_id == cane_id)
+            elif cane_identifier.startswith("Cane-") and cane_identifier[5:].isdigit():
+                # Handle "Cane-5" format - extract the numeric part
+                cane_id = int(cane_identifier[5:])
+                query = query.filter(Cane.cane_id == cane_id)
+            else:
+                # Try to match by cane_code
+                query = query.filter(Cane.cane_code == cane_identifier)
+            
+            # Apply branch filter if provided
+            if branch_id is not None:
+                query = (
+                    query.join(Canister, Cane.canister_id == Canister.canister_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(HospitalBranch.branch_id == branch_id)
+                )
+            
+            cane = query.first()
+            
+            if not cane:
+                raise AppException(
+                    message=f"Cane with identifier '{cane_identifier}' not found in canister {canister_id}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Update the goblet color
+            cane.goblet_color = color_update.goblet_color
+            cane.updated_by = updated_by
+            
+            self.db.commit()
+            self.db.refresh(cane)
+            
+            logger.info(
+                "Updated goblet color | canister_id=%s cane_id=%s goblet_color=%s",
+                canister_id,
+                cane.cane_id,
+                color_update.goblet_color
+            )
+            
+            return ColorUpdateResponse(
+                success=True,
+                message=f"Goblet color updated successfully to '{color_update.goblet_color}'",
+                cane_id=cane.cane_id,
+                updated_color=color_update.goblet_color
+            )
+            
+        except AppException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating goblet color: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to update goblet color: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def update_cryolock_color(
+        self,
+        canister_id: int,
+        color_update: CryolockColorUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> ColorUpdateResponse:
+        """
+        Update cryolock color for a specific cryolock within a canister.
+        
+        Args:
+            canister_id: Canister ID from URL path
+            color_update: Cryolock color update data containing cryolock_number and cryolock_color
+            updated_by: Username of the user updating the color
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            ColorUpdateResponse with update details
+            
+        Raises:
+            AppException: If update fails or cryolock not found
+        """
+        try:
+            # Find the cryolock by canister_id and cryolock_number
+            query = (
+                self.db.query(Cryolock)
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .filter(
+                    Canister.canister_id == canister_id,
+                    Cryolock.cryolock_number == color_update.cryolock_number
+                )
+            )
+            
+            # Apply branch filter if provided
+            if branch_id is not None:
+                query = (
+                    query.join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(HospitalBranch.branch_id == branch_id)
+                )
+            
+            cryolock = query.first()
+            
+            if not cryolock:
+                raise AppException(
+                    message=f"Cryolock with number '{color_update.cryolock_number}' not found in canister {canister_id}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Update the cryolock color
+            cryolock.cryolock_color = color_update.cryolock_color
+            cryolock.updated_by = updated_by
+            
+            self.db.commit()
+            self.db.refresh(cryolock)
+            
+            logger.info(
+                "Updated cryolock color | canister_id=%s cryolock_id=%s cryolock_number=%s cryolock_color=%s",
+                canister_id,
+                cryolock.cryolock_id,
+                color_update.cryolock_number,
+                color_update.cryolock_color
+            )
+            
+            return ColorUpdateResponse(
+                success=True,
+                message=f"Cryolock color updated successfully to '{color_update.cryolock_color}'",
+                cryolock_id=cryolock.cryolock_id,
+                updated_color=color_update.cryolock_color
+            )
+            
+        except AppException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating cryolock color: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to update cryolock color: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
     

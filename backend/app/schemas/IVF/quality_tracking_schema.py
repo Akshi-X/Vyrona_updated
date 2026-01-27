@@ -120,3 +120,35 @@ class IVFCanisterTrackingResponse(BaseModel):
     """Response for canister tracking details"""
     data: List[IVFCanisterTrackingItem] = Field(default_factory=list, description="Tracking rows")
     total: int = Field(..., description="Total number of rows")
+
+
+class GobletColorUpdate(BaseModel):
+    """Schema for updating goblet color"""
+    cane_identifier: str = Field(
+        ..., 
+        description="Cane identifier from the tracking details response. "
+        "This is the 'cane_id' field value from GET /canisters/{canister_id}/tracking-details. "
+        "It can be either: (1) the cane_code if available (e.g., 'Cane-A 12'), "
+        "or (2) the formatted cane_id (e.g., 'Cane-5'). "
+        "You can also use just the numeric part (e.g., '5' for 'Cane-5')."
+    )
+    goblet_color: str = Field(..., description="Goblet color to set (stored in the 'canes' table)")
+
+
+class CryolockColorUpdate(BaseModel):
+    """Schema for updating cryolock color"""
+    cryolock_number: str = Field(
+        ..., 
+        description="Cryolock number from the tracking details response. "
+        "This is the 'cryolock_number' field value from GET /canisters/{canister_id}/tracking-details."
+    )
+    cryolock_color: str = Field(..., description="Cryolock color to set (stored in the 'cryolocks' table)")
+
+
+class ColorUpdateResponse(BaseModel):
+    """Response for color update operations"""
+    success: bool = Field(..., description="Whether the update was successful")
+    message: str = Field(..., description="Success message")
+    cane_id: Optional[int] = Field(None, description="Cane ID that was updated (for goblet color)")
+    cryolock_id: Optional[int] = Field(None, description="Cryolock ID that was updated (for cryolock color)")
+    updated_color: str = Field(..., description="The color value that was set")
