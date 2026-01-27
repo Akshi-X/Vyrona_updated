@@ -11,6 +11,7 @@ import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import QualityDeviationChart from '../../components/QualityDeviationChart';
 import { patientService } from '../../services/patientService';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
+import TrackCanisterModal from '../../components/TrackCanisterModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
@@ -81,6 +82,8 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTrackShipment, setShowTrackShipment] = useState(false);
   const [trackError, setTrackError] = useState<string | undefined>(undefined);
+  const [showTrackCanister, setShowTrackCanister] = useState(false);
+  const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
 
   // WebSocket for unread chat count (tagged messages only)
@@ -138,6 +141,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfOutboundShipments, setIvfOutboundShipments] = useState<number | null>(null);
   const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
   const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
+
+  // IVF avg quality loss per container metric (live API data)
+  const [ivfAvgQualityLossPerContainer, setIvfAvgQualityLossPerContainer] = useState<number | null>(null);
+  const [loadingIvfAvgQualityLoss, setLoadingIvfAvgQualityLoss] = useState(false);
+  const [ivfAvgQualityLossError, setIvfAvgQualityLossError] = useState<string | null>(null);
 
   // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
@@ -458,6 +466,34 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
+  // Fetch IVF avg quality loss per container from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchAvgQualityLoss = async () => {
+      setLoadingIvfAvgQualityLoss(true);
+      setIvfAvgQualityLossError(null);
+      try {
+        const response = await ivfService.getAvgQualityLossPerContainer();
+        if (!cancelled) setIvfAvgQualityLossPerContainer(response?.avg_quality_loss_per_container ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfAvgQualityLossPerContainer(0);
+          setIvfAvgQualityLossError(e?.message || 'Failed to load avg quality loss');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfAvgQualityLoss(false);
+      }
+    };
+
+    fetchAvgQualityLoss();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
     try {
@@ -768,17 +804,21 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
 
-                      {/* Avg Quality Lost/Patient */}
+                      {/* Deviations */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Avg Quality Lost Patient" src={AvgQualityLostPatientIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Avg Quality Lost/Patient:
+                          Deviations
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.avgQualityLostPerPatient || '0'}
+                            {loadingIvfAvgQualityLoss
+                              ? '--'
+                              : ivfAvgQualityLossError
+                                ? '0'
+                                : `${ivfAvgQualityLossPerContainer ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -855,9 +895,8 @@ export default function Dashboard({ }: DashboardProps) {
                       <div 
                         className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
-                          // Navigate to IVF Track Shipment page
-                          // For now, navigate without patientId - the page will handle it
-                          navigate('/ivf-track-shipment');
+                          setShowTrackCanister(true);
+                          setCanisterError(undefined);
                         }}
                       >
                         {/* Background Graphic - Subtle Icon */}
@@ -893,7 +932,8 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/ivf-track-shipment');
+                                setShowTrackCanister(true);
+                                setCanisterError(undefined);
                               }}
                             >
                               <img
@@ -1526,6 +1566,21 @@ export default function Dashboard({ }: DashboardProps) {
             const msg = (e?.message as string) || 'Failed to fetch patient';
             setTrackError(msg);
           }
+        }}
+      />
+
+      {/* Track Canister Modal */}
+      <TrackCanisterModal
+        isOpen={showTrackCanister}
+        onClose={() => {
+          setCanisterError(undefined);
+          setShowTrackCanister(false);
+        }}
+        error={canisterError}
+        onTrack={(canisterId) => {
+          setCanisterError(undefined);
+          setShowTrackCanister(false);
+          navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
         }}
       />
     </div>
