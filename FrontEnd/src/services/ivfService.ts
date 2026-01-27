@@ -41,6 +41,13 @@ export interface OutboundShipmentsResponse {
   status: string;
 }
 
+export interface AvgQualityLossPerContainerResponse {
+  avg_quality_loss_per_container: number;
+  total_containers: number;
+  last_updated: string;
+  status: string;
+}
+
 // Internal type for raw API response (snake_case)
 interface RawEmbryoTrackingApiItem {
   his_number: string;
@@ -117,6 +124,13 @@ export class IvfService extends BaseApiService {
   async getOutboundShipments(): Promise<OutboundShipmentsResponse> {
     return await this.request<OutboundShipmentsResponse>(
       '/api/ivf/dashboard/metrics/outbound-shipments',
+      { method: 'GET' }
+    );
+  }
+
+  async getAvgQualityLossPerContainer(): Promise<AvgQualityLossPerContainerResponse> {
+    return await this.request<AvgQualityLossPerContainerResponse>(
+      '/api/ivf/dashboard/metrics/avg-quality-loss-per-container',
       { method: 'GET' }
     );
   }
