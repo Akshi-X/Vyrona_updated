@@ -32,7 +32,6 @@ class CanisterLn2Log(Base):
     refill_date = Column(Date, nullable=True, index=True, comment="Date when refill/opening was performed")
     refill_time = Column(Time, nullable=True, comment="Time when refill/opening was performed")
     refilled_by = Column(String(255), nullable=True, comment="Name of person who performed the refill/opening")
-    liquid_nitrogen_volume = Column(Float, nullable=True, comment="Liquid Nitrogen volume percentage (e.g., 80.0 for 80%)")
     description = Column(Text, nullable=True, comment="Description or notes about the refill")
     status = Column(SQLEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj], name="refill_status"), 
                    nullable=True, index=True, comment="Status of the refill log (Done, In progress, Not started)")

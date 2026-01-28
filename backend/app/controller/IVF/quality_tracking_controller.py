@@ -16,7 +16,6 @@ from app.schemas.IVF.quality_tracking_schema import (
     RefillLogStatusUpdate,
     RefillLogResponse,
     RefillLogListResponse,
-    IVFQualityKpiResponse,
     IVFCanisterTrackingResponse,
     GobletColorUpdate,
     CryolockColorUpdate,
@@ -50,7 +49,6 @@ def create_refill_log(
     - Refill Date: Date when refill was performed
     - Refill Time: Time when refill was performed
     - Refilled By: Name of person who performed the refill
-    - Liquid Nitrogen Volume: Volume percentage (0-100)
     - Description: Optional description or notes
     - Status: Status of the refill log (default: Not started)
     """
@@ -138,30 +136,6 @@ def update_refill_log_status(
         )
     except Exception as e:
         logger.error(f"Error in update_refill_log_status endpoint: {str(e)}", exc_info=True)
-        raise
-
-
-@router.get("/canisters/{canister_id}/kpis", response_model=IVFQualityKpiResponse)
-def get_ivf_quality_kpis(
-    canister_id: int = Path(..., description="Canister ID from URL"),
-    limit: int = Query(50, ge=1, le=500, description="Max number of readings to include"),
-    request: Request = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Fetch IVF container quality KPIs and tracking data.
-    """
-    try:
-        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-        quality_tracking_service = QualityTrackingService(db)
-        return quality_tracking_service.get_ivf_quality_kpis(
-            canister_id=canister_id,
-            limit=limit,
-            branch_id=branch_id
-        )
-    except Exception as e:
-        logger.error(f"Error in get_ivf_quality_kpis endpoint: {str(e)}", exc_info=True)
         raise
 
 
