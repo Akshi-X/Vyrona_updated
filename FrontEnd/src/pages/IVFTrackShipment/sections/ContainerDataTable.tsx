@@ -172,9 +172,9 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
         )}
       </div>
       <div
-        className="flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+        className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        <table className="min-w-max w-full text-xs">
+        <table className="min-w-max w-full text-xs bg-white">
           <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px]">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS Number (PK)</th>

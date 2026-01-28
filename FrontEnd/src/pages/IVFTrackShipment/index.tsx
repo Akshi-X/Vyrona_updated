@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
-import ContainerProcessFlow from './sections/ContainerProcessFlow';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import RiskFactorTable from './sections/RiskFactorTable';
@@ -81,7 +80,7 @@ export default function IVFTrackShipmentPage() {
 
                     {/* Row 2: Refill Log (full width) */}
                     <div>
-                        <RefillLogTable />
+                        <RefillLogTable canisterId={patientId} />
                     </div>
 
                     {/* Row 3: Risk Factor (left) | Risk Graph (right) */}

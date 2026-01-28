@@ -48,6 +48,25 @@ export interface AvgQualityLossPerContainerResponse {
   status: string;
 }
 
+export interface RefillLogItem {
+  canister_id: number;
+  refill_date: string;
+  refill_time: string;
+  refilled_by: string;
+  description: string;
+  status: string;
+  log_id: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string | null;
+}
+
+export interface RefillLogsResponse {
+  refill_logs: RefillLogItem[];
+  count: number;
+}
+
 // Internal type for raw API response (snake_case)
 interface RawEmbryoTrackingApiItem {
   his_number: string;
@@ -177,6 +196,13 @@ export class IvfService extends BaseApiService {
     };
   }
 
+  async getCanisterRefillLogs(canisterId: string | number): Promise<RefillLogsResponse> {
+    return await this.request<RefillLogsResponse>(
+      `/api/quality-tracking/canisters/${canisterId}/refill-logs`,
+      { method: 'GET' }
+    );
+  }
+
   /**
    * Update goblet color for a specific cane within a canister
    * @param canisterId - The canister ID
@@ -214,6 +240,46 @@ export class IvfService extends BaseApiService {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         cryolock_color: cryolockColor,
       }
+    );
+  }
+
+  /**
+   * Update refill log status for a specific log
+   * @param canisterId - The canister ID
+   * @param logId - The refill log ID
+   * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
+   */
+  async updateRefillLogStatus(
+    canisterId: string | number,
+    logId: number,
+    status: string
+  ): Promise<RefillLogItem> {
+    return await this.patch<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterId}/refill-logs/${logId}/status`,
+      {
+        status: status,
+      }
+    );
+  }
+
+  /**
+   * Create a new refill log for a canister
+   * @param canisterId - The canister ID
+   * @param refillLogData - The refill log data
+   */
+  async createRefillLog(
+    canisterId: string | number,
+    refillLogData: {
+      refill_date: string;
+      refill_time: string;
+      refilled_by: string;
+      description: string;
+      status: string;
+    }
+  ): Promise<RefillLogItem> {
+    return await this.post<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterId}/refill-logs`,
+      refillLogData
     );
   }
 }
