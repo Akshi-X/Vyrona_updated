@@ -602,6 +602,25 @@ class IoTService:
             details={"device_id": device_id}
         )
     
+    def get_device_status(self, device_id: str) -> Dict[str, Any]:
+        """Get device status including battery level and connected status
+        
+        Reference: https://developers.tive.com/reference/retrieve-device-status
+        Endpoint: GET /public/v3/devices/{deviceId}/status
+        
+        Returns device status information including:
+        - Battery level (batteryPercent)
+        - Connected status (connectivity information)
+        - Other device status fields
+        """
+        return self._handle_api_request(
+            'GET',
+            f'/devices/{device_id}/status',
+            "IOT_GET_DEVICE_FAILED",
+            f"Failed to get device status for {device_id}",
+            details={"device_id": device_id}
+        )
+    
     def update_device(self, device_id: str, **kwargs) -> Dict[str, Any]:
         """Update device settings"""
         payload = kwargs.copy()
