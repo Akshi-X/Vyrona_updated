@@ -68,6 +68,23 @@ interface RawEmbryoTrackingApiResponse {
   total: number;
 }
 
+// Type for canister tracking details API response (snake_case)
+interface RawCanisterTrackingApiItem {
+  his_number: string;
+  cryolock_number: string;
+  canister_number: number;
+  cane_id: string;
+  goblet_color: string;
+  cryolock_color: string;
+  date_of_vitrification: string;
+  move_to: boolean;
+}
+
+interface RawCanisterTrackingApiResponse {
+  data: RawCanisterTrackingApiItem[];
+  total: number;
+}
+
 const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => ({
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
@@ -80,6 +97,20 @@ const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => 
   siteName: item.site_name,
   status: item.status,
   embryoGrading: item.embryo_grading,
+});
+
+const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): IVFTreatment => ({
+  hisNumber: item.his_number,
+  cryolockNum: item.cryolock_number,
+  canisterNum: item.canister_number,
+  tankId: '-', // Not provided by API
+  caneId: item.cane_id,
+  gobletColor: item.goblet_color,
+  cryolockColor: item.cryolock_color,
+  dateOfVitrification: item.date_of_vitrification,
+  siteName: '-', // Not provided by API
+  status: '-', // Not provided by API
+  embryoGrading: '-', // Not provided by API
 });
 
 export class IvfService extends BaseApiService {
@@ -132,6 +163,57 @@ export class IvfService extends BaseApiService {
     return await this.request<AvgQualityLossPerContainerResponse>(
       '/api/ivf/dashboard/metrics/avg-quality-loss-per-container',
       { method: 'GET' }
+    );
+  }
+
+  async getCanisterTrackingDetails(canisterId: string | number): Promise<EmbryoTrackingApiResponse> {
+    const response = await this.request<RawCanisterTrackingApiResponse>(
+      `/api/quality-tracking/canisters/${canisterId}/tracking-details`,
+      { method: 'GET' }
+    );
+    return {
+      data: response.data.map(mapCanisterTrackingItemToTreatment),
+      total: response.total,
+    };
+  }
+
+  /**
+   * Update goblet color for a specific cane within a canister
+   * @param canisterId - The canister ID
+   * @param caneIdentifier - The cane identifier string (e.g., "Cane-A 12", "Cane-5", or just "5")
+   * @param gobletColor - The goblet color value to set (e.g., "Yellow", "Red", "Blue")
+   */
+  async updateGobletColor(
+    canisterId: string | number,
+    caneIdentifier: string,
+    gobletColor: string
+  ): Promise<{ success: boolean; message: string; updated_color: string }> {
+    return await this.patch<{ success: boolean; message: string; updated_color: string }>(
+      `/api/quality-tracking/canisters/${canisterId}/goblet-color`,
+      {
+        cane_identifier: caneIdentifier, // Cane identifier string, not an ID
+        goblet_color: gobletColor,
+      }
+    );
+  }
+
+  /**
+   * Update cryolock color for a specific cryolock within a canister
+   * @param canisterId - The canister ID
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+   * @param cryolockColor - The cryolock color value to set (e.g., "Yellow", "Red", "Blue")
+   */
+  async updateCryolockColor(
+    canisterId: string | number,
+    cryolockNumber: string,
+    cryolockColor: string
+  ): Promise<{ success: boolean; message: string; updated_color: string }> {
+    return await this.patch<{ success: boolean; message: string; updated_color: string }>(
+      `/api/quality-tracking/canisters/${canisterId}/cryolock-color`,
+      {
+        cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+        cryolock_color: cryolockColor,
+      }
     );
   }
 }

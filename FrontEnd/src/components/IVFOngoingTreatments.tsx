@@ -12,10 +12,10 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
             <thead className="sticky top-0 z-10">
              <tr className="bg-[#FDF4FF]">
                <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">
-                HIS Number (PK)
+                HIS # (PK)
               </th>
                <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">
-                Cryolock Num
+                Cryolock #
               </th>
                <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">
                 Canister #
