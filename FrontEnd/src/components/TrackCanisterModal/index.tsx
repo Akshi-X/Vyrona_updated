@@ -42,7 +42,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
         <img
           src={ContainerQualityTrackingIcon}
           alt="Track Canister"
-          className="w-6 h-6"
+          className="w-6 h-6 mt-5"
         />
       }
       containerClassName="w-[40%]"
