@@ -139,13 +139,27 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
         setEditValues({ gobletColor: '', cryolockColor: '' });
       } catch (e: any) {
         setSaveError(e?.message || 'Failed to save changes');
-        console.error('Error saving changes:', e);
       } finally {
         setSaving(false);
       }
     },
     [canisterId, editValues, rows]
   );
+
+  const cancelEditing = useCallback(() => {
+    setEditingRowIndex(null);
+    setEditValues({ gobletColor: '', cryolockColor: '' });
+    setSaveError(null);
+  }, []);
+
+  const startEditing = useCallback((index: number, row: IVFTreatment) => {
+    setEditingRowIndex(index);
+    setEditValues({
+      gobletColor: row.gobletColor || '',
+      cryolockColor: row.cryolockColor || '',
+    });
+    setSaveError(null);
+  }, []);
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[805px] flex flex-col">
@@ -263,12 +277,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
                             )}
                           </button>
                           <button
-                            onClick={() => {
-                              // Cancel editing
-                              setEditingRowIndex(null);
-                              setEditValues({ gobletColor: '', cryolockColor: '' });
-                              setSaveError(null);
-                            }}
+                            onClick={cancelEditing}
                             disabled={saving}
                             className="p-1 text-red-600 hover:text-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Cancel"
@@ -281,14 +290,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
                       ) : (
                         <div className="flex justify-center items-center">
                           <button
-                            onClick={() => {
-                              setEditingRowIndex(index);
-                              setEditValues({
-                                gobletColor: row.gobletColor || '',
-                                cryolockColor: row.cryolockColor || '',
-                              });
-                              setSaveError(null);
-                            }}
+                            onClick={() => startEditing(index, row)}
                             className="p-1 text-gray-600 hover:text-[#6B1176] transition-colors"
                             title="Edit"
                           >
@@ -314,11 +316,9 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
         }}
         onMoveToIncubator={() => {
           // Handle move to incubator logic here
-          console.log('Move to Incubator:', selectedRow);
         }}
         onMoveToTransit={() => {
           // Handle move to transit logic here
-          console.log('Move to Transit:', selectedRow);
         }}
         containerData={selectedRow || undefined}
       />
