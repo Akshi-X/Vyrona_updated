@@ -75,7 +75,7 @@ export default function IVFTrackShipmentPage() {
                         </div>
                         {/* Right Column: Container Data */}
                         <div>
-                            <ContainerDataTable />
+                            <ContainerDataTable canisterId={patientId} />
                         </div>
                     </div>
 

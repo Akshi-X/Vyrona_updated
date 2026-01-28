@@ -704,14 +704,14 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Embryos/Cryolocks
+                            Total Embryos
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfTotals
                               ? '--/--'
                               : ivfTotalsError
                                 ? '0/0'
-                                : `${ivfTotalEmbryos ?? 0}/${ivfTotalCryolocks ?? 0}`}
+                                : `${ivfTotalEmbryos ?? 0}`}
                           </div>
                         </div>
                       </div>
