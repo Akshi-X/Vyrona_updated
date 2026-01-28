@@ -1,85 +1,569 @@
-// Mock data for Refill Log
-const mockRefillData = [
-  {
-    containerId: '2020R034ST',
-    liquidNitrogenVol: '88%',
-    description: 'Change header text to better reflect...',
-    refilledBy: 'Dr. Sarah Johnson',
-    refilledDate: '01/03/2025',
-    status: 'Done',
-  },
-  {
-    containerId: '2020R034ST',
-    liquidNitrogenVol: '88%',
-    description: 'Change header text to better reflect...',
-    refilledBy: 'Dr. Sarah Johnson S',
-    refilledDate: '01/03/2025',
-    status: 'In Progress',
-  },
-  {
-    containerId: '2020R034ST',
-    liquidNitrogenVol: '88%',
-    description: 'Change header text to better reflect...',
-    refilledBy: 'Dr. Sarah Johnson',
-    refilledDate: '01/03/2025',
-    status: 'Not started',
-  },
-  {
-    containerId: '2020R034ST',
-    liquidNitrogenVol: '88%',
-    description: 'Change header text to better reflect...',
-    refilledBy: 'Dr. Sarah Johnson',
-    refilledDate: '01/03/2025',
-    status: 'Not started',
-  },
-  {
-    containerId: '2020R034ST',
-    liquidNitrogenVol: '88%',
-    description: 'Change header text to better reflect...',
-    refilledBy: 'Dr. Sarah Johnson',
-    refilledDate: '01/03/2025',
-    status: 'Not started',
-  },
-];
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { ivfService } from '../../../services/ivfService';
+import type { RefillLogItem } from '../../../services/ivfService';
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Done':
+  if (!status) return 'text-gray-600';
+  const normalizedStatus = status.trim();
+  switch (normalizedStatus.toLowerCase()) {
+    case 'done':
       return 'text-green-600';
-    case 'In Progress':
-      return 'text-blue-600';
+    case 'in progress':
+      return 'text-[#1456BF]';
     default:
       return 'text-gray-600';
   }
 };
 
-export default function RefillLogTable() {
+interface RefillLogTableProps {
+  canisterId?: string | number;
+}
+
+export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
+  const [rows, setRows] = useState<RefillLogItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+  const [editStatus, setEditStatus] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [newRefillLog, setNewRefillLog] = useState({
+    refill_date: '',
+    refill_time: '',
+    refilled_by: '',
+    description: '',
+    status: 'Not started',
+  });
+  const [isAddStatusDropdownOpen, setIsAddStatusDropdownOpen] = useState(false);
+  const [editingStatusDropdownIndex, setEditingStatusDropdownIndex] = useState<number | null>(null);
+  const addStatusDropdownRef = useRef<HTMLDivElement | null>(null);
+  const editStatusDropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const statusOptions = ['Not started', 'In progress', 'Done'] as const;
+
+  useEffect(() => {
+    if (!canisterId) {
+      setRows([]);
+      setError('Canister ID is required');
+      return;
+    }
+
+    let cancelled = false;
+    const fetchRows = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await ivfService.getCanisterRefillLogs(canisterId);
+        if (!cancelled) setRows(response?.refill_logs || []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setRows([]);
+          setError(e?.message || 'Failed to load refill logs');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRows();
+    return () => {
+      cancelled = true;
+    };
+  }, [canisterId]);
+
+  // Auto-dismiss save error after 5 seconds
+  useEffect(() => {
+    if (saveError) {
+      const timer = setTimeout(() => {
+        setSaveError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveError]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        addStatusDropdownRef.current &&
+        !addStatusDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAddStatusDropdownOpen(false);
+      }
+      if (editingStatusDropdownIndex !== null) {
+        const ref = editStatusDropdownRefs.current[editingStatusDropdownIndex];
+        if (ref && !ref.contains(event.target as Node)) {
+          setEditingStatusDropdownIndex(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingStatusDropdownIndex]);
+
+  const startEditing = useCallback((index: number, row: RefillLogItem) => {
+    setEditingRowIndex(index);
+    setEditStatus(row.status || '');
+    setSaveError(null);
+    setEditingStatusDropdownIndex(index);
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingRowIndex(null);
+    setEditStatus('');
+    setSaveError(null);
+    setEditingStatusDropdownIndex(null);
+  }, []);
+
+  const handleSave = useCallback(
+    async (index: number) => {
+      if (!canisterId) {
+        setSaveError('Canister ID is required');
+        return;
+      }
+
+      const originalRow = rows[index];
+      if (!originalRow || !originalRow.log_id) {
+        setSaveError('Invalid row data');
+        return;
+      }
+
+      if (editStatus === originalRow.status) {
+        // No changes to save
+        cancelEditing();
+        return;
+      }
+
+      if (!editStatus.trim()) {
+        setSaveError('Status is required');
+        return;
+      }
+
+      setSaving(true);
+      setSaveError(null);
+
+      try {
+        await ivfService.updateRefillLogStatus(canisterId, originalRow.log_id, editStatus.trim());
+
+        // Update local state
+        const updatedRows = [...rows];
+        updatedRows[index] = {
+          ...updatedRows[index],
+          status: editStatus.trim(),
+        };
+        setRows(updatedRows);
+        setEditingRowIndex(null);
+        setEditStatus('');
+      } catch (e: any) {
+        setSaveError(e?.message || 'Failed to save status');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [canisterId, rows, editStatus, cancelEditing]
+  );
+
+  const handleAddClick = useCallback(() => {
+    setIsAdding(true);
+    setAddError(null);
+    // Set default values
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
+    setNewRefillLog({
+      refill_date: dateStr,
+      refill_time: timeStr,
+      refilled_by: '',
+      description: '',
+      status: 'Not started',
+    });
+  }, []);
+
+  const cancelAdding = useCallback(() => {
+    setIsAdding(false);
+    setAddError(null);
+    setNewRefillLog({
+      refill_date: '',
+      refill_time: '',
+      refilled_by: '',
+      description: '',
+      status: 'Not started',
+    });
+  }, []);
+
+  const handleAddSubmit = useCallback(async () => {
+    if (!canisterId) {
+      setAddError('Canister ID is required');
+      return;
+    }
+
+    // Validate required fields
+    if (!newRefillLog.refill_date.trim()) {
+      setAddError('Refill date is required');
+      return;
+    }
+    if (!newRefillLog.refill_time.trim()) {
+      setAddError('Refill time is required');
+      return;
+    }
+    if (!newRefillLog.refilled_by.trim()) {
+      setAddError('Refilled by is required');
+      return;
+    }
+    if (!newRefillLog.description.trim()) {
+      setAddError('Description is required');
+      return;
+    }
+
+    setAdding(true);
+    setAddError(null);
+
+    try {
+      // Format time - ensure it has seconds (HH:MM:SS format)
+      const formattedTime = newRefillLog.refill_time.includes(':') && newRefillLog.refill_time.split(':').length === 2
+        ? `${newRefillLog.refill_time}:00`
+        : newRefillLog.refill_time;
+
+      await ivfService.createRefillLog(canisterId, {
+        refill_date: newRefillLog.refill_date,
+        refill_time: formattedTime,
+        refilled_by: newRefillLog.refilled_by.trim(),
+        description: newRefillLog.description.trim(),
+        status: newRefillLog.status,
+      });
+
+      // Refresh the data from server to get all fields correctly
+      const response = await ivfService.getCanisterRefillLogs(canisterId);
+      setRows(response?.refill_logs || []);
+
+      setIsAdding(false);
+      setNewRefillLog({
+        refill_date: '',
+        refill_time: '',
+        refilled_by: '',
+        description: '',
+        status: 'Not started',
+      });
+    } catch (e: any) {
+      setAddError(e?.message || 'Failed to add refill log');
+    } finally {
+      setAdding(false);
+    }
+  }, [canisterId, newRefillLog]);
+
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-      <h3 className="font-semibold text-black text-[16px] mb-4">Refill Log</h3>
-      <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
-        <table className="w-full text-xs">
-          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[400px] flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-black text-[16px]">Refill Log</h3>
+        <div className="flex items-center gap-3">
+          {saveError && (
+            <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
+              {saveError}
+            </div>
+          )}
+          {addError && (
+            <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
+              {addError}
+            </div>
+          )}
+          {!isAdding && (
+            <button
+              onClick={handleAddClick}
+              className="bg-[#6B1176] text-white px-4 py-2 rounded-md hover:bg-[#5a0e64] transition-colors font-medium text-sm uppercase flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              ADD
+            </button>
+          )}
+        </div>
+      </div>
+      <div
+        className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+      >
+        <table className="min-w-max w-full text-xs">
+          <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px]">
             <tr>
-              <th className="px-3 py-2 text-left rounded-tl-[10px]">Container ID</th>
-              <th className="px-3 py-2 text-left">Liquid Nitrogen Vol</th>
-              <th className="px-3 py-2 text-left">Description</th>
-              <th className="px-3 py-2 text-left">Refilled By</th>
-              <th className="px-3 py-2 text-left">Refilled Date</th>
-              <th className="px-3 py-2 text-left rounded-tr-[10px]">Status</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled Date</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refill Time</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled By</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Canister ID</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Description</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Status</th>
+              <th className="px-3 py-2 text-left rounded-tr-[10px] whitespace-nowrap">Edit</th>
             </tr>
           </thead>
           <tbody>
-            {mockRefillData.map((row, index) => (
-              <tr key={index} className="text-black text-[14px] h-[56px] hover:bg-gray-50 ">
-                <td className="px-3 py-2">{row.containerId}</td>
-                <td className="px-3 py-2">{row.liquidNitrogenVol}</td>
-                <td className="px-3 py-2">{row.description}</td>
-                <td className="px-3 py-2">{row.refilledBy}</td>
-                <td className="px-3 py-2">{row.refilledDate}</td>
-                <td className={`px-3 py-2 ${getStatusColor(row.status)}`}>{row.status}</td>
+            {loading ? (
+              <tr className="text-black text-[14px] h-[56px] bg-white">
+                <td className="px-3 py-2 text-gray-500" colSpan={7}>
+                  Loading...
+                </td>
               </tr>
-            ))}
+            ) : error ? (
+              <tr className="text-black text-[14px] h-[56px] bg-white">
+                <td className="px-3 py-2 text-red-600" colSpan={7}>
+                  {error}
+                </td>
+              </tr>
+            ) : (
+              <>
+                {/* Add new row input */}
+                {isAdding && (
+                  <tr className="text-black text-[14px] h-[56px] bg-white">
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="date"
+                        value={newRefillLog.refill_date}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, refill_date: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        required
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="time"
+                        value={newRefillLog.refill_time}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, refill_time: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        step="1"
+                        required
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.refilled_by}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, refilled_by: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter name"
+                        required
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={canisterId || ''}
+                        disabled
+                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.description}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, description: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter description"
+                        required
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {/* Custom Status dropdown styled like Role dropdown */}
+                      <div
+                        ref={addStatusDropdownRef}
+                        className="relative w-full"
+                      >
+                        <div
+                          className="w-full border rounded-[10px] px-2 py-1 pr-8 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
+                          onClick={() => setIsAddStatusDropdownOpen((open) => !open)}
+                        >
+                          <span>{newRefillLog.status || 'Status'}</span>
+                          <svg
+                            className={`w-4 h-4 transition-transform ${isAddStatusDropdownOpen ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+
+                        {isAddStatusDropdownOpen && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
+                            {statusOptions.map((option) => (
+                              <div
+                                key={option}
+                                className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
+                                  newRefillLog.status === option ? 'bg-[#8b2a96] text-white' : 'text-black'
+                                }`}
+                                onClick={() => {
+                                  setNewRefillLog({ ...newRefillLog, status: option });
+                                  setIsAddStatusDropdownOpen(false);
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <div className="flex justify-center items-center gap-2">
+                        <button
+                          onClick={() => void handleAddSubmit()}
+                          disabled={adding}
+                          className="p-1 text-green-600 hover:text-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Save"
+                        >
+                          {adding ? (
+                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={cancelAdding}
+                          disabled={adding}
+                          className="p-1 text-red-600 hover:text-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Cancel"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {rows.length === 0 && !isAdding ? (
+                  <tr className="text-black text-[14px] h-[56px] bg-white">
+                    <td className="px-3 py-2 text-gray-500" colSpan={7}>
+                      No refill logs found
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row, index) => {
+                    const isEditing = editingRowIndex === index;
+                return (
+                  <tr key={row.log_id} className="text-black text-[14px] h-[56px] bg-white hover:bg-gray-50">
+                    <td className="px-3 py-2 h-[56px]">{row.refill_date || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.refill_time || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.refilled_by || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.canister_id ?? '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.description || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {isEditing ? (
+                        <div
+                          ref={(el) => {
+                            editStatusDropdownRefs.current[index] = el;
+                          }}
+                          className="relative w-full"
+                        >
+                          <div
+                            className="w-full border rounded-[10px] px-2 py-1 pr-8 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
+                            onClick={() =>
+                              setEditingStatusDropdownIndex(
+                                editingStatusDropdownIndex === index ? null : index
+                              )
+                            }
+                          >
+                            <span>{editStatus || 'Status'}</span>
+                            <svg
+                              className={`w-4 h-4 transition-transform ${
+                                editingStatusDropdownIndex === index ? 'rotate-180' : ''
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+
+                          {editingStatusDropdownIndex === index && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg">
+                              {statusOptions.map((option) => (
+                                <div
+                                  key={option}
+                                  className={`px-3 py-2 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
+                                    editStatus === option ? 'bg-[#8b2a96] text-white' : 'text-black'
+                                  }`}
+                                  onClick={() => {
+                                    setEditStatus(option);
+                                    setEditingStatusDropdownIndex(null);
+                                  }}
+                                >
+                                  {option}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className={getStatusColor(row.status)}>{row.status || '-'}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {isEditing ? (
+                        <div className="flex justify-center items-center gap-2">
+                          <button
+                            onClick={() => void handleSave(index)}
+                            disabled={saving}
+                            className="p-1 text-green-600 hover:text-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Save"
+                          >
+                            {saving ? (
+                              <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            disabled={saving}
+                            className="p-1 text-red-600 hover:text-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Cancel"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center items-center">
+                          <button
+                            onClick={() => startEditing(index, row)}
+                            className="p-1 text-gray-600 hover:text-[#6B1176] transition-colors"
+                            title="Edit"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  );
+                })
+                )}
+              </>
+            )}
           </tbody>
         </table>
       </div>
