@@ -40,6 +40,49 @@ class QualityTrackingService:
     
     def __init__(self, db: Session):
         self.db = db
+
+    def resolve_canister_id(self, canister_number: str, branch_id: Optional[int] = None) -> int:
+        """
+        Resolve a canister_number (external identifier) to the internal canister_id.
+
+        Args:
+            canister_number: Canister number/code (e.g., "C1")
+            branch_id: Optional branch filter for authorization (when present)
+
+        Returns:
+            canister_id (int)
+
+        Raises:
+            AppException: If the canister_number is not found (or not accessible under branch filter)
+        """
+        try:
+            query = (
+                self.db.query(Canister)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .filter(Canister.canister_number == canister_number)
+            )
+
+            if branch_id is not None:
+                query = query.filter(Tank.branch_id == branch_id)
+
+            canister = query.first()
+            if not canister:
+                raise AppException(
+                    message=f"Canister with number '{canister_number}' not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            return canister.canister_id
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error resolving canister_id for canister_number={canister_number}: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to resolve canister: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
     
     def create_refill_log(
         self,
@@ -232,9 +275,8 @@ class QualityTrackingService:
                     IVFPatient.his_number,
                     Cryolock.cryolock_number,
                     Canister.canister_number,
-                    Cane.cane_id,
                     Cane.cane_code,
-                    Cane.goblet_color,
+                    Cryolock.goblet_color,
                     Cryolock.cryolock_color,
                     Embryo.date_of_vitrification
                 )
@@ -259,15 +301,12 @@ class QualityTrackingService:
 
             tracking_rows: List[IVFCanisterTrackingItem] = []
             for row in results:
-                # Format Cane ID: use cane_code if available, otherwise format as "Cane-{cane_id}"
-                cane_display = row.cane_code if row.cane_code else f"Cane-{row.cane_id}"
-
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
                         his_number=row.his_number or "",
                         cryolock_number=row.cryolock_number or "",
-                        canister_number=row.canister_number,
-                        cane_id=cane_display,
+                        canister_number=str(row.canister_number) if row.canister_number else None,
+                        cane_code=row.cane_code or "",
                         goblet_color=row.goblet_color or "",
                         cryolock_color=row.cryolock_color or "",
                         date_of_vitrification=row.date_of_vitrification,
@@ -295,11 +334,12 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> ColorUpdateResponse:
         """
-        Update goblet color for a specific cane within a canister.
+        Update goblet color for a specific cryolock within a canister.
+        Note: goblet_color is stored in the cryolocks table.
         
         Args:
             canister_id: Canister ID from URL path
-            color_update: Goblet color update data containing cane_identifier and goblet_color
+            color_update: Goblet color update data containing cryolock_number and goblet_color
             updated_by: Username of the user updating the color
             branch_id: Optional branch ID for filtering
             
@@ -307,66 +347,55 @@ class QualityTrackingService:
             ColorUpdateResponse with update details
             
         Raises:
-            AppException: If update fails or cane not found
+            AppException: If update fails or cryolock not found
         """
         try:
-            # Find the cane by canister_id and cane_identifier
-            # cane_identifier can be either cane_code or numeric part of "Cane-{id}"
-            cane_identifier = color_update.cane_identifier.strip()
-            
-            # Try to find by cane_code first
-            query = self.db.query(Cane).filter(
-                Cane.canister_id == canister_id
+            # Find the cryolock by canister_id and cryolock_number
+            query = (
+                self.db.query(Cryolock)
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .filter(
+                    Canister.canister_id == canister_id,
+                    Cryolock.cryolock_number == color_update.cryolock_number
+                )
             )
-            
-            # Check if identifier looks like a numeric ID (from "Cane-{id}" format)
-            if cane_identifier.isdigit():
-                cane_id = int(cane_identifier)
-                query = query.filter(Cane.cane_id == cane_id)
-            elif cane_identifier.startswith("Cane-") and cane_identifier[5:].isdigit():
-                # Handle "Cane-5" format - extract the numeric part
-                cane_id = int(cane_identifier[5:])
-                query = query.filter(Cane.cane_id == cane_id)
-            else:
-                # Try to match by cane_code
-                query = query.filter(Cane.cane_code == cane_identifier)
             
             # Apply branch filter if provided
             if branch_id is not None:
                 query = (
-                    query.join(Canister, Cane.canister_id == Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    query.join(Tank, Canister.tank_id == Tank.tank_id)
                     .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                     .filter(HospitalBranch.branch_id == branch_id)
                 )
             
-            cane = query.first()
+            cryolock = query.first()
             
-            if not cane:
+            if not cryolock:
                 raise AppException(
-                    message=f"Cane with identifier '{cane_identifier}' not found in canister {canister_id}",
+                    message=f"Cryolock with number '{color_update.cryolock_number}' not found in canister {canister_id}",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            # Update the goblet color
-            cane.goblet_color = color_update.goblet_color
-            cane.updated_by = updated_by
+            # Update goblet_color for this specific cryolock
+            cryolock.goblet_color = color_update.goblet_color
+            cryolock.updated_by = updated_by
             
             self.db.commit()
-            self.db.refresh(cane)
+            self.db.refresh(cryolock)
             
             logger.info(
-                "Updated goblet color | canister_id=%s cane_id=%s goblet_color=%s",
+                "Updated goblet color | canister_id=%s cryolock_number=%s goblet_color=%s",
                 canister_id,
-                cane.cane_id,
+                color_update.cryolock_number,
                 color_update.goblet_color
             )
             
             return ColorUpdateResponse(
                 success=True,
                 message=f"Goblet color updated successfully to '{color_update.goblet_color}'",
-                cane_id=cane.cane_id,
+                cryolock_number=color_update.cryolock_number,
                 updated_color=color_update.goblet_color
             )
             
@@ -440,9 +469,8 @@ class QualityTrackingService:
             self.db.refresh(cryolock)
             
             logger.info(
-                "Updated cryolock color | canister_id=%s cryolock_id=%s cryolock_number=%s cryolock_color=%s",
+                "Updated cryolock color | canister_id=%s cryolock_number=%s cryolock_color=%s",
                 canister_id,
-                cryolock.cryolock_id,
                 color_update.cryolock_number,
                 color_update.cryolock_color
             )
@@ -450,7 +478,7 @@ class QualityTrackingService:
             return ColorUpdateResponse(
                 success=True,
                 message=f"Cryolock color updated successfully to '{color_update.cryolock_color}'",
-                cryolock_id=cryolock.cryolock_id,
+                cryolock_number=color_update.cryolock_number,
                 updated_color=color_update.cryolock_color
             )
             

@@ -403,7 +403,7 @@ class IVFControlTowerResponse(BaseModel):
 
 class ActiveCanisterItem(BaseModel):
     """Schema for a single active canister in control tower"""
-    canister_id: int = Field(..., description="Canister ID")
+    canister_number: str = Field(..., description="Canister number/code (e.g., 'C1')")
     canister_status: CanisterStatus = Field(..., description="Canister status (safe, risk, critical)")
     updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log refill_date+refill_time")
     
@@ -438,9 +438,9 @@ class EmbryoTrackingItem(BaseModel):
     """Schema for embryo tracking table row"""
     his_number: str = Field(..., description="Patient HIS Number")
     cryolock_number: Optional[str] = Field(None, description="Cryolock Number")
-    canister_number: Optional[int] = Field(None, description="Canister Number")
-    tank_id: Optional[str] = Field(None, description="Tank ID (formatted)")
-    cane_id: Optional[str] = Field(None, description="Cane ID (formatted)")
+    canister_number: Optional[str] = Field(None, description="Canister Number/Code")
+    tank_code: Optional[str] = Field(None, description="Tank Code")
+    cane_code: Optional[str] = Field(None, description="Cane Code")
     goblet_color: Optional[str] = Field(None, description="Goblet Color")
     cryolock_color: Optional[str] = Field(None, description="Cryolock Color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of Vitrification")
