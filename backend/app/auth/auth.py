@@ -84,12 +84,13 @@ def verify_websocket_token(token: str) -> dict:
     user_id = payload.get("sub")
     pharma_id = payload.get("pharma_id")
     
-    if not user_id or pharma_id is None:
-        raise InvalidTokenException("Token missing user_id or pharma_id")
+    # For IVF/hospital users, pharma_id can be None, so only check user_id
+    if not user_id:
+        raise InvalidTokenException()
     
     return {
         "user_id": user_id,
-        "pharma_id": pharma_id,
+        "pharma_id": pharma_id,  # Can be None for hospital users
         "payload": payload
     }
 
