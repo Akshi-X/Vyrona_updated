@@ -212,7 +212,7 @@ class IVFService:
                     updated_at = canister.created_at
                 
                 canister_data = {
-                    "canister_id": canister.canister_id,
+                    "canister_number": canister.canister_number or "",
                     "canister_status": canister.canister_status.value if canister.canister_status else "safe",
                     "updated_at": updated_at
                 }
@@ -315,14 +315,11 @@ class IVFService:
                 query = (
                     self.db.query(
                         IVFPatient.his_number,
-                        Cryolock.cryolock_id,
                         Cryolock.cryolock_number,
                         Canister.canister_number,
-                        Tank.tank_id,
                         Tank.tank_code,
-                        Cane.cane_id,
                         Cane.cane_code,
-                        Cane.goblet_color,
+                        Cryolock.goblet_color,
                         Cryolock.cryolock_color,
                         Embryo.date_of_vitrification,
                         HospitalBranch.branch_name,
@@ -348,14 +345,11 @@ class IVFService:
                 # Group by cryolock to aggregate embryo_grading
                 query = query.group_by(
                     IVFPatient.his_number,
-                    Cryolock.cryolock_id,
                     Cryolock.cryolock_number,
                     Canister.canister_number,
-                    Tank.tank_id,
                     Tank.tank_code,
-                    Cane.cane_id,
                     Cane.cane_code,
-                    Cane.goblet_color,
+                    Cryolock.goblet_color,
                     Cryolock.cryolock_color,
                     Embryo.date_of_vitrification,
                     HospitalBranch.branch_name
@@ -365,14 +359,11 @@ class IVFService:
                 query = (
                     self.db.query(
                         IVFPatient.his_number,
-                        Cryolock.cryolock_id,
                         Cryolock.cryolock_number,
                         Canister.canister_number,
-                        Tank.tank_id,
                         Tank.tank_code,
-                        Cane.cane_id,
                         Cane.cane_code,
-                        Cane.goblet_color,
+                        Cryolock.goblet_color,
                         Cryolock.cryolock_color,
                         Embryo.date_of_vitrification,
                         Embryo.status,
@@ -400,18 +391,12 @@ class IVFService:
             tracking_list = []
             
             for row in results:
-                # Format tank_id: use tank_code if available, otherwise "Tank {tank_id}"
-                tank_display = row.tank_code if row.tank_code else f"Tank {row.tank_id}"
-                
-                # Format cane_id: use cane_code if available, otherwise format as "Cane-{cane_id}"
-                cane_display = row.cane_code if row.cane_code else f"Cane-{row.cane_id}"
-                
                 tracking_data = {
                     "his_number": row.his_number or "",
                     "cryolock_number": row.cryolock_number or "",
-                    "canister_number": row.canister_number,
-                    "tank_id": tank_display,
-                    "cane_id": cane_display,
+                    "canister_number": str(row.canister_number) if row.canister_number else None,
+                    "tank_code": row.tank_code or "",
+                    "cane_code": row.cane_code or "",
                     "goblet_color": row.goblet_color or "",
                     "cryolock_color": row.cryolock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,

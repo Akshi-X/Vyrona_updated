@@ -542,8 +542,7 @@ class IVFDashboardService:
                 top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(container_drivers)
                 
                 data.append({
-                    "container_id": row.container_id,
-                    "container_name": row.container_number,  # Container name
+                    "container_name": str(row.container_number) if row.container_number else None,  # Container number/code
                     "temperature": temp_val,  # Individual driver count
                     "humidity": humidity_val,  # Individual driver count
                     "agitation_vibration": agitation_val,  # Individual driver count

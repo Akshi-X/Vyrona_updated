@@ -20,7 +20,7 @@ class RefillLogBase(BaseModel):
 
 
 class RefillLogCreate(BaseModel):
-    """Schema for creating a new refill log - canister_id comes from URL path"""
+    """Schema for creating a new refill log - canister_number comes from URL path"""
     refill_date: date = Field(..., description="Date when refill was performed")
     refill_time: time = Field(..., description="Time when refill was performed")
     refilled_by: str = Field(..., description="Name of person who performed the refill")
@@ -55,8 +55,8 @@ class IVFCanisterTrackingItem(BaseModel):
     """Tracking details for a specific canister - matches table structure"""
     his_number: str = Field(..., description="Patient HIS Number (PK)")
     cryolock_number: str = Field(..., description="Cryolock number")
-    canister_number: Optional[int] = Field(None, description="Canister number")
-    cane_id: str = Field(..., description="Cane ID (formatted)")
+    canister_number: Optional[str] = Field(None, description="Canister number/code")
+    cane_code: str = Field(..., description="Cane code")
     goblet_color: str = Field(..., description="Goblet color")
     cryolock_color: str = Field(..., description="Cryolock color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
@@ -71,15 +71,12 @@ class IVFCanisterTrackingResponse(BaseModel):
 
 class GobletColorUpdate(BaseModel):
     """Schema for updating goblet color"""
-    cane_identifier: str = Field(
+    cryolock_number: str = Field(
         ..., 
-        description="Cane identifier from the tracking details response. "
-        "This is the 'cane_id' field value from GET /canisters/{canister_id}/tracking-details. "
-        "It can be either: (1) the cane_code if available (e.g., 'Cane-A 12'), "
-        "or (2) the formatted cane_id (e.g., 'Cane-5'). "
-        "You can also use just the numeric part (e.g., '5' for 'Cane-5')."
+        description="Cryolock number from the tracking details response. "
+        "This is the 'cryolock_number' field value from GET /canisters/{canister_number}/tracking-details."
     )
-    goblet_color: str = Field(..., description="Goblet color to set (stored in the 'canes' table)")
+    goblet_color: str = Field(..., description="Goblet color to set (stored in the 'cryolocks' table)")
 
 
 class CryolockColorUpdate(BaseModel):
@@ -87,7 +84,7 @@ class CryolockColorUpdate(BaseModel):
     cryolock_number: str = Field(
         ..., 
         description="Cryolock number from the tracking details response. "
-        "This is the 'cryolock_number' field value from GET /canisters/{canister_id}/tracking-details."
+        "This is the 'cryolock_number' field value from GET /canisters/{canister_number}/tracking-details."
     )
     cryolock_color: str = Field(..., description="Cryolock color to set (stored in the 'cryolocks' table)")
 
@@ -96,6 +93,5 @@ class ColorUpdateResponse(BaseModel):
     """Response for color update operations"""
     success: bool = Field(..., description="Whether the update was successful")
     message: str = Field(..., description="Success message")
-    cane_id: Optional[int] = Field(None, description="Cane ID that was updated (for goblet color)")
-    cryolock_id: Optional[int] = Field(None, description="Cryolock ID that was updated (for cryolock color)")
+    cryolock_number: Optional[str] = Field(None, description="Cryolock number that was updated (for goblet or cryolock color)")
     updated_color: str = Field(..., description="The color value that was set")
