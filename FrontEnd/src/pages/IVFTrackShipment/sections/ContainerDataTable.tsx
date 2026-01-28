@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ivfService } from '../../../services/ivfService';
 import type { IVFTreatment } from '../../../types/ivf.ts';
 import moveToIcon from '../../../assets/moveto.svg';
@@ -61,6 +61,91 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
       return () => clearTimeout(timer);
     }
   }, [saveError]);
+
+  const handleSave = useCallback(
+    async (index: number) => {
+      if (!canisterId) {
+        setSaveError('Canister ID is required');
+        return;
+      }
+
+      setSaving(true);
+      setSaveError(null);
+
+      try {
+        const promises: Promise<any>[] = [];
+        const originalRow = rows[index];
+        if (!originalRow) throw new Error('Row not found');
+
+        // Update goblet color if changed
+        if (editValues.gobletColor !== originalRow.gobletColor && editValues.gobletColor.trim()) {
+          // Ensure we're using the cane identifier string (e.g., "Cane-A 12"), not an ID
+          const caneIdentifier = originalRow.caneId;
+          if (!caneIdentifier || caneIdentifier.trim() === '') {
+            throw new Error('Cane identifier is required to update goblet color');
+          }
+          // Verify it's a string (cane identifier format like "Cane-A 12" or "Cane-5")
+          if (typeof caneIdentifier !== 'string') {
+            throw new Error(`Invalid cane identifier format: expected string, got ${typeof caneIdentifier}`);
+          }
+          promises.push(
+            ivfService.updateGobletColor(
+              canisterId,
+              caneIdentifier.trim(), // Send the cane identifier string (e.g., "Cane-A 12")
+              editValues.gobletColor.trim()
+            )
+          );
+        }
+
+        // Update cryolock color if changed
+        if (editValues.cryolockColor !== originalRow.cryolockColor && editValues.cryolockColor.trim()) {
+          // Ensure we're using the cryolock number string (e.g., "CAN-EGM-001-01"), not an ID
+          const cryolockNumber = originalRow.cryolockNum;
+          if (!cryolockNumber || cryolockNumber.trim() === '') {
+            throw new Error('Cryolock number is required to update cryolock color');
+          }
+          // Verify it's a string (cryolock number format like "CAN-EGM-001-01")
+          if (typeof cryolockNumber !== 'string') {
+            throw new Error(`Invalid cryolock number format: expected string, got ${typeof cryolockNumber}`);
+          }
+          promises.push(
+            ivfService.updateCryolockColor(
+              canisterId,
+              cryolockNumber.trim(), // Send the cryolock number string (e.g., "CAN-EGM-001-01")
+              editValues.cryolockColor.trim()
+            )
+          );
+        }
+
+        if (promises.length === 0) {
+          // No changes to save
+          setEditingRowIndex(null);
+          setEditValues({ gobletColor: '', cryolockColor: '' });
+          return;
+        }
+
+        // Wait for all updates to complete
+        await Promise.all(promises);
+
+        // Update local state
+        const updatedRows = [...rows];
+        updatedRows[index] = {
+          ...updatedRows[index],
+          gobletColor: editValues.gobletColor.trim() || originalRow.gobletColor,
+          cryolockColor: editValues.cryolockColor.trim() || originalRow.cryolockColor,
+        };
+        setRows(updatedRows);
+        setEditingRowIndex(null);
+        setEditValues({ gobletColor: '', cryolockColor: '' });
+      } catch (e: any) {
+        setSaveError(e?.message || 'Failed to save changes');
+        console.error('Error saving changes:', e);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [canisterId, editValues, rows]
+  );
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[805px] flex flex-col">
@@ -162,87 +247,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
                       {isEditing ? (
                         <div className="flex justify-center items-center gap-2">
                           <button
-                            onClick={async () => {
-                              if (!canisterId) {
-                                setSaveError('Canister ID is required');
-                                return;
-                              }
-
-                              setSaving(true);
-                              setSaveError(null);
-
-                              try {
-                                const promises: Promise<any>[] = [];
-                                const originalRow = rows[index];
-
-                                // Update goblet color if changed
-                                if (editValues.gobletColor !== originalRow.gobletColor && editValues.gobletColor.trim()) {
-                                  // Ensure we're using the cane identifier string (e.g., "Cane-A 12"), not an ID
-                                  const caneIdentifier = originalRow.caneId;
-                                  if (!caneIdentifier || caneIdentifier.trim() === '') {
-                                    throw new Error('Cane identifier is required to update goblet color');
-                                  }
-                                  // Verify it's a string (cane identifier format like "Cane-A 12" or "Cane-5")
-                                  if (typeof caneIdentifier !== 'string') {
-                                    throw new Error(`Invalid cane identifier format: expected string, got ${typeof caneIdentifier}`);
-                                  }
-                                  promises.push(
-                                    ivfService.updateGobletColor(
-                                      canisterId,
-                                      caneIdentifier.trim(), // Send the cane identifier string (e.g., "Cane-A 12")
-                                      editValues.gobletColor.trim()
-                                    )
-                                  );
-                                }
-
-                                // Update cryolock color if changed
-                                if (editValues.cryolockColor !== originalRow.cryolockColor && editValues.cryolockColor.trim()) {
-                                  // Ensure we're using the cryolock number string (e.g., "CAN-EGM-001-01"), not an ID
-                                  const cryolockNumber = originalRow.cryolockNum;
-                                  if (!cryolockNumber || cryolockNumber.trim() === '') {
-                                    throw new Error('Cryolock number is required to update cryolock color');
-                                  }
-                                  // Verify it's a string (cryolock number format like "CAN-EGM-001-01")
-                                  if (typeof cryolockNumber !== 'string') {
-                                    throw new Error(`Invalid cryolock number format: expected string, got ${typeof cryolockNumber}`);
-                                  }
-                                  promises.push(
-                                    ivfService.updateCryolockColor(
-                                      canisterId,
-                                      cryolockNumber.trim(), // Send the cryolock number string (e.g., "CAN-EGM-001-01")
-                                      editValues.cryolockColor.trim()
-                                    )
-                                  );
-                                }
-
-                                if (promises.length === 0) {
-                                  // No changes to save
-                                  setEditingRowIndex(null);
-                                  setEditValues({ gobletColor: '', cryolockColor: '' });
-                                  setSaving(false);
-                                  return;
-                                }
-
-                                // Wait for all updates to complete
-                                await Promise.all(promises);
-
-                                // Update local state
-                                const updatedRows = [...rows];
-                                updatedRows[index] = {
-                                  ...updatedRows[index],
-                                  gobletColor: editValues.gobletColor.trim() || originalRow.gobletColor,
-                                  cryolockColor: editValues.cryolockColor.trim() || originalRow.cryolockColor,
-                                };
-                                setRows(updatedRows);
-                                setEditingRowIndex(null);
-                                setEditValues({ gobletColor: '', cryolockColor: '' });
-                              } catch (e: any) {
-                                setSaveError(e?.message || 'Failed to save changes');
-                                console.error('Error saving changes:', e);
-                              } finally {
-                                setSaving(false);
-                              }
-                            }}
+                            onClick={() => void handleSave(index)}
                             disabled={saving}
                             className="p-1 text-green-600 hover:text-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Save"
