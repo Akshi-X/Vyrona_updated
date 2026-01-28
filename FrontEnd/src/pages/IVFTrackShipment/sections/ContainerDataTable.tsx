@@ -314,12 +314,6 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
           setIsMoveModalOpen(false);
           setSelectedRow(null);
         }}
-        onMoveToIncubator={() => {
-          // Handle move to incubator logic here
-        }}
-        onMoveToTransit={() => {
-          // Handle move to transit logic here
-        }}
         containerData={selectedRow || undefined}
       />
     </div>
