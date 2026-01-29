@@ -49,17 +49,6 @@ class OutboundShipmentsResponse(BaseModel):
     status: str = Field(default="success", description="Response status")
 
 
-class AvgQualityLossPerContainerResponse(BaseModel):
-    """Response for average quality loss per container metric"""
-    avg_quality_loss_per_container: float = Field(
-        ...,
-        description="Average quality loss per container from IVF quality logs for current month"
-    )
-    total_containers: int = Field(..., description="Total containers included in the calculation")
-    last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
-    status: str = Field(default="success", description="Response status")
-
-
 class DeviationsGraphResponse(BaseModel):
     """Response for deviations graph metric
     
@@ -80,7 +69,6 @@ class IVFDashboardMetricsResponse(BaseModel):
     quality_deviations_flagged: Dict = Field(..., description="Quality deviations flagged metric")
     top_deviation_driver: Dict = Field(..., description="Top deviation driver metric")
     outbound_shipments: Dict = Field(..., description="Outbound shipments metric")
-    avg_quality_loss_per_container: Dict = Field(..., description="Average quality loss per container metric")
     deviations_graph: Dict = Field(..., description="Deviations graph metric")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")

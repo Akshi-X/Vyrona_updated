@@ -78,7 +78,7 @@ def get_active_canisters(
     - branch_id: The ID of the branch
     - branch_name: The name of the branch
     - canisters: List of canisters for this branch with:
-        - canister_id: The ID of the canister
+        - canister_number: The canister number/code (e.g., 'C1')
         - canister_status: Status (safe, risk, or critical)
         - updated_at: Last updated date and time from the most recent canister log refill_date+refill_time (if available),
                       otherwise from canisters table created_at
@@ -91,12 +91,12 @@ def get_active_canisters(
                 "branch_name": "Egmore",
                 "canisters": [
                     {
-                        "canister_id": 1,
+                        "canister_number": "C1",
                         "canister_status": "safe",
                         "updated_at": "2024-01-15T10:30:00Z"
                     },
                     {
-                        "canister_id": 2,
+                        "canister_number": "C2",
                         "canister_status": "risk",
                         "updated_at": "2024-01-15T09:15:00Z"
                     }
@@ -107,7 +107,7 @@ def get_active_canisters(
                 "branch_name": "Anna Nagar",
                 "canisters": [
                     {
-                        "canister_id": 3,
+                        "canister_number": "C1",
                         "canister_status": "safe",
                         "updated_at": "2024-01-15T11:00:00Z"
                     }
@@ -144,9 +144,9 @@ def get_embryo_tracking(
     This endpoint returns embryo tracking information in a table format showing:
     - HIS Number (Patient identifier)
     - Cryolock Number
-    - Canister Number
-    - Tank ID (formatted)
-    - Cane ID (formatted)
+    - Canister Number/Code
+    - Tank Code
+    - Cane Code
     - Goblet Color
     - Cryolock Color
     - Date of Vitrification
@@ -160,9 +160,9 @@ def get_embryo_tracking(
             {
                 "his_number": "HIS-10234",
                 "cryolock_number": "CL-01",
-                "canister_number": 6,
-                "tank_id": "Tank 8",
-                "cane_id": "Cane-A 12",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A12",
                 "goblet_color": "Yellow",
                 "cryolock_color": "Blue",
                 "date_of_vitrification": "2024-08-12",
@@ -179,9 +179,9 @@ def get_embryo_tracking(
             {
                 "his_number": "HIS-10234",
                 "cryolock_number": "CL-01",
-                "canister_number": 6,
-                "tank_id": "Tank 8",
-                "cane_id": "Cane-A 12",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A12",
                 "goblet_color": "Yellow",
                 "cryolock_color": "Blue",
                 "date_of_vitrification": "2024-08-12",

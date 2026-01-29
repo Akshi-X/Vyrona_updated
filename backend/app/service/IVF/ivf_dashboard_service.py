@@ -411,62 +411,6 @@ class IVFDashboardService:
             "total_outbound_shipments": total_shipments
         }
 
-    def get_avg_quality_loss_per_container(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
-        """
-        Calculate average quality loss per container.
-        
-        Quality loss per container is calculated as the average quality_loss
-        from IVF quality logs for all time.
-        
-        Args:
-            branch_id: Optional branch ID to filter by
-            role: User's role to determine filtering
-            
-        Returns:
-            Dictionary with avg_quality_loss_per_container and total_containers
-        """
-        filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        per_container_query = (
-            self.db.query(
-                IVFQualityLog.canister_id.label("canister_id"),
-                func.avg(IVFQualityLog.quality_loss).label("avg_loss")
-            )
-            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
-            .filter(
-                Canister.is_active == True,
-                IVFQualityLog.quality_loss.isnot(None)
-            )
-            .group_by(IVFQualityLog.canister_id)
-        )
-        
-        if filter_branch_id is not None:
-            per_container_query = (
-                per_container_query
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        
-        per_container_subquery = per_container_query.subquery()
-        
-        avg_quality_loss = (
-            self.db.query(func.avg(per_container_subquery.c.avg_loss))
-            .scalar()
-        )
-        total_containers = (
-            self.db.query(func.count(per_container_subquery.c.canister_id))
-            .scalar()
-        )
-        
-        avg_quality_loss_value = round(float(avg_quality_loss), 2) if avg_quality_loss is not None else 0.0
-        total_containers_value = int(total_containers) if total_containers is not None else 0
-        
-        return {
-            "avg_quality_loss_per_container": avg_quality_loss_value,
-            "total_containers": total_containers_value
-        }
-
     def get_deviations_graph(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get deviations graph data for IVF dashboard.
@@ -542,8 +486,7 @@ class IVFDashboardService:
                 top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(container_drivers)
                 
                 data.append({
-                    "container_id": row.container_id,
-                    "container_name": row.container_number,  # Container name
+                    "container_name": str(row.container_number) if row.container_number else None,  # Container number/code
                     "temperature": temp_val,  # Individual driver count
                     "humidity": humidity_val,  # Individual driver count
                     "agitation_vibration": agitation_val,  # Individual driver count
