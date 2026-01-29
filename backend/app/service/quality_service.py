@@ -17,6 +17,9 @@ from fastapi.responses import Response
 from app.models.patient_model import Patient
 from app.models.user_model import User
 from app.models.geolocation_model import Geolocation
+from app.models.IVF.ivf_geolocation_model import IVFGeolocation
+from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
 from app.exceptions.patient_exceptions import PatientNotFoundException
@@ -486,6 +489,123 @@ class QualityService:
         except Exception as e:
             logger.error(f"Error retrieving geolocation history for patient {patient_id}: {e}")
             return []
+    
+    def get_canister_redis_history(self, canister_id: int, limit: int = 12) -> List[dict]:
+        """
+        Get last N messages for an IVF canister from Redis
+        
+        Args:
+            canister_id: Canister ID to get history for
+            limit: Number of messages to retrieve (default: 12)
+        
+        Returns:
+            List of quality data dictionaries, oldest first (ascending order)
+        """
+        try:
+            redis_client = get_redis()
+            history_key = f"ivf_quality_history:{canister_id}"
+            
+            # Get last N messages (0 to limit-1, since lrange is inclusive)
+            # Redis lpush stores newest at index 0, so this gets newest first
+            raw_history = redis_client.lrange(history_key, 0, limit - 1)
+            
+            if not raw_history:
+                return []
+            
+            # Parse JSON strings and return as list of dicts
+            history = []
+            for raw_data in raw_history:
+                try:
+                    data = json.loads(raw_data)
+                    history.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse Redis message for canister {canister_id}: {e}")
+                    continue
+            
+            # Reverse to get ascending order (oldest first)
+            history.reverse()
+            
+            return history
+        except Exception as e:
+            logger.error(f"Error retrieving Redis history for canister {canister_id}: {e}")
+            return []
+    
+    def get_canister_geolocation_history(self, canister_id: int, limit: int = 100) -> List[dict]:
+        """
+        Get geolocation records for an IVF canister from database
+        
+        Args:
+            canister_id: Canister ID to get geolocation history for
+            limit: Maximum number of records to retrieve (default: 100)
+        
+        Returns:
+            List of geolocation dictionaries, oldest first (ascending order)
+        """
+        try:
+            # Query geolocation records for the canister, ordered by id
+            geolocation_records = self.db.query(IVFGeolocation).filter(
+                IVFGeolocation.canister_id == canister_id
+            ).order_by(
+                IVFGeolocation.id.asc()
+            ).limit(limit).all()
+            
+            # Convert to dictionary format
+            geolocation_data = []
+            for record in geolocation_records:
+                geolocation_data.append({
+                    "type": "ivf_geolocation",
+                    "id": record.id,
+                    "canister_id": record.canister_id,
+                    "telemetry_data_id": record.ivf_telemetry_data_id,  # IVF model uses ivf_telemetry_data_id
+                    "current_latitude": round(record.current_latitude, 2) if record.current_latitude is not None else None,
+                    "current_longitude": round(record.current_longitude, 2) if record.current_longitude is not None else None,
+                    "reading_timestamp": record.reading_timestamp.isoformat() if record.reading_timestamp else None,
+                    "created_at": record.created_at.isoformat() if record.created_at else None,
+                })
+            
+            return geolocation_data
+        except Exception as e:
+            logger.error(f"Error retrieving geolocation history for canister {canister_id}: {e}")
+            return []
+    
+    def validate_canister_belongs_to_branch(self, canister_id: int, branch_id: Optional[int]) -> bool:
+        """
+        Validate that a canister belongs to the user's branch.
+        Admin users (branch_id is None) can access all canisters.
+        
+        Args:
+            canister_id: The canister ID to validate
+            branch_id: The user's branch ID (None for Admin users)
+        
+        Returns:
+            True if canister belongs to branch (or user is Admin), False otherwise
+        
+        Raises:
+            Exception: If canister doesn't exist or validation fails
+        """
+        try:
+            # Get canister
+            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
+            if not canister:
+                raise Exception(f"Canister {canister_id} not found")
+            
+            # Admin users (branch_id is None) can access all canisters
+            if branch_id is None:
+                return True
+            
+            # Get canister's branch through tank
+            tank = self.db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
+            if not tank:
+                raise Exception(f"Tank for canister {canister_id} not found")
+            
+            # Validate branch match
+            if tank.branch_id != branch_id:
+                raise Exception(f"Canister {canister_id} does not belong to your branch")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error validating canister {canister_id} for branch {branch_id}: {e}")
+            raise
     
     async def redis_listener(self, connection_manager: 'ConnectionManager'):
         """
