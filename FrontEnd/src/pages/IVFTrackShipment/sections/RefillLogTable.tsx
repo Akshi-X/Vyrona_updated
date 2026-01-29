@@ -16,10 +16,10 @@ const getStatusColor = (status: string) => {
 };
 
 interface RefillLogTableProps {
-  canisterId?: string | number;
+  canisterNumber?: string | number;
 }
 
-export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
+export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) {
   const [rows, setRows] = useState<RefillLogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,9 +45,9 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
   const statusOptions = ['Not started', 'In progress', 'Done'] as const;
 
   useEffect(() => {
-    if (!canisterId) {
+    if (!canisterNumber) {
       setRows([]);
-      setError('Canister ID is required');
+      setError('Canister number is required');
       return;
     }
 
@@ -56,7 +56,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
       setLoading(true);
       setError(null);
       try {
-        const response = await ivfService.getCanisterRefillLogs(canisterId);
+        const response = await ivfService.getCanisterRefillLogs(canisterNumber);
         if (!cancelled) setRows(response?.refill_logs || []);
       } catch (e: any) {
         if (!cancelled) {
@@ -72,7 +72,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
     return () => {
       cancelled = true;
     };
-  }, [canisterId]);
+  }, [canisterNumber]);
 
   // Auto-dismiss save error after 5 seconds
   useEffect(() => {
@@ -123,8 +123,8 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
 
   const handleSave = useCallback(
     async (index: number) => {
-      if (!canisterId) {
-        setSaveError('Canister ID is required');
+      if (!canisterNumber) {
+        setSaveError('Canister number is required');
         return;
       }
 
@@ -149,7 +149,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
       setSaveError(null);
 
       try {
-        await ivfService.updateRefillLogStatus(canisterId, originalRow.log_id, editStatus.trim());
+        await ivfService.updateRefillLogStatus(canisterNumber, originalRow.log_id, editStatus.trim());
 
         // Update local state
         const updatedRows = [...rows];
@@ -166,7 +166,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
         setSaving(false);
       }
     },
-    [canisterId, rows, editStatus, cancelEditing]
+    [canisterNumber, rows, editStatus, cancelEditing]
   );
 
   const handleAddClick = useCallback(() => {
@@ -198,8 +198,8 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
   }, []);
 
   const handleAddSubmit = useCallback(async () => {
-    if (!canisterId) {
-      setAddError('Canister ID is required');
+    if (!canisterNumber) {
+      setAddError('Canister number is required');
       return;
     }
 
@@ -230,7 +230,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
         ? `${newRefillLog.refill_time}:00`
         : newRefillLog.refill_time;
 
-      await ivfService.createRefillLog(canisterId, {
+      await ivfService.createRefillLog(canisterNumber, {
         refill_date: newRefillLog.refill_date,
         refill_time: formattedTime,
         refilled_by: newRefillLog.refilled_by.trim(),
@@ -239,7 +239,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
       });
 
       // Refresh the data from server to get all fields correctly
-      const response = await ivfService.getCanisterRefillLogs(canisterId);
+      const response = await ivfService.getCanisterRefillLogs(canisterNumber);
       setRows(response?.refill_logs || []);
 
       setIsAdding(false);
@@ -255,7 +255,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
     } finally {
       setAdding(false);
     }
-  }, [canisterId, newRefillLog]);
+  }, [canisterNumber, newRefillLog]);
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[400px] flex flex-col">
@@ -356,7 +356,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
                     <td className="px-3 py-2 h-[56px]">
                       <input
                         type="text"
-                        value={canisterId || ''}
+                        value={canisterNumber || ''}
                         disabled
                         className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
                       />
@@ -380,7 +380,7 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
                         className="relative w-full"
                       >
                         <div
-                          className="w-full border rounded-[10px] px-2 py-1 pr-8 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
+                          className="w-[117px] border rounded-[10px] px-2 py-1 pr-3 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
                           onClick={() => setIsAddStatusDropdownOpen((open) => !open)}
                         >
                           <span>{newRefillLog.status || 'Status'}</span>
@@ -471,8 +471,8 @@ export default function RefillLogTable({ canisterId }: RefillLogTableProps) {
                           className="relative w-full"
                         >
                           <div
-                            className="w-full border rounded-[10px] px-2 py-1 pr-8 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
-                            onClick={() =>
+                             className="w-[117px] border rounded-[10px] px-2 py-1 pr-3 cursor-pointer border-[#6B1176] text-sm flex items-center justify-between bg-white"
+                             onClick={() =>
                               setEditingStatusDropdownIndex(
                                 editingStatusDropdownIndex === index ? null : index
                               )

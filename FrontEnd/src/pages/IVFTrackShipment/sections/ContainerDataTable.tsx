@@ -5,10 +5,10 @@ import moveToIcon from '../../../assets/moveto.svg';
 import MoveContainerModal from '../../../components/MoveContainerModal';
 
 interface ContainerDataTableProps {
-  canisterId?: string | number;
+  canisterNumber?: string | number;
 }
 
-export default function ContainerDataTable({ canisterId }: ContainerDataTableProps) {
+export default function ContainerDataTable({ canisterNumber }: ContainerDataTableProps) {
   const [rows, setRows] = useState<IVFTreatment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +23,9 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canisterId) {
+    if (!canisterNumber) {
       setRows([]);
-      setError('Canister ID is required');
+      setError('Canister number is required');
       return;
     }
 
@@ -34,7 +34,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
       setLoading(true);
       setError(null);
       try {
-        const response = await ivfService.getCanisterTrackingDetails(canisterId);
+        const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
         if (!cancelled) setRows(response?.data || []);
       } catch (e: any) {
         if (!cancelled) {
@@ -50,7 +50,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
     return () => {
       cancelled = true;
     };
-  }, [canisterId]);
+  }, [canisterNumber]);
 
   // Auto-dismiss save error after 5 seconds
   useEffect(() => {
@@ -64,8 +64,8 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
 
   const handleSave = useCallback(
     async (index: number) => {
-      if (!canisterId) {
-        setSaveError('Canister ID is required');
+      if (!canisterNumber) {
+        setSaveError('Canister number is required');
         return;
       }
 
@@ -79,19 +79,19 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
 
         // Update goblet color if changed
         if (editValues.gobletColor !== originalRow.gobletColor && editValues.gobletColor.trim()) {
-          // Ensure we're using the cane identifier string (e.g., "Cane-A 12"), not an ID
-          const caneIdentifier = originalRow.caneId;
-          if (!caneIdentifier || caneIdentifier.trim() === '') {
-            throw new Error('Cane identifier is required to update goblet color');
+          // Ensure we're using the cryolock number string (e.g., "CAN-EGM-001-01"), not an ID
+          const cryolockNumber = originalRow.cryolockNum;
+          if (!cryolockNumber || cryolockNumber.trim() === '') {
+            throw new Error('Cryolock number is required to update goblet color');
           }
-          // Verify it's a string (cane identifier format like "Cane-A 12" or "Cane-5")
-          if (typeof caneIdentifier !== 'string') {
-            throw new Error(`Invalid cane identifier format: expected string, got ${typeof caneIdentifier}`);
+          // Verify it's a string (cryolock number format like "CAN-EGM-001-01")
+          if (typeof cryolockNumber !== 'string') {
+            throw new Error(`Invalid cryolock number format: expected string, got ${typeof cryolockNumber}`);
           }
           promises.push(
             ivfService.updateGobletColor(
-              canisterId,
-              caneIdentifier.trim(), // Send the cane identifier string (e.g., "Cane-A 12")
+              canisterNumber,
+              cryolockNumber.trim(), // Send the cryolock number string (e.g., "CAN-EGM-001-01")
               editValues.gobletColor.trim()
             )
           );
@@ -110,7 +110,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
           }
           promises.push(
             ivfService.updateCryolockColor(
-              canisterId,
+              canisterNumber,
               cryolockNumber.trim(), // Send the cryolock number string (e.g., "CAN-EGM-001-01")
               editValues.cryolockColor.trim()
             )
@@ -143,7 +143,7 @@ export default function ContainerDataTable({ canisterId }: ContainerDataTablePro
         setSaving(false);
       }
     },
-    [canisterId, editValues, rows]
+    [canisterNumber, editValues, rows]
   );
 
   const cancelEditing = useCallback(() => {
