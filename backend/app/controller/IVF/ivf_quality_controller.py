@@ -1,0 +1,239 @@
+"""
+IVF Quality Monitoring Controller
+Handles WebSocket and REST endpoints for real-time IVF canister quality monitoring
+Separate from CGT quality monitoring to maintain isolation
+"""
+import asyncio
+import json
+import logging
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
+from typing import Optional
+from sqlalchemy.orm import Session
+
+from app.service.redis_service import get_redis
+from app.service.quality_service import QualityService
+from app.service.IVF.quality_tracking_service import QualityTrackingService
+from app.auth.auth import verify_websocket_token
+from app.utils.websocket_manager import ConnectionManager
+from app.config.database import get_db, SessionLocal
+from app.models.user_model import User
+from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
+from app.utils.user_helpers import is_hospital_department
+from app.exceptions import InvalidTokenException
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/ivf/quality", tags=["IVF Quality Monitoring"])
+
+# Import shared connection manager from CGT quality controller
+from app.controller import quality_controller
+
+# Use the same connection manager instance as CGT for shared Redis listener
+manager = quality_controller.manager
+
+@router.websocket("/ws")
+async def ivf_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time IVF canister quality monitoring
+    
+    Requires authentication token in query parameter: ?token=<jwt_token>
+    Only accessible to users with IVF department
+    """
+    connection_id = None
+    
+    try:
+        # Accept connection first
+        await websocket.accept()
+        logger.info(f"IVF WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
+        
+        # Authenticate user - Get token from query parameter
+        query_params = dict(websocket.query_params)
+        token = query_params.get("token")
+        logger.info(f"Token from query params: {'present' if token else 'missing'}")
+        
+        if not token:
+            logger.warning("IVF WebSocket connection rejected: No token provided")
+            await websocket.close(code=1008, reason="Authentication required: No token provided")
+            return
+        
+        # Verify token using auth function
+        try:
+            auth_info = verify_websocket_token(token)
+            user_id = auth_info["user_id"]
+            pharma_id = auth_info.get("pharma_id")  # May be None for IVF users
+            logger.debug(f"Token verified: user_id={user_id}, pharma_id={pharma_id}")
+        except InvalidTokenException as e:
+            logger.warning(f"IVF WebSocket connection rejected: Invalid token - {str(e)}")
+            await websocket.close(code=1008, reason=f"Invalid token: {str(e)}")
+            return
+        except Exception as e:
+            logger.error(f"IVF WebSocket token verification error: {type(e).__name__}: {str(e)}")
+            await websocket.close(code=1008, reason=f"Token verification failed: {str(e)}")
+            return
+        
+        # Get user from database to verify department and get branch_id/role
+        db_temp = SessionLocal()
+        try:
+            user = db_temp.query(User).filter(User.user_id == user_id).first()
+            if not user:
+                logger.warning(f"User {user_id} not found in database")
+                await websocket.close(code=1008, reason="User not found")
+                return
+            
+            # Verify user is from IVF department
+            if not user.department or not is_hospital_department(user.department):
+                logger.warning(f"User {user_id} is not from IVF department (department: {user.department})")
+                await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
+                return
+            
+            branch_id = user.branch_id
+            role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+            role_normalized = role  # Already in correct format from enum
+            department = user.department
+            
+            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}")
+        finally:
+            db_temp.close()
+        
+        # Store connection info in connection manager for filtering
+        connection_id = await manager.connect(websocket)
+        manager.active_connections[connection_id]["pharma_id"] = pharma_id
+        manager.active_connections[connection_id]["user_id"] = user_id
+        manager.active_connections[connection_id]["branch_id"] = branch_id
+        manager.active_connections[connection_id]["role"] = role_normalized
+        manager.active_connections[connection_id]["department"] = department
+        
+        logger.info(f"IVF WebSocket authenticated: user={user_id}, branch={branch_id}, role={role_normalized}, connection={connection_id}")
+        
+    except Exception as e:
+        logger.error(f"IVF WebSocket authentication error: {type(e).__name__}: {str(e)}", exc_info=True)
+        try:
+            if connection_id:
+                manager.disconnect(connection_id)
+            await websocket.close(code=1011, reason=f"Internal server error: {str(e)}")
+        except:
+            pass
+        return
+    
+    try:
+        # Create database session for validation
+        db = SessionLocal()
+        
+        try:
+            quality_service = QualityService(db)
+            quality_tracking_service = QualityTrackingService(db)
+            
+            while True:
+                try:
+                    # Wait for messages with timeout to avoid blocking
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                    try:
+                        # Try to parse as JSON
+                        message = json.loads(data)
+                        
+                        # Handle IVF canister subscription - ONLY accept canister_number
+                        if "canister_number" not in message or not message["canister_number"]:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Subscription message must contain 'canister_number'"
+                            })
+                            continue
+                        
+                        canister_number = message["canister_number"]
+                        logger.info(f"Received canister_number: {canister_number}")
+                        
+                        # Convert canister_number to canister_id for internal operations
+                        try:
+                            # Convert canister_number to string (database column is VARCHAR/character varying)
+                            canister_number_str = str(canister_number)
+                            
+                            # First, look up canister_id from canister_number (without branch filter)
+                            # This allows us to check if canister exists first, then validate branch access
+                            canister = db.query(Canister).filter(Canister.canister_number == canister_number_str).first()
+                            
+                            if not canister:
+                                raise Exception(f"Canister number {canister_number} not found")
+                            
+                            canister_id = canister.canister_id
+                            
+                            # For non-admin users, validate that canister belongs to their branch
+                            if role_normalized != "Admin" and branch_id is not None:
+                                # Get canister's branch through tank
+                                tank = db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
+                                if not tank:
+                                    raise Exception(f"Tank for canister {canister_number} not found")
+                                
+                                if tank.branch_id != branch_id:
+                                    raise Exception(f"Canister number {canister_number} does not belong to your branch")
+                            
+                            logger.info(f"Converted canister_number {canister_number} to canister_id {canister_id}")
+                        except Exception as e:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Invalid canister number: {str(e)}"
+                            })
+                            continue
+                        
+                        # Validate canister belongs to user's branch (if user is not admin)
+                        try:
+                            # Admin users (branch_id is None) can access all canisters
+                            # User/Manager users must match branch
+                            if role_normalized != "Admin" and branch_id is not None:
+                                quality_service.validate_canister_belongs_to_branch(canister_id, branch_id)
+                            
+                            # Client is subscribing to a canister (IVF) - track by canister_number only
+                            # Store canister_number as string (database stores as VARCHAR)
+                            canister_number_for_sub = str(canister_number)
+                            
+                            # Store subscription using canister_number (primary identifier)
+                            # canister_id is stored for internal operations but subscription is tracked by canister_number
+                            manager.set_canister_subscription(connection_id, canister_id, canister_number_for_sub)
+                            
+                            # Get last 12 IVF quality logs from Redis for this canister
+                            ivf_history = quality_service.get_canister_redis_history(canister_id, limit=12)
+                            
+                            # Get IVF geolocation records from database
+                            ivf_geolocation_history = quality_service.get_canister_geolocation_history(canister_id, limit=100)
+                            
+                            # Send IVF geolocation history as a single array message
+                            if ivf_geolocation_history:
+                                await websocket.send_json({
+                                    "type": "ivf_geolocation_history",
+                                    "canister_id": canister_id,
+                                    "canister_number": canister_number,  # Include canister_number in response
+                                    "geolocations": ivf_geolocation_history,
+                                    "count": len(ivf_geolocation_history)
+                                })
+                            
+                            # Send IVF quality history messages (oldest first, ascending order)
+                            for historical_data in ivf_history:
+                                await websocket.send_json(historical_data)
+                            
+                            # Send confirmation after history
+                            await websocket.send_json({
+                                "type": "subscription_confirmed",
+                                "canister_id": canister_id,
+                                "canister_number": canister_number,  # Include canister_number in response
+                                "history_count": len(ivf_history),
+                                "geolocation_count": len(ivf_geolocation_history)
+                            })
+                        except Exception as e:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Invalid canister: {str(e)}"
+                            })
+                    except json.JSONDecodeError:
+                        # Not JSON, ignore
+                        pass
+                except asyncio.TimeoutError:
+                    # No message received, continue to keep connection alive
+                    continue
+        finally:
+            db.close()
+    except WebSocketDisconnect:
+        manager.disconnect_by_websocket(websocket)
+        logger.info(f"IVF WebSocket disconnected: {connection_id}")
+    except Exception as e:
+        logger.error(f"IVF WebSocket error: {e}")
+        manager.disconnect_by_websocket(websocket)
