@@ -32,9 +32,9 @@ router = APIRouter(
 )
 
 
-@router.post("/canisters/{canister_id}/refill-logs", response_model=RefillLogResponse, status_code=201)
+@router.post("/canisters/{canister_number}/refill-logs", response_model=RefillLogResponse, status_code=201)
 def create_refill_log(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     refill_log_data: RefillLogCreate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -55,6 +55,10 @@ def create_refill_log(
     try:
         quality_tracking_service = QualityTrackingService(db)
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.create_refill_log(
             canister_id=canister_id,
             refill_log_data=refill_log_data,
@@ -66,9 +70,9 @@ def create_refill_log(
         raise
 
 
-@router.get("/canisters/{canister_id}/refill-logs", response_model=RefillLogListResponse)
+@router.get("/canisters/{canister_number}/refill-logs", response_model=RefillLogListResponse)
 def get_refill_logs_by_container(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     status: Optional[str] = Query(None, description="Filter by status (Done, In progress, Not started)"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Limit number of results"),
     request: Request = None,
@@ -99,6 +103,10 @@ def get_refill_logs_by_container(
         
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.get_refill_logs(
             canister_id=canister_id,
             status=status,
@@ -112,9 +120,9 @@ def get_refill_logs_by_container(
         raise
 
 
-@router.patch("/canisters/{canister_id}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
+@router.patch("/canisters/{canister_number}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
 def update_refill_log_status(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     log_id: int = Path(..., description="Refill log ID"),
     status_update: RefillLogStatusUpdate = ...,
     request: Request = None,
@@ -127,6 +135,10 @@ def update_refill_log_status(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.update_refill_log_status(
             canister_id=canister_id,
             log_id=log_id,
@@ -139,9 +151,9 @@ def update_refill_log_status(
         raise
 
 
-@router.get("/canisters/{canister_id}/tracking-details", response_model=IVFCanisterTrackingResponse)
+@router.get("/canisters/{canister_number}/tracking-details", response_model=IVFCanisterTrackingResponse)
 def get_canister_tracking_details(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -162,6 +174,10 @@ def get_canister_tracking_details(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.get_canister_tracking_details(
             canister_id=canister_id,
             branch_id=branch_id
@@ -171,37 +187,41 @@ def get_canister_tracking_details(
         raise
 
 
-@router.patch("/canisters/{canister_id}/goblet-color", response_model=ColorUpdateResponse)
+@router.patch("/canisters/{canister_number}/goblet-color", response_model=ColorUpdateResponse)
 def update_goblet_color(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     color_update: GobletColorUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update goblet color for a specific cane within a canister.
+    Update goblet color for a specific cryolock within a canister.
     
     Use this endpoint to update the goblet color from the tracking table.
-    The goblet color is stored in the 'canes' table.
+    The goblet color is stored in the 'cryolocks' table.
     
-    WHERE TO GET cane_identifier:
-    - Use the "Cane ID" column value directly from the table row
-    - Examples: "Cane-A 12", "Cane-5", or just "5" (numeric part)
+    WHERE TO GET cryolock_number:
+    - Use the "cryolock_number" field value directly from the tracking details response
+    - Example: "T1/C1/A11/2", "CL-01", etc.
     
     Request Body:
-    - cane_identifier: Cane ID from the "Cane ID" column in the table (e.g., "Cane-A 12")
+    - cryolock_number: Cryolock number from the tracking details response (e.g., "T1/C1/A11/2")
     - goblet_color: The goblet color value to set (e.g., "Yellow", "Red", "Blue")
     
     Example Request:
     {
-        "cane_identifier": "Cane-A 12",
+        "cryolock_number": "T1/C1/A11/2",
         "goblet_color": "Yellow"
     }
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.update_goblet_color(
             canister_id=canister_id,
             color_update=color_update,
@@ -213,9 +233,9 @@ def update_goblet_color(
         raise
 
 
-@router.patch("/canisters/{canister_id}/cryolock-color", response_model=ColorUpdateResponse)
+@router.patch("/canisters/{canister_number}/cryolock-color", response_model=ColorUpdateResponse)
 def update_cryolock_color(
-    canister_id: int = Path(..., description="Canister ID from URL"),
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
     color_update: CryolockColorUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -244,6 +264,10 @@ def update_cryolock_color(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
         return quality_tracking_service.update_cryolock_color(
             canister_id=canister_id,
             color_update=color_update,

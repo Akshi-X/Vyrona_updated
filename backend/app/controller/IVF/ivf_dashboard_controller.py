@@ -14,7 +14,6 @@ from app.schemas.IVF.ivf_dashboard_schema import (
     QualityDeviationsFlaggedResponse,
     TopDeviationDriverResponse,
     OutboundShipmentsResponse,
-    AvgQualityLossPerContainerResponse,
     DeviationsGraphResponse
 )
 
@@ -217,35 +216,6 @@ def get_outbound_shipments(
         return OutboundShipmentsResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting outbound shipments: {str(e)}")
-
-
-@router.get("/metrics/avg-quality-loss-per-container", response_model=AvgQualityLossPerContainerResponse)
-def get_avg_quality_loss_per_container(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """
-    Get average quality loss per container.
-    
-    Metric 6: Avg quality loss per container (for all sites)
-    
-    Quality loss is calculated as average quality_loss per container
-    from IVF quality logs for all time.
-    
-    Role-based access:
-    - Manager (IVF): See metrics across all sites
-    - User (IVF): See metrics only for their assigned branch
-    - Admin: See metrics across all sites
-    """
-    try:
-        branch_id, role = get_dashboard_branch_filter(request)
-        
-        service = IVFDashboardService(db)
-        result = service.get_avg_quality_loss_per_container(branch_id=branch_id, role=role)
-        
-        return AvgQualityLossPerContainerResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting avg quality loss per container: {str(e)}")
 
 
 @router.get("/metrics/deviations-graph", response_model=DeviationsGraphResponse)
