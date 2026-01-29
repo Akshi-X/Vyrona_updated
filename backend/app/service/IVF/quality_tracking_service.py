@@ -3,34 +3,35 @@ Quality Tracking Service
 Handles business logic for quality tracking operations including LN2 refill logs
 """
 import logging
-from typing import Optional, List, Dict
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from typing import List, Optional
 
-# Import shared models (matching pattern from ivf_service.py)
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session
+
+from ...constants.http_status import HTTPStatus
+from ...constants.messages import ErrorMessages
+from ...exceptions.custom_exceptions import AppException
+from ...models.IVF.cane_model import Cane
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.canister_model import Canister
-from ...models.IVF.tank_model import Tank
-from ...models.IVF.hospital_branch_model import HospitalBranch
-from ...models.IVF.cane_model import Cane
 from ...models.IVF.cryolock_model import Cryolock
 from ...models.IVF.embryo_model import Embryo
+from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.patient_model import IVFPatient
-from ...models.shipment_model import Shipment
+from ...models.IVF.tank_model import Tank
 from ...schemas.IVF.quality_tracking_schema import (
-    RefillLogCreate,
-    RefillLogStatusUpdate,
-    RefillLogResponse,
-    RefillLogListResponse,
+    ColorUpdateResponse,
+    CryolockColorUpdate,
+    CryolockFlagUpdate,
+    CryolockFlagUpdateResponse,
+    GobletColorUpdate,
     IVFCanisterTrackingItem,
     IVFCanisterTrackingResponse,
-    GobletColorUpdate,
-    CryolockColorUpdate,
-    ColorUpdateResponse
+    RefillLogCreate,
+    RefillLogListResponse,
+    RefillLogResponse,
+    RefillLogStatusUpdate,
 )
-from ...exceptions.custom_exceptions import AppException
-from ...constants.messages import ErrorMessages
-from ...constants.http_status import HTTPStatus
 
 logger = logging.getLogger(__name__)
 
@@ -265,11 +266,62 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> IVFCanisterTrackingResponse:
         """
-        Fetch tracking details for a specific canister.
-        Returns data matching the table structure: HIS #, Cryolock #, Canister #, 
-        Cane ID, Goblet Color, Cryolock Color, Date of Vitrification, and Move to.
+        Fetch tracking details for a specific canister (grouped by cryolock).
+
+        Response includes cryolock flags: embryo_transfer and in_transit.
+        Also returns available_slots calculated as:
+        total_slots - count(cryolocks where embryo_transfer OR in_transit OR embryo_grading is set on any embryo)
         """
         try:
+            # total_slots = distinct cryolocks in this canister
+            total_slots_query = (
+                self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(Canister.canister_id == canister_id)
+            )
+            if branch_id is not None:
+                total_slots_query = total_slots_query.filter(HospitalBranch.branch_id == branch_id)
+            total_slots = total_slots_query.scalar() or 0
+
+            # moved_by_grading = cryolocks with any active embryo that has embryo_grading set (non-empty)
+            moved_by_grading_subq = (
+                self.db.query(Embryo.cryolock_id)
+                .filter(
+                    Embryo.is_active == True,
+                    Embryo.embryo_grading.isnot(None),
+                    Embryo.embryo_grading != ''
+                )
+                .distinct()
+                .subquery()
+            )
+
+            # moved_count = distinct cryolocks where embryo_transfer OR in_transit OR embryo_grading is set
+            moved_count_query = (
+                self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .outerjoin(moved_by_grading_subq, Cryolock.cryolock_id == moved_by_grading_subq.c.cryolock_id)
+                .filter(
+                    Canister.canister_id == canister_id,
+                    or_(
+                        Cryolock.embryo_transfer == True,
+                        Cryolock.in_transit == True,
+                        moved_by_grading_subq.c.cryolock_id.isnot(None)
+                    )
+                )
+            )
+            if branch_id is not None:
+                moved_count_query = moved_count_query.filter(HospitalBranch.branch_id == branch_id)
+            moved_count = moved_count_query.scalar() or 0
+            available_slots = max(total_slots - moved_count, 0)
+
+            # Data rows (group by cryolock so we don't duplicate on multiple embryos)
+            # Exclude cryolocks where embryo_transfer=True OR in_transit=True
             query = (
                 self.db.query(
                     IVFPatient.his_number,
@@ -278,7 +330,9 @@ class QualityTrackingService:
                     Cane.cane_code,
                     Cryolock.goblet_color,
                     Cryolock.cryolock_color,
-                    Embryo.date_of_vitrification
+                    func.max(Embryo.date_of_vitrification).label('date_of_vitrification'),
+                    Cryolock.embryo_transfer,
+                    Cryolock.in_transit
                 )
                 .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
                 .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
@@ -288,14 +342,25 @@ class QualityTrackingService:
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .filter(
                     Embryo.is_active == True,
-                    Canister.canister_id == canister_id
+                    Canister.canister_id == canister_id,
+                    # Exclude cryolocks that have been moved (embryo_transfer OR in_transit)
+                    Cryolock.embryo_transfer != True,
+                    Cryolock.in_transit != True
                 )
             )
-
             if branch_id is not None:
                 query = query.filter(HospitalBranch.branch_id == branch_id)
 
-            query = query.order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+            query = query.group_by(
+                IVFPatient.his_number,
+                Cryolock.cryolock_number,
+                Canister.canister_number,
+                Cane.cane_code,
+                Cryolock.goblet_color,
+                Cryolock.cryolock_color,
+                Cryolock.embryo_transfer,
+                Cryolock.in_transit
+            ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
 
             results = query.all()
 
@@ -310,18 +375,117 @@ class QualityTrackingService:
                         goblet_color=row.goblet_color or "",
                         cryolock_color=row.cryolock_color or "",
                         date_of_vitrification=row.date_of_vitrification,
-                        move_to=True  # All items can be moved (UI action)
+                        embryo_transfer=bool(row.embryo_transfer),
+                        in_transit=bool(row.in_transit)
                     )
                 )
 
             return IVFCanisterTrackingResponse(
                 data=tracking_rows,
-                total=len(tracking_rows)
+                total=total_slots,
+                available_slots=available_slots
             )
         except Exception as e:
             logger.error(f"Error fetching canister tracking details: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to fetch canister tracking details: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+
+    def mark_embryo_transfer(
+        self,
+        canister_id: int,
+        flag_update: CryolockFlagUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> CryolockFlagUpdateResponse:
+        """Mark a cryolock as moved to embryo transfer (embryo_transfer = True)."""
+        return self._set_cryolock_flag(
+            canister_id=canister_id,
+            cryolock_number=flag_update.cryolock_number,
+            flag_field="embryo_transfer",
+            updated_by=updated_by,
+            branch_id=branch_id
+        )
+
+    def mark_in_transit(
+        self,
+        canister_id: int,
+        flag_update: CryolockFlagUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> CryolockFlagUpdateResponse:
+        """Mark a cryolock as moved to transit (in_transit = True)."""
+        return self._set_cryolock_flag(
+            canister_id=canister_id,
+            cryolock_number=flag_update.cryolock_number,
+            flag_field="in_transit",
+            updated_by=updated_by,
+            branch_id=branch_id
+        )
+
+    def _set_cryolock_flag(
+        self,
+        canister_id: int,
+        cryolock_number: str,
+        flag_field: str,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> CryolockFlagUpdateResponse:
+        if flag_field not in {"embryo_transfer", "in_transit"}:
+            raise AppException(
+                message=f"Invalid flag_field '{flag_field}'",
+                error_code=ErrorMessages.BAD_REQUEST,
+                status_code=HTTPStatus.BAD_REQUEST
+            )
+
+        try:
+            query = (
+                self.db.query(Cryolock)
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .filter(
+                    Canister.canister_id == canister_id,
+                    Cryolock.cryolock_number == cryolock_number
+                )
+            )
+
+            if branch_id is not None:
+                query = (
+                    query.join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(HospitalBranch.branch_id == branch_id)
+                )
+
+            cryolock = query.first()
+            if not cryolock:
+                raise AppException(
+                    message=f"Cryolock with number '{cryolock_number}' not found in canister {canister_id}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            setattr(cryolock, flag_field, True)
+            cryolock.updated_by = updated_by
+
+            self.db.commit()
+            self.db.refresh(cryolock)
+
+            return CryolockFlagUpdateResponse(
+                success=True,
+                message=f"Updated {flag_field} successfully",
+                cryolock_number=cryolock.cryolock_number or cryolock_number,
+                embryo_transfer=bool(getattr(cryolock, "embryo_transfer", False)),
+                in_transit=bool(getattr(cryolock, "in_transit", False))
+            )
+        except AppException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating cryolock flag {flag_field}: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to update cryolock flag: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
