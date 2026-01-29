@@ -2,11 +2,21 @@
 Quality Tracking Service
 Handles business logic for quality tracking operations including LN2 refill logs
 """
+import io
 import logging
+from datetime import date, datetime
 from typing import List, Optional
 
-from sqlalchemy import desc, func, or_
+import pandas as pd
+from fastapi import Response
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
+
+try:
+    from openpyxl.styles import Alignment, Font, PatternFill
+except ImportError:
+    # openpyxl.styles may not be available in all environments
+    Alignment = Font = PatternFill = None
 
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
@@ -125,6 +135,11 @@ class QualityTrackingService:
                 refilled_by=refill_log_data.refilled_by,
                 description=refill_log_data.description,
                 status=refill_log_data.status,
+                cryoshipper=refill_log_data.cryoshipper,
+                disinfected_shipper_infected_tank_description=refill_log_data.disinfected_shipper_infected_tank_description,
+                reservoir=refill_log_data.reservoir,
+                ln2_ordered_date=refill_log_data.ln2_ordered_date,
+                ln2_received_date=refill_log_data.ln2_received_date,
                 created_by=created_by,
                 branch_id=branch_id,
                 refilled_count=last_refilled_count + 1,
@@ -653,6 +668,195 @@ class QualityTrackingService:
             logger.error(f"Error updating cryolock color: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to update cryolock color: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+
+    def export_monthly_refill_logs_excel(
+        self,
+        canister_id: int,
+        year: int,
+        month: int,
+        branch_id: Optional[int] = None
+    ) -> Response:
+        """
+        Export monthly refill logs to Excel format.
+        
+        Args:
+            canister_id: Canister ID to export logs for
+            year: Year for the monthly report (e.g., 2024)
+            month: Month for the monthly report (1-12)
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            FastAPI Response with Excel file
+            
+        Raises:
+            AppException: If export fails or canister not found
+        """
+        try:
+            # Get canister information
+            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
+            if not canister:
+                raise AppException(
+                    message=f"Canister with ID {canister_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            canister_number = canister.canister_number or f"Canister-{canister_id}"
+            
+            # Calculate date range for the month
+            start_date = date(year, month, 1)
+            # Get last day of month
+            if month == 12:
+                end_date = date(year + 1, 1, 1)
+            else:
+                end_date = date(year, month + 1, 1)
+            
+            # Query refill logs for the specified month
+            query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.refill_date >= start_date,
+                    CanisterLn2Log.refill_date < end_date
+                )
+            )
+            
+            # Apply branch filter if provided
+            if branch_id is not None:
+                query = query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            # Order by date and time
+            query = query.order_by(
+                CanisterLn2Log.refill_date,
+                CanisterLn2Log.refill_time
+            )
+            
+            refill_logs = query.all()
+            
+            if not refill_logs:
+                raise AppException(
+                    message=f"No refill logs found for canister {canister_number} in {year}-{month:02d}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Prepare data for Excel - matching the table columns from the UI
+            excel_data = []
+            for log in refill_logs:
+                excel_data.append({
+                    "Container ID": canister_number,
+                    "Refill Date": log.refill_date.strftime("%Y-%m-%d") if log.refill_date else "",
+                    "Refill Time": log.refill_time.strftime("%H:%M:%S") if log.refill_time else "",
+                    "Cryoshipper": log.cryoshipper or "",
+                    "Disinfected Shipper/Infected Tank Description": log.disinfected_shipper_infected_tank_description or "",
+                    "Reservoir": log.reservoir or "",
+                    "LN2 Ordered Date": log.ln2_ordered_date.strftime("%Y-%m-%d") if log.ln2_ordered_date else "",
+                    "LN2 Received Date": log.ln2_received_date.strftime("%Y-%m-%d") if log.ln2_received_date else "",
+                    "Description": log.description or "",
+                    "Refilled By": log.refilled_by or "",
+                    "Status": log.status.value if log.status else ""
+                })
+            
+            # Create DataFrame
+            df = pd.DataFrame(excel_data)
+            
+            # Create Excel file in memory
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # Write metadata at the top
+                metadata_df = pd.DataFrame({
+                    "Field": ["Canister/Container ID", "Date"],
+                    "Value": [canister_number, f"{year}-{month:02d}"]
+                })
+                
+                # Write metadata to first rows
+                metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=0)
+                
+                # Write data starting from row 4 (after metadata and header)
+                df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=3)
+                
+                # Get workbook and worksheet for formatting
+                workbook = writer.book
+                worksheet = writer.sheets['Refill Logs']
+                
+                # Format metadata section with brand colors
+                if Font and PatternFill and Alignment:
+                    # Brand colors: #6B1176 (purple), #FDF4FF (light purple background)
+                    brand_purple = "6B1176"  # Primary brand purple
+                    brand_purple_light = "FDF4FF"  # Light purple background
+                    
+                    # Style metadata header (row 1) - light purple background with purple text
+                    metadata_header_fill = PatternFill(start_color=brand_purple_light, end_color=brand_purple_light, fill_type="solid")
+                    metadata_header_font = Font(bold=True, color=brand_purple, size=11)
+                    
+                    for cell in worksheet[1]:
+                        cell.fill = metadata_header_fill
+                        cell.font = metadata_header_font
+                        cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    # Style metadata values (row 2) - bold purple text
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                    for cell in worksheet[2]:
+                        cell.font = metadata_value_font
+                        cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    # Style data header (row 4) - purple background with white text
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    for cell in worksheet[4]:
+                        cell.fill = data_header_fill
+                        cell.font = data_header_font
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                else:
+                    # If openpyxl.styles is not available, skip formatting
+                    logger.warning("openpyxl.styles not available, skipping Excel formatting")
+                
+                # Auto-adjust column widths
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            output.seek(0)
+            excel_content = output.read()
+            output.close()
+            
+            # Generate filename
+            filename = f"refill_logs_{canister_number}_{year}_{month:02d}.xlsx"
+            
+            # Create response
+            response = Response(
+                content=excel_content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
+            
+            logger.info(
+                f"Exported {len(refill_logs)} refill logs for canister {canister_number} ({year}-{month:02d})"
+            )
+            
+            return response
+            
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error exporting monthly refill logs: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to export refill logs: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )

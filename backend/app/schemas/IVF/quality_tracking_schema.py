@@ -17,6 +17,11 @@ class RefillLogBase(BaseModel):
     refilled_by: str = Field(..., description="Name of person who performed the refill")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
+    cryoshipper: Optional[str] = Field(None, description="Cryoshipper information")
+    disinfected_shipper_infected_tank_description: Optional[str] = Field(None, description="Description of disinfected shipper/infected tank")
+    reservoir: Optional[str] = Field(None, description="Reservoir name")
+    ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
+    ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
 
 
 class RefillLogCreate(BaseModel):
@@ -26,6 +31,11 @@ class RefillLogCreate(BaseModel):
     refilled_by: str = Field(..., description="Name of person who performed the refill")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
+    cryoshipper: Optional[str] = Field(None, description="Cryoshipper information")
+    disinfected_shipper_infected_tank_description: Optional[str] = Field(None, description="Description of disinfected shipper/infected tank")
+    reservoir: Optional[str] = Field(None, description="Reservoir name")
+    ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
+    ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
 
 
 class RefillLogStatusUpdate(BaseModel):

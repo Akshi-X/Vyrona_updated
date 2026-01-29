@@ -3,7 +3,7 @@ Quality Tracking Controller
 Handles HTTP requests for quality tracking operations including LN2 refill logs
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Response
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -346,4 +346,45 @@ def mark_in_transit(
         )
     except Exception as e:
         logger.error(f"Error in mark_in_transit endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/canisters/{canister_number}/refill-logs/export-excel")
+def export_monthly_refill_logs_excel(
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    year: int = Query(..., ge=2000, le=2100, description="Year for the monthly report (e.g., 2024)"),
+    month: int = Query(..., ge=1, le=12, description="Month for the monthly report (1-12)"),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export monthly refill logs to Excel format.
+    
+    Returns an Excel file with:
+    - Metadata at the top: Canister/Container ID and Date (year-month)
+    - Refill log data with all columns
+    
+    Query Parameters:
+    - year: Year for the monthly report (e.g., 2024)
+    - month: Month for the monthly report (1-12)
+    
+    Example:
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024&month=3
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.export_monthly_refill_logs_excel(
+            canister_id=canister_id,
+            year=year,
+            month=month,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in export_monthly_refill_logs_excel endpoint: {str(e)}", exc_info=True)
         raise
