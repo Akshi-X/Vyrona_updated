@@ -74,13 +74,13 @@ export default function IVFTrackShipmentPage() {
                         </div>
                         {/* Right Column: Container Data */}
                         <div>
-                            <ContainerDataTable canisterId={patientId} />
+                            <ContainerDataTable canisterNumber={patientId} />
                         </div>
                     </div>
 
                     {/* Row 2: Refill Log (full width) */}
                     <div>
-                        <RefillLogTable canisterId={patientId} />
+                        <RefillLogTable canisterNumber={patientId} />
                     </div>
 
                     {/* Row 3: Risk Factor (left) | Risk Graph (right) */}
