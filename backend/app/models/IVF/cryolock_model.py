@@ -18,6 +18,7 @@ class Cryolock(Base):
     # Cryolock Information
     cryolock_number = Column(String(255), nullable=True)
     cryolock_color = Column(String(255), nullable=True)
+    goblet_color = Column(String(255), nullable=True)
     
     # Relationships
     cane = relationship("Cane", back_populates="cryolocks")
