@@ -12,7 +12,7 @@ import backButton from '../../assets/backButton.svg';
 import { userService } from '../../services/userService';
 
 export default function IVFTrackShipmentPage() {
-    const { patientId } = useParams<{ patientId: string }>();
+    const { canisterId } = useParams<{ canisterId: string }>();
     const { logout } = useAuth();
     const navigate = useNavigate();
     const [userInitials, setUserInitials] = useState<string>('U');
@@ -62,7 +62,7 @@ export default function IVFTrackShipmentPage() {
                         >
                             <img src={backButton} alt="" className="w-4 h-4" />
                         </button>
-                        <span>Container ID: {patientId || 'Canister 1'}</span>
+                        <span>Container ID: {canisterId || 'Canister 1'}</span>
                     </div>
                     {/* <ContainerProcessFlow /> */}
                     {/* Row 1: Quality Tracking + Quality Parameter (left) | Container Data (right) */}
@@ -74,13 +74,13 @@ export default function IVFTrackShipmentPage() {
                         </div>
                         {/* Right Column: Container Data */}
                         <div>
-                            <ContainerDataTable canisterNumber={patientId} />
+                            <ContainerDataTable canisterNumber={canisterId} />
                         </div>
                     </div>
 
                     {/* Row 2: Refill Log (full width) */}
                     <div>
-                        <RefillLogTable canisterNumber={patientId} />
+                        <RefillLogTable canisterNumber={canisterId} />
                     </div>
 
                     {/* Row 3: Risk Factor (left) | Risk Graph (right) */}
