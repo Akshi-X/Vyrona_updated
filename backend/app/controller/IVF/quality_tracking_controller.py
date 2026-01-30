@@ -3,7 +3,7 @@ Quality Tracking Controller
 Handles HTTP requests for quality tracking operations including LN2 refill logs
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Response
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -19,7 +19,9 @@ from app.schemas.IVF.quality_tracking_schema import (
     IVFCanisterTrackingResponse,
     GobletColorUpdate,
     CryolockColorUpdate,
-    ColorUpdateResponse
+    ColorUpdateResponse,
+    CryolockFlagUpdate,
+    CryolockFlagUpdateResponse
 )
 from app.constants.enums import TaskStatus
 from app.utils.ivf_helpers import get_branch_filter_info
@@ -279,3 +281,198 @@ def update_cryolock_color(
         raise
 
 
+@router.patch("/canisters/{canister_number}/embryo-transfer", response_model=CryolockFlagUpdateResponse)
+def mark_embryo_transfer(
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    flag_update: CryolockFlagUpdate = ...,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a cryolock as moved to embryo transfer (embryo_transfer=true).
+
+    Request Body:
+    {
+        \"cryolock_number\": \"T1/C1/A11/2\"
+    }
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.mark_embryo_transfer(
+            canister_id=canister_id,
+            flag_update=flag_update,
+            updated_by=current_user.email if current_user else None,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in mark_embryo_transfer endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.patch("/canisters/{canister_number}/in-transit", response_model=CryolockFlagUpdateResponse)
+def mark_in_transit(
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    flag_update: CryolockFlagUpdate = ...,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a cryolock as moved to transit (in_transit=true).
+
+    Request Body:
+    {
+        \"cryolock_number\": \"T1/C1/A11/2\"
+    }
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.mark_in_transit(
+            canister_id=canister_id,
+            flag_update=flag_update,
+            updated_by=current_user.email if current_user else None,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in mark_in_transit endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/canisters/{canister_number}/refill-logs/export-excel")
+def export_monthly_refill_logs_excel(
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export monthly refill logs to Excel format.
+    
+    Returns an Excel file with:
+    - Metadata at the top: Canister/Container ID and Date (year-month)
+    - Refill log data with all columns
+    
+    Query Parameters:
+    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    
+    Example:
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024&month=3
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        canister_id = quality_tracking_service.resolve_canister_id(
+            canister_number=canister_number,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.export_monthly_refill_logs_excel(
+            canister_id=canister_id,
+            year=year,
+            month=month,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in export_monthly_refill_logs_excel endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/kpi-thresholds/export-csv")
+def export_kpi_threshold_monthly_csv(
+    canister_number: str = Query(..., description="Canister number to filter by (e.g., 'C1') - required"),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export KPI threshold data as monthly CSV log for a specific canister.
+    
+    Returns a CSV file with:
+    - Date and Time of readings
+    - Canister information
+    - KPI values (Temperature, Humidity, Agitation, Light)
+    - Threshold targets and ranges
+    - Threshold violation status
+    - Quality loss percentage
+    
+    Query Parameters:
+    - canister_number: Canister number to filter by (e.g., 'C1') - required
+    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    
+    Example:
+    GET /api/quality-tracking/kpi-thresholds/export-csv?canister_number=C1
+    GET /api/quality-tracking/kpi-thresholds/export-csv?canister_number=C1&year=2024&month=3
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.export_kpi_threshold_monthly_csv(
+            canister_number=canister_number,
+            year=year,
+            month=month,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in export_kpi_threshold_monthly_csv endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/telemetry-data/export-csv")
+def export_telemetry_data_monthly_csv(
+    canister_number: str = Query(..., description="Canister number to filter by (e.g., 'C1') - required"),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export IVF telemetry data as monthly CSV log for a specific canister.
+    
+    Returns a CSV file with:
+    - Telemetry record ID and timestamps
+    - Canister information
+    - Device ID
+    - Temperature, Humidity, Shock/Agitation, Light values
+    - Location data (Latitude, Longitude)
+    - Battery and connectivity information
+    - Raw telemetry data (JSON)
+    
+    Query Parameters:
+    - canister_number: Canister number to filter by (e.g., 'C1') - required
+    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    
+    Example:
+    GET /api/quality-tracking/telemetry-data/export-csv?canister_number=C1
+    GET /api/quality-tracking/telemetry-data/export-csv?canister_number=C1&year=2024&month=3
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.export_telemetry_data_monthly_csv(
+            canister_number=canister_number,
+            year=year,
+            month=month,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in export_telemetry_data_monthly_csv endpoint: {str(e)}", exc_info=True)
+        raise

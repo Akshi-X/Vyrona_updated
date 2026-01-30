@@ -17,6 +17,11 @@ class RefillLogBase(BaseModel):
     refilled_by: str = Field(..., description="Name of person who performed the refill")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
+    cryoshipper: Optional[str] = Field(None, description="Cryoshipper information")
+    disinfected_shipper_infected_tank_description: Optional[str] = Field(None, description="Description of disinfected shipper/infected tank")
+    reservoir: Optional[str] = Field(None, description="Reservoir name")
+    ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
+    ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
 
 
 class RefillLogCreate(BaseModel):
@@ -26,6 +31,11 @@ class RefillLogCreate(BaseModel):
     refilled_by: str = Field(..., description="Name of person who performed the refill")
     description: Optional[str] = Field(None, description="Description or notes about the refill")
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Status of the refill log")
+    cryoshipper: Optional[str] = Field(None, description="Cryoshipper information")
+    disinfected_shipper_infected_tank_description: Optional[str] = Field(None, description="Description of disinfected shipper/infected tank")
+    reservoir: Optional[str] = Field(None, description="Reservoir name")
+    ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
+    ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
 
 
 class RefillLogStatusUpdate(BaseModel):
@@ -60,13 +70,32 @@ class IVFCanisterTrackingItem(BaseModel):
     goblet_color: str = Field(..., description="Goblet color")
     cryolock_color: str = Field(..., description="Cryolock color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
-    move_to: bool = Field(default=True, description="Indicates if item can be moved (UI action)")
+    embryo_transfer: bool = Field(default=False, description="Whether the cryolock has been moved to embryo transfer")
+    in_transit: bool = Field(default=False, description="Whether the cryolock has been moved to transit")
 
 
 class IVFCanisterTrackingResponse(BaseModel):
     """Response for canister tracking details"""
     data: List[IVFCanisterTrackingItem] = Field(default_factory=list, description="Tracking rows")
-    total: int = Field(..., description="Total number of rows")
+    total: int = Field(..., description="Total number of cryolocks (total slots)")
+    available_slots: int = Field(..., description="Available slots = total - moved (embryo_transfer/in_transit/embryo_grading set)")
+
+
+class CryolockFlagUpdate(BaseModel):
+    """Schema for updating cryolock flags (embryo_transfer / in_transit)"""
+    cryolock_number: str = Field(
+        ...,
+        description="Cryolock number from tracking details response"
+    )
+
+
+class CryolockFlagUpdateResponse(BaseModel):
+    """Response for cryolock flag update operations"""
+    success: bool = Field(..., description="Whether the update was successful")
+    message: str = Field(..., description="Success message")
+    cryolock_number: str = Field(..., description="Cryolock number that was updated")
+    embryo_transfer: bool = Field(..., description="Updated embryo_transfer flag value")
+    in_transit: bool = Field(..., description="Updated in_transit flag value")
 
 
 class GobletColorUpdate(BaseModel):
