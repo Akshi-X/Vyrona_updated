@@ -48,6 +48,25 @@ export interface AvgQualityLossPerContainerResponse {
   status: string;
 }
 
+export interface RefillLogItem {
+  canister_id: number;
+  refill_date: string;
+  refill_time: string;
+  refilled_by: string;
+  description: string;
+  status: string;
+  log_id: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string | null;
+}
+
+export interface RefillLogsResponse {
+  refill_logs: RefillLogItem[];
+  count: number;
+}
+
 // Internal type for raw API response (snake_case)
 interface RawEmbryoTrackingApiItem {
   his_number: string;
@@ -166,9 +185,9 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async getCanisterTrackingDetails(canisterId: string | number): Promise<EmbryoTrackingApiResponse> {
+  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse> {
     const response = await this.request<RawCanisterTrackingApiResponse>(
-      `/api/quality-tracking/canisters/${canisterId}/tracking-details`,
+      `/api/quality-tracking/canisters/${canisterNumber}/tracking-details`,
       { method: 'GET' }
     );
     return {
@@ -177,21 +196,28 @@ export class IvfService extends BaseApiService {
     };
   }
 
+  async getCanisterRefillLogs(canisterNumber: string | number): Promise<RefillLogsResponse> {
+    return await this.request<RefillLogsResponse>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      { method: 'GET' }
+    );
+  }
+
   /**
-   * Update goblet color for a specific cane within a canister
-   * @param canisterId - The canister ID
-   * @param caneIdentifier - The cane identifier string (e.g., "Cane-A 12", "Cane-5", or just "5")
+   * Update goblet color for a specific cryolock within a canister
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
    * @param gobletColor - The goblet color value to set (e.g., "Yellow", "Red", "Blue")
    */
   async updateGobletColor(
-    canisterId: string | number,
-    caneIdentifier: string,
+    canisterNumber: string | number,
+    cryolockNumber: string,
     gobletColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/canisters/${canisterId}/goblet-color`,
+      `/api/quality-tracking/canisters/${canisterNumber}/goblet-color`,
       {
-        cane_identifier: caneIdentifier, // Cane identifier string, not an ID
+        cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         goblet_color: gobletColor,
       }
     );
@@ -199,21 +225,61 @@ export class IvfService extends BaseApiService {
 
   /**
    * Update cryolock color for a specific cryolock within a canister
-   * @param canisterId - The canister ID
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
    * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
    * @param cryolockColor - The cryolock color value to set (e.g., "Yellow", "Red", "Blue")
    */
   async updateCryolockColor(
-    canisterId: string | number,
+    canisterNumber: string | number,
     cryolockNumber: string,
     cryolockColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/canisters/${canisterId}/cryolock-color`,
+      `/api/quality-tracking/canisters/${canisterNumber}/cryolock-color`,
       {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         cryolock_color: cryolockColor,
       }
+    );
+  }
+
+  /**
+   * Update refill log status for a specific log
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param logId - The refill log ID
+   * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
+   */
+  async updateRefillLogStatus(
+    canisterNumber: string | number,
+    logId: number,
+    status: string
+  ): Promise<RefillLogItem> {
+    return await this.patch<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs/${logId}/status`,
+      {
+        status: status,
+      }
+    );
+  }
+
+  /**
+   * Create a new refill log for a canister
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param refillLogData - The refill log data
+   */
+  async createRefillLog(
+    canisterNumber: string | number,
+    refillLogData: {
+      refill_date: string;
+      refill_time: string;
+      refilled_by: string;
+      description: string;
+      status: string;
+    }
+  ): Promise<RefillLogItem> {
+    return await this.post<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      refillLogData
     );
   }
 }
