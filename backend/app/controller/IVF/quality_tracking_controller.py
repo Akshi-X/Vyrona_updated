@@ -352,26 +352,27 @@ def mark_in_transit(
 @router.get("/canisters/{canister_number}/refill-logs/export-excel")
 def export_monthly_refill_logs_excel(
     canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
-    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Export monthly refill logs to Excel format.
+    Export refill logs to Excel format.
     
     Returns an Excel file with:
-    - Metadata at the top: Canister/Container ID and Date (year-month)
+    - Metadata at the top: Container ID, Year/Month-Year, and Current Year Total
     - Refill log data with all columns
     
     Query Parameters:
-    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
-    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
     
     Example:
-    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel
-    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024&month=3
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel (exports current year)
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024 (exports year 2024)
+    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024&month=3 (exports March 2024)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
@@ -391,19 +392,20 @@ def export_monthly_refill_logs_excel(
         raise
 
 
-@router.get("/kpi-thresholds/export-csv")
-def export_kpi_threshold_monthly_csv(
+@router.get("/kpi-thresholds/export-excel")
+def export_kpi_threshold_monthly_excel(
     canister_number: str = Query(..., description="Canister number to filter by (e.g., 'C1') - required"),
-    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, uses current month."),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Export KPI threshold data as monthly CSV log for a specific canister.
+    Export KPI threshold deviation data as Excel format for a specific canister.
     
-    Returns a CSV file with:
+    Returns an Excel file with:
+    - Metadata at the top: Container ID, Year/Month-Year, and Total Deviations
     - Date and Time of readings
     - Canister information
     - KPI values (Temperature, Humidity, Agitation, Light)
@@ -413,66 +415,66 @@ def export_kpi_threshold_monthly_csv(
     
     Query Parameters:
     - canister_number: Canister number to filter by (e.g., 'C1') - required
-    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
-    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
     
     Example:
-    GET /api/quality-tracking/kpi-thresholds/export-csv?canister_number=C1
-    GET /api/quality-tracking/kpi-thresholds/export-csv?canister_number=C1&year=2024&month=3
+    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1 (exports current year)
+    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1&year=2024 (exports year 2024)
+    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1&year=2024&month=3 (exports March 2024)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        return quality_tracking_service.export_kpi_threshold_monthly_csv(
+        return quality_tracking_service.export_kpi_threshold_monthly_excel(
             canister_number=canister_number,
             year=year,
             month=month,
             branch_id=branch_id
         )
     except Exception as e:
-        logger.error(f"Error in export_kpi_threshold_monthly_csv endpoint: {str(e)}", exc_info=True)
+        logger.error(f"Error in export_kpi_threshold_monthly_excel endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.get("/telemetry-data/export-csv")
-def export_telemetry_data_monthly_csv(
-    canister_number: str = Query(..., description="Canister number to filter by (e.g., 'C1') - required"),
-    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the monthly report (e.g., 2024). If not provided, uses current year."),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the monthly report (1-12). If not provided, uses current month."),
+@router.get("/canisters/{canister_number}/combined-report/export-excel")
+def export_combined_refill_logs_and_deviations_excel(
+    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Export IVF telemetry data as monthly CSV log for a specific canister.
+    Export combined refill logs and KPI threshold deviations to Excel format with two sheets.
     
-    Returns a CSV file with:
-    - Telemetry record ID and timestamps
-    - Canister information
-    - Device ID
-    - Temperature, Humidity, Shock/Agitation, Light values
-    - Location data (Latitude, Longitude)
-    - Battery and connectivity information
-    - Raw telemetry data (JSON)
+    Returns an Excel file with two sheets:
+    - Sheet 1: Refill Logs - Contains refill log data with metadata
+    - Sheet 2: KPI Threshold Deviations - Contains deviation data with metadata
     
     Query Parameters:
-    - canister_number: Canister number to filter by (e.g., 'C1') - required
-    - year: Year for the monthly report (e.g., 2024). Optional - defaults to current year.
-    - month: Month for the monthly report (1-12). Optional - defaults to current month.
+    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
     
     Example:
-    GET /api/quality-tracking/telemetry-data/export-csv?canister_number=C1
-    GET /api/quality-tracking/telemetry-data/export-csv?canister_number=C1&year=2024&month=3
+    GET /api/quality-tracking/canisters/C1/combined-report/export-excel (exports current year)
+    GET /api/quality-tracking/canisters/C1/combined-report/export-excel?year=2024 (exports year 2024)
+    GET /api/quality-tracking/canisters/C1/combined-report/export-excel?year=2024&month=3 (exports March 2024)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        return quality_tracking_service.export_telemetry_data_monthly_csv(
+        canister_id = quality_tracking_service.resolve_canister_id(
             canister_number=canister_number,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.export_combined_refill_logs_and_deviations_excel(
+            canister_id=canister_id,
             year=year,
             month=month,
             branch_id=branch_id
         )
     except Exception as e:
-        logger.error(f"Error in export_telemetry_data_monthly_csv endpoint: {str(e)}", exc_info=True)
+        logger.error(f"Error in export_combined_refill_logs_and_deviations_excel endpoint: {str(e)}", exc_info=True)
         raise
