@@ -2,11 +2,16 @@
 WebSocket Connection Manager
 Manages WebSocket connections for quality monitoring
 """
-from fastapi import WebSocket
-from typing import Dict, Optional
-import uuid
 import logging
+import uuid
 from datetime import datetime
+from typing import Dict, Optional
+
+from fastapi import WebSocket
+
+from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
+from app.models.patient_model import Patient
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +87,6 @@ class ConnectionManager:
         # Handle CGT messages (patient_id)
         if patient_id:
             # Get patient's pharma_id from database
-            from app.models.patient_model import Patient
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
             if not patient:
                 return  # Patient doesn't exist
@@ -114,9 +118,6 @@ class ConnectionManager:
         if canister_id or canister_number:
             # For IVF, validate canister belongs to user's branch
             # Get canister's branch_id from database
-            from app.models.IVF.canister_model import Canister
-            from app.models.IVF.tank_model import Tank
-            
             # If only canister_number is provided, look up canister_id
             if canister_number and not canister_id:
                 # Convert to string (database column is VARCHAR)
