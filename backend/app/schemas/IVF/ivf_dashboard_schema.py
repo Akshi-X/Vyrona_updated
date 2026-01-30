@@ -62,6 +62,17 @@ class DeviationsGraphResponse(BaseModel):
     status: str = Field(default="success", description="Response status")
 
 
+class TotalDeviationsResponse(BaseModel):
+    """Response for total deviations metric"""
+    total_deviations: int = Field(..., description="Total number of deviations (any KPI violation)")
+    temperature_deviations: int = Field(..., description="Count of temperature deviations")
+    humidity_deviations: int = Field(..., description="Count of humidity deviations")
+    agitation_deviations: int = Field(..., description="Count of agitation/vibration deviations")
+    light_deviations: int = Field(..., description="Count of light deviations")
+    last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    status: str = Field(default="success", description="Response status")
+
+
 class IVFDashboardMetricsResponse(BaseModel):
     """Response for all IVF dashboard metrics"""
     total_embryos_cryolocks: Dict = Field(..., description="Total embryos and cryolocks metric")
