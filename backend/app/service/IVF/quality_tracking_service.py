@@ -2,6 +2,7 @@
 Quality Tracking Service
 Handles business logic for quality tracking operations including LN2 refill logs
 """
+import csv
 import io
 import logging
 from datetime import date, datetime
@@ -18,6 +19,7 @@ except ImportError:
     # openpyxl.styles may not be available in all environments
     Alignment = Font = PatternFill = None
 
+from ...constants.app_constants import COMMON_API_HEADERS
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
@@ -27,6 +29,8 @@ from ...models.IVF.canister_model import Canister
 from ...models.IVF.cryolock_model import Cryolock
 from ...models.IVF.embryo_model import Embryo
 from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.ivf_quality_log_model import IVFQualityLog
+from ...models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from ...models.IVF.patient_model import IVFPatient
 from ...models.IVF.tank_model import Tank
 from ...schemas.IVF.quality_tracking_schema import (
@@ -675,8 +679,8 @@ class QualityTrackingService:
     def export_monthly_refill_logs_excel(
         self,
         canister_id: int,
-        year: int,
-        month: int,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
         branch_id: Optional[int] = None
     ) -> Response:
         """
@@ -684,8 +688,8 @@ class QualityTrackingService:
         
         Args:
             canister_id: Canister ID to export logs for
-            year: Year for the monthly report (e.g., 2024)
-            month: Month for the monthly report (1-12)
+            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
+            month: Month for the monthly report (1-12). If not provided, uses current month.
             branch_id: Optional branch ID for filtering
             
         Returns:
@@ -695,6 +699,29 @@ class QualityTrackingService:
             AppException: If export fails or canister not found
         """
         try:
+            # Use current month if year/month not provided
+            current_date = datetime.now()
+            if year is None:
+                year = current_date.year
+            if month is None:
+                month = current_date.month
+            
+            # Validate month
+            if not (1 <= month <= 12):
+                raise AppException(
+                    message="Month must be between 1 and 12",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Validate year
+            if not (2000 <= year <= 2100):
+                raise AppException(
+                    message="Year must be between 2000 and 2100",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
             # Get canister information
             canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
             if not canister:
@@ -857,6 +884,438 @@ class QualityTrackingService:
             logger.error(f"Error exporting monthly refill logs: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to export refill logs: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def export_kpi_threshold_monthly_csv(
+        self,
+        canister_number: str,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch_id: Optional[int] = None
+    ) -> Response:
+        """
+        Export KPI threshold data as monthly CSV log for a specific canister.
+        
+        Args:
+            canister_number: Canister number to filter by (e.g., "C1") - required
+            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
+            month: Month for the monthly report (1-12). If not provided, uses current month.
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            FastAPI Response with CSV file containing KPI threshold data
+            
+        Raises:
+            AppException: If export fails
+        """
+        try:
+            # Validate canister_number is provided
+            if not canister_number or not canister_number.strip():
+                raise AppException(
+                    message="canister_number is required",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Use current month if year/month not provided
+            current_date = datetime.now()
+            if year is None:
+                year = current_date.year
+            if month is None:
+                month = current_date.month
+            
+            # Validate month
+            if not (1 <= month <= 12):
+                raise AppException(
+                    message="Month must be between 1 and 12",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Validate year
+            if not (2000 <= year <= 2100):
+                raise AppException(
+                    message="Year must be between 2000 and 2100",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Resolve canister_id (required)
+            canister_id = self.resolve_canister_id(canister_number, branch_id)
+            
+            # Calculate date range for the month
+            start_datetime = datetime(year, month, 1, 0, 0, 0)
+            if month == 12:
+                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+            else:
+                end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+            
+            # Query IVF quality logs for the specified month and canister
+            query = (
+                self.db.query(
+                    IVFQualityLog,
+                    Canister.canister_number,
+                    HospitalBranch.branch_name
+                )
+                .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(
+                    IVFQualityLog.reading_timestamp >= start_datetime,
+                    IVFQualityLog.reading_timestamp < end_datetime,
+                    IVFQualityLog.canister_id == canister_id,
+                    Canister.is_active == True
+                )
+            )
+            
+            # Apply branch filter if provided
+            if branch_id is not None:
+                query = query.filter(HospitalBranch.branch_id == branch_id)
+            
+            # Order by timestamp
+            query = query.order_by(IVFQualityLog.reading_timestamp)
+            
+            results = query.all()
+            
+            if not results:
+                raise AppException(
+                    message=f"No KPI threshold data found for {year}-{month:02d}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # KPI Threshold Targets (from IVF_PARAMETER_TARGETS)
+            kpi_targets = {
+                "temperature": {"target": 5.0, "min": 0.0, "max": 10.0, "unit": "°C"},
+                "humidity": {"target": 50.0, "min": 45.0, "max": 55.0, "unit": "%"},
+                "agitation": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "G"},
+                "light": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "lux"}
+            }
+            
+            # Prepare CSV data
+            csv_data = []
+            for quality_log, canister_number, branch_name in results:
+                # Determine which parameters violated thresholds
+                violations = []
+                if quality_log.is_temp_loss:
+                    violations.append("Temperature")
+                if quality_log.is_humidity_loss:
+                    violations.append("Humidity")
+                if quality_log.is_agitation_loss:
+                    violations.append("Agitation")
+                if quality_log.is_light_loss:
+                    violations.append("Light")
+                
+                csv_data.append({
+                    "Date": quality_log.reading_timestamp.strftime("%Y-%m-%d") if quality_log.reading_timestamp else "",
+                    "Time": quality_log.reading_timestamp.strftime("%H:%M:%S") if quality_log.reading_timestamp else "",
+                    "Canister Number": canister_number or "",
+                    "Branch Name": branch_name or "",
+                    "Device ID": quality_log.device_id or "",
+                    "Temperature (°C)": f"{quality_log.temperature:.2f}" if quality_log.temperature is not None else "",
+                    "Temperature Target (°C)": f"{kpi_targets['temperature']['target']:.1f}",
+                    "Temperature Min (°C)": f"{kpi_targets['temperature']['min']:.1f}",
+                    "Temperature Max (°C)": f"{kpi_targets['temperature']['max']:.1f}",
+                    "Temperature Violation": "Yes" if quality_log.is_temp_loss else "No",
+                    "Humidity (%)": f"{quality_log.humidity:.2f}" if quality_log.humidity is not None else "",
+                    "Humidity Target (%)": f"{kpi_targets['humidity']['target']:.1f}",
+                    "Humidity Min (%)": f"{kpi_targets['humidity']['min']:.1f}",
+                    "Humidity Max (%)": f"{kpi_targets['humidity']['max']:.1f}",
+                    "Humidity Violation": "Yes" if quality_log.is_humidity_loss else "No",
+                    "Agitation (G)": f"{quality_log.agitation:.2f}" if quality_log.agitation is not None else "",
+                    "Agitation Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
+                    "Agitation Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
+                    "Agitation Max (G)": f"{kpi_targets['agitation']['max']:.1f}",
+                    "Agitation Violation": "Yes" if quality_log.is_agitation_loss else "No",
+                    "Light (lux)": f"{quality_log.light:.2f}" if quality_log.light is not None else "",
+                    "Light Target (lux)": f"{kpi_targets['light']['target']:.1f}",
+                    "Light Min (lux)": f"{kpi_targets['light']['min']:.1f}",
+                    "Light Max (lux)": f"{kpi_targets['light']['max']:.1f}",
+                    "Light Violation": "Yes" if quality_log.is_light_loss else "No",
+                    "Quality Loss (%)": f"{quality_log.quality_loss:.2f}" if quality_log.quality_loss is not None else "",
+                    "Violated Parameters": ", ".join(violations) if violations else "None"
+                })
+            
+            # Create CSV in memory
+            buffer = io.StringIO()
+            
+            try:
+                if csv_data:
+                    fieldnames = list(csv_data[0].keys())
+                    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(csv_data)
+                
+                csv_text = buffer.getvalue()
+            except Exception as exc:
+                logger.error(
+                    f"CSV export generation failed for KPI thresholds {year}-{month:02d}: {exc}",
+                    exc_info=True
+                )
+                raise AppException(
+                    message=f"Failed to generate CSV export: {str(exc)}",
+                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+            finally:
+                buffer.close()
+            
+            # Encode CSV content
+            csv_content = csv_text.encode("utf-8")
+            
+            # Generate filename
+            filename = f"kpi_threshold_{canister_number}_{year}_{month:02d}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+            
+            # Create response
+            response = Response(content=csv_content, media_type="text/csv")
+            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+            for header, value in COMMON_API_HEADERS.items():
+                response.headers.setdefault(header, value)
+            
+            logger.info(
+                f"Exported {len(csv_data)} KPI threshold records for {year}-{month:02d}"
+            )
+            
+            return response
+            
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error exporting KPI threshold monthly CSV: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to export KPI threshold data: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def export_telemetry_data_monthly_csv(
+        self,
+        canister_number: str,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch_id: Optional[int] = None
+    ) -> Response:
+        """
+        Export IVF telemetry data as monthly CSV log for a specific canister.
+        
+        Args:
+            canister_number: Canister number to filter by (e.g., "C1") - required
+            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
+            month: Month for the monthly report (1-12). If not provided, uses current month.
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            FastAPI Response with CSV file containing telemetry data
+            
+        Raises:
+            AppException: If export fails
+        """
+        try:
+            # Validate canister_number is provided
+            if not canister_number or not canister_number.strip():
+                raise AppException(
+                    message="canister_number is required",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Use current month if year/month not provided
+            current_date = datetime.now()
+            if year is None:
+                year = current_date.year
+            if month is None:
+                month = current_date.month
+            
+            # Validate month
+            if not (1 <= month <= 12):
+                raise AppException(
+                    message="Month must be between 1 and 12",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Validate year
+            if not (2000 <= year <= 2100):
+                raise AppException(
+                    message="Year must be between 2000 and 2100",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Resolve canister_id (required)
+            canister_id = self.resolve_canister_id(canister_number, branch_id)
+            
+            # Calculate date range for the month
+            start_datetime = datetime(year, month, 1, 0, 0, 0)
+            if month == 12:
+                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+            else:
+                end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+            
+            # Query IVF telemetry data for the specified month and canister
+            query = (
+                self.db.query(
+                    IVFTelemetryData,
+                    Canister.canister_number,
+                    HospitalBranch.branch_name
+                )
+                .join(Canister, IVFTelemetryData.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(
+                    IVFTelemetryData.created_at >= start_datetime,
+                    IVFTelemetryData.created_at < end_datetime,
+                    IVFTelemetryData.canister_id == canister_id,
+                    Canister.is_active == True
+                )
+            )
+            
+            # Apply branch filter if provided
+            if branch_id is not None:
+                query = query.filter(HospitalBranch.branch_id == branch_id)
+            
+            # Order by created_at
+            query = query.order_by(IVFTelemetryData.created_at)
+            
+            results = query.all()
+            
+            if not results:
+                raise AppException(
+                    message=f"No telemetry data found for {year}-{month:02d}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Prepare CSV data
+            csv_data = []
+            for telemetry_record, canister_number, branch_name in results:
+                # Extract data from JSONB telemetry_data field
+                telemetry_json = telemetry_record.telemetry_data or {}
+                
+                # Extract temperature
+                temperature_value = None
+                temperature_unit = None
+                if "Temperature" in telemetry_json and telemetry_json["Temperature"]:
+                    temp_obj = telemetry_json["Temperature"]
+                    temperature_value = temp_obj.get("Celsius") or temp_obj.get("Value")
+                    temperature_unit = temp_obj.get("Unit", "")
+                
+                # Extract humidity
+                humidity_value = None
+                humidity_unit = None
+                if "Humidity" in telemetry_json and telemetry_json["Humidity"]:
+                    humidity_obj = telemetry_json["Humidity"]
+                    humidity_value = humidity_obj.get("Percentage") or humidity_obj.get("Value")
+                    humidity_unit = humidity_obj.get("Unit", "")
+                
+                # Extract shock/agitation
+                shock_value = None
+                if "Shock" in telemetry_json and telemetry_json["Shock"]:
+                    shock_value = telemetry_json["Shock"].get("G") or telemetry_json["Shock"].get("Value")
+                elif "Vibration" in telemetry_json and telemetry_json["Vibration"]:
+                    shock_value = telemetry_json["Vibration"].get("Value")
+                elif "Agitation" in telemetry_json and telemetry_json["Agitation"]:
+                    shock_value = telemetry_json["Agitation"].get("Value")
+                
+                # Extract light
+                light_value = None
+                if "Light" in telemetry_json and telemetry_json["Light"]:
+                    light_obj = telemetry_json["Light"]
+                    light_value = light_obj.get("Lux") or light_obj.get("Value")
+                
+                # Extract location
+                latitude = None
+                longitude = None
+                if "Location" in telemetry_json and telemetry_json["Location"]:
+                    location_obj = telemetry_json["Location"]
+                    latitude = location_obj.get("Latitude") or location_obj.get("latitude")
+                    longitude = location_obj.get("Longitude") or location_obj.get("longitude")
+                
+                # Extract timestamp from telemetry data
+                telemetry_timestamp = telemetry_json.get("Timestamp") or telemetry_json.get("timestamp")
+                
+                # Extract device ID from telemetry data (fallback to column value)
+                device_id = telemetry_json.get("DeviceId") or telemetry_json.get("device_id") or telemetry_record.device_id
+                
+                # Extract battery and connectivity info if available
+                battery_level = telemetry_json.get("BatteryLevel") or telemetry_json.get("battery_level")
+                is_charging = telemetry_json.get("IsCharging") or telemetry_json.get("is_charging")
+                connected_status = telemetry_json.get("Connected") or telemetry_json.get("connected")
+                signal_strength = telemetry_json.get("SignalStrength") or telemetry_json.get("signal_strength")
+                
+                csv_data.append({
+                    "ID": telemetry_record.id,
+                    "Created At": telemetry_record.created_at.strftime("%Y-%m-%d %H:%M:%S") if telemetry_record.created_at else "",
+                    "Telemetry Timestamp": telemetry_timestamp or "",
+                    "Canister ID": telemetry_record.canister_id,
+                    "Canister Number": canister_number or "",
+                    "Branch Name": branch_name or "",
+                    "Device ID": device_id or "",
+                    "Temperature Value": f"{temperature_value}" if temperature_value is not None else "",
+                    "Temperature Unit": temperature_unit or "",
+                    "Humidity Value": f"{humidity_value}" if humidity_value is not None else "",
+                    "Humidity Unit": humidity_unit or "",
+                    "Shock/Agitation (G)": f"{shock_value}" if shock_value is not None else "",
+                    "Light Value (Lux)": f"{light_value}" if light_value is not None else "",
+                    "Latitude": f"{latitude}" if latitude is not None else "",
+                    "Longitude": f"{longitude}" if longitude is not None else "",
+                    "Battery Level": f"{battery_level}" if battery_level is not None else "",
+                    "Is Charging": f"{is_charging}" if is_charging is not None else "",
+                    "Connected": f"{connected_status}" if connected_status is not None else "",
+                    "Signal Strength": f"{signal_strength}" if signal_strength is not None else "",
+                    "Raw Telemetry Data": str(telemetry_json) if telemetry_json else ""
+                })
+            
+            # Create CSV in memory
+            buffer = io.StringIO()
+            
+            try:
+                if csv_data:
+                    fieldnames = list(csv_data[0].keys())
+                    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(csv_data)
+                
+                csv_text = buffer.getvalue()
+            except Exception as exc:
+                logger.error(
+                    f"CSV export generation failed for telemetry data {year}-{month:02d}: {exc}",
+                    exc_info=True
+                )
+                raise AppException(
+                    message=f"Failed to generate CSV export: {str(exc)}",
+                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+            finally:
+                buffer.close()
+            
+            # Encode CSV content
+            csv_content = csv_text.encode("utf-8")
+            
+            # Generate filename
+            filename = f"telemetry_data_{canister_number}_{year}_{month:02d}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+            
+            # Create response
+            response = Response(content=csv_content, media_type="text/csv")
+            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+            for header, value in COMMON_API_HEADERS.items():
+                response.headers.setdefault(header, value)
+            
+            logger.info(
+                f"Exported {len(csv_data)} telemetry data records for {year}-{month:02d}"
+            )
+            
+            return response
+            
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error exporting telemetry data monthly CSV: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to export telemetry data: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
