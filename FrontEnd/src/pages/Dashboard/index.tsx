@@ -46,8 +46,6 @@ import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations
 import DeviationDriverIcon from '../../assets/DashBoardIcons/DeviationDriver.svg';
 import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.svg';
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
-// Mock data
-import ivfDashboardMock from '../../data/ivfDashboardMock.json';
 import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 
@@ -100,16 +98,6 @@ export default function Dashboard({ }: DashboardProps) {
       return null;
     }
   });
-  // IVF mock data
-  const [ivfData, setIvfData] = useState<any>(() => {
-    try {
-      const dept = localStorage.getItem('department');
-      if (dept?.toUpperCase() === 'IVF') {
-        return ivfDashboardMock;
-      }
-    } catch {}
-    return null;
-  });
 
   // IVF embryo tracking (live API data)
   const [ivfEmbryoTracking, setIvfEmbryoTracking] = useState<IVFTreatment[]>([]);
@@ -146,6 +134,14 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfAvgQualityLossPerContainer, setIvfAvgQualityLossPerContainer] = useState<number | null>(null);
   const [loadingIvfAvgQualityLoss, setLoadingIvfAvgQualityLoss] = useState(false);
   const [ivfAvgQualityLossError, setIvfAvgQualityLossError] = useState<string | null>(null);
+
+  // IVF quality deviation chart data (live API data)
+  const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
+    containers: string[];
+    metrics: Array<{ name: string; color: string; data: number[] }>;
+  } | null>(null);
+  const [loadingIvfQualityDeviationChart, setLoadingIvfQualityDeviationChart] = useState(false);
+  const [ivfQualityDeviationChartError, setIvfQualityDeviationChartError] = useState<string | null>(null);
 
   // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
@@ -269,11 +265,6 @@ export default function Dashboard({ }: DashboardProps) {
         }
         
         setUserDepartment(department);
-        
-        // Load IVF mock data if user is IVF
-        if (department === 'IVF') {
-          setIvfData(ivfDashboardMock);
-        }
       } catch {
         // Try to get department from localStorage even if API fails
         try {
@@ -281,9 +272,6 @@ export default function Dashboard({ }: DashboardProps) {
           if (storedDept) {
             const department = storedDept.toUpperCase();
             setUserDepartment(department);
-            if (department === 'IVF') {
-              setIvfData(ivfDashboardMock);
-            }
           }
         } catch {}
         setUserInitials('U');
@@ -494,6 +482,71 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
+  // Fetch IVF quality deviation chart from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchQualityDeviationChart = async () => {
+      setLoadingIvfQualityDeviationChart(true);
+      setIvfQualityDeviationChartError(null);
+      try {
+        const response = await ivfService.getDeviationsGraph();
+        if (!cancelled && response?.data) {
+          // Transform API response to chart format
+          const containers = response.data.map((item) => item.site_name);
+          
+          // Extract data for each metric
+          const temperatureData = response.data.map((item) => item.temperature);
+          const humidityData = response.data.map((item) => item.humidity);
+          const agitationVibrationData = response.data.map((item) => item.agitation_vibration);
+          const topRiskDriverData = response.data.map((item) => item.top_risk_driver);
+
+          const metrics = [
+            {
+              name: 'Temperature',
+              color: '#C7A0E8',
+              data: temperatureData,
+            },
+            {
+              name: 'Humidity',
+              color: '#C9CBCD',
+              data: humidityData,
+            },
+            {
+              name: 'Agitation / Vibration',
+              color: '#F5A9E1',
+              data: agitationVibrationData,
+            },
+            {
+              name: 'Top risk driver',
+              color: '#85A2DF',
+              data: topRiskDriverData,
+            },
+          ];
+
+          setIvfQualityDeviationChart({
+            containers,
+            metrics,
+          });
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfQualityDeviationChart(null);
+          setIvfQualityDeviationChartError(e?.message || 'Failed to load quality deviation chart');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfQualityDeviationChart(false);
+      }
+    };
+
+    fetchQualityDeviationChart();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
     try {
@@ -685,7 +738,7 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {userDepartment === 'IVF' && ivfData ? (
+          {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
               <div className="flex gap-6 flex-1 flex-col lg:flex-row">
@@ -1040,12 +1093,20 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Quality Deviation Chart - Below Quality Tracking */}
                   <section className="flex-1 h-[347px]">
-                    {ivfData.qualityDeviation && (
+                    {loadingIvfQualityDeviationChart ? (
+                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                        <p className="text-gray-500">Loading quality deviation data...</p>
+                      </div>
+                    ) : ivfQualityDeviationChartError ? (
+                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                        <p className="text-red-500">Error: {ivfQualityDeviationChartError}</p>
+                      </div>
+                    ) : ivfQualityDeviationChart ? (
                       <QualityDeviationChart
-                        timestamps={ivfData.qualityDeviation.timestamps}
-                        metrics={ivfData.qualityDeviation.metrics}
+                        containers={ivfQualityDeviationChart.containers}
+                        metrics={ivfQualityDeviationChart.metrics}
                       />
-                    )}
+                    ) : null}
                   </section>
                 </div>
               </div>

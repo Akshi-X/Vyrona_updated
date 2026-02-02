@@ -43,7 +43,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
 
         {/* Title */}
         <h3 className="text-[18px] font-semibold text-black text-center leading-tight">
-          Do you want to move this container ?
+          Confirm Container Transfer
         </h3>
 
         {/* Description */}
@@ -60,7 +60,7 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
             }}
             className="flex-1 px-4 py-2.5 rounded-md bg-gradient-to-r from-[#9C3AA6] to-[#6B1176] text-white hover:opacity-95 transition-opacity font-medium text-sm"
           >
-            Move to Incubator chamber
+            Embryo Transfer
           </button>
           <button
             onClick={() => {
