@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, field_validator, field_serializer, model_serializer
+from pydantic import BaseModel, field_validator, field_serializer, model_serializer, model_validator
 
 from app.constants.enums import TaskPriority, TaskStatus
 
@@ -15,7 +15,8 @@ class CreateTaskRequest(BaseModel):
     task_name: str
     description: Optional[str] = None
     assignee_id: str
-    patient_id: Optional[str] = None
+    patient_id: Optional[str] = None  # For CGT flow
+    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
     due_date: Optional[datetime] = None
     priority: TaskPriority
     status: Optional[TaskStatus] = TaskStatus.NOT_STARTED
@@ -44,7 +45,8 @@ class UpdateTaskRequest(BaseModel):
     task_name: Optional[str] = None
     description: Optional[str] = None
     assignee_id: Optional[str] = None
-    patient_id: Optional[str] = None
+    patient_id: Optional[str] = None  # For CGT flow
+    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
     due_date: Optional[datetime] = None
     priority: Optional[TaskPriority] = None
     status: Optional[TaskStatus] = None
@@ -68,6 +70,23 @@ class UpdateTaskRequest(BaseModel):
         if v and len(v) > 2000:
             raise ValueError("Description is too long (max 2000 characters)")
         return v.strip() if v else None
+    
+    @model_validator(mode='after')
+    def validate_patient_or_canister(self):
+        """Validate that patient_id and canister_number are not both provided"""
+        # Treat empty strings as None
+        patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
+        canister_number = self.canister_number.strip() if self.canister_number and isinstance(self.canister_number, str) else self.canister_number
+        
+        # If both are provided, raise error
+        if patient_id and canister_number:
+            raise ValueError("Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        
+        # Update the model with cleaned values
+        if patient_id is not None or canister_number is not None:
+            self.patient_id = patient_id if patient_id else None
+            self.canister_number = canister_number if canister_number else None
+        return self
 
 
 class UpdateTaskStatusRequest(BaseModel):
@@ -116,7 +135,8 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     assignee: TaskAssigneeInfo
     created_by: TaskCreatorInfo
-    patient_id: Optional[str]
+    patient_id: Optional[str]  # For CGT flow
+    canister_number: Optional[str]  # For IVF flow (e.g., "C1")
     due_date: Optional[datetime]
     priority: TaskPriority
     status: TaskStatus
@@ -160,9 +180,10 @@ class TaskListResponse(BaseModel):
 
 
 class PatientTaskListResponse(BaseModel):
-    """Response schema for tasks associated with a patient"""
+    """Response schema for tasks associated with a patient or canister"""
     message: str
-    patient_id: str
+    patient_id: Optional[str] = None  # For CGT flow
+    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
     total: int
     page: int
     page_size: int
