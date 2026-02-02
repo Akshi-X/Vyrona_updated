@@ -36,6 +36,13 @@ class CanisterLn2Log(Base):
     status = Column(SQLEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj], name="refill_status"), 
                    nullable=True, index=True, comment="Status of the refill log (Done, In progress, Not started)")
     
+    # Additional refill log fields
+    cryoshipper = Column(String(255), nullable=True, comment="Cryoshipper information")
+    disinfected_shipper_infected_tank_description = Column(Text, nullable=True, comment="Description of disinfected shipper/infected tank")
+    reservoir = Column(String(255), nullable=True, comment="Reservoir name")
+    ln2_ordered_date = Column(Date, nullable=True, comment="Date when LN2 was ordered")
+    ln2_received_date = Column(Date, nullable=True, comment="Date when LN2 was received")
+    
     # Relationships
     canister = relationship("Canister", back_populates="ln2_logs")
     
