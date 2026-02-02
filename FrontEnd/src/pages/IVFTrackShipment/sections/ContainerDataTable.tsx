@@ -162,7 +162,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   }, []);
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[805px] flex flex-col">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] w-[980px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[16px]">Container Data</h3>
         {saveError && (

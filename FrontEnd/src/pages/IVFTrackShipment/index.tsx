@@ -4,8 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
-import RiskFactorTable from './sections/RiskFactorTable';
-import RiskGraph from './sections/RiskGraph';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
 import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
 import backButton from '../../assets/backButton.svg';
@@ -70,24 +68,19 @@ export default function IVFTrackShipmentPage() {
                         {/* Left Column: Stacked Quality Tracking and Quality Parameter */}
                         <div className="flex flex-col gap-6">
                             <IVFQualityTrackingChart />
-                            <IVFQualityParametersTable />
+                            <ContainerDataTable canisterNumber={canisterId} />
                         </div>
                         {/* Right Column: Container Data */}
                         <div>
-                            <ContainerDataTable canisterNumber={canisterId} />
+                            <IVFQualityParametersTable />
                         </div>
                     </div>
 
-                    {/* Row 2: Refill Log (full width) */}
+                    {/* Row 3: Refill Log (full width) */}
                     <div>
                         <RefillLogTable canisterNumber={canisterId} />
                     </div>
 
-                    {/* Row 3: Risk Factor (left) | Risk Graph (right) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <RiskFactorTable />
-                        <RiskGraph />
-                    </div>
                 </div>
             </main>
         </div>

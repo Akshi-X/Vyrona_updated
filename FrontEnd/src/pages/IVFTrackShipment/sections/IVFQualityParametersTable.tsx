@@ -114,7 +114,7 @@ export function IVFQualityParametersTable() {
   };
 
   return (
-    <div className="rounded-[5px] border border-gray-200 h-[320px] bg-white p-4">
+    <div className="rounded-[5px] border border-gray-200 h-[460px] bg-white p-4">
       <div className="mb-3">
         <h3 className="text-base font-semibold text-gray-900 text-[16px] mb-2">Quality Parameter</h3>
         <div className="flex items-center justify-between">
