@@ -14,7 +14,8 @@ from app.schemas.IVF.ivf_dashboard_schema import (
     QualityDeviationsFlaggedResponse,
     TopDeviationDriverResponse,
     OutboundShipmentsResponse,
-    DeviationsGraphResponse
+    DeviationsGraphResponse,
+    TotalDeviationsResponse
 )
 
 router = APIRouter(prefix="/ivf/dashboard", tags=["IVF Dashboard"])
@@ -246,3 +247,33 @@ def get_deviations_graph(
         return DeviationsGraphResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting deviations graph: {str(e)}")
+
+
+@router.get("/metrics/total-deviations", response_model=TotalDeviationsResponse)
+def get_total_deviations(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get total count of deviations from IVF quality logs.
+    
+    Counts all records in IVFQualityLog where any deviation flag is True:
+    - Temperature deviations (is_temp_loss)
+    - Humidity deviations (is_humidity_loss)
+    - Agitation/Vibration deviations (is_agitation_loss)
+    - Light deviations (is_light_loss)
+    
+    Role-based access:
+    - Manager (IVF): Count deviations across all branches
+    - User (IVF): Count deviations only for their assigned branch/site
+    - Admin: Count deviations across all branches
+    """
+    try:
+        branch_id, role = get_dashboard_branch_filter(request)
+        
+        service = IVFDashboardService(db)
+        result = service.get_total_deviations(branch_id=branch_id, role=role)
+        
+        return TotalDeviationsResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting total deviations: {str(e)}")
