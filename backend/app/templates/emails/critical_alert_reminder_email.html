@@ -3,251 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>{{ subject }}</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #F8F9FA;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #FFFFFF;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
-            color: #FFFFFF;
-            padding: 25px 30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        .header .subtitle {
-            font-size: 14px;
-            opacity: 0.9;
-            margin: 0;
-        }
-        .content {
-            padding: 30px;
-            color: #374151;
-        }
-        .content h2 {
-            color: #F59E0B;
-            font-size: 18px;
-            margin-top: 0;
-        }
-        .reminder-notice {
-            background-color: #FFFBEB;
-            border-left: 4px solid #F59E0B;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-        .reminder-notice p {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #92400E;
-        }
-        .alert-list {
-            margin: 20px 0;
-        }
-        .alert-item {
-            background-color: #FEF2F2;
-            border-left: 4px solid #DC2626;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-        }
-        .alert-item.medium-severity {
-            background-color: #FFFBEB;
-            border-left-color: #F59E0B;
-        }
-        .alert-item.low-severity {
-            background-color: #EFF6FF;
-            border-left-color: #3B82F6;
-        }
-        .alert-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .alert-type {
-            font-weight: 600;
-            color: #DC2626;
-            font-size: 14px;
-        }
-        .alert-item.medium-severity .alert-type {
-            color: #F59E0B;
-        }
-        .alert-item.low-severity .alert-type {
-            color: #3B82F6;
-        }
-        .alert-severity {
-            font-size: 12px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-        .severity-high {
-            background-color: #FEE2E2;
-            color: #DC2626;
-        }
-        .severity-medium {
-            background-color: #FEF3C7;
-            color: #D97706;
-        }
-        .severity-low {
-            background-color: #DBEAFE;
-            color: #2563EB;
-        }
-        .alert-details {
-            font-size: 13px;
-            color: #6B7280;
-            margin: 5px 0;
-        }
-        .alert-details strong {
-            color: #374151;
-        }
-        .alert-message {
-            font-size: 14px;
-            color: #374151;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #E5E7EB;
-        }
-        .footer {
-            background-color: #F8F9FA;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6B7280;
-            border-top: 1px solid #E5E7EB;
-        }
-        .footer p {
-            margin: 5px 0;
-        }
-        .divider {
-            height: 1px;
-            background-color: #E5E7EB;
-            margin: 20px 0;
-        }
-        .icon {
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-        .action-buttons {
-            text-align: center;
-            margin: 30px 0;
-        }
-        .button {
-            display: inline-block;
-            padding: 18px 45px;
-            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
-            color: #FFFFFF !important;
-            text-decoration: none !important;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 18px;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            box-shadow: 0 4px 12px rgba(107, 17, 118, 0.4);
-            transition: all 0.2s ease;
-            border: 2px solid #6B1176;
-            cursor: pointer;
-            text-align: center;
-            min-width: 200px;
-        }
-        .button:hover {
-            background: linear-gradient(135deg, #5A0F66 0%, #632F88 100%);
-            color: #FFFFFF !important;
-            box-shadow: 0 6px 16px rgba(107, 17, 118, 0.5);
-            transform: translateY(-2px);
-            border-color: #5A0F66;
-        }
-        .button:active {
-            transform: translateY(0);
-            box-shadow: 0 3px 8px rgba(107, 17, 118, 0.4);
-        }
-        .summary-box {
-            background-color: #F9FAFB;
-            border: 1px solid #E5E7EB;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            font-size: 14px;
-            color: #374151;
-        }
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td {font-family: Arial, sans-serif !important;}
     </style>
+    <![endif]-->
 </head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <div class="icon">⏰</div>
-            <h1>{{ subject }}</h1>
-            <p class="subtitle">myGrape - Critical Alert Reminder</p>
-        </div>
-        
-        <div class="content">
-            <h2>Hello {{ user_name }},</h2>
-            <p>You have <strong>{{ total_count }} unacknowledged critical alert(s)</strong> that require your attention.</p>
-            
-            <div class="reminder-notice">
-                <p><strong>⏰ Action Required:</strong> Please review and acknowledge these alerts as soon as possible.</p>
-            </div>
-            
-            <div class="summary-box">
-                <strong>Summary:</strong> {{ total_count }} unacknowledged alert(s) across your assigned area(s).
-            </div>
-            
-            <div class="alert-list">
-                {% for alert in alerts %}
-                <div class="alert-item {% if alert.severity == 'High' %}high-severity{% elif alert.severity == 'Medium' %}medium-severity{% else %}low-severity{% endif %}">
-                    <div class="alert-item-header">
-                        <span class="alert-type">{{ alert.alert_type }}</span>
-                        <span class="alert-severity severity-{{ alert.severity.lower() }}">{{ alert.severity }}</span>
-                    </div>
-                    <div class="alert-details">
-                        <p><strong>📦 Canister:</strong> {{ alert.canister_number }}</p>
-                        <p><strong>🏢 Branch:</strong> {{ alert.branch_name }}</p>
-                        <p><strong>🕐 Occurred:</strong> {{ alert.occurred_at }} ({{ alert.hours_since }} hour(s) ago)</p>
-                    </div>
-                    <div class="alert-message">
-                        <strong>Message:</strong> {{ alert.message }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            
-            <div class="action-buttons">
-                <a href="{{ acknowledge_url }}" class="button" style="color: #FFFFFF !important; text-decoration: none !important;">
-                    VIEW ALERTS
-                </a>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <p style="font-size: 14px; color: #6B7280;">
-                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-                <a href="{{ acknowledge_url }}" style="color: #2563EB; word-break: break-all;">{{ acknowledge_url }}</a>
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p><strong>myGrape</strong></p>
-            <p>This is an automated reminder. Please do not reply to this email.</p>
-            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: Arial, sans-serif;">
+    <!-- Wrapper Table -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8F9FA;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!-- Main Container Table -->
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 600px;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #6B1176; color: #FFFFFF; padding: 25px 30px; text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 10px;">⏰</div>
+                            <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF;">{{ subject }}</h1>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #FFFFFF; opacity: 0.9;">myGrape - Critical Alert Reminder</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #6B1176; font-weight: 600;">Hello {{ user_name }},</h2>
+                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">You have <strong>{{ total_count }} unacknowledged critical alert(s)</strong> that require your attention.</p>
+                            
+                            <!-- Reminder Notice -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; color: #92400E;">
+                                        <strong>⏰ Action Required:</strong> Please review and acknowledge these alerts as soon as possible.
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Summary Box -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F9FAFB; border: 1px solid #E5E7EB; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; color: #374151;">
+                                        <strong>Summary:</strong> {{ total_count }} unacknowledged alert(s) across your assigned area(s).
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Alert List -->
+                            {% for alert in alerts %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {% if alert.severity == 'High' %}#FEF2F2{% elif alert.severity == 'Medium' %}#FFFBEB{% else %}#EFF6FF{% endif %}; border-left: 4px solid {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %}; margin: 15px 0;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <!-- Alert Header -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 10px;">
+                                            <tr>
+                                                <td style="font-weight: 600; font-size: 14px; color: {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">
+                                                    {{ alert.alert_type }}
+                                                </td>
+                                                <td align="right" style="font-size: 12px; font-weight: 600; padding: 4px 8px; background-color: {% if alert.severity == 'High' %}#FEE2E2{% elif alert.severity == 'Medium' %}#FEF3C7{% else %}#DBEAFE{% endif %}; color: {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#D97706{% else %}#2563EB{% endif %}; border-radius: 4px;">
+                                                    {{ alert.severity }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Alert Details -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">📦 Canister:</strong> {{ alert.canister_number }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">🏢 Branch:</strong> {{ alert.branch_name }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">🕐 Occurred:</strong> {{ alert.occurred_at }} ({{ alert.hours_since }} hour(s) ago)
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Alert Message -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #E5E7EB;">
+                                            <tr>
+                                                <td style="font-size: 14px; color: #374151;">
+                                                    <strong>Message:</strong> {{ alert.message }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endfor %}
+                            
+                            <!-- Button -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <a href="{{ acknowledge_url }}" style="display: inline-block; padding: 18px 45px; background-color: #6B1176; color: #FFFFFF !important; text-decoration: none !important; border-radius: 8px; font-weight: 700; font-size: 18px; letter-spacing: 0.8px; text-transform: uppercase; border: 2px solid #6B1176;">
+                                            VIEW ALERTS
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Divider -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+                                <tr>
+                                    <td style="height: 1px; background-color: #E5E7EB;"></td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Note -->
+                            <p style="margin: 0; font-size: 14px; color: #6B7280; line-height: 1.6;">
+                                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+                                <a href="{{ acknowledge_url }}" style="color: #2563EB; word-break: break-all; text-decoration: underline;">{{ acknowledge_url }}</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #F8F9FA; padding: 20px; text-align: center; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB;">
+                            <p style="margin: 5px 0;"><strong>myGrape</strong></p>
+                            <p style="margin: 5px 0;">This is an automated reminder. Please do not reply to this email.</p>
+                            <p style="margin: 10px 0 0 0;">© 2025 myGrape. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
