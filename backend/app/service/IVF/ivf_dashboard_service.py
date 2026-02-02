@@ -356,6 +356,112 @@ class IVFDashboardService:
             "all_drivers": drivers
         }
     
+    def get_total_deviations(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+        """
+        Get total count of deviations from IVF quality logs.
+        
+        Counts all records in IVFQualityLog where any deviation flag is True:
+        - is_temp_loss (Temperature)
+        - is_humidity_loss (Humidity)
+        - is_agitation_loss (Agitation/Vibration)
+        - is_light_loss (Light)
+        
+        Role-based access:
+        - Manager (IVF): Count deviations across all branches
+        - User (IVF): Count deviations only for their assigned branch
+        - Admin: Count deviations across all branches
+        
+        Args:
+            branch_id: Optional branch ID to filter by
+            role: User's role to determine filtering
+            
+        Returns:
+            Dictionary with total deviations and breakdown by type
+        """
+        # Apply branch filter based on role
+        filter_branch_id = self._get_branch_filter(branch_id, role)
+        
+        # Base query conditions for quality logs with deviations
+        # Join through: IVFQualityLog -> Canister -> Tank -> Branch
+        base_conditions = [
+            Canister.is_active == True
+        ]
+        
+        # Apply branch filtering if needed
+        if filter_branch_id is not None:
+            base_conditions.append(HospitalBranch.branch_id == filter_branch_id)
+        
+        # Count temperature deviations
+        temp_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_temp_loss == True)
+        )
+        temp_count = temp_query.scalar() or 0
+        
+        # Count humidity deviations
+        humidity_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_humidity_loss == True)
+        )
+        humidity_count = humidity_query.scalar() or 0
+        
+        # Count agitation deviations
+        agitation_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_agitation_loss == True)
+        )
+        agitation_count = agitation_query.scalar() or 0
+        
+        # Count light deviations
+        light_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_light_loss == True)
+        )
+        light_count = light_query.scalar() or 0
+        
+        # Count total deviations (any flag is True)
+        # Use distinct count to avoid double-counting records with multiple violations
+        total_query = (
+            self.db.query(func.count(func.distinct(IVFQualityLog.id)))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(
+                or_(
+                    IVFQualityLog.is_temp_loss == True,
+                    IVFQualityLog.is_humidity_loss == True,
+                    IVFQualityLog.is_agitation_loss == True,
+                    IVFQualityLog.is_light_loss == True
+                )
+            )
+        )
+        total_count = total_query.scalar() or 0
+        
+        return {
+            "total_deviations": total_count,
+            "temperature_deviations": temp_count,
+            "humidity_deviations": humidity_count,
+            "agitation_deviations": agitation_count,
+            "light_deviations": light_count
+        }
+    
     def get_outbound_shipments(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get count of outbound shipments.
