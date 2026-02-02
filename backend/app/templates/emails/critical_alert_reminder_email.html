@@ -24,7 +24,7 @@
                         <td style="background-color: #6B1176; color: #FFFFFF; padding: 25px 30px; text-align: center;">
                             <div style="font-size: 32px; margin-bottom: 10px;">⏰</div>
                             <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF;">{{ subject }}</h1>
-                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #FFFFFF; opacity: 0.9;">myGrape - Critical Alert Reminder</p>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #E5D4F0;">myGrape - Critical Alert Reminder</p>
                         </td>
                     </tr>
                     
@@ -105,9 +105,17 @@
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
                                 <tr>
                                     <td align="center" style="padding: 10px 0;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ acknowledge_url }}" style="height:56px;v-text-anchor:middle;width:200px;" arcsize="8%" stroke="f" fillcolor="#6B1176">
+                                            <w:anchorlock/>
+                                            <center style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:18px;font-weight:700;">VIEW ALERTS</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]><!-->
                                         <a href="{{ acknowledge_url }}" style="display: inline-block; padding: 18px 45px; background-color: #6B1176; color: #FFFFFF !important; text-decoration: none !important; border-radius: 8px; font-weight: 700; font-size: 18px; letter-spacing: 0.8px; text-transform: uppercase; border: 2px solid #6B1176;">
                                             VIEW ALERTS
                                         </a>
+                                        <!--<![endif]-->
                                     </td>
                                 </tr>
                             </table>
@@ -122,7 +130,7 @@
                             <!-- Note -->
                             <p style="margin: 0; font-size: 14px; color: #6B7280; line-height: 1.6;">
                                 <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
-                                <a href="{{ acknowledge_url }}" style="color: #2563EB; word-break: break-all; text-decoration: underline;">{{ acknowledge_url }}</a>
+                                <a href="{{ acknowledge_url }}" style="color: #2563EB; text-decoration: underline; word-wrap: break-word;">{{ acknowledge_url }}</a>
                             </p>
                         </td>
                     </tr>
