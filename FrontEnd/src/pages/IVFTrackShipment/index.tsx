@@ -1,39 +1,128 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
-import RiskFactorTable from './sections/RiskFactorTable';
-import RiskGraph from './sections/RiskGraph';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
 import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
-import backButton from '../../assets/backButton.svg';
-import { userService } from '../../services/userService';
+import { userService, type UserProfileDto } from '../../services/userService';
+// Header icons & modals
+import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
+import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
+import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
+import CriticalAlertsModal from '../../components/CriticalAlertsModal';
+import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
+import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
+import { tasksService, type Task } from '../../services/tasksService';
+import StakeholderChatBox from '../../components/StakeholderChatBox';
+import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
 export default function IVFTrackShipmentPage() {
     const { canisterId } = useParams<{ canisterId: string }>();
-    const { logout } = useAuth();
+    const { logout, userRole } = useAuth();
     const navigate = useNavigate();
     const [userInitials, setUserInitials] = useState<string>('U');
+    
+    // Header interactions state
+    const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
+    const [showMyTasks, setShowMyTasks] = useState(false);
+    const [showStakeholderChats, setShowStakeholderChats] = useState(false);
+    const [showStakeholderChatScreen, setShowStakeholderChatScreen] = useState(false);
+    const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
+    const [myTasks, setMyTasks] = useState<Task[]>([]);
+    const [loadingAlerts, setLoadingAlerts] = useState(false);
+    const [loadingTasks, setLoadingTasks] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string>('');
+    const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
+    const [stakeholderChats, setStakeholderChats] = useState<Array<{ id: string; sender: string; patientId: string; message: string; timestamp: string; isRead: boolean }>>([]);
+
+    // WebSocket for unread count
+    const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
+
+    // Calculate stakeholder chat count: only show count if canister has tagged unread messages
+    const stakeholderChatCount = React.useMemo(() => {
+        if (!canisterId || !wsUnreadMessages) return 0;
+        // Count only tagged unread messages for this specific canister
+        return wsUnreadMessages.filter(msg => msg.patient_id === canisterId).length;
+    }, [canisterId, wsUnreadMessages]);
+    
+    const criticalAlertsCount = criticalAlerts.length;
+    const myTasksCount = myTasks.length;
+
+    const fetchCriticalAlerts = async () => {
+        setLoadingAlerts(true);
+        try {
+            const response = await criticalAlertsService.getCriticalAlerts('pharma_12345');
+            setCriticalAlerts(response.alerts || []);
+        } catch (e) {
+            setCriticalAlerts([]);
+        } finally {
+            setLoadingAlerts(false);
+        }
+    };
+
+    const fetchMyTasks = async () => {
+        setLoadingTasks(true);
+        try {
+            let allTasks: Task[] = [];
+            
+            // If canisterId is available, use canister-specific endpoint if available
+            // Otherwise use general tasks endpoint
+            const response = await tasksService.getMyTasks();
+            // Combine created_tasks and assigned_tasks into a single array
+            allTasks = [
+                ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
+                ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
+            ];
+            
+            // Ensure we always set an array
+            setMyTasks(Array.isArray(allTasks) ? allTasks : []);
+        } catch (e) {
+            console.error('Error fetching tasks:', e);
+            setMyTasks([]);
+        } finally {
+            setLoadingTasks(false);
+        }
+    };
+
+    const fetchCurrentUser = async () => {
+        try {
+            const profile = await userService.getProfile();
+            setCurrentUser(profile);
+            setCurrentUserId(profile.user_id);
+            const first = profile.first_name?.trim?.() || '';
+            const last = profile.last_name?.trim?.() || '';
+            const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
+            setUserInitials(initials);
+        } catch (error) {
+            // Error handled silently
+        }
+    };
 
     useEffect(() => {
-        let isMounted = true;
-        (async () => {
-            try {
-                const profile = await userService.getProfile();
-                const first = profile.first_name?.trim?.() || '';
-                const last = profile.last_name?.trim?.() || '';
-                const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
-                if (isMounted) setUserInitials(initials);
-            } catch {
-                if (isMounted) setUserInitials('U');
-            }
-        })();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
+        fetchCriticalAlerts();
+        fetchMyTasks();
+        fetchCurrentUser();
+    }, [canisterId]);
+
+    // Update stakeholder chats from WebSocket data
+    useEffect(() => {
+        if (wsUnreadMessages && wsUnreadMessages.length > 0) {
+            const transformedChats = wsUnreadMessages.map((msg) => ({
+                id: msg.patient_id,
+                sender: msg.sender_name,
+                patientId: `Canister ID : ${msg.patient_id}`,
+                message: msg.message_content,
+                timestamp: new Date(msg.created_at).toLocaleString(),
+                isRead: false
+            }));
+            setStakeholderChats(transformedChats);
+        } else {
+            setStakeholderChats([]);
+        }
+    }, [wsUnreadMessages]);
 
     return (
         <div className="bg-[#FDFAFF] flex w-full h-full">
@@ -53,43 +142,266 @@ export default function IVFTrackShipmentPage() {
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
-                    <div className="flex items-center gap-3 text-black text-sm font-semibold">
-                        <button
-                            type="button"
-                            onClick={() => navigate(-1)}
-                            className="inline-flex items-center justify-center w-[16px] h-[14px] rounded-md hover:bg-black/5 active:bg-black/10 transition-colors"
-                            aria-label="Back"
-                        >
-                            <img src={backButton} alt="" className="w-4 h-4" />
-                        </button>
-                        <span>Container ID: {canisterId || 'Canister 1'}</span>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-sm">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/dashboard')}
+                                className="text-gray-500 text-[12px] mt-[2.5px] hover:text-gray-700 transition-colors"
+                            >
+                                Dashboard
+                            </button>
+                            <span className="text-gray-500">/</span>
+                            <span className="text-black font-semibold">Container Quality Tracking</span>
+                            <span className="text-black font-semibold">-</span>
+                            <span className="text-black font-semibold">Container ID: {canisterId || 'C1'}</span>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            {/* Critical Alerts */}
+                            <div className="relative group">
+                                <img
+                                    className="w-[25px] h-[25px] cursor-pointer"
+                                    alt="Critical Alerts"
+                                    src={CriticalAlertsIcon}
+                                    onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
+                                />
+                                {criticalAlertsCount > 0 && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                                        <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                                    </div>
+                                )}
+                                {/* Tooltip */}
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="font-semibold text-black text-xs whitespace-nowrap">
+                                        Critical Alerts
+                                    </div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                </div>
+                            </div>
+                            {/* Stakeholder Chats */}
+                            <div className="relative group">
+                                <img
+                                    className="w-[25px] h-[25px] cursor-pointer"
+                                    alt="Stakeholder Chats"
+                                    src={StakeholderChatsIcon}
+                                    onClick={() => setShowStakeholderChatScreen(true)}
+                                />
+                                {stakeholderChatCount > 0 && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                                        <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                                    </div>
+                                )}
+                                {/* Tooltip */}
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="font-semibold text-black text-xs whitespace-nowrap">
+                                        Stakeholder Chats
+                                    </div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                </div>
+                            </div>
+                            {/* My Tasks */}
+                            <div className="relative group">
+                                <img
+                                    className="w-[25px] h-[25px] cursor-pointer"
+                                    alt="My Tasks"
+                                    src={MyTasksIcon}
+                                    onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
+                                />
+                                {myTasksCount > 0 && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                                        <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                                    </div>
+                                )}
+                                {/* Tooltip */}
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="font-semibold text-black text-xs whitespace-nowrap">
+                                        My Tasks
+                                    </div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     {/* <ContainerProcessFlow /> */}
-                    {/* Row 1: Quality Tracking + Quality Parameter (left) | Container Data (right) */}
+                    {/* Row 1: Quality Tracking (left) | Quality Parameter (right) */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left Column: Stacked Quality Tracking and Quality Parameter */}
-                        <div className="flex flex-col gap-6">
-                            <IVFQualityTrackingChart />
-                            <IVFQualityParametersTable />
-                        </div>
-                        {/* Right Column: Container Data */}
+                        {/* Left Column: Quality Tracking */}
                         <div>
-                            <ContainerDataTable canisterNumber={canisterId} />
+                            <IVFQualityTrackingChart />
+                        </div>
+                        {/* Right Column: Quality Parameter */}
+                        <div>
+                            <IVFQualityParametersTable />
                         </div>
                     </div>
 
-                    {/* Row 2: Refill Log (full width) */}
+                    {/* Row 2: Container Data (full width) */}
+                    <div>
+                        <ContainerDataTable canisterNumber={canisterId} />
+                    </div>
+
+                    {/* Row 3: Refill Log (full width) */}
                     <div>
                         <RefillLogTable canisterNumber={canisterId} />
                     </div>
 
-                    {/* Row 3: Risk Factor (left) | Risk Graph (right) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <RiskFactorTable />
-                        <RiskGraph />
-                    </div>
                 </div>
             </main>
+
+            {/* Stakeholder Chat Box */}
+            <StakeholderChatBox
+                isOpen={showStakeholderChatScreen}
+                onClose={() => setShowStakeholderChatScreen(false)}
+                patientId={canisterId}
+                onMessagesUpdated={() => {
+                    // WebSocket will automatically update unread count
+                    // No need to manually refresh
+                }}
+            />
+
+            {/* Modals */}
+            <CriticalAlertsModal
+                isOpen={showCriticalAlerts}
+                onClose={() => setShowCriticalAlerts(false)}
+                alerts={criticalAlerts.map((a) => ({
+                    id: a.id,
+                    type: a.type,
+                    severity: a.severity,
+                    patientId: a.patient_id,
+                    message: a.message,
+                    timestamp: a.timestamp,
+                    status: a.status,
+                }))}
+                loading={loadingAlerts}
+            />
+            <MyTasksModal
+                isOpen={showMyTasks}
+                onClose={() => setShowMyTasks(false)}
+                tasks={myTasks.map(task => {
+                    try {
+                        return {
+                            id: task.id.toString(),
+                            patientId: task.patient_id || 'N/A',
+                            taskName: task.task_name,
+                            description: task.description || '',
+                            assigneeBy: task.created_by 
+                                ? `${task.created_by.first_name || ''} ${task.created_by.last_name || ''}`.trim() || 'Unknown'
+                                : 'Unknown',
+                            assignedTo: task.assignee
+                                ? `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim() || 'Unknown'
+                                : 'Unknown',
+                            dueDate: task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A',
+                            priority: task.priority,
+                            status: task.status
+                        };
+                    } catch (error) {
+                        console.error('Error transforming task:', task, error);
+                        return {
+                            id: task.id?.toString() || 'unknown',
+                            patientId: task.patient_id || 'N/A',
+                            taskName: task.task_name || 'Unknown Task',
+                            description: task.description || '',
+                            assigneeBy: 'Unknown',
+                            assignedTo: 'Unknown',
+                            dueDate: 'N/A',
+                            priority: task.priority || 'Medium',
+                            status: task.status || 'Not started'
+                        };
+                    }
+                })}
+                loading={loadingTasks}
+                variant="track"
+                currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
+                currentUserId={currentUserId}
+                userRole={userRole || currentUser?.role || ''}
+                defaultPatientId={canisterId || ''}
+                onTaskCreated={() => {
+                    // Refresh tasks after creation
+                    fetchMyTasks();
+                }}
+                onAdd={() => {
+                    // Task creation handled by onTaskCreated callback
+                }}
+                onEdit={async (task: MyTask) => {
+                    try {
+                        const taskId = parseInt(task.id);
+                        if (isNaN(taskId)) {
+                            console.error('Invalid task ID:', task.id);
+                            return;
+                        }
+
+                        // Get assigneeId from the task (it should be stored when user selects from dropdown)
+                        const assigneeId = (task as any).assigneeId;
+                        
+                        // Prepare update data
+                        const updateData: {
+                            task_name?: string;
+                            description?: string;
+                            assignee_id?: string;
+                            patient_id?: string;
+                            due_date?: string;
+                            priority?: 'Low' | 'Medium' | 'High';
+                            status?: 'Not started' | 'In progress' | 'Done';
+                        } = {};
+
+                        // Check if task was created by current user - they can edit all fields
+                        const isCreatedByMe = task.assigneeBy?.trim().toLowerCase() === 
+                            (currentUser ? `${currentUser.first_name} ${currentUser.last_name}`.trim().toLowerCase() : '');
+
+                        if (isCreatedByMe) {
+                            // Creator can update all fields
+                            updateData.task_name = task.taskName;
+                            updateData.description = task.description;
+                            if (assigneeId) {
+                                // assignee_id should be a string (user_id)
+                                updateData.assignee_id = String(assigneeId);
+                            }
+                            updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;
+                            // Parse date - handle both ISO format and locale date string
+                            if (task.dueDate && task.dueDate !== 'N/A') {
+                                try {
+                                    const date = new Date(task.dueDate);
+                                    if (!isNaN(date.getTime())) {
+                                        updateData.due_date = date.toISOString();
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing date:', task.dueDate, e);
+                                }
+                            }
+                            updateData.priority = task.priority;
+                            updateData.status = task.status;
+                        } else {
+                            // Assignee can only update status - use dedicated status update endpoint
+                            if (task.status) {
+                                await tasksService.updateTaskStatus(taskId, task.status);
+                                // Refresh tasks after update
+                                fetchMyTasks();
+                                return; // Early return since we've handled the update
+                            }
+                            return;
+                        }
+
+                        // Call update API for full task updates (when creator edits)
+                        if (Object.keys(updateData).length > 0) {
+                            await tasksService.updateTask(taskId, updateData);
+                        }
+
+                        // Refresh tasks after update
+                        fetchMyTasks();
+                    } catch (error) {
+                        console.error('Error updating task:', error);
+                    }
+                }}
+                onDelete={(_taskId) => {
+                    // TODO: Implement delete task functionality
+                }}
+            />
+            {/* Legacy modal retained but not used by icon click */}
+            <StakeholderChatsModal
+                isOpen={showStakeholderChats}
+                onClose={() => setShowStakeholderChats(false)}
+                chats={stakeholderChats}
+            />
         </div>
     );
 }
