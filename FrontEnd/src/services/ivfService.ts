@@ -48,9 +48,20 @@ export interface AvgQualityLossPerContainerResponse {
   status: string;
 }
 
+export interface TotalDeviationsResponse {
+  total_deviations: number;
+  temperature_deviations: number;
+  humidity_deviations: number;
+  agitation_deviations: number;
+  light_deviations: number;
+  last_updated: string;
+  status: string;
+}
+
 export interface DeviationsGraphDataItem {
-  site_id: number;
-  site_name: string;
+  site_id?: number;
+  site_name?: string;
+  container_name?: string; // Used for user view
   temperature: number;
   humidity: number;
   agitation_vibration: number;
@@ -74,6 +85,11 @@ export interface RefillLogItem {
   refilled_by: string;
   description: string;
   status: string;
+  cryoshipper: string | null;
+  disinfected_shipper_infected_tank_description: string | null;
+  reservoir: string | null;
+  ln2_ordered_date: string | null;
+  ln2_received_date: string | null;
   log_id: number;
   created_at: string;
   updated_at: string;
@@ -200,6 +216,13 @@ export class IvfService extends BaseApiService {
   async getAvgQualityLossPerContainer(): Promise<AvgQualityLossPerContainerResponse> {
     return await this.request<AvgQualityLossPerContainerResponse>(
       '/api/ivf/dashboard/metrics/avg-quality-loss-per-container',
+      { method: 'GET' }
+    );
+  }
+
+  async getTotalDeviations(): Promise<TotalDeviationsResponse> {
+    return await this.request<TotalDeviationsResponse>(
+      '/api/ivf/dashboard/metrics/total-deviations',
       { method: 'GET' }
     );
   }
