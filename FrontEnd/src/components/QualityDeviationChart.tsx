@@ -3,18 +3,16 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Tooltip,
   Legend
 );
@@ -26,58 +24,86 @@ interface QualityMetric {
 }
 
 interface QualityDeviationChartProps {
-  timestamps: string[];
+  containers: string[];
   metrics: QualityMetric[];
 }
 
-export default function QualityDeviationChart({ timestamps, metrics }: QualityDeviationChartProps) {
+export default function QualityDeviationChart({ containers, metrics }: QualityDeviationChartProps) {
   // Fixed color palette matching design
   const getColorForMetric = (name: string): string => {
     const key = name.toLowerCase();
     if (key.includes('temperature')) return '#C7A0E8';
     if (key.includes('humidity')) return '#C9CBCD';
+    if (key.includes('top risk driver') || key.includes('top risk')) return '#85A2DF';
+    if (key.includes('empty') || key.includes('remaining') || key.includes('unused')) return '#F4F4F4';
     // Agitation / Vibration (default)
     return '#F5A9E1';
   };
 
   const chartData = useMemo(
-    () => ({
-      labels: timestamps,
-      datasets: metrics.map((metric) => ({
+    () => {
+      // Calculate remaining space for background bar (100 - sum of all metrics for each container)
+      const backgroundData = containers.map((_, containerIndex) => {
+        const total = metrics.reduce((sum, metric) => sum + (metric.data[containerIndex] || 0), 0);
+        return Math.max(0, 100 - total);
+      });
+
+      // Create datasets for metrics
+      const metricDatasets = metrics.map((metric, index) => ({
         label: metric.name,
         data: metric.data,
+        backgroundColor: getColorForMetric(metric.name),
         borderColor: getColorForMetric(metric.name),
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        // filled markers (matching legend)
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: getColorForMetric(metric.name),
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1,
-        tension: 0.4,
-        fill: false,
-      })),
-    }),
-    [timestamps, metrics]
+        borderWidth: 0,
+        stack: 'qualityDeviation',
+        barThickness: 8, // Fixed 8px height for horizontal bars
+        borderRadius: index === 0 
+          ? { topLeft: 8, bottomLeft: 8, topRight: 0, bottomRight: 0 }
+          : 0,
+      }));
+
+      // Add background bar as the last dataset (rightmost, gets right rounding)
+      const backgroundDataset = {
+        label: 'Remaining',
+        data: backgroundData,
+        backgroundColor: '#F4F4F4',
+        borderColor: '#F4F4F4',
+        borderWidth: 0,
+        stack: 'qualityDeviation',
+        barThickness: 8, // Fixed 8px height for horizontal bars
+        borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 8, bottomRight: 8 },
+      };
+
+      return {
+        labels: containers,
+        datasets: [...metricDatasets, backgroundDataset],
+      };
+    },
+    [containers, metrics]
   );
 
   const legendItems = useMemo(
     () =>
-      metrics.map((m) => ({
-        label: m.name,
-        color: getColorForMetric(m.name),
-      })),
+      metrics
+        .filter((m) => {
+          // Exclude background/remaining metrics from legend
+          const key = m.name.toLowerCase();
+          return !key.includes('empty') && !key.includes('remaining') && !key.includes('unused');
+        })
+        .map((m) => ({
+          label: m.name,
+          color: getColorForMetric(m.name),
+        })),
     [metrics]
   );
 
   const chartOptions = useMemo(
     () => ({
+      indexAxis: 'y' as const,
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          // Render custom legend above the chart (under the title)
           display: false,
         },
         tooltip: {
@@ -90,10 +116,34 @@ export default function QualityDeviationChart({ timestamps, metrics }: QualityDe
           bodyFont: {
             size: 11,
           },
+          filter: (tooltipItem: any) => {
+            // Hide background/remaining bar from tooltips
+            return tooltipItem.dataset.label !== 'Remaining';
+          },
         },
       },
       scales: {
         x: {
+          beginAtZero: true,
+          max: 100,
+          grid: {
+            color: '#E5E5E5',
+            drawBorder: false,
+            borderDash: [2, 2],
+          },
+          ticks: {
+            stepSize: 20,
+            color: '#4B4B4B',
+            font: {
+              size: 11,
+            },
+            padding: 10,
+          },
+          border: {
+            display: false,
+          },
+        },
+        y: {
           grid: {
             display: false,
           },
@@ -102,29 +152,7 @@ export default function QualityDeviationChart({ timestamps, metrics }: QualityDe
             font: {
               size: 11,
             },
-            maxRotation: 0,
-            minRotation: 0,
             padding: 14,
-          },
-          border: {
-            display: false,
-          },
-        },
-        y: {
-          beginAtZero: true,
-          max: 8,
-          grid: {
-            color: '#E5E5E5',
-            drawBorder: false,
-            borderDash: [2, 2],
-          },
-          ticks: {
-            stepSize: 2,
-            color: '#666666',
-            font: {
-              size: 11,
-            },
-            padding: 10,
           },
           border: {
             display: false,
@@ -153,7 +181,7 @@ export default function QualityDeviationChart({ timestamps, metrics }: QualityDe
         ))}
       </div>
       <div className="flex-1 min-h-0">
-        <Line data={chartData} options={chartOptions} />
+        <Bar data={chartData} options={chartOptions} />
       </div>
     </div>
   );
