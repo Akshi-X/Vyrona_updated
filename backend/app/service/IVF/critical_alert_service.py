@@ -268,6 +268,7 @@ class CriticalAlertService:
         
         if existing_alert:
             # Update occurred_at to latest and refresh updated_at
+            logger.info(f"Alert already exists with dedup_key={dedup_key}, updating existing alert_id={existing_alert.alert_id}")
             existing_alert.occurred_at = occurred_at
             existing_alert.updated_at = datetime.now(timezone.utc)
             return existing_alert
@@ -322,21 +323,46 @@ class CriticalAlertService:
         current_time = datetime.now(timezone.utc)
         
         for canister in canisters:
+            logger.info(f"Checking alerts for canister_id={canister.canister_id} (canister_number={canister.canister_number})")
+            
             # Check for KPI deviations from recent quality logs (last 24 hours)
+            time_threshold = current_time - timedelta(days=1)
             recent_quality_logs = (
                 self.db.query(IVFQualityLog)
                 .filter(
                     IVFQualityLog.canister_id == canister.canister_id,
-                    IVFQualityLog.reading_timestamp >= current_time - timedelta(days=1)
+                    IVFQualityLog.reading_timestamp >= time_threshold
                 )
                 .order_by(desc(IVFQualityLog.reading_timestamp))
                 .all()
             )
             
+            logger.info(f"Found {len(recent_quality_logs)} quality logs from last 24 hours for canister_id={canister.canister_id}")
+            
+            if not recent_quality_logs:
+                # Check if there are any quality logs at all (for debugging)
+                all_logs_count = self.db.query(IVFQualityLog).filter(
+                    IVFQualityLog.canister_id == canister.canister_id
+                ).count()
+                if all_logs_count > 0:
+                    latest_log = self.db.query(IVFQualityLog).filter(
+                        IVFQualityLog.canister_id == canister.canister_id
+                    ).order_by(desc(IVFQualityLog.reading_timestamp)).first()
+                    if latest_log:
+                        hours_ago = (current_time - latest_log.reading_timestamp).total_seconds() / 3600
+                        logger.warning(f"No recent quality logs for canister_id={canister.canister_id}. "
+                                     f"Latest log is {hours_ago:.1f} hours old (timestamp: {latest_log.reading_timestamp})")
+            
             for quality_log in recent_quality_logs:
+                logger.debug(f"Checking quality_log id={quality_log.id}, timestamp={quality_log.reading_timestamp}, "
+                            f"temp={quality_log.temperature}, humidity={quality_log.humidity}, "
+                            f"agitation={quality_log.agitation}, light={quality_log.light}, "
+                            f"quality_loss={quality_log.quality_loss}")
+                
                 # Check KPI deviation
                 kpi_alert = self._check_kpi_deviation(quality_log)
                 if kpi_alert:
+                    logger.info(f"KPI deviation detected for canister_id={canister.canister_id}: {kpi_alert['message']}")
                     alert = self._create_alert(
                         canister_id=canister.canister_id,
                         alert_type=AlertType.DEVIATION_ALERT,
@@ -346,11 +372,16 @@ class CriticalAlertService:
                         occurred_at=quality_log.reading_timestamp,
                         triggered_by=AlertTriggeredBy.SYSTEM
                     )
-                    alerts_created.append(alert)
+                    if alert:
+                        alerts_created.append(alert)
+                        logger.info(f"Created KPI deviation alert: alert_id={alert.alert_id}")
+                else:
+                    logger.debug(f"No KPI deviation found in quality_log id={quality_log.id}")
                 
                 # Check quality loss
                 quality_alert = self._check_quality_loss(quality_log)
                 if quality_alert:
+                    logger.info(f"Quality loss detected for canister_id={canister.canister_id}: {quality_alert['message']}")
                     alert = self._create_alert(
                         canister_id=canister.canister_id,
                         alert_type=AlertType.QUALITY_ALERT,
@@ -360,7 +391,11 @@ class CriticalAlertService:
                         occurred_at=quality_log.reading_timestamp,
                         triggered_by=AlertTriggeredBy.SYSTEM
                     )
-                    alerts_created.append(alert)
+                    if alert:
+                        alerts_created.append(alert)
+                        logger.info(f"Created quality loss alert: alert_id={alert.alert_id}")
+                else:
+                    logger.debug(f"No quality loss found in quality_log id={quality_log.id}")
             
             # Check refill log
             refill_alert = self._check_refill_log(canister.canister_id)
@@ -523,6 +558,51 @@ class CriticalAlertService:
         # Get canister number for response
         canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
         canister_number = canister.canister_number if canister else None
+        
+        # Build alert responses with canister_number
+        alert_responses = []
+        for alert in alerts:
+            alert_dict = {
+                **alert.__dict__,
+                'canister_number': canister_number
+            }
+            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
+        
+        return CanisterAlertsResponse(
+            canister_id=canister_id,
+            canister_number=canister_number,
+            alerts=alert_responses,
+            total_count=len(alert_responses)
+        )
+    
+    def get_canister_alerts_by_number(
+        self, 
+        canister_number: str, 
+        branch_id: Optional[int] = None
+    ) -> CanisterAlertsResponse:
+        """
+        Get all alerts for a specific canister by canister_number.
+        
+        Args:
+            canister_number: Canister number/code (e.g., "C1")
+            branch_id: Optional branch filter for authorization
+        
+        Returns:
+            CanisterAlertsResponse with all alerts for the canister
+        """
+        # Resolve canister_number to canister_id
+        try:
+            canister_id = self.resolve_canister_id(canister_number, branch_id)
+        except ValueError as e:
+            raise ValueError(f"Canister '{canister_number}' not found: {str(e)}")
+        
+        # Get all alerts for this canister
+        alerts = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.canister_id == canister_id)
+            .order_by(desc(CriticalAlert.occurred_at))
+            .all()
+        )
         
         # Build alert responses with canister_number
         alert_responses = []
