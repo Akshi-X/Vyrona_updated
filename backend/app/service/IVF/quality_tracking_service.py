@@ -2,15 +2,16 @@
 Quality Tracking Service
 Handles business logic for quality tracking operations including LN2 refill logs
 """
-import csv
+# Standard library imports
 import io
 import logging
 from datetime import date, datetime
 from typing import List, Optional
 
+# Third-party imports
 import pandas as pd
 from fastapi import Response
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 try:
@@ -19,7 +20,7 @@ except ImportError:
     # openpyxl.styles may not be available in all environments
     Alignment = Font = PatternFill = None
 
-from ...constants.app_constants import COMMON_API_HEADERS
+# Local application imports
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
@@ -684,12 +685,12 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> Response:
         """
-        Export monthly refill logs to Excel format.
+        Export refill logs to Excel format.
         
         Args:
             canister_id: Canister ID to export logs for
-            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
-            month: Month for the monthly report (1-12). If not provided, uses current month.
+            year: Year for the report (e.g., 2024). If not provided, uses current year.
+            month: Month for the report (1-12). If not provided, exports entire year.
             branch_id: Optional branch ID for filtering
             
         Returns:
@@ -699,20 +700,10 @@ class QualityTrackingService:
             AppException: If export fails or canister not found
         """
         try:
-            # Use current month if year/month not provided
+            # Use current year if year not provided
             current_date = datetime.now()
             if year is None:
                 year = current_date.year
-            if month is None:
-                month = current_date.month
-            
-            # Validate month
-            if not (1 <= month <= 12):
-                raise AppException(
-                    message="Month must be between 1 and 12",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
             
             # Validate year
             if not (2000 <= year <= 2100):
@@ -721,6 +712,15 @@ class QualityTrackingService:
                     error_code=ErrorMessages.INVALID_INPUT,
                     status_code=HTTPStatus.BAD_REQUEST
                 )
+            
+            # Validate month if provided
+            if month is not None:
+                if not (1 <= month <= 12):
+                    raise AppException(
+                        message="Month must be between 1 and 12",
+                        error_code=ErrorMessages.INVALID_INPUT,
+                        status_code=HTTPStatus.BAD_REQUEST
+                    )
             
             # Get canister information
             canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
@@ -733,15 +733,26 @@ class QualityTrackingService:
             
             canister_number = canister.canister_number or f"Canister-{canister_id}"
             
-            # Calculate date range for the month
-            start_date = date(year, month, 1)
-            # Get last day of month
-            if month == 12:
-                end_date = date(year + 1, 1, 1)
+            # Calculate date range based on whether month is provided
+            if month is not None:
+                # Export specific month
+                start_date = date(year, month, 1)
+                if month == 12:
+                    end_date = date(year + 1, 1, 1)
+                else:
+                    end_date = date(year, month + 1, 1)
+                # Format month-year for metadata
+                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                date_range_display = f"{month_names[month]}-{year}"
+                date_range_str = f"{year}-{month:02d}"
             else:
-                end_date = date(year, month + 1, 1)
+                # Export entire year
+                start_date = date(year, 1, 1)
+                end_date = date(year + 1, 1, 1)
+                date_range_display = str(year)
+                date_range_str = str(year)
             
-            # Query refill logs for the specified month
+            # Query refill logs for the date range
             query = (
                 self.db.query(CanisterLn2Log)
                 .filter(
@@ -764,17 +775,45 @@ class QualityTrackingService:
             refill_logs = query.all()
             
             if not refill_logs:
+                error_msg = f"No refill logs found for canister {canister_number} in {date_range_str}"
                 raise AppException(
-                    message=f"No refill logs found for canister {canister_number} in {year}-{month:02d}",
+                    message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            # Prepare data for Excel - matching the table columns from the UI
+            # Get current year total log count (for metadata)
+            current_year = datetime.now().year
+            current_year_start = date(current_year, 1, 1)
+            current_year_end = date(current_year + 1, 1, 1)
+            
+            current_year_total_query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.refill_date >= current_year_start,
+                    CanisterLn2Log.refill_date < current_year_end
+                )
+            )
+            
+            if branch_id is not None:
+                current_year_total_query = current_year_total_query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            current_year_total = current_year_total_query.count()
+            
+            # Format date range for metadata
+            if month is not None:
+                # Format as "Jan-2026" if month is provided
+                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                date_range_display = f"{month_names[month]}-{year}"
+            else:
+                # Format as "2026" if only year
+                date_range_display = str(year)
+            
+            # Prepare data for Excel - remove Container ID and Status columns from data rows
             excel_data = []
             for log in refill_logs:
                 excel_data.append({
-                    "Container ID": canister_number,
                     "Refill Date": log.refill_date.strftime("%Y-%m-%d") if log.refill_date else "",
                     "Refill Time": log.refill_time.strftime("%H:%M:%S") if log.refill_time else "",
                     "Cryoshipper": log.cryoshipper or "",
@@ -783,8 +822,7 @@ class QualityTrackingService:
                     "LN2 Ordered Date": log.ln2_ordered_date.strftime("%Y-%m-%d") if log.ln2_ordered_date else "",
                     "LN2 Received Date": log.ln2_received_date.strftime("%Y-%m-%d") if log.ln2_received_date else "",
                     "Description": log.description or "",
-                    "Refilled By": log.refilled_by or "",
-                    "Status": log.status.value if log.status else ""
+                    "Refilled By": log.refilled_by or ""
                 })
             
             # Create DataFrame
@@ -794,17 +832,27 @@ class QualityTrackingService:
             output = io.BytesIO()
             
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Write metadata at the top
-                metadata_df = pd.DataFrame({
-                    "Field": ["Canister/Container ID", "Date"],
-                    "Value": [canister_number, f"{year}-{month:02d}"]
-                })
+                # Write metadata at the top without "Field" and "Value" headers
+                # Format: Container ID on top, then Year/Month-Year, then Current Year Total
+                # Create metadata as a simple list of rows without column headers
+                metadata_data = [
+                    ["Container ID", canister_number],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Current Year Total", str(current_year_total)]
+                ]
                 
-                # Write metadata to first rows
-                metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=0)
+                # Write metadata to first rows without headers
+                metadata_df = pd.DataFrame(metadata_data)
+                metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
                 
-                # Write data starting from row 4 (after metadata and header)
-                df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=3)
+                # Write data starting from row 5 (after metadata: 3 data rows + 1 empty row + 1 header row)
+                # Row 1: Container ID | canister_number
+                # Row 2: Year/Month-Year | 2026 or Jan-2026
+                # Row 3: Current Year Total | count
+                # Row 4: (empty)
+                # Row 5: Data headers
+                # Row 6+: Data rows
+                df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
                 
                 # Get workbook and worksheet for formatting
                 workbook = writer.book
@@ -816,26 +864,23 @@ class QualityTrackingService:
                     brand_purple = "6B1176"  # Primary brand purple
                     brand_purple_light = "FDF4FF"  # Light purple background
                     
-                    # Style metadata header (row 1) - light purple background with purple text
-                    metadata_header_fill = PatternFill(start_color=brand_purple_light, end_color=brand_purple_light, fill_type="solid")
-                    metadata_header_font = Font(bold=True, color=brand_purple, size=11)
-                    
-                    for cell in worksheet[1]:
-                        cell.fill = metadata_header_fill
-                        cell.font = metadata_header_font
-                        cell.alignment = Alignment(horizontal="left", vertical="center")
-                    
-                    # Style metadata values (row 2) - bold purple text
+                    # Style metadata rows (rows 1-3) - bold purple text for labels, regular for values
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
                     metadata_value_font = Font(bold=True, color=brand_purple, size=11)
-                    for cell in worksheet[2]:
-                        cell.font = metadata_value_font
-                        cell.alignment = Alignment(horizontal="left", vertical="center")
                     
-                    # Style data header (row 4) - purple background with white text
+                    for row_idx in range(1, 4):  # Rows 1, 2, 3 (metadata rows)
+                        for col_idx, cell in enumerate(worksheet[row_idx]):
+                            if col_idx == 0:  # First column (labels)
+                                cell.font = metadata_label_font
+                            else:  # Second column (values)
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    # Style data header (row 5) - purple background with white text
                     data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
                     data_header_font = Font(bold=True, color="FFFFFF", size=11)
                     
-                    for cell in worksheet[4]:
+                    for cell in worksheet[5]:
                         cell.fill = data_header_fill
                         cell.font = data_header_font
                         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -861,7 +906,10 @@ class QualityTrackingService:
             output.close()
             
             # Generate filename
-            filename = f"refill_logs_{canister_number}_{year}_{month:02d}.xlsx"
+            if month is not None:
+                filename = f"refill_logs_{canister_number}_{year}_{month:02d}.xlsx"
+            else:
+                filename = f"refill_logs_{canister_number}_{year}.xlsx"
             
             # Create response
             response = Response(
@@ -873,7 +921,7 @@ class QualityTrackingService:
             )
             
             logger.info(
-                f"Exported {len(refill_logs)} refill logs for canister {canister_number} ({year}-{month:02d})"
+                f"Exported {len(refill_logs)} refill logs for canister {canister_number} ({date_range_str})"
             )
             
             return response
@@ -881,14 +929,14 @@ class QualityTrackingService:
         except AppException:
             raise
         except Exception as e:
-            logger.error(f"Error exporting monthly refill logs: {str(e)}", exc_info=True)
+            logger.error(f"Error exporting refill logs: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to export refill logs: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
     
-    def export_kpi_threshold_monthly_csv(
+    def export_kpi_threshold_monthly_excel(
         self,
         canister_number: str,
         year: Optional[int] = None,
@@ -896,16 +944,16 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> Response:
         """
-        Export KPI threshold data as monthly CSV log for a specific canister.
+        Export KPI threshold deviation data as Excel format for a specific canister.
         
         Args:
             canister_number: Canister number to filter by (e.g., "C1") - required
-            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
-            month: Month for the monthly report (1-12). If not provided, uses current month.
+            year: Year for the report (e.g., 2024). If not provided, uses current year.
+            month: Month for the report (1-12). If not provided, exports entire year.
             branch_id: Optional branch ID for filtering
             
         Returns:
-            FastAPI Response with CSV file containing KPI threshold data
+            FastAPI Response with Excel file containing KPI threshold deviation data
             
         Raises:
             AppException: If export fails
@@ -919,20 +967,10 @@ class QualityTrackingService:
                     status_code=HTTPStatus.BAD_REQUEST
                 )
             
-            # Use current month if year/month not provided
+            # Use current year if year not provided
             current_date = datetime.now()
             if year is None:
                 year = current_date.year
-            if month is None:
-                month = current_date.month
-            
-            # Validate month
-            if not (1 <= month <= 12):
-                raise AppException(
-                    message="Month must be between 1 and 12",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
             
             # Validate year
             if not (2000 <= year <= 2100):
@@ -942,15 +980,36 @@ class QualityTrackingService:
                     status_code=HTTPStatus.BAD_REQUEST
                 )
             
+            # Validate month if provided
+            if month is not None:
+                if not (1 <= month <= 12):
+                    raise AppException(
+                        message="Month must be between 1 and 12",
+                        error_code=ErrorMessages.INVALID_INPUT,
+                        status_code=HTTPStatus.BAD_REQUEST
+                    )
+            
             # Resolve canister_id (required)
             canister_id = self.resolve_canister_id(canister_number, branch_id)
             
-            # Calculate date range for the month
-            start_datetime = datetime(year, month, 1, 0, 0, 0)
-            if month == 12:
-                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+            # Calculate date range based on whether month is provided
+            if month is not None:
+                # Export specific month
+                start_datetime = datetime(year, month, 1, 0, 0, 0)
+                if month == 12:
+                    end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                else:
+                    end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+                # Format month-year for metadata
+                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                date_range_display = f"{month_names[month]}-{year}"
+                date_range_str = f"{year}-{month:02d}"
             else:
-                end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+                # Export entire year
+                start_datetime = datetime(year, 1, 1, 0, 0, 0)
+                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                date_range_display = str(year)
+                date_range_str = str(year)
             
             # Query IVF quality logs for the specified month and canister
             query = (
@@ -981,7 +1040,7 @@ class QualityTrackingService:
             
             if not results:
                 raise AppException(
-                    message=f"No KPI threshold data found for {year}-{month:02d}",
+                    message=f"No KPI threshold deviation data found for {date_range_str}",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -994,9 +1053,9 @@ class QualityTrackingService:
                 "light": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "lux"}
             }
             
-            # Prepare CSV data
-            csv_data = []
-            for quality_log, canister_number, branch_name in results:
+            # Prepare Excel data
+            excel_data = []
+            for quality_log, canister_num, branch_name in results:
                 # Determine which parameters violated thresholds
                 violations = []
                 if quality_log.is_temp_loss:
@@ -1008,10 +1067,10 @@ class QualityTrackingService:
                 if quality_log.is_light_loss:
                     violations.append("Light")
                 
-                csv_data.append({
+                excel_data.append({
                     "Date": quality_log.reading_timestamp.strftime("%Y-%m-%d") if quality_log.reading_timestamp else "",
                     "Time": quality_log.reading_timestamp.strftime("%H:%M:%S") if quality_log.reading_timestamp else "",
-                    "Canister Number": canister_number or "",
+                    "Canister Number": canister_num or "",
                     "Branch Name": branch_name or "",
                     "Device ID": quality_log.device_id or "",
                     "Temperature (°C)": f"{quality_log.temperature:.2f}" if quality_log.temperature is not None else "",
@@ -1038,44 +1097,96 @@ class QualityTrackingService:
                     "Violated Parameters": ", ".join(violations) if violations else "None"
                 })
             
-            # Create CSV in memory
-            buffer = io.StringIO()
+            # Create DataFrame
+            df = pd.DataFrame(excel_data)
             
-            try:
-                if csv_data:
-                    fieldnames = list(csv_data[0].keys())
-                    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(csv_data)
+            # Create Excel file in memory
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # Write metadata at the top without "Field" and "Value" headers
+                # Format: Container ID on top, then Year/Month-Year, then Total Deviations
+                metadata_data = [
+                    ["Container ID", canister_number],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Total Deviations", str(len(excel_data))]
+                ]
                 
-                csv_text = buffer.getvalue()
-            except Exception as exc:
-                logger.error(
-                    f"CSV export generation failed for KPI thresholds {year}-{month:02d}: {exc}",
-                    exc_info=True
-                )
-                raise AppException(
-                    message=f"Failed to generate CSV export: {str(exc)}",
-                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-            finally:
-                buffer.close()
+                # Write metadata to first rows without headers
+                metadata_df = pd.DataFrame(metadata_data)
+                metadata_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, header=False, startrow=0)
+                
+                # Write data starting from row 5 (after metadata: 3 data rows + 1 empty row + 1 header row)
+                df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, startrow=4)
+                
+                # Get workbook and worksheet for formatting
+                workbook = writer.book
+                worksheet = writer.sheets['KPI Threshold Deviations']
+                
+                # Format metadata section with brand colors
+                if Font and PatternFill and Alignment:
+                    # Brand colors: #6B1176 (purple), #FDF4FF (light purple background)
+                    brand_purple = "6B1176"  # Primary brand purple
+                    brand_purple_light = "FDF4FF"  # Light purple background
+                    
+                    # Style metadata rows (rows 1-3) - bold purple text for labels, regular for values
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                    
+                    for row_idx in range(1, 4):  # Rows 1, 2, 3 (metadata rows)
+                        for col_idx, cell in enumerate(worksheet[row_idx]):
+                            if col_idx == 0:  # First column (labels)
+                                cell.font = metadata_label_font
+                            else:  # Second column (values)
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    # Style data header (row 5) - purple background with white text
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    for cell in worksheet[5]:
+                        cell.fill = data_header_fill
+                        cell.font = data_header_font
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                else:
+                    # If openpyxl.styles is not available, skip formatting
+                    logger.warning("openpyxl.styles not available, skipping Excel formatting")
+                
+                # Auto-adjust column widths
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
             
-            # Encode CSV content
-            csv_content = csv_text.encode("utf-8")
+            output.seek(0)
+            excel_content = output.read()
+            output.close()
             
             # Generate filename
-            filename = f"kpi_threshold_{canister_number}_{year}_{month:02d}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+            if month is not None:
+                filename = f"kpi_threshold_deviations_{canister_number}_{year}_{month:02d}.xlsx"
+            else:
+                filename = f"kpi_threshold_deviations_{canister_number}_{year}.xlsx"
             
             # Create response
-            response = Response(content=csv_content, media_type="text/csv")
-            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-            for header, value in COMMON_API_HEADERS.items():
-                response.headers.setdefault(header, value)
+            response = Response(
+                content=excel_content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
             
             logger.info(
-                f"Exported {len(csv_data)} KPI threshold records for {year}-{month:02d}"
+                f"Exported {len(excel_data)} KPI threshold deviation records for {date_range_str}"
             )
             
             return response
@@ -1083,58 +1194,42 @@ class QualityTrackingService:
         except AppException:
             raise
         except Exception as e:
-            logger.error(f"Error exporting KPI threshold monthly CSV: {str(e)}", exc_info=True)
+            logger.error(f"Error exporting KPI threshold deviations: {str(e)}", exc_info=True)
             raise AppException(
-                message=f"Failed to export KPI threshold data: {str(e)}",
+                message=f"Failed to export KPI threshold deviation data: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
     
-    def export_telemetry_data_monthly_csv(
+    def export_combined_refill_logs_and_deviations_excel(
         self,
-        canister_number: str,
+        canister_id: int,
         year: Optional[int] = None,
         month: Optional[int] = None,
         branch_id: Optional[int] = None
     ) -> Response:
         """
-        Export IVF telemetry data as monthly CSV log for a specific canister.
+        Export combined refill logs and KPI threshold deviations to Excel format with two sheets.
         
         Args:
-            canister_number: Canister number to filter by (e.g., "C1") - required
-            year: Year for the monthly report (e.g., 2024). If not provided, uses current year.
-            month: Month for the monthly report (1-12). If not provided, uses current month.
+            canister_id: Canister ID to export logs for
+            year: Year for the report (e.g., 2024). If not provided, uses current year.
+            month: Month for the report (1-12). If not provided, exports entire year.
             branch_id: Optional branch ID for filtering
             
         Returns:
-            FastAPI Response with CSV file containing telemetry data
+            FastAPI Response with Excel file containing two sheets:
+            - Sheet 1: Refill Logs
+            - Sheet 2: KPI Threshold Deviations
             
         Raises:
-            AppException: If export fails
+            AppException: If export fails or canister not found
         """
         try:
-            # Validate canister_number is provided
-            if not canister_number or not canister_number.strip():
-                raise AppException(
-                    message="canister_number is required",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
-            
-            # Use current month if year/month not provided
+            # Use current year if year not provided
             current_date = datetime.now()
             if year is None:
                 year = current_date.year
-            if month is None:
-                month = current_date.month
-            
-            # Validate month
-            if not (1 <= month <= 12):
-                raise AppException(
-                    message="Month must be between 1 and 12",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
             
             # Validate year
             if not (2000 <= year <= 2100):
@@ -1144,168 +1239,325 @@ class QualityTrackingService:
                     status_code=HTTPStatus.BAD_REQUEST
                 )
             
-            # Resolve canister_id (required)
-            canister_id = self.resolve_canister_id(canister_number, branch_id)
+            # Validate month if provided
+            if month is not None:
+                if not (1 <= month <= 12):
+                    raise AppException(
+                        message="Month must be between 1 and 12",
+                        error_code=ErrorMessages.INVALID_INPUT,
+                        status_code=HTTPStatus.BAD_REQUEST
+                    )
             
-            # Calculate date range for the month
-            start_datetime = datetime(year, month, 1, 0, 0, 0)
-            if month == 12:
-                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
-            else:
-                end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
-            
-            # Query IVF telemetry data for the specified month and canister
-            query = (
-                self.db.query(
-                    IVFTelemetryData,
-                    Canister.canister_number,
-                    HospitalBranch.branch_name
-                )
-                .join(Canister, IVFTelemetryData.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(
-                    IVFTelemetryData.created_at >= start_datetime,
-                    IVFTelemetryData.created_at < end_datetime,
-                    IVFTelemetryData.canister_id == canister_id,
-                    Canister.is_active == True
-                )
-            )
-            
-            # Apply branch filter if provided
-            if branch_id is not None:
-                query = query.filter(HospitalBranch.branch_id == branch_id)
-            
-            # Order by created_at
-            query = query.order_by(IVFTelemetryData.created_at)
-            
-            results = query.all()
-            
-            if not results:
+            # Get canister information
+            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
+            if not canister:
                 raise AppException(
-                    message=f"No telemetry data found for {year}-{month:02d}",
+                    message=f"Canister with ID {canister_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            # Prepare CSV data
-            csv_data = []
-            for telemetry_record, canister_number, branch_name in results:
-                # Extract data from JSONB telemetry_data field
-                telemetry_json = telemetry_record.telemetry_data or {}
-                
-                # Extract temperature
-                temperature_value = None
-                temperature_unit = None
-                if "Temperature" in telemetry_json and telemetry_json["Temperature"]:
-                    temp_obj = telemetry_json["Temperature"]
-                    temperature_value = temp_obj.get("Celsius") or temp_obj.get("Value")
-                    temperature_unit = temp_obj.get("Unit", "")
-                
-                # Extract humidity
-                humidity_value = None
-                humidity_unit = None
-                if "Humidity" in telemetry_json and telemetry_json["Humidity"]:
-                    humidity_obj = telemetry_json["Humidity"]
-                    humidity_value = humidity_obj.get("Percentage") or humidity_obj.get("Value")
-                    humidity_unit = humidity_obj.get("Unit", "")
-                
-                # Extract shock/agitation
-                shock_value = None
-                if "Shock" in telemetry_json and telemetry_json["Shock"]:
-                    shock_value = telemetry_json["Shock"].get("G") or telemetry_json["Shock"].get("Value")
-                elif "Vibration" in telemetry_json and telemetry_json["Vibration"]:
-                    shock_value = telemetry_json["Vibration"].get("Value")
-                elif "Agitation" in telemetry_json and telemetry_json["Agitation"]:
-                    shock_value = telemetry_json["Agitation"].get("Value")
-                
-                # Extract light
-                light_value = None
-                if "Light" in telemetry_json and telemetry_json["Light"]:
-                    light_obj = telemetry_json["Light"]
-                    light_value = light_obj.get("Lux") or light_obj.get("Value")
-                
-                # Extract location
-                latitude = None
-                longitude = None
-                if "Location" in telemetry_json and telemetry_json["Location"]:
-                    location_obj = telemetry_json["Location"]
-                    latitude = location_obj.get("Latitude") or location_obj.get("latitude")
-                    longitude = location_obj.get("Longitude") or location_obj.get("longitude")
-                
-                # Extract timestamp from telemetry data
-                telemetry_timestamp = telemetry_json.get("Timestamp") or telemetry_json.get("timestamp")
-                
-                # Extract device ID from telemetry data (fallback to column value)
-                device_id = telemetry_json.get("DeviceId") or telemetry_json.get("device_id") or telemetry_record.device_id
-                
-                # Extract battery and connectivity info if available
-                battery_level = telemetry_json.get("BatteryLevel") or telemetry_json.get("battery_level")
-                is_charging = telemetry_json.get("IsCharging") or telemetry_json.get("is_charging")
-                connected_status = telemetry_json.get("Connected") or telemetry_json.get("connected")
-                signal_strength = telemetry_json.get("SignalStrength") or telemetry_json.get("signal_strength")
-                
-                csv_data.append({
-                    "ID": telemetry_record.id,
-                    "Created At": telemetry_record.created_at.strftime("%Y-%m-%d %H:%M:%S") if telemetry_record.created_at else "",
-                    "Telemetry Timestamp": telemetry_timestamp or "",
-                    "Canister ID": telemetry_record.canister_id,
-                    "Canister Number": canister_number or "",
-                    "Branch Name": branch_name or "",
-                    "Device ID": device_id or "",
-                    "Temperature Value": f"{temperature_value}" if temperature_value is not None else "",
-                    "Temperature Unit": temperature_unit or "",
-                    "Humidity Value": f"{humidity_value}" if humidity_value is not None else "",
-                    "Humidity Unit": humidity_unit or "",
-                    "Shock/Agitation (G)": f"{shock_value}" if shock_value is not None else "",
-                    "Light Value (Lux)": f"{light_value}" if light_value is not None else "",
-                    "Latitude": f"{latitude}" if latitude is not None else "",
-                    "Longitude": f"{longitude}" if longitude is not None else "",
-                    "Battery Level": f"{battery_level}" if battery_level is not None else "",
-                    "Is Charging": f"{is_charging}" if is_charging is not None else "",
-                    "Connected": f"{connected_status}" if connected_status is not None else "",
-                    "Signal Strength": f"{signal_strength}" if signal_strength is not None else "",
-                    "Raw Telemetry Data": str(telemetry_json) if telemetry_json else ""
+            canister_number = canister.canister_number or f"Canister-{canister_id}"
+            
+            # Calculate date range based on whether month is provided
+            if month is not None:
+                # Export specific month
+                start_date = date(year, month, 1)
+                if month == 12:
+                    end_date = date(year + 1, 1, 1)
+                else:
+                    end_date = date(year, month + 1, 1)
+                start_datetime = datetime(year, month, 1, 0, 0, 0)
+                if month == 12:
+                    end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                else:
+                    end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+                date_range_str = f"{year}-{month:02d}"
+                # Format month-year for metadata
+                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                date_range_display = f"{month_names[month]}-{year}"
+            else:
+                # Export entire year
+                start_date = date(year, 1, 1)
+                end_date = date(year + 1, 1, 1)
+                start_datetime = datetime(year, 1, 1, 0, 0, 0)
+                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                date_range_str = str(year)
+                date_range_display = str(year)
+            
+            # ============================================
+            # SHEET 1: REFILL LOGS
+            # ============================================
+            refill_logs_query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.refill_date >= start_date,
+                    CanisterLn2Log.refill_date < end_date
+                )
+            )
+            
+            if branch_id is not None:
+                refill_logs_query = refill_logs_query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            refill_logs_query = refill_logs_query.order_by(
+                CanisterLn2Log.refill_date,
+                CanisterLn2Log.refill_time
+            )
+            
+            refill_logs = refill_logs_query.all()
+            
+            # Prepare refill logs data
+            refill_logs_data = []
+            for log in refill_logs:
+                refill_logs_data.append({
+                    "Refill Date": log.refill_date.strftime("%Y-%m-%d") if log.refill_date else "",
+                    "Refill Time": log.refill_time.strftime("%H:%M:%S") if log.refill_time else "",
+                    "Cryoshipper": log.cryoshipper or "",
+                    "Disinfected Shipper/Infected Tank Description": log.disinfected_shipper_infected_tank_description or "",
+                    "Reservoir": log.reservoir or "",
+                    "LN2 Ordered Date": log.ln2_ordered_date.strftime("%Y-%m-%d") if log.ln2_ordered_date else "",
+                    "LN2 Received Date": log.ln2_received_date.strftime("%Y-%m-%d") if log.ln2_received_date else "",
+                    "Description": log.description or "",
+                    "Refilled By": log.refilled_by or ""
                 })
             
-            # Create CSV in memory
-            buffer = io.StringIO()
+            # Get current year total log count (for metadata)
+            current_year = datetime.now().year
+            current_year_start = date(current_year, 1, 1)
+            current_year_end = date(current_year + 1, 1, 1)
             
-            try:
-                if csv_data:
-                    fieldnames = list(csv_data[0].keys())
-                    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(csv_data)
+            current_year_total_query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.refill_date >= current_year_start,
+                    CanisterLn2Log.refill_date < current_year_end
+                )
+            )
+            
+            if branch_id is not None:
+                current_year_total_query = current_year_total_query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            current_year_total = current_year_total_query.count()
+            
+            # ============================================
+            # SHEET 2: KPI THRESHOLD DEVIATIONS
+            # ============================================
+            # KPI Threshold Targets
+            kpi_targets = {
+                "temperature": {"target": 5.0, "min": 0.0, "max": 10.0, "unit": "°C"},
+                "humidity": {"target": 50.0, "min": 45.0, "max": 55.0, "unit": "%"},
+                "agitation": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "G"},
+                "light": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "lux"}
+            }
+            
+            # Query IVF quality logs for deviations
+            deviations_query = (
+                self.db.query(
+                    IVFQualityLog,
+                    Canister.canister_number,
+                    HospitalBranch.branch_name
+                )
+                .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(
+                    IVFQualityLog.reading_timestamp >= start_datetime,
+                    IVFQualityLog.reading_timestamp < end_datetime,
+                    IVFQualityLog.canister_id == canister_id,
+                    Canister.is_active == True
+                )
+            )
+            
+            if branch_id is not None:
+                deviations_query = deviations_query.filter(HospitalBranch.branch_id == branch_id)
+            
+            deviations_query = deviations_query.order_by(IVFQualityLog.reading_timestamp)
+            
+            deviations_results = deviations_query.all()
+            
+            # Prepare deviations data
+            deviations_data = []
+            for quality_log, canister_num, branch_name in deviations_results:
+                # Determine which parameters violated thresholds
+                violations = []
+                if quality_log.is_temp_loss:
+                    violations.append("Temperature")
+                if quality_log.is_humidity_loss:
+                    violations.append("Humidity")
+                if quality_log.is_agitation_loss:
+                    violations.append("Agitation")
+                if quality_log.is_light_loss:
+                    violations.append("Light")
                 
-                csv_text = buffer.getvalue()
-            except Exception as exc:
-                logger.error(
-                    f"CSV export generation failed for telemetry data {year}-{month:02d}: {exc}",
-                    exc_info=True
-                )
-                raise AppException(
-                    message=f"Failed to generate CSV export: {str(exc)}",
-                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-            finally:
-                buffer.close()
+                deviations_data.append({
+                    "Date": quality_log.reading_timestamp.strftime("%Y-%m-%d") if quality_log.reading_timestamp else "",
+                    "Time": quality_log.reading_timestamp.strftime("%H:%M:%S") if quality_log.reading_timestamp else "",
+                    "Canister Number": canister_num or "",
+                    "Branch Name": branch_name or "",
+                    "Device ID": quality_log.device_id or "",
+                    "Temperature (°C)": f"{quality_log.temperature:.2f}" if quality_log.temperature is not None else "",
+                    "Temperature Target (°C)": f"{kpi_targets['temperature']['target']:.1f}",
+                    "Temperature Min (°C)": f"{kpi_targets['temperature']['min']:.1f}",
+                    "Temperature Max (°C)": f"{kpi_targets['temperature']['max']:.1f}",
+                    "Temperature Violation": "Yes" if quality_log.is_temp_loss else "No",
+                    "Humidity (%)": f"{quality_log.humidity:.2f}" if quality_log.humidity is not None else "",
+                    "Humidity Target (%)": f"{kpi_targets['humidity']['target']:.1f}",
+                    "Humidity Min (%)": f"{kpi_targets['humidity']['min']:.1f}",
+                    "Humidity Max (%)": f"{kpi_targets['humidity']['max']:.1f}",
+                    "Humidity Violation": "Yes" if quality_log.is_humidity_loss else "No",
+                    "Agitation (G)": f"{quality_log.agitation:.2f}" if quality_log.agitation is not None else "",
+                    "Agitation Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
+                    "Agitation Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
+                    "Agitation Max (G)": f"{kpi_targets['agitation']['max']:.1f}",
+                    "Agitation Violation": "Yes" if quality_log.is_agitation_loss else "No",
+                    "Light (lux)": f"{quality_log.light:.2f}" if quality_log.light is not None else "",
+                    "Light Target (lux)": f"{kpi_targets['light']['target']:.1f}",
+                    "Light Min (lux)": f"{kpi_targets['light']['min']:.1f}",
+                    "Light Max (lux)": f"{kpi_targets['light']['max']:.1f}",
+                    "Light Violation": "Yes" if quality_log.is_light_loss else "No",
+                    "Quality Loss (%)": f"{quality_log.quality_loss:.2f}" if quality_log.quality_loss is not None else "",
+                    "Violated Parameters": ", ".join(violations) if violations else "None"
+                })
             
-            # Encode CSV content
-            csv_content = csv_text.encode("utf-8")
+            # ============================================
+            # CREATE EXCEL FILE WITH TWO SHEETS
+            # ============================================
+            # Create DataFrames
+            refill_logs_df = pd.DataFrame(refill_logs_data)
+            deviations_df = pd.DataFrame(deviations_data)
+            
+            # Create Excel file in memory
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # ============================================
+                # SHEET 1: REFILL LOGS
+                # ============================================
+                if not refill_logs_df.empty:
+                    # Write metadata for refill logs
+                    refill_metadata_data = [
+                        ["Container ID", canister_number],
+                        ["Year" if month is None else "Month-Year", date_range_display],
+                        ["Current Year Total", str(current_year_total)]
+                    ]
+                    refill_metadata_df = pd.DataFrame(refill_metadata_data)
+                    refill_metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
+                    
+                    # Write refill logs data starting from row 5
+                    refill_logs_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
+                    
+                    # Format refill logs sheet
+                    refill_worksheet = writer.sheets['Refill Logs']
+                    if Font and PatternFill and Alignment:
+                        brand_purple = "6B1176"
+                        metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                        metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                        
+                        for row_idx in range(1, 4):
+                            for col_idx, cell in enumerate(refill_worksheet[row_idx]):
+                                if col_idx == 0:
+                                    cell.font = metadata_label_font
+                                else:
+                                    cell.font = metadata_value_font
+                                cell.alignment = Alignment(horizontal="left", vertical="center")
+                        
+                        data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                        data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                        
+                        for cell in refill_worksheet[5]:
+                            cell.fill = data_header_fill
+                            cell.font = data_header_font
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                    
+                    # Auto-adjust column widths for refill logs
+                    for column in refill_worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        refill_worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+                # ============================================
+                # SHEET 2: KPI THRESHOLD DEVIATIONS
+                # ============================================
+                if not deviations_df.empty:
+                    # Write metadata for deviations
+                    deviations_metadata_data = [
+                        ["Container ID", canister_number],
+                        ["Year" if month is None else "Month-Year", date_range_display],
+                        ["Total Deviations", str(len(deviations_data))]
+                    ]
+                    deviations_metadata_df = pd.DataFrame(deviations_metadata_data)
+                    deviations_metadata_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, header=False, startrow=0)
+                    
+                    # Write deviations data starting from row 5
+                    deviations_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, startrow=4)
+                    
+                    # Format deviations sheet
+                    deviations_worksheet = writer.sheets['KPI Threshold Deviations']
+                    if Font and PatternFill and Alignment:
+                        brand_purple = "6B1176"
+                        metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                        metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                        
+                        for row_idx in range(1, 4):
+                            for col_idx, cell in enumerate(deviations_worksheet[row_idx]):
+                                if col_idx == 0:
+                                    cell.font = metadata_label_font
+                                else:
+                                    cell.font = metadata_value_font
+                                cell.alignment = Alignment(horizontal="left", vertical="center")
+                        
+                        data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                        data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                        
+                        for cell in deviations_worksheet[5]:
+                            cell.fill = data_header_fill
+                            cell.font = data_header_font
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                    
+                    # Auto-adjust column widths for deviations
+                    for column in deviations_worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        deviations_worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            output.seek(0)
+            excel_content = output.read()
+            output.close()
             
             # Generate filename
-            filename = f"telemetry_data_{canister_number}_{year}_{month:02d}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+            if month is not None:
+                filename = f"combined_report_{canister_number}_{year}_{month:02d}.xlsx"
+            else:
+                filename = f"combined_report_{canister_number}_{year}.xlsx"
             
             # Create response
-            response = Response(content=csv_content, media_type="text/csv")
-            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-            for header, value in COMMON_API_HEADERS.items():
-                response.headers.setdefault(header, value)
+            response = Response(
+                content=excel_content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
             
             logger.info(
-                f"Exported {len(csv_data)} telemetry data records for {year}-{month:02d}"
+                f"Exported combined report for canister {canister_number} ({date_range_str}): "
+                f"{len(refill_logs_data)} refill logs, {len(deviations_data)} deviations"
             )
             
             return response
@@ -1313,9 +1565,9 @@ class QualityTrackingService:
         except AppException:
             raise
         except Exception as e:
-            logger.error(f"Error exporting telemetry data monthly CSV: {str(e)}", exc_info=True)
+            logger.error(f"Error exporting combined report: {str(e)}", exc_info=True)
             raise AppException(
-                message=f"Failed to export telemetry data: {str(e)}",
+                message=f"Failed to export combined report: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
