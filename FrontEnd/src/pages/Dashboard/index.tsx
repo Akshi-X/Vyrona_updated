@@ -132,10 +132,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
   const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
 
-  // IVF avg quality loss per container metric (live API data)
-  const [ivfAvgQualityLossPerContainer, setIvfAvgQualityLossPerContainer] = useState<number | null>(null);
-  const [loadingIvfAvgQualityLoss, setLoadingIvfAvgQualityLoss] = useState(false);
-  const [ivfAvgQualityLossError, setIvfAvgQualityLossError] = useState<string | null>(null);
 
   // IVF total deviations metric (live API data)
   const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
@@ -546,33 +542,6 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
-  // Fetch IVF avg quality loss per container from API
-  useEffect(() => {
-    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
-    if (!shouldFetch) return;
-
-    let cancelled = false;
-    const fetchAvgQualityLoss = async () => {
-      setLoadingIvfAvgQualityLoss(true);
-      setIvfAvgQualityLossError(null);
-      try {
-        const response = await ivfService.getAvgQualityLossPerContainer();
-        if (!cancelled) setIvfAvgQualityLossPerContainer(response?.avg_quality_loss_per_container ?? 0);
-      } catch (e: any) {
-        if (!cancelled) {
-          setIvfAvgQualityLossPerContainer(0);
-          setIvfAvgQualityLossError(e?.message || 'Failed to load avg quality loss');
-        }
-      } finally {
-        if (!cancelled) setLoadingIvfAvgQualityLoss(false);
-      }
-    };
-
-    fetchAvgQualityLoss();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
 
   // Fetch IVF total deviations from API
   useEffect(() => {
