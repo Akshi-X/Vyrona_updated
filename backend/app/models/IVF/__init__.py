@@ -7,6 +7,7 @@ from .canister_ln2_log_model import CanisterLn2Log
 from .ivf_telemetry_data_model import IVFTelemetryData
 from .ivf_quality_log_model import IVFQualityLog
 from .ivf_geolocation_model import IVFGeolocation
+from .ivf_shipment_model import IVFShipment
 from .cane_model import Cane
 from .cryolock_model import Cryolock
 from .patient_model import IVFPatient
