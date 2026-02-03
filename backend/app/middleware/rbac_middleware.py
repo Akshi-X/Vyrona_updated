@@ -20,6 +20,7 @@ from ..config.permissions import (
     AUTHENTICATED_ENDPOINTS
 )
 from ..exceptions import AdminRoleRequiredException, ManagerRoleRequiredException, UserRoleRequiredException
+from ..utils.user_helpers import is_hospital_department
 
 
 class RBACMiddleware(BaseHTTPMiddleware):
@@ -48,7 +49,12 @@ class RBACMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         current_user = request.state.current_user
-        user_role = current_user.role.lower()
+        # Get role as string (handle enum)
+        user_role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+        user_role = user_role_str.lower()
+        
+        # Check if user is hospital user (IVF) - they have different permission rules
+        is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
         
         # Check if endpoint requires specific role
         # Note: Check overlapping permissions first (endpoints in multiple sets)
@@ -61,14 +67,25 @@ class RBACMiddleware(BaseHTTPMiddleware):
         
         elif requires_manager and requires_pharma_admin:
             # Endpoint is in both manager and pharma_admin sets (e.g., task creation)
-            # Allow admin, manager, or pharma_admin
-            if user_role not in ['admin', 'manager', 'pharma_admin']:
-                raise ManagerRoleRequiredException(user_role=user_role)
+            # For IVF (hospital users): Allow admin, manager, or user
+            # For CGT (pharma users): Allow admin, manager, or pharma_admin
+            if is_hospital_user:
+                if user_role not in ['admin', 'manager', 'user']:
+                    raise ManagerRoleRequiredException(user_role=user_role)
+            else:
+                if user_role not in ['admin', 'manager', 'pharma_admin']:
+                    raise ManagerRoleRequiredException(user_role=user_role)
         
         elif requires_manager:
             # Manager-only endpoint
-            if user_role not in ['admin', 'manager']:
-                raise ManagerRoleRequiredException(user_role=user_role)
+            # For IVF (hospital users): Allow admin, manager, or user
+            # For CGT (pharma users): Allow admin or manager
+            if is_hospital_user:
+                if user_role not in ['admin', 'manager', 'user']:
+                    raise ManagerRoleRequiredException(user_role=user_role)
+            else:
+                if user_role not in ['admin', 'manager']:
+                    raise ManagerRoleRequiredException(user_role=user_role)
         
         elif requires_pharma_admin:
             # Pharma admin-only endpoint
