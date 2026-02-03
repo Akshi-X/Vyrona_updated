@@ -475,22 +475,6 @@ class QualityTrackingService:
             branch_id=branch_id
         )
 
-    def mark_in_transit(
-        self,
-        canister_id: int,
-        flag_update: CryolockFlagUpdate,
-        updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
-    ) -> CryolockFlagUpdateResponse:
-        """Mark a cryolock as moved to transit (in_transit = True)."""
-        return self._set_cryolock_flag(
-            canister_id=canister_id,
-            cryolock_number=flag_update.cryolock_number,
-            flag_field="in_transit",
-            updated_by=updated_by,
-            branch_id=branch_id
-        )
-
     def _parse_description(self, description: str) -> dict:
         """
         Parse description to extract source, destination, and device_id.
@@ -609,11 +593,18 @@ class QualityTrackingService:
         10. Return response with shipment details
         """
         try:
-            # Step 1: Get and validate cryolock
+            # Step 1 & 2: Get cryolock, canister, tank, and source branch in a single optimized query
             query = (
-                self.db.query(Cryolock)
+                self.db.query(
+                    Cryolock,
+                    Canister,
+                    Tank,
+                    HospitalBranch
+                )
                 .join(Cane, Cryolock.cane_id == Cane.cane_id)
                 .join(Canister, Cane.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .filter(
                     Canister.canister_id == canister_id,
                     Cryolock.cryolock_number == request.cryolock_number
@@ -621,22 +612,19 @@ class QualityTrackingService:
             )
 
             if branch_id is not None:
-                query = (
-                    query.join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == branch_id)
-                )
+                query = query.filter(HospitalBranch.branch_id == branch_id)
 
-            cryolock = query.first()
-            if not cryolock:
+            result = query.first()
+            if not result:
                 raise AppException(
                     message=f"Cryolock with number '{request.cryolock_number}' not found in canister {canister_id}",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
-
-            # Step 2: Get source branch (from canister → tank → branch)
-            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
+            
+            cryolock, canister, tank, source_branch = result
+            
+            # Validate all required objects exist
             if not canister:
                 raise AppException(
                     message=f"Canister {canister_id} not found",
@@ -644,7 +632,6 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            tank = self.db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
             if not tank:
                 raise AppException(
                     message=f"Tank for canister {canister_id} not found",
@@ -652,9 +639,6 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            source_branch = self.db.query(HospitalBranch).filter(
-                HospitalBranch.branch_id == tank.branch_id
-            ).first()
             if not source_branch:
                 raise AppException(
                     message=f"Source branch for canister {canister_id} not found",
@@ -808,6 +792,15 @@ class QualityTrackingService:
             self.db.commit()
             self.db.refresh(ivf_shipment)
             self.db.refresh(cryolock)
+            
+            # Verify in_transit was updated successfully
+            if not cryolock.in_transit:
+                logger.error(f"Failed to update in_transit flag for cryolock {cryolock.cryolock_id}")
+                raise AppException(
+                    message="Failed to update cryolock in_transit status",
+                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
 
             # Step 10: Build response
             shipment_response = {
