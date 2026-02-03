@@ -82,7 +82,8 @@ def init_db():
         cane_model,
         cryolock_model,
         patient_model as ivf_patient_model,
-        embryo_model
+        embryo_model,
+        critical_alert_model
     )
     
     # Note: IVF schema separation has been removed
