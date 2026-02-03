@@ -206,7 +206,16 @@ def setup_exception_handlers(app):
         error_messages = []
         for error in exc.errors():
             field = ".".join(str(loc) for loc in error["loc"])
-            if field == "body.email":
+            error_msg = error.get("msg", "")
+            
+            # Check for model_validator errors (these have "__root__" or empty loc)
+            if not field or field == "__root__" or "body" not in field:
+                # This is likely a model_validator error - use the message directly
+                if error_msg:
+                    error_messages.append(error_msg)
+                else:
+                    error_messages.append(str(error))
+            elif field == "body.email":
                 error_messages.append("Please provide a valid email address")
             elif field == "body.password":
                 error_messages.append("Password is required")
@@ -219,7 +228,11 @@ def setup_exception_handlers(app):
             elif field == "body.company_name":
                 error_messages.append("Company name is required")
             else:
-                error_messages.append(f"Invalid {field}")
+                # Use the error message if available, otherwise generic
+                if error_msg:
+                    error_messages.append(error_msg)
+                else:
+                    error_messages.append(f"Invalid {field}")
         
         # Use the first error message or a generic one
         user_message = error_messages[0] if error_messages else "Please check your input and try again"
