@@ -3,6 +3,7 @@ from sqlalchemy import desc, func, and_
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from collections import defaultdict
+from datetime import datetime as dt, date, time
 import logging
 
 from ...models.IVF.hospital_model import Hospital
@@ -15,6 +16,7 @@ from ...models.IVF.cane_model import Cane
 from ...models.IVF.cryolock_model import Cryolock
 from ...models.IVF.patient_model import IVFPatient
 from ...models.IVF.embryo_model import Embryo
+from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.shipment_model import Shipment
 from ...constants.enums import CanisterStatus
 
@@ -153,8 +155,6 @@ class IVFService:
             # Optimized query: Use subquery to get latest log per canister in one query
             # This eliminates N+1 query problem
             # Get latest refill_date and refill_time separately, then combine in Python
-            from datetime import datetime as dt, date, time
-            
             latest_logs_subquery = (
                 self.db.query(
                     CanisterLn2Log.canister_id,
@@ -323,6 +323,7 @@ class IVFService:
                         Cryolock.cryolock_color,
                         Embryo.date_of_vitrification,
                         HospitalBranch.branch_name,
+                        Cryolock.cryolock_id,
                         # Aggregate embryo_grading for grouping by cryolock
                         func.string_agg(
                             func.coalesce(Embryo.embryo_grading, ''), 
@@ -352,7 +353,8 @@ class IVFService:
                     Cryolock.goblet_color,
                     Cryolock.cryolock_color,
                     Embryo.date_of_vitrification,
-                    HospitalBranch.branch_name
+                    HospitalBranch.branch_name,
+                    Cryolock.cryolock_id
                 ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
             else:
                 # Manager/Admin roles: Show individual embryos with status (no aggregation)
@@ -368,6 +370,7 @@ class IVFService:
                         Embryo.date_of_vitrification,
                         Embryo.status,
                         HospitalBranch.branch_name,
+                        Cryolock.cryolock_id,
                         Embryo.embryo_grading  # Individual grading, not aggregated
                     )
                     .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
@@ -388,9 +391,47 @@ class IVFService:
             
             results = query.all()
             
+            # Get cryolock IDs to fetch shipment descriptions
+            cryolock_ids = [row.cryolock_id for row in results]
+            
+            # Fetch descriptions from ivf_shipment table for cryolocks
+            # Get the most recent shipment description for each cryolock
+            shipment_descriptions = {}
+            if cryolock_ids:
+                # Use a subquery to get the latest shipment per cryolock
+                latest_shipments = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        func.max(IVFShipment.id).label('latest_shipment_id')
+                    )
+                    .filter(
+                        IVFShipment.cryolock_id.in_(cryolock_ids),
+                        IVFShipment.description.isnot(None)
+                    )
+                    .group_by(IVFShipment.cryolock_id)
+                    .subquery()
+                )
+                
+                shipment_descriptions_query = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        IVFShipment.description
+                    )
+                    .join(
+                        latest_shipments,
+                        IVFShipment.id == latest_shipments.c.latest_shipment_id
+                    )
+                )
+                
+                for shipment_row in shipment_descriptions_query.all():
+                    shipment_descriptions[shipment_row.cryolock_id] = shipment_row.description
+            
             tracking_list = []
             
             for row in results:
+                # Get description for this cryolock if it exists
+                description = shipment_descriptions.get(row.cryolock_id)
+                
                 tracking_data = {
                     "his_number": row.his_number or "",
                     "cryolock_number": row.cryolock_number or "",
@@ -400,6 +441,7 @@ class IVFService:
                     "goblet_color": row.goblet_color or "",
                     "cryolock_color": row.cryolock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,
+                    "description": description
                 }
                 
                 # Role-based field visibility

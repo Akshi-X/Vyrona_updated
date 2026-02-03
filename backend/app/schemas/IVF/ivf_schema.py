@@ -447,6 +447,7 @@ class EmbryoTrackingItem(BaseModel):
     embryo_grading: Optional[str] = Field(None, description="Comma-separated embryo gradings (User role only)")
     site_name: Optional[str] = Field(None, description="Branch name (Manager/Admin roles only)")
     status: Optional[str] = Field(None, description="Embryo status (Manager/Admin roles only)")
+    description: Optional[str] = Field(None, description="Shipment description if cryolock is in transit (from ivf_shipment table)")
     
     class Config:
         from_attributes = True

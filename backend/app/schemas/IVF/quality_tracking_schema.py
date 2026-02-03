@@ -72,6 +72,7 @@ class IVFCanisterTrackingItem(BaseModel):
     date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
     embryo_transfer: bool = Field(default=False, description="Whether the cryolock has been moved to embryo transfer")
     in_transit: bool = Field(default=False, description="Whether the cryolock has been moved to transit")
+    description: Optional[str] = Field(None, description="Shipment description if cryolock is in transit (from ivf_shipment table)")
 
 
 class IVFCanisterTrackingResponse(BaseModel):
@@ -124,3 +125,39 @@ class ColorUpdateResponse(BaseModel):
     message: str = Field(..., description="Success message")
     cryolock_number: Optional[str] = Field(None, description="Cryolock number that was updated (for goblet or cryolock color)")
     updated_color: str = Field(..., description="The color value that was set")
+
+
+class InTransitWithShipmentRequest(BaseModel):
+    """Schema for marking cryolock as in transit and creating IoT shipment
+    
+    Description format: "crylock is move from <source> to <destination>-deviceid -<device_id>"
+    Example: "crylock is move from egmore to thambaram-deviceid -xxxxx"
+    
+    The description will be parsed to extract:
+    - Source location (matched to branch name)
+    - Destination location (matched to branch name)
+    - Device ID (extracted from description)
+    """
+    cryolock_number: str = Field(..., description="Cryolock number to mark as in transit")
+    description: str = Field(..., description="Description containing source, destination, and device ID. Format: 'crylock is move from <source> to <destination>-deviceid -<device_id>'")
+
+
+class BranchInfo(BaseModel):
+    """Branch information for shipment response"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: Optional[str] = Field(None, description="Branch name")
+    address: Optional[str] = Field(None, description="Full address string")
+    latitude: Optional[float] = Field(None, description="Latitude coordinate")
+    longitude: Optional[float] = Field(None, description="Longitude coordinate")
+
+
+class InTransitWithShipmentResponse(BaseModel):
+    """Response for in-transit with shipment creation"""
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Success message")
+    cryolock_number: str = Field(..., description="Cryolock number that was updated")
+    in_transit: bool = Field(..., description="Updated in_transit flag value")
+    shipment: Dict = Field(..., description="Shipment details including shipment_id, iot_shipment_id, source/destination branches, etc.")
+    
+    class Config:
+        from_attributes = True
