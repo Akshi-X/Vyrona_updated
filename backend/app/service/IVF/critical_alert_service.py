@@ -7,6 +7,8 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from psycopg2.errors import UniqueViolation
 
 from ...models.IVF.critical_alert_model import CriticalAlert, AlertType, AlertSeverity, AlertStatus
 from ...models.IVF.canister_model import Canister
@@ -274,25 +276,74 @@ class CriticalAlertService:
             return existing_alert
         
         # Create new alert with UUID
-        alert = CriticalAlert(
-            alert_id=str(uuid.uuid4()),
-            canister_id=canister_id,
-            hospital_id=hospital_id,
-            branch_id=branch_id,
-            alert_type=alert_type.value,
-            source=source.value,
-            severity=severity.value,
-            message=message,
-            status=AlertStatus.ACTIVE.value,
-            triggered_by=triggered_by.value,
-            occurred_at=occurred_at,
-            dedup_key=dedup_key,
-            created_at=datetime.now(timezone.utc)
-        )
-        
-        self.db.add(alert)
-        self.db.flush()
-        return alert
+        try:
+            alert = CriticalAlert(
+                alert_id=str(uuid.uuid4()),
+                canister_id=canister_id,
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                alert_type=alert_type.value,
+                source=source.value,
+                severity=severity.value,
+                message=message,
+                status=AlertStatus.ACTIVE.value,
+                triggered_by=triggered_by.value,
+                occurred_at=occurred_at,
+                dedup_key=dedup_key,
+                created_at=datetime.now(timezone.utc)
+            )
+            
+            self.db.add(alert)
+            self.db.flush()
+            return alert
+        except IntegrityError as e:
+            # Handle race condition: if another process created the alert between our check and insert
+            if isinstance(e.orig, UniqueViolation) and 'dedup_key' in str(e.orig):
+                logger.info(f"Alert with dedup_key={dedup_key} already exists (race condition), fetching existing alert")
+                self.db.rollback()
+                
+                # Fetch the existing alert
+                existing_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.dedup_key == dedup_key,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value
+                    )
+                    .first()
+                )
+                
+                if existing_alert:
+                    # Update occurred_at to latest and refresh updated_at
+                    existing_alert.occurred_at = occurred_at
+                    existing_alert.updated_at = datetime.now(timezone.utc)
+                    self.db.flush()
+                    return existing_alert
+                else:
+                    # Alert exists but was acknowledged/resolved, create new one with different dedup_key
+                    logger.warning(f"Alert with dedup_key={dedup_key} exists but is not active, creating new alert")
+                    # Create new alert with timestamp in dedup_key to make it unique
+                    new_dedup_key = f"{dedup_key}:{datetime.now(timezone.utc).strftime('%H%M%S')}"
+                    alert = CriticalAlert(
+                        alert_id=str(uuid.uuid4()),
+                        canister_id=canister_id,
+                        hospital_id=hospital_id,
+                        branch_id=branch_id,
+                        alert_type=alert_type.value,
+                        source=source.value,
+                        severity=severity.value,
+                        message=message,
+                        status=AlertStatus.ACTIVE.value,
+                        triggered_by=triggered_by.value,
+                        occurred_at=occurred_at,
+                        dedup_key=new_dedup_key,
+                        created_at=datetime.now(timezone.utc)
+                    )
+                    self.db.add(alert)
+                    self.db.flush()
+                    return alert
+            else:
+                # Re-raise if it's a different integrity error
+                raise
     
     def check_and_create_alerts(self, canister_number: Optional[str] = None, branch_id: Optional[int] = None) -> List[CriticalAlert]:
         """
@@ -480,8 +531,8 @@ class CriticalAlertService:
         all_users = {user.user_id: user for user in users_to_notify + branch_users}.values()
         
         # Send email to each user
-        # Navigate to alerts page where user can manually acknowledge
-        alerts_url = f"{settings.FRONTEND_URL}/ivf/alerts?alert_id={alert.alert_id}"
+        # Navigate to dashboard with alert_id query param - Dashboard will open alerts modal automatically
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
         
         # Load email template
         template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
@@ -849,8 +900,8 @@ class CriticalAlertService:
             })
         
         subject = f"Reminder: {len(alerts)} Unacknowledged Critical Alert(s)"
-        # Navigate to alerts page where user can manually acknowledge
-        alerts_url = f"{settings.FRONTEND_URL}/ivf/alerts"
+        # Navigate to dashboard - Dashboard will show alerts modal
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard"
         
         try:
             if template:

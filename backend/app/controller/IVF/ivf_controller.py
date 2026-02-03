@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Path
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
 from app.service.IVF.ivf_service import IVFService
-from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
+from app.models.IVF.canister_model import Canister
+from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
 from app.utils.ivf_helpers import get_branch_filter_info
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
@@ -202,4 +203,72 @@ def get_embryo_tracking(
         return EmbryoTrackingResponse(**tracking_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting embryo tracking data: {str(e)}")
+
+
+@router.get("/canisters/{canister_number}/check", response_model=CanisterCheckResponse)
+def check_canister_exists(
+    canister_number: str = Path(..., description="Canister number/code to check (e.g., 'C1')"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Check if a canister exists in the system by canister number.
+    
+    This endpoint allows users to verify if a canister number exists before performing operations.
+    
+    Path Parameters:
+    - canister_number: Canister number/code to check (e.g., 'C1')
+    
+    Response:
+    - exists: Boolean indicating if the canister exists
+    - canister_number: The canister number that was checked
+    - canister_id: Canister ID if exists (null if not found)
+    - is_active: Whether the canister is active (null if not found)
+    - canister_status: Canister status (null if not found)
+    - message: Descriptive message about the result
+    
+    Example Response (exists):
+    {
+        "exists": true,
+        "canister_number": "C1",
+        "canister_id": 1,
+        "is_active": true,
+        "canister_status": "safe",
+        "message": "Canister C1 exists and is active"
+    }
+    
+    Example Response (not exists):
+    {
+        "exists": false,
+        "canister_number": "C999",
+        "canister_id": null,
+        "is_active": null,
+        "canister_status": null,
+        "message": "Canister C999 does not exist"
+    }
+    """
+    try:
+        # Query canister by canister_number
+        canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
+        
+        if canister:
+            return CanisterCheckResponse(
+                exists=True,
+                canister_number=canister_number,
+                canister_id=canister.canister_id,
+                is_active=canister.is_active,
+                canister_status=canister.canister_status.value if canister.canister_status else None,
+                message=f"Canister {canister_number} exists and is {'active' if canister.is_active else 'inactive'}"
+            )
+        else:
+            return CanisterCheckResponse(
+                exists=False,
+                canister_number=canister_number,
+                canister_id=None,
+                is_active=None,
+                canister_status=None,
+                message=f"Canister {canister_number} does not exist"
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking canister existence: {str(e)}")
 
