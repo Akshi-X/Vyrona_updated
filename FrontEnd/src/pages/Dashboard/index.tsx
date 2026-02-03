@@ -13,6 +13,7 @@ import { patientService } from '../../services/patientService';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
 import TrackCanisterModal from '../../components/TrackCanisterModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
+import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
 import { performanceService, type AvgQualityDeviationsResponse, type OnTimePercentageResponse, type AvgLeadTimeResponse, type SuccessRateResponse } from '../../services/performanceService';
@@ -73,7 +74,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
 
   // Real data from APIs
-  const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
+  const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[] | IVFAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [stakeholderChats, setStakeholderChats] = useState<StakeholderChat[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
@@ -83,6 +84,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [showTrackCanister, setShowTrackCanister] = useState(false);
   const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
+  const [apiUnreadCount, setApiUnreadCount] = useState<number>(0);
 
   // WebSocket for unread chat count (tagged messages only)
   const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket();
@@ -153,66 +155,112 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingChats(true);
     try {
       const response = await chatService.getUnreadMessages();
-      const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
-        id: msg.message_id.toString(),
-        sender: msg.sender_name,
-        patientId: `Patient ID: ${msg.patient_id}`,
-        message: msg.message_content,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        isRead: false // These are unread messages
-      }));
-      setStakeholderChats(transformedChats);
+      console.log('[Dashboard] Fetched unread messages:', response);
+      
+      // Update the total unread count from API response
+      if (response && typeof response.total_unread === 'number') {
+        setApiUnreadCount(response.total_unread);
+        console.log('[Dashboard] API unread count:', response.total_unread);
+      }
+      
+      if (response && response.unread_messages && response.unread_messages.length > 0) {
+        const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
+          id: msg.message_id.toString(),
+          sender: msg.sender_name,
+          patientId: msg.canister_number 
+            ? `Canister ID: ${msg.canister_number}` 
+            : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
+          message: msg.message_content,
+          timestamp: new Date(msg.created_at).toLocaleString(),
+          isRead: false // These are unread messages
+        }));
+        console.log('[Dashboard] Transformed chats:', transformedChats);
+        setStakeholderChats(transformedChats);
+      } else {
+        // No messages found - set empty array and count to 0
+        console.log('[Dashboard] No unread messages found');
+        setStakeholderChats([]);
+        setApiUnreadCount(0);
+      }
     } catch (error) {
-      setStakeholderChats([]);
+      console.error('[Dashboard] Error fetching stakeholder chats:', error);
+      // Only clear chats on error if we don't have any cached data
+      // This prevents clearing messages that might have been loaded from WebSocket
+      setStakeholderChats(prevChats => {
+        console.log('[Dashboard] Preserving existing chats on error:', prevChats.length);
+        return prevChats.length > 0 ? prevChats : [];
+      });
+      // Don't reset API count on error - keep last known value
     } finally {
       setLoadingChats(false);
     }
   };
 
-  // Update stakeholder chats from WebSocket data
+  // Update stakeholder chats from WebSocket data (only when WebSocket has data)
+  // Don't clear chats if WebSocket is empty - let API fetch handle initial load
   useEffect(() => {
     if (wsUnreadMessages && wsUnreadMessages.length > 0) {
+      console.log('[Dashboard] Updating chats from WebSocket:', wsUnreadMessages.length, 'messages');
       const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
         id: msg.message_id.toString(),
         sender: msg.sender_name,
-        patientId: `Patient ID: ${msg.patient_id}`,
+        patientId: msg.canister_number 
+          ? `Canister ID: ${msg.canister_number}` 
+          : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
         message: msg.message_content,
         timestamp: new Date(msg.created_at).toLocaleString(),
         isRead: false
       }));
       setStakeholderChats(transformedChats);
     } else {
-      setStakeholderChats([]);
+      console.log('[Dashboard] WebSocket has no messages, keeping existing chats');
     }
+    // Don't clear chats if WebSocket is empty - API fetch will handle it
   }, [wsUnreadMessages]);
 
   // Calculate dynamic notification counts
-  // Use WebSocket unread count (tagged messages only) for badge
-  const stakeholderChatCount = wsUnreadCount || 0;
+  // Use the maximum of WebSocket count and API count to ensure accuracy
+  // This handles cases where WebSocket might not be connected yet or API has more recent data
+  const stakeholderChatCount = Math.max(wsUnreadCount || 0, apiUnreadCount || 0);
   const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
   const myTasksCount = myTasks.length; // Show total tasks count
+
+  // Format count for display (show "9+" for counts > 9)
+  const formatCount = (count: number): string => {
+    return count > 9 ? '9+' : count.toString();
+  };
 
 
   // Fetch critical alerts from API
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      // TODO: Get pharma_id from user context or modify API to use current user context
-      // For now, using a default pharma_id - this should be replaced with actual user's pharma_id
-      const pharmaId = '1'; // Default pharma_id - needs to be replaced with actual user's pharma_id
-      const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
-      setCriticalAlerts(response.alerts || []);
+      const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+      
+      if (isIVF) {
+        // Use IVF alerts service for IVF department
+        const response = await ivfAlertsService.getHospitalAlerts();
+        setCriticalAlerts(response.alerts || []);
+      } else {
+        // Use CGT alerts service for CGT department
+        // TODO: Get pharma_id from user context or modify API to use current user context
+        // For now, using a default pharma_id - this should be replaced with actual user's pharma_id
+        const pharmaId = '1'; // Default pharma_id - needs to be replaced with actual user's pharma_id
+        const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
+        setCriticalAlerts(response.alerts || []);
+      }
     } catch (error) {
+      console.error('Error fetching alerts:', error);
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
     }
   };
 
-  // Fetch critical alerts on component mount
+  // Fetch critical alerts on component mount and when department changes
   useEffect(() => {
     fetchCriticalAlerts();
-  }, []);
+  }, [userDepartment]);
 
   // Fetch my tasks from API
   const fetchMyTasks = async () => {
@@ -237,13 +285,52 @@ export default function Dashboard({ }: DashboardProps) {
     fetchMyTasks();
   }, []);
 
+  // Fetch unread count on component mount (for badge display)
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch unread messages to get the count (without opening modal)
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await chatService.getUnreadMessages();
+          if (response && typeof response.total_unread === 'number') {
+            setApiUnreadCount(response.total_unread);
+            console.log('[Dashboard] Initial unread count from API:', response.total_unread);
+          }
+        } catch (error) {
+          console.error('[Dashboard] Error fetching initial unread count:', error);
+        }
+      };
+      fetchUnreadCount();
+    }
+  }, [isAuthenticated]);
+
   // Fetch stakeholder chats when modal opens (for display)
   // WebSocket handles real-time updates automatically
   useEffect(() => {
     if (showStakeholderChats && isAuthenticated) {
+      console.log('[Dashboard] Modal opened, fetching stakeholder chats...');
       fetchStakeholderChats();
     }
   }, [showStakeholderChats, isAuthenticated]);
+
+  // Update API count when WebSocket count changes (as a fallback/sync)
+  useEffect(() => {
+    if (wsUnreadCount !== null && wsUnreadCount !== undefined) {
+      // WebSocket count is authoritative when available
+      // But we keep API count as fallback
+      console.log('[Dashboard] WebSocket unread count updated:', wsUnreadCount);
+    }
+  }, [wsUnreadCount]);
+
+  // Debug: Log the final calculated count
+  useEffect(() => {
+    console.log('[Dashboard] Total unread message count:', stakeholderChatCount, '(WebSocket:', wsUnreadCount, ', API:', apiUnreadCount, ')');
+  }, [stakeholderChatCount, wsUnreadCount, apiUnreadCount]);
+
+  // Debug: Log when chats state changes
+  useEffect(() => {
+    console.log('[Dashboard] Stakeholder chats state changed:', stakeholderChats.length, 'chats');
+  }, [stakeholderChats]);
 
   // Fetch user profile to compute initials and get department
   useEffect(() => {
@@ -616,15 +703,39 @@ export default function Dashboard({ }: DashboardProps) {
     }
   });
 
-  const transformedAlerts = criticalAlerts.map(alert => ({
-    id: alert.id,
-    type: alert.type,
-    severity: alert.severity,
-    patientId: alert.patient_id,
-    message: alert.message,
-    timestamp: alert.timestamp,
-    status: alert.status
-  }));
+  const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+  
+  const transformedAlerts = criticalAlerts.map(alert => {
+    // Check if it's an IVF alert (has alert_id) or CGT alert (has id)
+    if ('alert_id' in alert) {
+      // IVF alert
+      const ivfAlert = alert as IVFAlert;
+      const severity: 'Low' | 'Medium' | 'High' | 'Critical' = 
+        ivfAlert.severity === 'High' ? 'High' : 
+        ivfAlert.severity === 'Medium' ? 'Medium' : 'Low';
+      return {
+        id: ivfAlert.alert_id,
+        type: ivfAlert.alert_type,
+        severity,
+        patientId: ivfAlert.canister_number || `Canister ${ivfAlert.canister_id}`,
+        message: ivfAlert.message,
+        timestamp: new Date(ivfAlert.occurred_at).toLocaleString(),
+        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
+      };
+    } else {
+      // CGT alert
+      const cgtAlert = alert as ServiceCriticalAlert;
+      return {
+        id: cgtAlert.id,
+        type: cgtAlert.type,
+        severity: cgtAlert.severity,
+        patientId: cgtAlert.patient_id,
+        message: cgtAlert.message,
+        timestamp: cgtAlert.timestamp,
+        status: cgtAlert.status
+      };
+    }
+  });
 
   const handleLogout = () => {
     logout();
@@ -644,6 +755,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [, setError] = useState<string | null>(null);
 
   // Fetch patient statistics and logistics metrics on component mount
+  // Only fetch CGT APIs if user is NOT IVF (i.e., is CGT)
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -677,10 +789,23 @@ export default function Dashboard({ }: DashboardProps) {
       }
     };
 
-    if (isAuthenticated) {
+    // Only fetch CGT APIs if user is authenticated AND is NOT IVF (i.e., is CGT)
+    const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+    if (isAuthenticated && !isIVF) {
       fetchDashboardData();
+    } else {
+      // If IVF user, set loading to false and clear CGT data
+      setLoading(false);
+      setPatientStats(null);
+      setLogisticsMetrics(null);
+      setRiskMetrics(null);
+      setComplianceMetrics(null);
+      setQualityDeviations(null);
+      setOnTimePercentage(null);
+      setAvgLeadTime(null);
+      setSuccessRate(null);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userDepartment]);
 
   // Icon mapping function
   const getIcon = (iconName: string) => {
@@ -951,8 +1076,10 @@ export default function Dashboard({ }: DashboardProps) {
                           }}
                         />
                         {stakeholderChatCount > 0 && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                            <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
+                            stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
+                          }`}>
+                            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
                           </div>
                         )}
                       </div>
@@ -1381,9 +1508,11 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {stakeholderChatCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
+                        stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
+                      }`}>
                         <span className="font-semibold text-white text-[10px]">
-                          {stakeholderChatCount}
+                          {formatCount(stakeholderChatCount)}
                         </span>
                       </div>
                     )}
@@ -1625,6 +1754,16 @@ export default function Dashboard({ }: DashboardProps) {
         onClose={() => setShowCriticalAlerts(false)}
         alerts={transformedAlerts}
         loading={loadingAlerts}
+        onAcknowledge={isIVF ? async (alertId) => {
+          try {
+            await ivfAlertsService.acknowledgeAlert(alertId);
+            // Refresh alerts after acknowledgment
+            fetchCriticalAlerts();
+          } catch (error) {
+            console.error('Error acknowledging alert:', error);
+            throw error;
+          }
+        } : undefined}
       />
 
       {/* My Tasks Modal */}
