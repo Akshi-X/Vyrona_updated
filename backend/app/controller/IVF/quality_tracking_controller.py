@@ -317,40 +317,6 @@ def mark_embryo_transfer(
         raise
 
 
-@router.patch("/canisters/{canister_number}/in-transit", response_model=CryolockFlagUpdateResponse)
-def mark_in_transit(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
-    flag_update: CryolockFlagUpdate = ...,
-    request: Request = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Mark a cryolock as moved to transit (in_transit=true).
-
-    Request Body:
-    {
-        \"cryolock_number\": \"T1/C1/A11/2\"
-    }
-    """
-    try:
-        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-        quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
-            branch_id=branch_id
-        )
-        return quality_tracking_service.mark_in_transit(
-            canister_id=canister_id,
-            flag_update=flag_update,
-            updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
-        )
-    except Exception as e:
-        logger.error(f"Error in mark_in_transit endpoint: {str(e)}", exc_info=True)
-        raise
-
-
 @router.patch("/canisters/{canister_number}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
 def mark_in_transit_with_shipment(
     canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
