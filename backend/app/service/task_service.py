@@ -23,6 +23,8 @@ from app.exceptions import (
 from app.models.patient_model import Patient
 from app.models.task_model import Tasks
 from app.models.user_model import User
+from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
 from app.schemas.task_schema import (
     CreateTaskRequest,
     UpdateTaskRequest,
@@ -38,10 +40,31 @@ from app.schemas.task_schema import (
     TaskPermissions,
     PatientTaskListResponse
 )
-from app.utils.utils import get_user_by_id
+from app.utils.utils import get_user_by_id, normalize_role_to_title_case
+from app.utils.user_helpers import is_hospital_department
 
 
-def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
+def _resolve_canister_number_to_id(canister_number: str, db: Session) -> int:
+    """
+    Resolve canister_number (string) to canister_id (int) for internal database operations.
+    
+    Args:
+        canister_number: Canister number/code (e.g., "C1")
+        db: Database session
+        
+    Returns:
+        canister_id (int)
+        
+    Raises:
+        TaskInvalidPatientException: If canister not found
+    """
+    canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
+    if not canister:
+        raise TaskInvalidPatientException(patient_id=f"Canister with number '{canister_number}' not found")
+    return canister.canister_id
+
+
+def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskResponse:
     """
     Build a TaskResponse from a Tasks model instance.
     Includes permission flags for frontend.
@@ -49,12 +72,11 @@ def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
     Args:
         task: Tasks model instance
         current_user: Current authenticated user
+        db: Database session (needed to fetch canister_number)
         
     Returns:
         TaskResponse with all task details and permissions
     """
-    from ..utils.utils import normalize_role_to_title_case
-    
     # Build assignee info
     assignee_info = TaskAssigneeInfo(
         user_id=task.assignee.user_id,
@@ -82,6 +104,13 @@ def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
         can_edit_status_only=can_edit_status_only
     )
     
+    # Get canister_number if canister_id exists
+    canister_number = None
+    if task.canister_id:
+        canister = db.query(Canister).filter(Canister.canister_id == task.canister_id).first()
+        if canister:
+            canister_number = canister.canister_number
+    
     return TaskResponse(
         id=task.id,
         task_name=task.task_name,
@@ -89,6 +118,7 @@ def _build_task_response(task: Tasks, current_user: User) -> TaskResponse:
         assignee=assignee_info,
         created_by=creator_info,
         patient_id=task.patient_id,
+        canister_number=canister_number,
         due_date=task.due_date,
         priority=task.priority,
         status=task.status,
@@ -104,40 +134,81 @@ def create_task(
     db: Session
 ) -> CreateTaskResponse:
     """
-    Create a new task. Managers and pharma_admins can create tasks.
+    Create a new task.
+    
+    For CGT (pharma users): Only managers and pharma_admins can create tasks.
+    For IVF (hospital users): Users and managers can create tasks.
     
     Args:
         request: CreateTaskRequest with task details
-        current_user: Current authenticated user (must be manager or pharma_admin)
+        current_user: Current authenticated user
         db: Database session
         
     Returns:
         CreateTaskResponse with created task details
         
     Raises:
-        TaskManagerOnlyException: If user is not a manager or pharma_admin
+        TaskManagerOnlyException: If user is not authorized (CGT: not manager/pharma_admin)
         TaskInvalidAssigneeException: If assignee not found or invalid
         TaskInvalidPatientException: If patient not found (when patient_id provided)
         TaskCreateFailedException: If task creation fails
     """
     try:
-        # Check if user has permission to create tasks (manager or pharma_admin)
-        if current_user.role.lower() not in ("manager", "pharma_admin"):
-            raise TaskManagerOnlyException(user_role=current_user.role)
+        # Determine if user is hospital user (IVF) or pharma user (CGT)
+        is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
         
-        # Validate assignee exists and is from same company
+        # Get role as string (handle enum)
+        user_role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+        user_role_lower = user_role_str.lower()
+        
+        # Permission check: Different rules for CGT vs IVF
+        if is_hospital_user:
+            # IVF (hospital users): Users and managers can create tasks
+            if user_role_lower not in ("user", "manager", "admin"):
+                raise TaskManagerOnlyException(user_role=user_role_str)
+        else:
+            # CGT (pharma users): Only managers and pharma_admins can create tasks
+            if user_role_lower not in ("manager", "pharma_admin"):
+                raise TaskManagerOnlyException(user_role=user_role_str)
+        
+        # Validate assignee exists and is from same company/hospital
         assignee = get_user_by_id(request.assignee_id, db)
-        if not assignee or \
-           assignee.pharma_id != current_user.pharma_id or \
-           assignee.approved_status != 'approved' or \
-           not assignee.status:
+        if not assignee or assignee.approved_status != 'approved' or not assignee.status:
             raise TaskInvalidAssigneeException(user_id=request.assignee_id)
         
-        # Validate patient exists (if provided)
+        # Validate assignee is in same company/hospital
+        if is_hospital_user:
+            # IVF: Validate by hospital_id
+            if not assignee.hospital_id or assignee.hospital_id != current_user.hospital_id:
+                raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+            
+            # IVF: User cannot assign tasks to manager
+            assignee_role_str = assignee.role.value if hasattr(assignee.role, 'value') else str(assignee.role)
+            if user_role_lower == "user" and assignee_role_str.lower() == "manager":
+                raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+        else:
+            # CGT: Validate by pharma_id
+            if not assignee.pharma_id or assignee.pharma_id != current_user.pharma_id:
+                raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+        
+        # Validate that only one is provided (not both)
+        if request.patient_id and request.canister_number:
+            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        
+        # Ensure at least one is provided (patient_id for CGT or canister_number for IVF)
+        if not request.patient_id and not request.canister_number:
+            raise TaskInvalidPatientException(patient_id="Either patient_id (CGT) or canister_number (IVF) must be provided")
+        
+        # Validate patient exists (if provided for CGT flow)
         if request.patient_id:
             patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
             if not patient:
                 raise TaskInvalidPatientException(patient_id=request.patient_id)
+        
+        # Resolve canister_number to canister_id if provided (for IVF flow)
+        canister_id = None
+        if request.canister_number:
+            canister_id = _resolve_canister_number_to_id(request.canister_number, db)
         
         # Create task
         task = Tasks(
@@ -147,6 +218,7 @@ def create_task(
             created_by_id=current_user.user_id,
             updated_by_id=current_user.user_id,
             patient_id=request.patient_id,
+            canister_id=canister_id,
             due_date=request.due_date,
             priority=request.priority,
             status=request.status or TaskStatus.NOT_STARTED,
@@ -159,7 +231,7 @@ def create_task(
         db.refresh(task)
         
         # Build response
-        task_response = _build_task_response(task, current_user)
+        task_response = _build_task_response(task, current_user, db)
         
         return CreateTaskResponse(
             message=SuccessMessages.TASK_CREATED,
@@ -207,8 +279,8 @@ def get_all_tasks(current_user: User, db: Session) -> TaskListResponse:
             )
         ).order_by(Tasks.created_at.desc()).all()
 
-        created_responses = [_build_task_response(task, current_user) for task in created]
-        assigned_responses = [_build_task_response(task, current_user) for task in assigned]
+        created_responses = [_build_task_response(task, current_user, db) for task in created]
+        assigned_responses = [_build_task_response(task, current_user, db) for task in assigned]
 
         return TaskListResponse(
             total_created=len(created_responses),
@@ -284,11 +356,12 @@ def get_tasks_by_patient(
             .all()
         )
 
-        task_responses = [_build_task_response(task, current_user) for task in tasks]
+        task_responses = [_build_task_response(task, current_user, db) for task in tasks]
 
         return PatientTaskListResponse(
             message=SuccessMessages.TASKS_RETRIEVED,
             patient_id=patient_id,
+            canister_number=None,
             total=total,
             page=sanitized_page,
             page_size=sanitized_page_size,
@@ -300,6 +373,86 @@ def get_tasks_by_patient(
         raise
     except Exception as e:
         raise DatabaseQueryException(operation="get patient tasks", reason=str(e))
+
+
+def get_tasks_by_canister(
+    canister_number: str,
+    current_user: User,
+    db: Session,
+    *,
+    status: Optional[TaskStatus] = None,
+    priority: Optional[TaskPriority] = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE
+) -> PatientTaskListResponse:
+    """
+    Retrieve tasks associated with a specific canister with pagination/filtering (IVF flow).
+
+    Managers and pharma admins in the same pharma can see all canister tasks.
+    Other roles are limited to tasks they created or are assigned to.
+    """
+    try:
+        if not canister_number:
+            raise TaskInvalidPatientException(patient_id=f"Invalid canister_number: {canister_number}")
+
+        # Resolve canister_number to canister_id
+        canister_id = _resolve_canister_number_to_id(canister_number, db)
+        canister = db.query(Canister).filter(Canister.canister_id == canister_id).first()
+        if not canister:
+            raise TaskInvalidPatientException(patient_id=f"Canister {canister_number} not found")
+
+        sanitized_page = max(page, 1)
+        sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
+
+        query = (
+            db.query(Tasks)
+            .options(
+                selectinload(Tasks.assignee),
+                selectinload(Tasks.created_by)
+            )
+            .filter(Tasks.canister_id == canister_id)
+        )
+
+        privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
+        if current_user.role.lower() not in privileged_roles:
+            query = query.filter(
+                or_(
+                    Tasks.created_by_id == current_user.user_id,
+                    Tasks.assignee_id == current_user.user_id
+                )
+            )
+
+        if status:
+            query = query.filter(Tasks.status == status)
+        if priority:
+            query = query.filter(Tasks.priority == priority)
+
+        total = query.count()
+
+        tasks = (
+            query.order_by(Tasks.created_at.desc())
+            .offset((sanitized_page - 1) * sanitized_page_size)
+            .limit(sanitized_page_size)
+            .all()
+        )
+
+        task_responses = [_build_task_response(task, current_user, db) for task in tasks]
+
+        return PatientTaskListResponse(
+            message=SuccessMessages.TASKS_RETRIEVED,
+            patient_id=None,
+            canister_number=canister_number,
+            total=total,
+            page=sanitized_page,
+            page_size=sanitized_page_size,
+            has_next=((sanitized_page - 1) * sanitized_page_size + len(task_responses)) < total,
+            tasks=task_responses
+        )
+
+    except TaskInvalidPatientException:
+        raise
+    except Exception as e:
+        raise DatabaseQueryException(operation="get canister tasks", reason=str(e))
 
 
 def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskResponse:
@@ -330,7 +483,7 @@ def get_task_by_id(task_id: int, current_user: User, db: Session) -> TaskRespons
             raise TaskNotFoundException(task_id=task_id)  # Return 404 to avoid info leak
         
         # Build and return response
-        return _build_task_response(task, current_user)
+        return _build_task_response(task, current_user, db)
         
     except TaskNotFoundException:
         raise
@@ -377,19 +530,51 @@ def update_task(
         # Validate new assignee (if provided)
         if request.assignee_id:
             assignee = get_user_by_id(request.assignee_id, db)
-            if not assignee or \
-               assignee.pharma_id != current_user.pharma_id or \
-               assignee.approved_status != 'approved' or \
-               not assignee.status:
+            if not assignee or assignee.approved_status != 'approved' or not assignee.status:
                 raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+            
+            # Determine if user is hospital user (IVF) or pharma user (CGT)
+            is_hospital_user = is_hospital_department(current_user.department) if current_user.department else False
+            
+            # Get roles as strings (handle enum)
+            current_user_role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+            current_user_role_lower = current_user_role_str.lower()
+            assignee_role_str = assignee.role.value if hasattr(assignee.role, 'value') else str(assignee.role)
+            assignee_role_lower = assignee_role_str.lower()
+            
+            # Validate assignee is in same company/hospital
+            if is_hospital_user:
+                # IVF: Validate by hospital_id
+                if not assignee.hospital_id or assignee.hospital_id != current_user.hospital_id:
+                    raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+                
+                # IVF: User cannot assign tasks to manager
+                if current_user_role_lower == "user" and assignee_role_lower == "manager":
+                    raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+            else:
+                # CGT: Validate by pharma_id
+                if not assignee.pharma_id or assignee.pharma_id != current_user.pharma_id:
+                    raise TaskInvalidAssigneeException(user_id=request.assignee_id)
+            
             task.assignee_id = request.assignee_id
         
-        # Validate new patient (if provided)
+        # Validate that only one is provided (not both) - schema validation should catch this, but double-check
+        if request.patient_id and request.canister_number:
+            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        
+        # Validate new patient (if provided for CGT flow)
         if request.patient_id:
             patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
             if not patient:
                 raise TaskInvalidPatientException(patient_id=request.patient_id)
             task.patient_id = request.patient_id
+            task.canister_id = None  # Clear canister_id when setting patient_id
+        
+        # Resolve canister_number to canister_id if provided (for IVF flow)
+        if request.canister_number:
+            canister_id = _resolve_canister_number_to_id(request.canister_number, db)
+            task.canister_id = canister_id
+            task.patient_id = None  # Clear patient_id when setting canister_id
         
         # Update fields (only if provided)
         if request.task_name is not None:
@@ -411,7 +596,7 @@ def update_task(
         db.refresh(task)
         
         # Build response
-        task_response = _build_task_response(task, current_user)
+        task_response = _build_task_response(task, current_user, db)
         
         return UpdateTaskResponse(
             message=SuccessMessages.TASK_UPDATED,
@@ -469,7 +654,7 @@ def update_task_status(
         db.refresh(task)
         
         # Build response
-        task_response = _build_task_response(task, current_user)
+        task_response = _build_task_response(task, current_user, db)
         
         return UpdateTaskStatusResponse(
             message=SuccessMessages.TASK_STATUS_UPDATED,
