@@ -23,7 +23,6 @@ const tableHeaders: TableHeader[] = [
   { label: "Goblet Color", hasFilter: true, filterKey: 'gobletColor' },
   { label: "Cryolock Color", hasFilter: true, filterKey: 'cryolockColor' },
   { label: "Date of Vitrification" },
-  { label: "Embryo Grading" },
   { label: "Site Name", hasFilter: true, filterKey: 'siteName' },
   { label: "Status", hasFilter: true, filterKey: 'status' },
 ];
@@ -235,7 +234,7 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
               if (!hasData) {
                 return (
                   <tr className="bg-white">
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-xs">
                       No treatments found
                     </td>
                   </tr>
@@ -245,7 +244,7 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
               if (!hasFilteredData && isFiltered) {
                 return (
                   <tr className="bg-white">
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-xs">
                       No data found for the selected filters
                     </td>
                   </tr>
@@ -265,7 +264,6 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
                   <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.embryoGrading || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
                 </tr>

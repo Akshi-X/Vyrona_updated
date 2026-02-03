@@ -326,6 +326,11 @@ export class IvfService extends BaseApiService {
       refilled_by: string;
       description: string;
       status: string;
+      cryoshipper?: string | null;
+      disinfected_shipper_infected_tank_description?: string | null;
+      reservoir?: string | null;
+      ln2_ordered_date?: string | null;
+      ln2_received_date?: string | null;
     }
   ): Promise<RefillLogItem> {
     return await this.post<RefillLogItem>(
