@@ -21,6 +21,8 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [totalContainers, setTotalContainers] = useState<number>(0);
+  const [availableSlots, setAvailableSlots] = useState<number>(0);
 
   useEffect(() => {
     if (!canisterNumber) {
@@ -35,10 +37,16 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
       setError(null);
       try {
         const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
-        if (!cancelled) setRows(response?.data || []);
+        if (!cancelled) {
+          setRows(response?.data || []);
+          setTotalContainers(response?.total || 0);
+          setAvailableSlots(response?.available_slots || 0);
+        }
       } catch (e: any) {
         if (!cancelled) {
           setRows([]);
+          setTotalContainers(0);
+          setAvailableSlots(0);
           setError(e?.message || 'Failed to load container data');
         }
       } finally {
@@ -165,11 +173,21 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[16px]">Container Data</h3>
-        {saveError && (
-          <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
-            {saveError}
+        <div className="flex items-center gap-4">
+          <div className="text-black text-sm">
+            <span className="font-medium">Total Canisters: </span>
+            <span className="font-semibold">{totalContainers}</span>
           </div>
-        )}
+          <div className="text-black text-sm">
+            <span className="font-medium">Available slots: </span>
+            <span className="font-semibold">{availableSlots}</span>
+          </div>
+          {saveError && (
+            <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
+              {saveError}
+            </div>
+          )}
+        </div>
       </div>
       <div
         className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
@@ -215,7 +233,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                     <td className="px-3 py-2 whitespace-nowrap">{row.hisNumber || '-'} </td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.cryolockNum || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.canisterNum || '-'}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.caneId || '-'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{row.caneCode || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {isEditing ? (
                         <input

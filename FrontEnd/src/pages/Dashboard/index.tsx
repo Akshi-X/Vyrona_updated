@@ -1150,7 +1150,7 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Ongoing Treatments Section */}
               <section>
                 <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
-                <h2 className="font-semibold text-black text-base mb-4">Embroyo Tracking</h2>
+                <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
                 ) : ivfEmbryoTrackingError ? (

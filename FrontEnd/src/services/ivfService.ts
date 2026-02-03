@@ -107,8 +107,8 @@ interface RawEmbryoTrackingApiItem {
   his_number: string;
   cryolock_number: string;
   canister_number: number;
-  tank_id: string;
-  cane_id: string;
+  tank_code: string;
+  cane_code: string;
   goblet_color: string;
   cryolock_color: string;
   date_of_vitrification: string;
@@ -127,7 +127,7 @@ interface RawCanisterTrackingApiItem {
   his_number: string;
   cryolock_number: string;
   canister_number: number;
-  cane_id: string;
+  cane_code: string;
   goblet_color: string;
   cryolock_color: string;
   date_of_vitrification: string;
@@ -137,14 +137,15 @@ interface RawCanisterTrackingApiItem {
 interface RawCanisterTrackingApiResponse {
   data: RawCanisterTrackingApiItem[];
   total: number;
+  available_slots: number;
 }
 
 const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => ({
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
   canisterNum: item.canister_number,
-  tankId: item.tank_id,
-  caneId: item.cane_id,
+  tankCode: item.tank_code,
+  caneCode: item.cane_code,
   gobletColor: item.goblet_color,
   cryolockColor: item.cryolock_color,
   dateOfVitrification: item.date_of_vitrification,
@@ -157,8 +158,8 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
   canisterNum: item.canister_number,
-  tankId: '-', // Not provided by API
-  caneId: item.cane_id,
+  tankCode: '-', // Not provided by API
+  caneCode: item.cane_code,
   gobletColor: item.goblet_color,
   cryolockColor: item.cryolock_color,
   dateOfVitrification: item.date_of_vitrification,
@@ -234,7 +235,7 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse> {
+  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
     const response = await this.request<RawCanisterTrackingApiResponse>(
       `/api/quality-tracking/canisters/${canisterNumber}/tracking-details`,
       { method: 'GET' }
@@ -242,6 +243,7 @@ export class IvfService extends BaseApiService {
     return {
       data: response.data.map(mapCanisterTrackingItemToTreatment),
       total: response.total,
+      available_slots: response.available_slots,
     };
   }
 

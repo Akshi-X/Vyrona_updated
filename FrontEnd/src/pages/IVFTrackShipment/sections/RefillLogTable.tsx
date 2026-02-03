@@ -296,7 +296,7 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled By</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Description</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Cryoshipper</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Disinfected Shipper</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Infected Shipper</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Reservoir</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Ordered Date</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Received Date</th>

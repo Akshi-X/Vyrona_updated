@@ -260,8 +260,8 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
                   <td className="px-4 py-3 text-xs">{treatment.hisNumber || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.cryolockNum || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.canisterNum || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.tankId || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.caneId || '-'}</td>
+                  <td className="px-4 py-3 text-xs">{treatment.tankCode || '-'}</td>
+                  <td className="px-4 py-3 text-xs">{treatment.caneCode || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
