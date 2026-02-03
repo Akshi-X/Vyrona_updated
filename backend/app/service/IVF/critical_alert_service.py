@@ -786,7 +786,6 @@ class CriticalAlertService:
                 continue
             
             # Get hospital_id from user's branch
-            from ...models.IVF.hospital_branch_model import HospitalBranch
             branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == user.branch_id).first()
             if not branch:
                 continue
@@ -818,7 +817,6 @@ class CriticalAlertService:
         canister_number_map = {c.canister_id: c.canister_number for c in canisters}
         
         # Get branch names
-        from ...models.IVF.hospital_branch_model import HospitalBranch
         branch_ids = list(set([alert.branch_id for alert in alerts]))
         branches = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id.in_(branch_ids)).all()
         branch_name_map = {b.branch_id: b.branch_name for b in branches}
