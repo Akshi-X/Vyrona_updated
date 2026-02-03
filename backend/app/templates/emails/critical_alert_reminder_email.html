@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{{ subject }}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td {font-family: Arial, sans-serif !important;}
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8F9FA; font-family: Arial, sans-serif;">
+    <!-- Wrapper Table -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8F9FA;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!-- Main Container Table -->
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 600px;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #6B1176; color: #FFFFFF; padding: 25px 30px; text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 10px;">⏰</div>
+                            <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF;">{{ subject }}</h1>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #E5D4F0;">myGrape - Critical Alert Reminder</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="margin: 0 0 15px 0; font-size: 18px; color: #6B1176; font-weight: 600;">Hello {{ user_name }},</h2>
+                            <p style="margin: 0 0 20px 0; font-size: 14px; color: #374151; line-height: 1.6;">You have <strong>{{ total_count }} unacknowledged critical alert(s)</strong> that require your attention.</p>
+                            
+                            <!-- Reminder Notice -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; color: #92400E;">
+                                        <strong>⏰ Action Required:</strong> Please review and acknowledge these alerts as soon as possible.
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Summary Box -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F9FAFB; border: 1px solid #E5E7EB; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; color: #374151;">
+                                        <strong>Summary:</strong> {{ total_count }} unacknowledged alert(s) across your assigned area(s).
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Alert List -->
+                            {% for alert in alerts %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: {% if alert.severity == 'High' %}#FEF2F2{% elif alert.severity == 'Medium' %}#FFFBEB{% else %}#EFF6FF{% endif %}; border-left: 4px solid {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %}; margin: 15px 0;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <!-- Alert Header -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 10px;">
+                                            <tr>
+                                                <td style="font-weight: 600; font-size: 14px; color: {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#F59E0B{% else %}#3B82F6{% endif %};">
+                                                    {{ alert.alert_type }}
+                                                </td>
+                                                <td align="right" style="font-size: 12px; font-weight: 600; padding: 4px 8px; background-color: {% if alert.severity == 'High' %}#FEE2E2{% elif alert.severity == 'Medium' %}#FEF3C7{% else %}#DBEAFE{% endif %}; color: {% if alert.severity == 'High' %}#DC2626{% elif alert.severity == 'Medium' %}#D97706{% else %}#2563EB{% endif %}; border-radius: 4px;">
+                                                    {{ alert.severity }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Alert Details -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">📦 Canister:</strong> {{ alert.canister_number }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">🏢 Branch:</strong> {{ alert.branch_name }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px 0; font-size: 13px; color: #6B7280;">
+                                                    <strong style="color: #374151;">🕐 Occurred:</strong> {{ alert.occurred_at }} ({{ alert.hours_since }} hour(s) ago)
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Alert Message -->
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #E5E7EB;">
+                                            <tr>
+                                                <td style="font-size: 14px; color: #374151;">
+                                                    <strong>Message:</strong> {{ alert.message }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endfor %}
+                            
+                            <!-- Button -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="padding: 10px 0;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ acknowledge_url }}" style="height:56px;v-text-anchor:middle;width:200px;" arcsize="8%" stroke="f" fillcolor="#6B1176">
+                                            <w:anchorlock/>
+                                            <center style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:18px;font-weight:700;">VIEW ALERTS</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]><!-->
+                                        <a href="{{ acknowledge_url }}" style="display: inline-block; padding: 18px 45px; background-color: #6B1176; color: #FFFFFF !important; text-decoration: none !important; border-radius: 8px; font-weight: 700; font-size: 18px; letter-spacing: 0.8px; text-transform: uppercase; border: 2px solid #6B1176;">
+                                            VIEW ALERTS
+                                        </a>
+                                        <!--<![endif]-->
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Divider -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+                                <tr>
+                                    <td style="height: 1px; background-color: #E5E7EB;"></td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Note -->
+                            <p style="margin: 0; font-size: 14px; color: #6B7280; line-height: 1.6;">
+                                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+                                <a href="{{ acknowledge_url }}" style="color: #2563EB; text-decoration: underline; word-wrap: break-word;">{{ acknowledge_url }}</a>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #F8F9FA; padding: 20px; text-align: center; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB;">
+                            <p style="margin: 5px 0;"><strong>myGrape</strong></p>
+                            <p style="margin: 5px 0;">This is an automated reminder. Please do not reply to this email.</p>
+                            <p style="margin: 10px 0 0 0;">© 2025 myGrape. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

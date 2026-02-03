@@ -11,4 +11,5 @@ from .cane_model import Cane
 from .cryolock_model import Cryolock
 from .patient_model import IVFPatient
 from .embryo_model import Embryo
+from .critical_alert_model import CriticalAlert, AlertType, AlertSource, AlertTriggeredBy, AlertSeverity, AlertStatus
 
