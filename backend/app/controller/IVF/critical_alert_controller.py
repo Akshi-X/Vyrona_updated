@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.config.database import get_db
+from app.models.IVF.canister_model import Canister
 from app.service.IVF.critical_alert_service import CriticalAlertService
 from app.schemas.IVF.critical_alert_schema import (
     CriticalAlertResponse,
@@ -134,7 +135,6 @@ def check_and_create_alerts(
         
         # Get canister numbers for all alerts
         canister_ids = [alert.canister_id for alert in alerts]
-        from app.models.IVF.canister_model import Canister
         canisters = db.query(Canister).filter(Canister.canister_id.in_(canister_ids)).all()
         canister_number_map = {c.canister_id: c.canister_number for c in canisters}
         

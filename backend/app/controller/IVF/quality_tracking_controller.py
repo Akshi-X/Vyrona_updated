@@ -21,7 +21,9 @@ from app.schemas.IVF.quality_tracking_schema import (
     CryolockColorUpdate,
     ColorUpdateResponse,
     CryolockFlagUpdate,
-    CryolockFlagUpdateResponse
+    CryolockFlagUpdateResponse,
+    InTransitWithShipmentRequest,
+    InTransitWithShipmentResponse
 )
 from app.constants.enums import TaskStatus
 from app.utils.ivf_helpers import get_branch_filter_info
@@ -315,21 +317,41 @@ def mark_embryo_transfer(
         raise
 
 
-@router.patch("/canisters/{canister_number}/in-transit", response_model=CryolockFlagUpdateResponse)
-def mark_in_transit(
+@router.patch("/canisters/{canister_number}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
+def mark_in_transit_with_shipment(
     canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
-    flag_update: CryolockFlagUpdate = ...,
+    shipment_request: InTransitWithShipmentRequest = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Mark a cryolock as moved to transit (in_transit=true).
-
+    Mark a cryolock as moved to transit AND create IoT shipment.
+    
+    This endpoint:
+    1. Parses description to extract source, destination, and device ID
+    2. Marks the cryolock as in_transit = True
+    3. Creates an IoT shipment via Tive API
+    4. Stores shipment record in database
+    
     Request Body:
     {
-        \"cryolock_number\": \"T1/C1/A11/2\"
+        \"cryolock_number\": \"T1/C1/A11/2\",
+        \"description\": \"crylock is move from egmore to thambaram-deviceid -xxxxx\"
     }
+    
+    Description Format:
+    - "crylock is move from <source> to <destination>-deviceid -<device_id>"
+    - Example: "crylock is move from egmore to thambaram-deviceid -xxxxx"
+    - Source location is auto-detected from canister's current branch
+    - Destination location is extracted from description and matched to branch name
+    - Device ID is extracted from description (optional)
+    
+    Returns shipment details including:
+    - shipment_id (auto-generated: SHIP-YYYYMMDD-CANISTER_ID-CRYOLOCK_ID)
+    - iot_shipment_id (from IoT API)
+    - source and destination branch details
+    - device_id (if extracted from description)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
@@ -338,14 +360,14 @@ def mark_in_transit(
             canister_number=canister_number,
             branch_id=branch_id
         )
-        return quality_tracking_service.mark_in_transit(
+        return quality_tracking_service.mark_in_transit_with_shipment(
             canister_id=canister_id,
-            flag_update=flag_update,
+            request=shipment_request,
             updated_by=current_user.email if current_user else None,
             branch_id=branch_id
         )
     except Exception as e:
-        logger.error(f"Error in mark_in_transit endpoint: {str(e)}", exc_info=True)
+        logger.error(f"Error in mark_in_transit_with_shipment endpoint: {str(e)}", exc_info=True)
         raise
 
 

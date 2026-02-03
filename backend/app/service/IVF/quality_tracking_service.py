@@ -5,7 +5,8 @@ Handles business logic for quality tracking operations including LN2 refill logs
 # Standard library imports
 import io
 import logging
-from datetime import date, datetime
+import re
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
 # Third-party imports
@@ -32,6 +33,7 @@ from ...models.IVF.embryo_model import Embryo
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_telemetry_data_model import IVFTelemetryData
+from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_model import IVFPatient
 from ...models.IVF.tank_model import Tank
 from ...schemas.IVF.quality_tracking_schema import (
@@ -40,6 +42,8 @@ from ...schemas.IVF.quality_tracking_schema import (
     CryolockFlagUpdate,
     CryolockFlagUpdateResponse,
     GobletColorUpdate,
+    InTransitWithShipmentRequest,
+    InTransitWithShipmentResponse,
     IVFCanisterTrackingItem,
     IVFCanisterTrackingResponse,
     RefillLogCreate,
@@ -47,6 +51,7 @@ from ...schemas.IVF.quality_tracking_schema import (
     RefillLogResponse,
     RefillLogStatusUpdate,
 )
+from ...service.iot_service import IoTService
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +346,8 @@ class QualityTrackingService:
             available_slots = max(total_slots - moved_count, 0)
 
             # Data rows (group by cryolock so we don't duplicate on multiple embryos)
-            # Exclude cryolocks where embryo_transfer=True OR in_transit=True
+            # Include all cryolocks (both available and in_transit) to show descriptions
+            # Exclude only embryo_transfer=True cryolocks
             query = (
                 self.db.query(
                     IVFPatient.his_number,
@@ -352,7 +358,8 @@ class QualityTrackingService:
                     Cryolock.cryolock_color,
                     func.max(Embryo.date_of_vitrification).label('date_of_vitrification'),
                     Cryolock.embryo_transfer,
-                    Cryolock.in_transit
+                    Cryolock.in_transit,
+                    Cryolock.cryolock_id
                 )
                 .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
                 .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
@@ -363,9 +370,8 @@ class QualityTrackingService:
                 .filter(
                     Embryo.is_active == True,
                     Canister.canister_id == canister_id,
-                    # Exclude cryolocks that have been moved (embryo_transfer OR in_transit)
-                    Cryolock.embryo_transfer != True,
-                    Cryolock.in_transit != True
+                    # Exclude only embryo_transfer cryolocks (include in_transit to show descriptions)
+                    Cryolock.embryo_transfer != True
                 )
             )
             if branch_id is not None:
@@ -379,13 +385,52 @@ class QualityTrackingService:
                 Cryolock.goblet_color,
                 Cryolock.cryolock_color,
                 Cryolock.embryo_transfer,
-                Cryolock.in_transit
+                Cryolock.in_transit,
+                Cryolock.cryolock_id
             ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
 
             results = query.all()
 
+            # Get cryolock IDs to fetch shipment descriptions
+            cryolock_ids = [row.cryolock_id for row in results]
+            
+            # Fetch descriptions from ivf_shipment table for cryolocks
+            # Get the most recent shipment description for each cryolock
+            shipment_descriptions = {}
+            if cryolock_ids:
+                # Use a subquery to get the latest shipment per cryolock
+                latest_shipments = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        func.max(IVFShipment.id).label('latest_shipment_id')
+                    )
+                    .filter(
+                        IVFShipment.cryolock_id.in_(cryolock_ids),
+                        IVFShipment.description.isnot(None)
+                    )
+                    .group_by(IVFShipment.cryolock_id)
+                    .subquery()
+                )
+                
+                shipment_descriptions_query = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        IVFShipment.description
+                    )
+                    .join(
+                        latest_shipments,
+                        IVFShipment.id == latest_shipments.c.latest_shipment_id
+                    )
+                )
+                
+                for shipment_row in shipment_descriptions_query.all():
+                    shipment_descriptions[shipment_row.cryolock_id] = shipment_row.description
+
             tracking_rows: List[IVFCanisterTrackingItem] = []
             for row in results:
+                # Get description for this cryolock if it exists
+                description = shipment_descriptions.get(row.cryolock_id)
+                
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
                         his_number=row.his_number or "",
@@ -396,7 +441,8 @@ class QualityTrackingService:
                         cryolock_color=row.cryolock_color or "",
                         date_of_vitrification=row.date_of_vitrification,
                         embryo_transfer=bool(row.embryo_transfer),
-                        in_transit=bool(row.in_transit)
+                        in_transit=bool(row.in_transit),
+                        description=description
                     )
                 )
 
@@ -429,21 +475,377 @@ class QualityTrackingService:
             branch_id=branch_id
         )
 
-    def mark_in_transit(
+    def _parse_description(self, description: str) -> dict:
+        """
+        Parse description to extract source, destination, and device_id.
+        
+        Expected format: "crylock is move from <source> to <destination>-deviceid -<device_id>"
+        Example: "crylock is move from egmore to thambaram-deviceid -xxxxx"
+        
+        Returns dict with: source_location, destination_location, device_id
+        """
+        # Normalize description (lowercase for matching)
+        desc_lower = description.lower()
+        
+        # Extract device ID - look for patterns like:
+        # "-deviceid -xxxxx", "-deviceid-xxxxx", "deviceid -xxxxx", "deviceid: xxxxx", etc.
+        device_id = None
+        device_patterns = [
+            r'-deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
+            r'deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
+            r'-deviceid\s+([a-zA-Z0-9_-]+)',
+            r'deviceid\s+([a-zA-Z0-9_-]+)',
+        ]
+        
+        for pattern in device_patterns:
+            match = re.search(pattern, desc_lower, re.IGNORECASE)
+            if match:
+                device_id = match.group(1).strip()
+                # Remove device_id part from description for location parsing
+                description = re.sub(pattern, '', description, flags=re.IGNORECASE)
+                break
+        
+        # Extract source and destination - look for "from X to Y" pattern
+        # Patterns: "from <source> to <destination>", "move from <source> to <destination>"
+        source_location = None
+        destination_location = None
+        
+        # Try various patterns
+        patterns = [
+            r'(?:move|moving|transfer|transferring)\s+from\s+([a-zA-Z0-9\s-]+?)\s+to\s+([a-zA-Z0-9\s-]+)',
+            r'from\s+([a-zA-Z0-9\s-]+?)\s+to\s+([a-zA-Z0-9\s-]+)',
+            r'([a-zA-Z0-9\s-]+?)\s+to\s+([a-zA-Z0-9\s-]+)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                source_location = match.group(1).strip()
+                destination_location = match.group(2).strip()
+                # Clean up common words
+                source_location = re.sub(r'\b(crylock|cryolock|is|move|moving|transfer)\b', '', source_location, flags=re.IGNORECASE).strip()
+                destination_location = re.sub(r'\b(crylock|cryolock|is|move|moving|transfer)\b', '', destination_location, flags=re.IGNORECASE).strip()
+                break
+        
+        return {
+            "source_location": source_location,
+            "destination_location": destination_location,
+            "device_id": device_id
+        }
+    
+    def _find_branch_by_name(self, location_name: str) -> Optional[HospitalBranch]:
+        """
+        Find branch by matching location name to branch_name.
+        Performs case-insensitive partial matching.
+        """
+        if not location_name:
+            return None
+        
+        # Try exact match first (case-insensitive)
+        branch = self.db.query(HospitalBranch).filter(
+            func.lower(HospitalBranch.branch_name) == location_name.lower()
+        ).first()
+        
+        if branch:
+            return branch
+        
+        # Try partial match (contains)
+        branch = self.db.query(HospitalBranch).filter(
+            func.lower(HospitalBranch.branch_name).contains(location_name.lower())
+        ).first()
+        
+        if branch:
+            return branch
+        
+        # Try matching against district_name or area
+        branch = self.db.query(HospitalBranch).filter(
+            or_(
+                func.lower(HospitalBranch.district_name).contains(location_name.lower()),
+                func.lower(HospitalBranch.area).contains(location_name.lower())
+            )
+        ).first()
+        
+        return branch
+
+    def mark_in_transit_with_shipment(
         self,
         canister_id: int,
-        flag_update: CryolockFlagUpdate,
+        request: InTransitWithShipmentRequest,
         updated_by: Optional[str] = None,
         branch_id: Optional[int] = None
-    ) -> CryolockFlagUpdateResponse:
-        """Mark a cryolock as moved to transit (in_transit = True)."""
-        return self._set_cryolock_flag(
-            canister_id=canister_id,
-            cryolock_number=flag_update.cryolock_number,
-            flag_field="in_transit",
-            updated_by=updated_by,
-            branch_id=branch_id
-        )
+    ) -> InTransitWithShipmentResponse:
+        """
+        Mark a cryolock as in transit AND create IoT shipment.
+        
+        Description format: "crylock is move from <source> to <destination>-deviceid -<device_id>"
+        Example: "crylock is move from egmore to thambaram-deviceid -xxxxx"
+        
+        Steps:
+        1. Get cryolock and validate
+        2. Get source branch (from canister → tank → branch)
+        3. Parse description to extract destination and device_id
+        4. Find destination branch by name
+        5. Generate shipment ID (format: SHIP-YYYYMMDD-CANISTER_ID-CRYOLOCK_ID)
+        6. Build IoT shipment payload
+        7. Create IoT shipment via IoTService
+        8. Mark cryolock as in_transit = True
+        9. Store shipment record in DB
+        10. Return response with shipment details
+        """
+        try:
+            # Step 1 & 2: Get cryolock, canister, tank, and source branch in a single optimized query
+            query = (
+                self.db.query(
+                    Cryolock,
+                    Canister,
+                    Tank,
+                    HospitalBranch
+                )
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(
+                    Canister.canister_id == canister_id,
+                    Cryolock.cryolock_number == request.cryolock_number
+                )
+            )
+
+            if branch_id is not None:
+                query = query.filter(HospitalBranch.branch_id == branch_id)
+
+            result = query.first()
+            if not result:
+                raise AppException(
+                    message=f"Cryolock with number '{request.cryolock_number}' not found in canister {canister_id}",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            cryolock, canister, tank, source_branch = result
+            
+            # Validate all required objects exist
+            if not canister:
+                raise AppException(
+                    message=f"Canister {canister_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            if not tank:
+                raise AppException(
+                    message=f"Tank for canister {canister_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            if not source_branch:
+                raise AppException(
+                    message=f"Source branch for canister {canister_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            # Step 3: Parse description to extract source, destination and device_id
+            parsed = self._parse_description(request.description)
+            source_location_name = parsed.get("source_location")
+            destination_location_name = parsed.get("destination_location")
+            device_id = parsed.get("device_id")
+            
+            if not destination_location_name:
+                raise AppException(
+                    message="Could not extract destination location from description. Expected format: 'crylock is move from <source> to <destination>-deviceid -<device_id>'",
+                    error_code=ErrorMessages.BAD_REQUEST,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Validate source location matches canister's current branch (if provided in description)
+            if source_location_name:
+                source_branch_name_lower = (source_branch.branch_name or "").lower()
+                source_location_lower = source_location_name.lower()
+                # Check if source matches (case-insensitive, partial match)
+                if source_location_lower not in source_branch_name_lower and source_branch_name_lower not in source_location_lower:
+                    # Also check district_name and area
+                    district_match = source_branch.district_name and source_location_lower in (source_branch.district_name.lower() or "")
+                    area_match = source_branch.area and source_location_lower in (source_branch.area.lower() or "")
+                    if not (district_match or area_match):
+                        logger.warning(f"Source location '{source_location_name}' in description doesn't match canister's branch '{source_branch.branch_name}'. Using canister's branch as source.")
+                        # Continue anyway - use canister's branch as source
+            
+            # Step 4: Find destination branch by name
+            destination_branch = self._find_branch_by_name(destination_location_name)
+            if not destination_branch:
+                raise AppException(
+                    message=f"Destination branch '{destination_location_name}' not found. Please check the branch name in your description. Available branches can be queried from the control tower API.",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            # Validate coordinates exist
+            if not source_branch.latitude or not source_branch.longitude:
+                raise AppException(
+                    message=f"Source branch {source_branch.branch_id} missing coordinates",
+                    error_code=ErrorMessages.BAD_REQUEST,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            if not destination_branch.latitude or not destination_branch.longitude:
+                raise AppException(
+                    message=f"Destination branch {destination_branch.branch_id} missing coordinates",
+                    error_code=ErrorMessages.BAD_REQUEST,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+
+            # Step 5: Generate shipment ID (format: SHIP-YYYYMMDD-CANISTER_ID-CRYOLOCK_ID)
+            # Clean cryolock number for use in shipment ID (replace / with -)
+            clean_cryolock = request.cryolock_number.replace('/', '-')
+            shipment_id = f"SHIP-{datetime.now().strftime('%Y%m%d')}-{canister_id}-{clean_cryolock}"
+
+            # Step 6: Build IoT shipment payload
+            # Build address objects
+            from_address = {
+                "street": source_branch.area or "",
+                "locality": source_branch.district_name or "",
+                "state": source_branch.state_name or "",
+                "country": source_branch.country_name or "",
+                "postalCode": source_branch.pincode or ""
+            }
+            
+            to_address = {
+                "street": destination_branch.area or "",
+                "locality": destination_branch.district_name or "",
+                "state": destination_branch.state_name or "",
+                "country": destination_branch.country_name or "",
+                "postalCode": destination_branch.pincode or ""
+            }
+
+            # Build shipment leg (single leg for IVF)
+            shipment_leg = {
+                "mode": "Road",  # Default mode, can be made configurable
+                "fromAddress": from_address,
+                "toAddress": to_address,
+                "fromCoordinates": {
+                    "latitude": float(source_branch.latitude),
+                    "longitude": float(source_branch.longitude)
+                },
+                "toCoordinates": {
+                    "latitude": float(destination_branch.latitude),
+                    "longitude": float(destination_branch.longitude)
+                },
+                "shipFromDate": datetime.now(timezone.utc).isoformat()
+            }
+
+            # Build IoT shipment request
+            iot_shipment_payload = {
+                "request": {},
+                "ShipmentId": shipment_id,
+                "name": request.description,
+                "ShipmentLegs": [shipment_leg]
+            }
+
+            # Add device if extracted from description
+            if device_id:
+                iot_shipment_payload["devices"] = [device_id]
+
+            # Step 7: Create IoT shipment
+            iot_service = IoTService.get_instance()
+            iot_response = None
+            iot_shipment_id = None
+            
+            try:
+                iot_response = iot_service.create_shipment(**iot_shipment_payload)
+                # Extract IoT shipment ID from response (structure may vary)
+                if isinstance(iot_response, dict):
+                    iot_shipment_id = iot_response.get("shipmentId") or iot_response.get("id") or iot_response.get("ShipmentId")
+                logger.info(f"Successfully created IoT shipment: {iot_shipment_id}")
+            except Exception as iot_error:
+                logger.error(f"Failed to create IoT shipment, but continuing with DB record: {str(iot_error)}", exc_info=True)
+                # Continue even if IoT API fails - we'll still mark as in_transit and store shipment record
+
+            # Step 8: Mark cryolock as in_transit
+            cryolock.in_transit = True
+            cryolock.updated_by = updated_by
+
+            # Step 9: Store shipment record in DB
+            ivf_shipment = IVFShipment(
+                shipment_id=shipment_id,
+                iot_shipment_id=iot_shipment_id,
+                cryolock_id=cryolock.cryolock_id,
+                canister_id=canister_id,
+                source_branch_id=source_branch.branch_id,
+                destination_branch_id=destination_branch.branch_id,
+                description=request.description,
+                device_id=device_id,
+                shipment_status="created" if iot_shipment_id else "failed",
+                source_location=source_branch.branch_name or f"Branch {source_branch.branch_id}",
+                source_latitude=float(source_branch.latitude),
+                source_longitude=float(source_branch.longitude),
+                destination_location=destination_branch.branch_name or f"Branch {destination_branch.branch_id}",
+                destination_latitude=float(destination_branch.latitude),
+                destination_longitude=float(destination_branch.longitude),
+                scheduled_departure_time=datetime.now(timezone.utc),
+                created_by=updated_by,
+                updated_by=updated_by
+            )
+            
+            self.db.add(ivf_shipment)
+            self.db.commit()
+            self.db.refresh(ivf_shipment)
+            self.db.refresh(cryolock)
+            
+            # Verify in_transit was updated successfully
+            if not cryolock.in_transit:
+                logger.error(f"Failed to update in_transit flag for cryolock {cryolock.cryolock_id}")
+                raise AppException(
+                    message="Failed to update cryolock in_transit status",
+                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
+
+            # Step 10: Build response
+            shipment_response = {
+                "shipment_id": shipment_id,
+                "iot_shipment_id": iot_shipment_id,
+                "source_branch": {
+                    "branch_id": source_branch.branch_id,
+                    "branch_name": source_branch.branch_name,
+                    "address": f"{source_branch.area or ''}, {source_branch.district_name or ''}, {source_branch.state_name or ''}, {source_branch.country_name or ''}",
+                    "latitude": float(source_branch.latitude),
+                    "longitude": float(source_branch.longitude)
+                },
+                "destination_branch": {
+                    "branch_id": destination_branch.branch_id,
+                    "branch_name": destination_branch.branch_name,
+                    "address": f"{destination_branch.area or ''}, {destination_branch.district_name or ''}, {destination_branch.state_name or ''}, {destination_branch.country_name or ''}",
+                    "latitude": float(destination_branch.latitude),
+                    "longitude": float(destination_branch.longitude)
+                },
+                "description": request.description,
+                "device_id": device_id,
+                "parsed_source": parsed.get("source_location"),
+                "parsed_destination": parsed.get("destination_location"),
+                "status": ivf_shipment.shipment_status
+            }
+
+            return InTransitWithShipmentResponse(
+                success=True,
+                message="Cryolock marked as in transit and shipment created successfully",
+                cryolock_number=cryolock.cryolock_number or request.cryolock_number,
+                in_transit=True,
+                shipment=shipment_response
+            )
+
+        except AppException:
+            self.db.rollback()
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to create shipment: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
     def _set_cryolock_flag(
         self,
