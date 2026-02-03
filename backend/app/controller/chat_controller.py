@@ -2,24 +2,28 @@ import json
 import logging
 import uuid
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Response, Request
 from sqlalchemy.orm import Session
 from typing import List
 import time
 from app.config import database
+from app.config.database import SessionLocal
 from app.schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, 
     PatientMessagesResponse, UnreadMessagesResponse,
     ChatErrorResponse
 )
 from app.service.chat_service import (
-    create_chat_message, get_patient_messages, get_unread_messages,
-    broadcast_new_message, handle_websocket_connection, handle_websocket_message_loop
+    create_chat_message, get_patient_messages, get_canister_messages, get_unread_messages,
+    broadcast_new_message, broadcast_unread_messages_update, handle_websocket_connection, handle_websocket_message_loop,
+    mark_canister_as_read, get_canister_unread_count, mark_patient_as_read, get_patient_unread_count
 )
 from app.dependencies.auth_dependencies import (
-    get_current_user, get_pharma_id_from_request, authenticate_websocket
+    get_current_user, get_pharma_id_from_request, get_current_user_pharma_id, 
+    get_hospital_id_from_request, authenticate_websocket
 )
 from app.models import user_model
+from app.models.IVF.canister_model import Canister
 from app.utils.chat_websocket_manager import ChatConnectionManager
 from app.exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
@@ -58,6 +62,7 @@ router = APIRouter(
 async def send_chat_message(
     request: ChatMessageCreateRequest,
     response: Response,
+    http_request: Request,
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user)
 ):
@@ -73,11 +78,21 @@ async def send_chat_message(
         
         sender_name = f"{current_user.first_name} {current_user.last_name}"
         sender_role = current_user.role.value if current_user.role else None
+        
+        # Get pharma_id or hospital_id based on user type
+        sender_pharma_id = None
+        sender_hospital_id = None
+        if hasattr(http_request.state, "pharma_id") and http_request.state.pharma_id is not None:
+            sender_pharma_id = http_request.state.pharma_id
+        if hasattr(http_request.state, "hospital_id") and http_request.state.hospital_id is not None:
+            sender_hospital_id = http_request.state.hospital_id
+        
         db_start = time.time()
         result = create_chat_message(
             request,
             current_user.user_id,
-            current_user.pharma_id,
+            sender_pharma_id,
+            sender_hospital_id,
             sender_name,
             sender_role,
             db
@@ -89,7 +104,7 @@ async def send_chat_message(
         asyncio.create_task(
             broadcast_new_message(
                 result,
-                current_user.pharma_id,
+                sender_pharma_id,  # Can be None for hospital users
                 chat_connection_manager
             )
         )
@@ -167,12 +182,73 @@ async def get_patient_chat_messages(
 def get_user_unread_messages(
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
-    pharma_id: int = Depends(get_pharma_id_from_request)
+    http_request: Request = None
 ):
     """Get all unread messages for the current user"""
     try:
+        # Get pharma_id or hospital_id based on user type
+        pharma_id = None
+        if hasattr(http_request.state, "pharma_id") and http_request.state.pharma_id is not None:
+            pharma_id = http_request.state.pharma_id
+        elif hasattr(http_request.state, "hospital_id") and http_request.state.hospital_id is not None:
+            # For hospital users, pharma_id is None - get_unread_messages will handle it
+            pharma_id = None
+        else:
+            # Try to get from current_user object as fallback
+            pharma_id = current_user.pharma_id
+        
         result = get_unread_messages(current_user.user_id, pharma_id, db)
         return result
+    except ChatUserNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except ChatMessageNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.get("/canisters/{canister_number}/messages",
+    response_model=PatientMessagesResponse,
+    summary="Get canister messages",
+    description="""
+    Get all messages for a specific canister (IVF flow).
+    Messages are NOT automatically marked as read.
+    Frontend must explicitly call the mark_as_read endpoint when user:
+    - Sends a message
+    - Closes chat window
+    - Keeps chat window open while receiving new messages
+    """)
+async def get_canister_chat_messages(
+    canister_number: str = Path(..., description="Canister number/code (e.g., 'C1')"),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    http_request: Request = None
+):
+    """Get all messages for a specific canister (does NOT mark as read)"""
+    try:
+        # Get pharma_id or hospital_id based on user type
+        pharma_id = None
+        hospital_id = None
+        if hasattr(http_request.state, "pharma_id") and http_request.state.pharma_id is not None:
+            pharma_id = http_request.state.pharma_id
+        if hasattr(http_request.state, "hospital_id") and http_request.state.hospital_id is not None:
+            hospital_id = http_request.state.hospital_id
+        
+        result = await get_canister_messages(
+            canister_number, 
+            current_user.user_id, 
+            pharma_id, 
+            hospital_id,
+            db, 
+            mark_as_read=False
+        )
+        return result
+    except ChatPatientNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
     except ChatUserNotFoundException as e:
         raise HTTPException(status_code=e.status_code, detail=e.to_dict())
     except ChatMessageNotFoundException as e:
@@ -202,8 +278,6 @@ async def mark_patient_messages_as_read(
 ):
     """Mark all messages for a patient as read"""
     try:
-        from app.service.chat_service import mark_patient_as_read, get_patient_unread_count, broadcast_unread_messages_update
-        
         # Mark all messages as read
         latest_message_id = mark_patient_as_read(current_user.user_id, patient_id, db)
         
@@ -213,7 +287,6 @@ async def mark_patient_messages_as_read(
         # Broadcast unread update via WebSocket (non-blocking)
         # Create a new DB session for the broadcast task since the current session will be closed
         try:
-            from app.config.database import SessionLocal
             asyncio.create_task(
                 broadcast_unread_messages_update(
                     current_user.user_id,
@@ -229,6 +302,76 @@ async def mark_patient_messages_as_read(
             "success": True,
             "message": f"Messages for patient {patient_id} marked as read",
             "patient_id": patient_id,
+            "last_read_message_id": latest_message_id,
+            "unread_count": unread_count
+        }
+    except ChatPatientNotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.to_dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error_code": "CHAT_INTERNAL_ERROR",
+            "message": "Internal server error",
+            "details": str(e)
+        })
+
+
+@router.post("/canisters/{canister_number}/mark-read",
+    summary="Mark canister messages as read",
+    description="""
+    Mark all messages for a canister as read (IVF flow).
+    Frontend should call this when:
+    - User sends a message
+    - User closes chat window
+    - User keeps chat window open while receiving new messages
+    """)
+async def mark_canister_messages_as_read(
+    canister_number: str = Path(..., description="Canister number/code (e.g., 'C1')"),
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user),
+    http_request: Request = None
+):
+    """Mark all messages for a canister as read"""
+    try:
+        # Resolve canister_number to canister_id
+        canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
+        if not canister:
+            raise HTTPException(status_code=404, detail={
+                "error_code": "CHAT_CANISTER_NOT_FOUND",
+                "message": f"Canister with number '{canister_number}' not found"
+            })
+        
+        canister_id = canister.canister_id
+        
+        # Mark all messages as read
+        latest_message_id = mark_canister_as_read(current_user.user_id, canister_id, db)
+        
+        # Get updated unread count
+        unread_count = get_canister_unread_count(current_user.user_id, canister_id, db)
+        
+        # Broadcast unread update via WebSocket (non-blocking)
+        # Get pharma_id for broadcast (can be None for hospital users)
+        pharma_id = None
+        if hasattr(http_request.state, "pharma_id") and http_request.state.pharma_id is not None:
+            pharma_id = http_request.state.pharma_id
+        elif hasattr(current_user, "pharma_id") and current_user.pharma_id is not None:
+            pharma_id = current_user.pharma_id
+        
+        try:
+            asyncio.create_task(
+                broadcast_unread_messages_update(
+                    current_user.user_id,
+                    pharma_id,
+                    chat_connection_manager,
+                    SessionLocal()  # Create new session for background task
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast unread update after marking messages as read: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Messages for canister {canister_number} marked as read",
+            "canister_number": canister_number,
             "last_read_message_id": latest_message_id,
             "unread_count": unread_count
         }

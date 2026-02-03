@@ -185,3 +185,57 @@ class CanisterStatus(str, Enum):
     @classmethod
     def list(cls):
         return [status.value for status in cls]
+
+
+class AlertType(str, Enum):
+    """Enum for alert types"""
+    DEVIATION_ALERT = "Deviation alert"
+    QUALITY_ALERT = "Quality alert"
+    REFILL_LOG_ALERT = "Refill log alert"
+    
+    @classmethod
+    def list(cls):
+        return [alert_type.value for alert_type in cls]
+
+
+class AlertSource(str, Enum):
+    """Enum for alert source - where the alert originated from"""
+    KPI = "KPI"
+    QUALITY = "QUALITY"
+    REFILL = "REFILL"
+    
+    @classmethod
+    def list(cls):
+        return [source.value for source in cls]
+
+
+class AlertTriggeredBy(str, Enum):
+    """Enum for alert triggered by - who/what triggered the alert"""
+    SYSTEM = "system"
+    DEVICE = "device"
+    MANUAL = "manual"
+    
+    @classmethod
+    def list(cls):
+        return [trigger.value for trigger in cls]
+
+
+class AlertSeverity(str, Enum):
+    """Enum for alert severity"""
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+    
+    @classmethod
+    def list(cls):
+        return [severity.value for severity in cls]
+
+
+class AlertStatus(str, Enum):
+    """Enum for alert status"""
+    ACTIVE = "Active"
+    ACKNOWLEDGED = "Acknowledged"
+    
+    @classmethod
+    def list(cls):
+        return [status.value for status in cls]

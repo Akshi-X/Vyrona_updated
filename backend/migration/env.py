@@ -76,7 +76,8 @@ from app.models.IVF import (
     cane_model,
     cryolock_model,
     patient_model as ivf_patient_model,
-    embryo_model
+    embryo_model,
+    critical_alert_model
 )
 
 # Import IVF model classes explicitly
@@ -89,6 +90,7 @@ from app.models.IVF.cane_model import Cane
 from app.models.IVF.cryolock_model import Cryolock
 from app.models.IVF.patient_model import IVFPatient
 from app.models.IVF.embryo_model import Embryo
+from app.models.IVF.critical_alert_model import CriticalAlert
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
