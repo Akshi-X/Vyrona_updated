@@ -36,6 +36,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
     refilled_by: '',
     description: '',
     status: 'Not started',
+    cryoshipper: '',
+    disinfected_shipper_infected_tank_description: '',
+    reservoir: '',
+    ln2_ordered_date: '',
+    ln2_received_date: '',
   });
   const [isAddStatusDropdownOpen, setIsAddStatusDropdownOpen] = useState(false);
   const [editingStatusDropdownIndex, setEditingStatusDropdownIndex] = useState<number | null>(null);
@@ -182,6 +187,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
       refilled_by: '',
       description: '',
       status: 'Not started',
+      cryoshipper: '',
+      disinfected_shipper_infected_tank_description: '',
+      reservoir: '',
+      ln2_ordered_date: '',
+      ln2_received_date: '',
     });
   }, []);
 
@@ -194,6 +204,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
       refilled_by: '',
       description: '',
       status: 'Not started',
+      cryoshipper: '',
+      disinfected_shipper_infected_tank_description: '',
+      reservoir: '',
+      ln2_ordered_date: '',
+      ln2_received_date: '',
     });
   }, []);
 
@@ -236,6 +251,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
         refilled_by: newRefillLog.refilled_by.trim(),
         description: newRefillLog.description.trim(),
         status: newRefillLog.status,
+        cryoshipper: newRefillLog.cryoshipper.trim() || null,
+        disinfected_shipper_infected_tank_description: newRefillLog.disinfected_shipper_infected_tank_description.trim() || null,
+        reservoir: newRefillLog.reservoir.trim() || null,
+        ln2_ordered_date: newRefillLog.ln2_ordered_date || null,
+        ln2_received_date: newRefillLog.ln2_received_date || null,
       });
 
       // Refresh the data from server to get all fields correctly
@@ -249,6 +269,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
         refilled_by: '',
         description: '',
         status: 'Not started',
+        cryoshipper: '',
+        disinfected_shipper_infected_tank_description: '',
+        reservoir: '',
+        ln2_ordered_date: '',
+        ln2_received_date: '',
       });
     } catch (e: any) {
       setAddError(e?.message || 'Failed to add refill log');
@@ -370,6 +395,59 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                       />
                     </td>
                     <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.cryoshipper}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, cryoshipper: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter cryoshipper"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.disinfected_shipper_infected_tank_description}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, disinfected_shipper_infected_tank_description: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter description"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.reservoir}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, reservoir: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter reservoir"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="date"
+                        value={newRefillLog.ln2_ordered_date}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, ln2_ordered_date: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="date"
+                        value={newRefillLog.ln2_received_date}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, ln2_received_date: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
                       {/* Custom Status dropdown styled like Role dropdown */}
                       <div
                         ref={addStatusDropdownRef}
@@ -409,46 +487,6 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                           </div>
                         )}
                       </div>
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                        value="-"
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                        value="-"
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                        value="-"
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="date"
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                        value=""
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="date"
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                        value=""
-                      />
                     </td>
                     <td className="px-3 py-2 h-[56px]">
                       <div className="flex justify-center items-center gap-2">
