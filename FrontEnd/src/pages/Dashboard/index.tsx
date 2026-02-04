@@ -42,6 +42,7 @@ import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
 import OutboundQualityTrackingIcon from '../../assets/DashBoardIcons/OutboundQualityTracking.svg';
+import OutboundModelIcon from '../../assets/OutboundModel.svg';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
 import DeviationDriverIcon from '../../assets/DashBoardIcons/DeviationDriver.svg';
@@ -1790,7 +1791,7 @@ export default function Dashboard({ }: DashboardProps) {
         }}
         error={outboundQualityTrackingError}
         title="Outbound Quality Tracking"
-        icon={OutboundQualityTrackingIcon}
+        icon={OutboundModelIcon}
         onTrack={(canisterId) => {
           setOutboundQualityTrackingError(undefined);
           setShowOutboundQualityTracking(false);
