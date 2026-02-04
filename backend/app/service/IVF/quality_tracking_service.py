@@ -13,6 +13,7 @@ from typing import List, Optional
 import pandas as pd
 from fastapi import Response
 from sqlalchemy import desc, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 try:
@@ -22,6 +23,7 @@ except ImportError:
     Alignment = Font = PatternFill = None
 
 # Local application imports
+from ...constants.error_codes import ERROR_CODES
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
@@ -484,13 +486,25 @@ class QualityTrackingService:
         
         Returns dict with: source_location, destination_location, device_id
         """
-        # Normalize description (lowercase for matching)
-        desc_lower = description.lower()
+        # Normalize description - replace newlines and multiple spaces with single space
+        # This handles frontend format with newlines: "From\nEgmore\nto\nErode\nDevice Id:\ndevice ID\n1344t3"
+        description_normalized = re.sub(r'\s+', ' ', description.strip())
+        desc_lower = description_normalized.lower()
         
         # Extract device ID - look for patterns like:
-        # "-deviceid -xxxxx", "-deviceid-xxxxx", "deviceid -xxxxx", "deviceid: xxxxx", etc.
+        # Frontend format: "Device Id: device ID 1344t3" (after normalization)
+        # Standard formats: "-deviceid -xxxxx", "-deviceid-xxxxx", "deviceid -xxxxx", "deviceid: xxxxx", etc.
         device_id = None
         device_patterns = [
+            # Frontend format: "Device Id:" followed by "device ID" and then the actual ID
+            # Example: "Device Id: device ID 1344t3" -> captures "1344t3"
+            # This pattern ensures we skip "device ID" and capture the actual ID after it
+            r'device\s*id\s*:\s*device\s*id\s+([a-zA-Z0-9_-]{3,})',
+            # Frontend format without "device ID" text: "Device Id: 1344t3"
+            r'device\s*id\s*:\s+([a-zA-Z0-9_-]{3,})',
+            # Pattern: "device ID" followed by ID (handles frontend format without colon)
+            r'device\s*id\s+([a-zA-Z0-9_-]{3,})',
+            # Standard formats
             r'-deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
             r'deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
             r'-deviceid\s+([a-zA-Z0-9_-]+)',
@@ -502,8 +516,11 @@ class QualityTrackingService:
             if match:
                 device_id = match.group(1).strip()
                 # Remove device_id part from description for location parsing
-                description = re.sub(pattern, '', description, flags=re.IGNORECASE)
+                description_normalized = re.sub(pattern, '', description_normalized, flags=re.IGNORECASE)
                 break
+        
+        # Use normalized description for location parsing
+        description = description_normalized
         
         # Extract source and destination - look for "from X to Y" pattern
         # Patterns: "from <source> to <destination>", "move from <source> to <destination>"
@@ -644,6 +661,15 @@ class QualityTrackingService:
                     message=f"Source branch for canister {canister_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
+                )
+
+            # Validate: Check in_transit column FIRST - if True, immediately return error
+            # Do not proceed with any shipment creation or database changes
+            if cryolock.in_transit:
+                raise AppException(
+                    message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
+                    error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
+                    status_code=HTTPStatus.BAD_REQUEST
                 )
 
             # Step 3: Parse description to extract source, destination and device_id
@@ -798,7 +824,7 @@ class QualityTrackingService:
                 logger.error(f"Failed to update in_transit flag for cryolock {cryolock.cryolock_id}")
                 raise AppException(
                     message="Failed to update cryolock in_transit status",
-                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    error_code=ERROR_CODES["SERVER_ERROR"],
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR
                 )
 
@@ -838,12 +864,30 @@ class QualityTrackingService:
         except AppException:
             self.db.rollback()
             raise
+        except IntegrityError as e:
+            self.db.rollback()
+            error_str = str(e).lower()
+            # Check if it's a unique constraint violation for shipment_id
+            if 'shipment_id' in error_str or 'unique' in error_str:
+                logger.error(f"Duplicate shipment detected: {str(e)}", exc_info=True)
+                raise AppException(
+                    message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
+                    error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            else:
+                logger.error(f"Database integrity error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
+                raise AppException(
+                    message=f"Failed to create shipment due to database constraint violation: {str(e)}",
+                    error_code=ERROR_CODES["SERVER_ERROR"],
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to create shipment: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                error_code=ERROR_CODES["SERVER_ERROR"],
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
