@@ -202,26 +202,27 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
               <th className="px-3 py-2 text-left whitespace-nowrap">Goblet Color</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock Color</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Date of Vitrification</th>
-              <th className="px-3 py-2 text-left rounded-tr-[10px] whitespace-nowrap">Move to</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Description</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Move to</th>
               <th className="px-3 py-2 text-left rounded-tr-[10px] whitespace-nowrap">Edit</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={9}>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={10}>
                   Loading...
                 </td>
               </tr>
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={9}>
+                <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={10}>
                   {error}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={9}>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={10}>
                   No container data found
                 </td>
               </tr>
@@ -264,6 +265,11 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.dateOfVitrification || '-'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap max-w-[200px]">
+                      <div className="truncate" title={row.description || undefined}>
+                        {row.description || '-'}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div 
                         className="cursor-pointer flex justify-center items-center"
@@ -333,6 +339,43 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           setSelectedRow(null);
         }}
         containerData={selectedRow || undefined}
+        onMoveToIncubator={async () => {
+          if (!canisterNumber || !selectedRow?.cryolockNum) {
+            throw new Error('Canister number and cryolock number are required');
+          }
+          
+          await ivfService.markEmbryoTransfer(
+            canisterNumber,
+            selectedRow.cryolockNum
+          );
+          
+          // Refresh the data after successful move
+          const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
+          setRows(response?.data || []);
+          setTotalContainers(response?.total || 0);
+          setAvailableSlots(response?.available_slots || 0);
+          setIsMoveModalOpen(false);
+          setSelectedRow(null);
+        }}
+        onMoveToTransit={async (description: string) => {
+          if (!canisterNumber || !selectedRow?.cryolockNum) {
+            throw new Error('Canister number and cryolock number are required');
+          }
+          
+          await ivfService.markInTransitWithShipment(
+            canisterNumber,
+            selectedRow.cryolockNum,
+            description
+          );
+          
+          // Refresh the data after successful move
+          const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
+          setRows(response?.data || []);
+          setTotalContainers(response?.total || 0);
+          setAvailableSlots(response?.available_slots || 0);
+          setIsMoveModalOpen(false);
+          setSelectedRow(null);
+        }}
       />
     </div>
   );

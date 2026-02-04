@@ -205,7 +205,6 @@ export default function IVFTrackShipmentPage() {
                                     onClick={handleExport}
                                     disabled={exporting || !canisterId}
                                     className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Export Combined Report to Excel"
                                 >
                                     {exporting ? (
                                         <svg className="animate-spin h-[25px] w-[25px] text-[#6B1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
