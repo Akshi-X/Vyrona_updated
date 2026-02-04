@@ -15,12 +15,13 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E827A6FF6CDB465783FB263473BFB596 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4A612E608EAF473F8845FCACCC6A05FE }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E047935FC2B142BEAFF7D9170EC2DE11 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3F8F541F3D8546418162DF69EEC5261C }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-backend-dev
           package: backend
+
