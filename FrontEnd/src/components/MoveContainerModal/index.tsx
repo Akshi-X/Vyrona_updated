@@ -11,7 +11,7 @@ interface MoveContainerModalProps {
     hisNumber?: string;
     cryolockNum?: string;
     canisterNum?: string | number;
-    caneId?: string;
+    caneCode?: string;
   };
 }
 
@@ -43,12 +43,12 @@ const MoveContainerModal: React.FC<MoveContainerModalProps> = ({
 
         {/* Title */}
         <h3 className="text-[18px] font-semibold text-black text-center leading-tight">
-          Confirm Container Transfer
+          Confirm Container Transfer?
         </h3>
 
         {/* Description */}
         <p className="text-[14px] text-[#969696] text-center leading-relaxed pb-8">
-          The Container will be move from Your end to other center
+          The container will be moved based on the appropriate next step.
         </p>
 
         {/* Action Buttons - Side by Side */}

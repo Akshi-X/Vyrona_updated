@@ -2,8 +2,8 @@ export interface IVFTreatment {
   hisNumber: string;
   cryolockNum: string;
   canisterNum: number;
-  tankId: string;
-  caneId: string;
+  tankCode: string;
+  caneCode: string;
   gobletColor: string;
   cryolockColor: string;
   dateOfVitrification: string;

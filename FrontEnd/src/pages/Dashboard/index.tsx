@@ -66,7 +66,7 @@ import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
 interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, userRole } = useAuth();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -121,7 +121,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfQualityDeviationsError, setIvfQualityDeviationsError] = useState<string | null>(null);
 
   // IVF top deviation driver metric (live API data)
-  const [ivfTopDeviationDriverCount, setIvfTopDeviationDriverCount] = useState<number | null>(null);
+  const [ivfTopDeviationDriverName, setIvfTopDeviationDriverName] = useState<string | null>(null);
   const [loadingIvfTopDeviationDriver, setLoadingIvfTopDeviationDriver] = useState(false);
   const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
 
@@ -134,6 +134,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfAvgQualityLossPerContainer, setIvfAvgQualityLossPerContainer] = useState<number | null>(null);
   const [loadingIvfAvgQualityLoss, setLoadingIvfAvgQualityLoss] = useState(false);
   const [ivfAvgQualityLossError, setIvfAvgQualityLossError] = useState<string | null>(null);
+
+  // IVF total deviations metric (live API data)
+  const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
+  const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
+  const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -409,10 +414,10 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfTopDeviationDriverError(null);
       try {
         const response = await ivfService.getTopDeviationDriver();
-        if (!cancelled) setIvfTopDeviationDriverCount(response?.count ?? 0);
+        if (!cancelled) setIvfTopDeviationDriverName(response?.driver_name ?? 'N/A');
       } catch (e: any) {
         if (!cancelled) {
-          setIvfTopDeviationDriverCount(null);
+          setIvfTopDeviationDriverName(null);
           setIvfTopDeviationDriverError(e?.message || 'Failed to load top deviation driver');
         }
       } finally {
@@ -482,6 +487,34 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
+  // Fetch IVF total deviations from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotalDeviations = async () => {
+      setLoadingIvfTotalDeviations(true);
+      setIvfTotalDeviationsError(null);
+      try {
+        const response = await ivfService.getTotalDeviations();
+        if (!cancelled) setIvfTotalDeviations(response?.total_deviations ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalDeviations(null);
+          setIvfTotalDeviationsError(e?.message || 'Failed to load total deviations');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTotalDeviations(false);
+      }
+    };
+
+    fetchTotalDeviations();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
   // Fetch IVF quality deviation chart from API
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
@@ -495,7 +528,10 @@ export default function Dashboard({ }: DashboardProps) {
         const response = await ivfService.getDeviationsGraph();
         if (!cancelled && response?.data) {
           // Transform API response to chart format
-          const containers = response.data.map((item) => item.site_name);
+          // Use container_name if role is 'user', otherwise use site_name
+          const containers = response.data.map((item) => 
+            userRole === 'user' ? (item.container_name || '') : (item.site_name || '')
+          );
           
           // Extract data for each metric
           const temperatureData = response.data.map((item) => item.temperature);
@@ -545,7 +581,7 @@ export default function Dashboard({ }: DashboardProps) {
     return () => {
       cancelled = true;
     };
-  }, [userDepartment, isAuthenticated]);
+  }, [userDepartment, isAuthenticated, userRole]);
 
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
@@ -826,8 +862,8 @@ export default function Dashboard({ }: DashboardProps) {
                             {loadingIvfTopDeviationDriver
                               ? '--'
                               : ivfTopDeviationDriverError
-                                ? '0'
-                                : `${ivfTopDeviationDriverCount ?? 0}`}
+                                ? 'N/A'
+                                : ivfTopDeviationDriverName ?? 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -867,11 +903,11 @@ export default function Dashboard({ }: DashboardProps) {
                           Deviations
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {loadingIvfAvgQualityLoss
+                            {loadingIvfTotalDeviations
                               ? '--'
-                              : ivfAvgQualityLossError
+                              : ivfTotalDeviationsError
                                 ? '0'
-                                : `${ivfAvgQualityLossPerContainer ?? 0}`}
+                                : `${ivfTotalDeviations ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -1114,7 +1150,7 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Ongoing Treatments Section */}
               <section>
                 <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
-                <h2 className="font-semibold text-black text-base mb-4">Embroyo Tracking</h2>
+                <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
                 ) : ivfEmbryoTrackingError ? (
