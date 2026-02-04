@@ -1,37 +1,58 @@
-name: Deploy mgscale backend
+name: Build and deploy Python app to Azure Web App - mgscale-backend-dev
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
-env:
-  AZURE_WEBAPP_NAME: mgscale-backend-dev
-  PYTHON_VERSION: '3.12'
-
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
+      # Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.10'
 
+      # Install dependencies
       - name: Install dependencies
+        working-directory: BackEnd   # 🔁 change if your folder name is different
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r requirements.txt
 
-      - name: Zip application
-        run: |
-          cd backend
-          zip -r ../app.zip . -x "__pycache__/*"
+      # Upload application code as artifact
+      - name: Upload artifact for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-app
+          path: BackEnd               # 🔁 full app folder (NOT dist)
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      # Download artifact (this becomes wwwroot)
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-app
+          path: .
+
+      # Login to Azure using Service Principal
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -39,8 +60,10 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
+      # Deploy to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: app.zip
+          app-name: mgscale-backend-dev   # 🔁 your Python Web App name
+          slot-name: Production
+          package: .
