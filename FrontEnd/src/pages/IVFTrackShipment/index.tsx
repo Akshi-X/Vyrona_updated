@@ -11,11 +11,13 @@ import { userService, type UserProfileDto } from '../../services/userService';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
+import ExportTrackPageIcon from '../../assets/ExportTrackPage.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
-import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
+import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
+import { ivfService } from '../../services/ivfService';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
@@ -30,13 +32,14 @@ export default function IVFTrackShipmentPage() {
     const [showMyTasks, setShowMyTasks] = useState(false);
     const [showStakeholderChats, setShowStakeholderChats] = useState(false);
     const [showStakeholderChatScreen, setShowStakeholderChatScreen] = useState(false);
-    const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
+    const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
     const [myTasks, setMyTasks] = useState<Task[]>([]);
     const [loadingAlerts, setLoadingAlerts] = useState(false);
     const [loadingTasks, setLoadingTasks] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
     const [stakeholderChats, setStakeholderChats] = useState<Array<{ id: string; sender: string; patientId: string; message: string; timestamp: string; isRead: boolean }>>([]);
+    const [exporting, setExporting] = useState(false);
 
     // WebSocket for unread count
     const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
@@ -44,8 +47,10 @@ export default function IVFTrackShipmentPage() {
     // Calculate stakeholder chat count: only show count if canister has tagged unread messages
     const stakeholderChatCount = React.useMemo(() => {
         if (!canisterId || !wsUnreadMessages) return 0;
-        // Count only tagged unread messages for this specific canister
-        return wsUnreadMessages.filter(msg => msg.patient_id === canisterId).length;
+        // Count only tagged unread messages for this specific canister (IVF flow uses canister_number)
+        return wsUnreadMessages.filter(msg => 
+            msg.canister_number === canisterId || msg.patient_id === canisterId
+        ).length;
     }, [canisterId, wsUnreadMessages]);
     
     const criticalAlertsCount = criticalAlerts.length;
@@ -54,9 +59,17 @@ export default function IVFTrackShipmentPage() {
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
-            const response = await criticalAlertsService.getCriticalAlerts('pharma_12345');
-            setCriticalAlerts(response.alerts || []);
+            // If canisterId is available, fetch canister-specific alerts
+            // Otherwise, fetch hospital-wide alerts
+            if (canisterId) {
+                const response = await ivfAlertsService.getCanisterAlerts(canisterId);
+                setCriticalAlerts(response.alerts || []);
+            } else {
+                const response = await ivfAlertsService.getHospitalAlerts();
+                setCriticalAlerts(response.alerts || []);
+            }
         } catch (e) {
+            console.error('Error fetching IVF alerts:', e);
             setCriticalAlerts([]);
         } finally {
             setLoadingAlerts(false);
@@ -68,14 +81,19 @@ export default function IVFTrackShipmentPage() {
         try {
             let allTasks: Task[] = [];
             
-            // If canisterId is available, use canister-specific endpoint if available
-            // Otherwise use general tasks endpoint
-            const response = await tasksService.getMyTasks();
-            // Combine created_tasks and assigned_tasks into a single array
-            allTasks = [
-                ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
-                ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
-            ];
+            // IVF flow: if canisterId is available, use canister-specific endpoint
+            // Otherwise fallback to general "my tasks"
+            if (canisterId) {
+                const canisterResponse = await tasksService.getCanisterTasks(canisterId);
+                allTasks = Array.isArray(canisterResponse.tasks) ? canisterResponse.tasks : [];
+            } else {
+                const response = await tasksService.getMyTasks();
+                // Combine created_tasks and assigned_tasks into a single array
+                allTasks = [
+                    ...(Array.isArray(response.created_tasks) ? response.created_tasks : []),
+                    ...(Array.isArray(response.assigned_tasks) ? response.assigned_tasks : [])
+                ];
+            }
             
             // Ensure we always set an array
             setMyTasks(Array.isArray(allTasks) ? allTasks : []);
@@ -96,8 +114,29 @@ export default function IVFTrackShipmentPage() {
             const last = profile.last_name?.trim?.() || '';
             const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
             setUserInitials(initials);
-        } catch (error) {
+        } catch {
             // Error handled silently
+        }
+    };
+
+    const handleExport = async () => {
+        if (!canisterId) {
+            console.error('Canister ID is required for export');
+            return;
+        }
+
+        setExporting(true);
+        try {
+            const currentDate = new Date();
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
+            
+            await ivfService.exportCombinedReportExcel(canisterId, year, month);
+        } catch (e: any) {
+            console.error('Error exporting report:', e);
+            // You could show a toast notification here
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -110,19 +149,21 @@ export default function IVFTrackShipmentPage() {
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
         if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-            const transformedChats = wsUnreadMessages.map((msg) => ({
-                id: msg.patient_id,
-                sender: msg.sender_name,
-                patientId: `Canister ID : ${msg.patient_id}`,
-                message: msg.message_content,
-                timestamp: new Date(msg.created_at).toLocaleString(),
-                isRead: false
-            }));
+            const transformedChats = wsUnreadMessages
+                .filter(msg => msg.canister_number === canisterId || (msg.patient_id && canisterId && msg.patient_id === canisterId))
+                .map((msg) => ({
+                    id: msg.canister_number || msg.patient_id || '',
+                    sender: msg.sender_name,
+                    patientId: msg.canister_number ? `Canister ID : ${msg.canister_number}` : (msg.patient_id ? `Canister ID : ${msg.patient_id}` : ''),
+                    message: msg.message_content,
+                    timestamp: new Date(msg.created_at).toLocaleString(),
+                    isRead: false
+                }));
             setStakeholderChats(transformedChats);
         } else {
             setStakeholderChats([]);
         }
-    }, [wsUnreadMessages]);
+    }, [wsUnreadMessages, canisterId]);
 
     return (
         <div className="bg-[#FDFAFF] flex w-full h-full">
@@ -157,6 +198,35 @@ export default function IVFTrackShipmentPage() {
                             <span className="text-black font-semibold">Container ID: {canisterId || 'C1'}</span>
                         </div>
                         <div className="flex items-center gap-6">
+                            {/* Export Excel */}
+                            <div className="relative group">
+                                <button
+                                    type="button"
+                                    onClick={handleExport}
+                                    disabled={exporting || !canisterId}
+                                    className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {exporting ? (
+                                        <svg className="animate-spin h-[25px] w-[25px] text-[#6B1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    ) : (
+                                        <img
+                                            className="w-[25px] h-[25px]"
+                                            alt="Export Excel"
+                                            src={ExportTrackPageIcon}
+                                        />
+                                    )}
+                                </button>
+                                {/* Tooltip */}
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="font-semibold text-black text-xs whitespace-nowrap">
+                                        Export Combined Report
+                                    </div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                </div>
+                            </div>
                             {/* Critical Alerts */}
                             <div className="relative group">
                                 <img
@@ -252,7 +322,7 @@ export default function IVFTrackShipmentPage() {
             <StakeholderChatBox
                 isOpen={showStakeholderChatScreen}
                 onClose={() => setShowStakeholderChatScreen(false)}
-                patientId={canisterId}
+                canisterNumber={canisterId}
                 onMessagesUpdated={() => {
                     // WebSocket will automatically update unread count
                     // No need to manually refresh
@@ -264,15 +334,25 @@ export default function IVFTrackShipmentPage() {
                 isOpen={showCriticalAlerts}
                 onClose={() => setShowCriticalAlerts(false)}
                 alerts={criticalAlerts.map((a) => ({
-                    id: a.id,
-                    type: a.type,
-                    severity: a.severity,
-                    patientId: a.patient_id,
+                    id: a.alert_id,
+                    type: a.alert_type,
+                    severity: a.severity === 'High' ? 'High' : a.severity === 'Medium' ? 'Medium' : 'Low',
+                    patientId: a.canister_number || `Canister ${a.canister_id}`,
                     message: a.message,
-                    timestamp: a.timestamp,
-                    status: a.status,
+                    timestamp: new Date(a.occurred_at).toLocaleString(),
+                    status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
+                onAcknowledge={async (alertId) => {
+                    try {
+                        await ivfAlertsService.acknowledgeAlert(alertId);
+                        // Refresh alerts after acknowledgment
+                        fetchCriticalAlerts();
+                    } catch (error) {
+                        console.error('Error acknowledging alert:', error);
+                        throw error;
+                    }
+                }}
             />
             <MyTasksModal
                 isOpen={showMyTasks}
@@ -282,6 +362,7 @@ export default function IVFTrackShipmentPage() {
                         return {
                             id: task.id.toString(),
                             patientId: task.patient_id || 'N/A',
+                            canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name,
                             description: task.description || '',
                             assigneeBy: task.created_by 
@@ -299,6 +380,7 @@ export default function IVFTrackShipmentPage() {
                         return {
                             id: task.id?.toString() || 'unknown',
                             patientId: task.patient_id || 'N/A',
+                            canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name || 'Unknown Task',
                             description: task.description || '',
                             assigneeBy: 'Unknown',
@@ -310,11 +392,11 @@ export default function IVFTrackShipmentPage() {
                     }
                 })}
                 loading={loadingTasks}
-                variant="track"
+                variant="ivf"
                 currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
                 currentUserId={currentUserId}
                 userRole={userRole || currentUser?.role || ''}
-                defaultPatientId={canisterId || ''}
+                defaultCanisterNumber={canisterId || ''}
                 onTaskCreated={() => {
                     // Refresh tasks after creation
                     fetchMyTasks();
@@ -331,7 +413,7 @@ export default function IVFTrackShipmentPage() {
                         }
 
                         // Get assigneeId from the task (it should be stored when user selects from dropdown)
-                        const assigneeId = (task as any).assigneeId;
+                        const assigneeId = task.assigneeId;
                         
                         // Prepare update data
                         const updateData: {
@@ -339,6 +421,7 @@ export default function IVFTrackShipmentPage() {
                             description?: string;
                             assignee_id?: string;
                             patient_id?: string;
+                            canister_number?: string;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
                             status?: 'Not started' | 'In progress' | 'Done';
@@ -356,7 +439,15 @@ export default function IVFTrackShipmentPage() {
                                 // assignee_id should be a string (user_id)
                                 updateData.assignee_id = String(assigneeId);
                             }
-                            updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;
+
+                            // IVF tasks are canister-scoped; CGT tasks are patient-scoped
+                            if (task.canisterNumber && task.canisterNumber !== 'N/A') {
+                                updateData.canister_number = String(task.canisterNumber);
+                                updateData.patient_id = undefined;
+                            } else {
+                                updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;
+                            }
+
                             // Parse date - handle both ISO format and locale date string
                             if (task.dueDate && task.dueDate !== 'N/A') {
                                 try {
@@ -392,7 +483,7 @@ export default function IVFTrackShipmentPage() {
                         console.error('Error updating task:', error);
                     }
                 }}
-                onDelete={(_taskId) => {
+                onDelete={() => {
                     // TODO: Implement delete task functionality
                 }}
             />

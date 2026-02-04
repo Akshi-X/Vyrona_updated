@@ -11,6 +11,7 @@ export interface IVFTreatment {
   status: string;
   // Available from API, not currently displayed in the table UI
   embryoGrading?: string;
+  description?: string | null;
 }
 
 export interface EmbryoTrackingApiResponse {

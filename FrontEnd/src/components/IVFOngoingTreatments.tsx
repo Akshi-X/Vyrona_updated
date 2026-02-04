@@ -23,7 +23,7 @@ const tableHeaders: TableHeader[] = [
   { label: "Goblet Color", hasFilter: true, filterKey: 'gobletColor' },
   { label: "Cryolock Color", hasFilter: true, filterKey: 'cryolockColor' },
   { label: "Date of Vitrification" },
-  { label: "Embryo Grading" },
+  { label: "Description" },
   { label: "Site Name", hasFilter: true, filterKey: 'siteName' },
   { label: "Status", hasFilter: true, filterKey: 'status' },
 ];
@@ -265,7 +265,11 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
                   <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.embryoGrading || '-'}</td>
+                  <td className="px-4 py-3 text-xs max-w-[200px]">
+                    <div className="truncate" title={treatment.description || undefined}>
+                      {treatment.description || '-'}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
                   <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
                 </tr>

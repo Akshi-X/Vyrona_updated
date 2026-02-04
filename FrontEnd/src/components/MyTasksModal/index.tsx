@@ -11,6 +11,8 @@ import { TASK_FIELD_ERRORS } from '../../constants/validation';
 export interface MyTask {
   id: string;
   patientId: string;
+  canisterNumber?: string;
+  assigneeId?: string; // user_id (stored for update calls)
   taskName: string;
   description: string;
   assigneeBy: string;
@@ -28,12 +30,13 @@ interface MyTasksModalProps {
   onAdd?: () => void;
   onEdit?: (task: MyTask) => void;
   onDelete?: (taskId: string) => void;
-  variant?: 'dashboard' | 'track'; // Add variant to differentiate between Dashboard and Track & Trace
+  variant?: 'dashboard' | 'track' | 'ivf'; // Add variant to differentiate between Dashboard, Track & Trace and IVF
   currentUserName?: string; // Current user's full name for "Assigned by" field
   currentUserId?: string; // Current user's ID
   onTaskCreated?: () => void; // Callback to refresh tasks after creation
   userRole?: string; // User's role for role-based access control
   defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
+  defaultCanisterNumber?: string; // Default canister number to pre-fill when adding a new IVF task
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -43,20 +46,22 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   loading = false,
   onAdd,
   onEdit,
-  onDelete: _onDelete, // Reserved for future delete functionality
   variant = 'dashboard',
   currentUserName = '',
   currentUserId = '',
   onTaskCreated,
   userRole = '',
-  defaultPatientId = ''
+  defaultPatientId = '',
+  defaultCanisterNumber = ''
 }) => {
   const isUserRole = userRole?.toLowerCase() === 'user';
+  const isIvfVariant = variant === 'ivf';
   const [showInputRow, setShowInputRow] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
   const [newTask, setNewTask] = useState({
     patientId: '',
+    canisterNumber: '',
     taskName: '',
     description: '',
     assigneeBy: currentUserName || '',
@@ -95,9 +100,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const handleAddClick = () => {
     setShowInputRow(true);
     setValidationErrors({});
-    // Reset form with current user as default and pre-fill patientId if provided
+    // Reset form with current user as default and pre-fill patientId/canisterNumber if provided
     setNewTask({
-      patientId: defaultPatientId || '',
+      patientId: isIvfVariant ? '' : (defaultPatientId || ''),
+      canisterNumber: isIvfVariant ? (defaultCanisterNumber || '') : '',
       taskName: '',
       description: '',
       assigneeBy: currentUserName || '',
@@ -113,10 +119,16 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     const requiredFields: Record<string, string> = {
       taskName: TASK_FIELD_ERRORS.taskName,
       description: TASK_FIELD_ERRORS.description,
-      patientId: TASK_FIELD_ERRORS.patientId,
       dueDate: TASK_FIELD_ERRORS.dueDate,
       assigneeId: TASK_FIELD_ERRORS.assigneeId,
     };
+
+    // CGT uses patient_id, IVF uses canister_number
+    if (isIvfVariant) {
+      requiredFields.canisterNumber = TASK_FIELD_ERRORS.canisterNumber;
+    } else {
+      requiredFields.patientId = TASK_FIELD_ERRORS.patientId;
+    }
 
     const errors: Record<string, string> = {};
 
@@ -148,7 +160,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         task_name: newTask.taskName.trim(),
         description: newTask.description.trim(),
         assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
-        patient_id: newTask.patientId.trim() || undefined,
+        patient_id: isIvfVariant ? undefined : (newTask.patientId.trim() || undefined),
+        canister_number: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
         due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : undefined,
         priority: newTask.priority,
         status: newTask.status as 'Not started' | 'In progress' | 'Done'
@@ -172,6 +185,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       setValidationErrors({});
       setNewTask({
         patientId: '',
+        canisterNumber: '',
         taskName: '',
         description: '',
         assigneeBy: currentUserName || '',
@@ -181,7 +195,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         priority: 'Medium',
         status: 'Not started'
       });
-    } catch (error) {
+    } catch {
       setValidationErrors({ submit: 'Failed to create task. Please try again.' });
     } finally {
       setIsSaving(false);
@@ -194,6 +208,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     setValidationErrors({});
     setNewTask({
       patientId: '',
+      canisterNumber: '',
       taskName: '',
       description: '',
       assigneeBy: currentUserName || '',
@@ -224,7 +239,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const handleSaveEdit = () => {
     if (editedTask && onEdit) {
       // Find assigneeId from the selected user name if not already stored
-      let assigneeId = (editedTask as any).assigneeId;
+      let assigneeId = editedTask.assigneeId;
       if (!assigneeId && editedTask.assignedTo) {
         const user = findUserByName(editedTask.assignedTo);
         if (user) {
@@ -233,7 +248,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       }
       // Pass the task with assigneeId if available, ensuring status is included
       const taskToSave = assigneeId 
-        ? { ...editedTask, ...({ assigneeId } as any), status: editedTask.status }
+        ? { ...editedTask, assigneeId, status: editedTask.status }
         : { ...editedTask, status: editedTask.status };
       onEdit(taskToSave);
     }
@@ -258,7 +273,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     try {
       const response = await userService.getAllUsersInCompany();
       setUsers(response.users || []);
-    } catch (error) {
+    } catch {
       setUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -302,6 +317,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       setIsStatusFilterOpen(false);
       setNewTask({
         patientId: '',
+        canisterNumber: '',
         taskName: '',
         description: '',
         assigneeBy: currentUserName || '',
@@ -535,7 +551,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         </colgroup>
         <thead className="bg-[#fdeeff]">
           <tr className="border-b border-[#eeeeee]">
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Patient ID</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+              {isIvfVariant ? 'Canister ID' : 'Patient ID'}
+            </th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Task Name</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Description</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
@@ -739,7 +757,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </div>
               </div>
             </th>
-            {variant === 'track' && <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>}
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -750,19 +768,21 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 <div>
                   <input
                     type="text"
-                    value={newTask.patientId}
-                    onChange={(e) => handleInputChange('patientId', e.target.value)}
-                    placeholder="Patient ID"
+                    value={isIvfVariant ? newTask.canisterNumber : newTask.patientId}
+                    onChange={(e) => handleInputChange(isIvfVariant ? 'canisterNumber' : 'patientId', e.target.value)}
+                    placeholder={isIvfVariant ? 'Canister ID' : 'Patient ID'}
                     required
                     readOnly
                     className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-gray-50 text-gray-700 cursor-not-allowed ${
-                      validationErrors.patientId 
+                      (isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId)
                         ? 'border-red-500 focus:ring-red-200' 
                         : 'border-gray-300 focus:ring-purple-200'
                     }`}
                   />
-                  {validationErrors.patientId && (
-                    <div className="text-xs text-red-500 mt-1">{validationErrors.patientId}</div>
+                  {(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) && (
+                    <div className="text-xs text-red-500 mt-1">
+                      {isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId}
+                    </div>
                   )}
                 </div>
               </td>
@@ -911,40 +931,38 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                   </select>
                 </div>
               </td>
-              {variant === 'track' && (
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-center sticky z-10">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={handleSaveAdd}
-                        disabled={isSaving}
-                        className={`inline-flex items-center justify-center px-2 py-1 text-sm font-medium rounded transition-colors ${
-                          isSaving 
-                            ? 'text-gray-400 cursor-not-allowed' 
-                            : 'text-green-600 hover:text-green-800 hover:bg-green-50'
-                        }`}
-                        title="Save new task"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={handleCancelAdd}
-                        className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                        title="Cancel adding task"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-              )}
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={handleSaveAdd}
+                    disabled={isSaving}
+                    className={`inline-flex items-center justify-center px-2 py-1 text-sm font-medium rounded transition-colors ${
+                      isSaving 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                    }`}
+                    title="Save new task"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleCancelAdd}
+                    className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    title="Cancel adding task"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
             </tr>
           )}
           {visibleTasks.length === 0 && !showInputRow && (
             <tr>
-              <td colSpan={variant === 'track' ? 9 : 8} className="bg-white p-[15px] text-center text-gray-500 text-sm">
+              <td colSpan={9} className="bg-white p-[15px] text-center text-gray-500 text-sm">
                 No tasks match the current filters
               </td>
             </tr>
@@ -960,7 +978,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   <div className="font-mono truncate">
-                    {task.patientId}
+                    {isIvfVariant ? (task.canisterNumber || 'N/A') : task.patientId}
                   </div>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
@@ -1008,8 +1026,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                           setEditedTask({ 
                             ...editedTask, 
                             assignedTo: fullName,
-                            // Store assigneeId as a property we can access later
-                            ...({ assigneeId: selectedUserId } as any)
+                            assigneeId: selectedUserId
                           });
                         }
                       }}
@@ -1158,7 +1175,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                   const day = String(dateObj.getDate()).padStart(2, '0');
                                   formattedTask.dueDate = `${year}-${month}-${day}`;
                                 }
-                              } catch (e) {
+                              } catch {
                                 // If parsing fails, keep original value
                                 formattedTask.dueDate = task.dueDate;
                               }
