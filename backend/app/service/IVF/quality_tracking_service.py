@@ -13,6 +13,7 @@ from typing import List, Optional
 import pandas as pd
 from fastapi import Response
 from sqlalchemy import desc, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 try:
@@ -22,6 +23,7 @@ except ImportError:
     Alignment = Font = PatternFill = None
 
 # Local application imports
+from ...constants.error_codes import ERROR_CODES
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
@@ -646,6 +648,26 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
 
+            # Validate: Check if cryolock already has an active shipment
+            if cryolock.in_transit:
+                # Check for existing active shipments (not delivered or cancelled)
+                existing_shipment = (
+                    self.db.query(IVFShipment)
+                    .filter(
+                        IVFShipment.cryolock_id == cryolock.cryolock_id,
+                        IVFShipment.shipment_status.notin_(['delivered', 'cancelled'])
+                    )
+                    .order_by(desc(IVFShipment.created_at))
+                    .first()
+                )
+                
+                if existing_shipment:
+                    raise AppException(
+                        message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
+                        error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
+                        status_code=HTTPStatus.BAD_REQUEST
+                    )
+
             # Step 3: Parse description to extract source, destination and device_id
             parsed = self._parse_description(request.description)
             source_location_name = parsed.get("source_location")
@@ -838,6 +860,24 @@ class QualityTrackingService:
         except AppException:
             self.db.rollback()
             raise
+        except IntegrityError as e:
+            self.db.rollback()
+            error_str = str(e).lower()
+            # Check if it's a unique constraint violation for shipment_id
+            if 'shipment_id' in error_str or 'unique' in error_str:
+                logger.error(f"Duplicate shipment detected: {str(e)}", exc_info=True)
+                raise AppException(
+                    message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
+                    error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            else:
+                logger.error(f"Database integrity error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
+                raise AppException(
+                    message=f"Failed to create shipment due to database constraint violation: {str(e)}",
+                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+                )
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)

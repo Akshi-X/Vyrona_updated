@@ -21,6 +21,12 @@ class Canister(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     canister_status = Column(SQLEnum(CanisterStatus, values_callable=lambda obj: [e.value for e in obj], name='canister_status'), 
                             default=CanisterStatus.SAFE, nullable=False)
+    tive_device_id = Column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Tive device identifier mapped to this canister (e.g., EntityName like 'J712149' or a device id)",
+    )
     
     # Relationships
     tank = relationship("Tank", back_populates="canisters")
