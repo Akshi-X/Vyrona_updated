@@ -13,24 +13,23 @@ jobs:
       contents: read
 
     steps:
-      # 1️⃣ Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # Checkout code
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (use same as Azure: Node 24)
+      # Node version (same as Azure)
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24.x'
 
-      # 3️⃣ Install dependencies & build (Vite)
-      - name: Install dependencies and build frontend
+      # Build frontend
+      - name: Install & build frontend
         working-directory: FrontEnd
         run: |
           npm install
           npm run build
 
-      # 4️⃣ Upload ONLY the build output (dist)
+      # 🔑 Upload ONLY dist
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -45,22 +44,22 @@ jobs:
       contents: read
 
     steps:
-      # 5️⃣ Download build artifact
-      - name: Download frontend build artifact
+      # Download artifact
+      - name: Download frontend artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: .
 
-      # 6️⃣ Azure Login
-      - name: Login to Azure
+      # Azure login
+      - name: Azure Login
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3F8F541F3D8546418162DF69EEC5261C }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
-      # 7️⃣ Deploy static files to Azure Web App
+      # 🔑 Deploy static files
       - name: Deploy to Azure Web App (DEV)
         uses: azure/webapps-deploy@v3
         with:
