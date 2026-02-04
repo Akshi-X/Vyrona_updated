@@ -54,6 +54,11 @@ def _create_test_client(monkeypatch):
             self.first_name = "John"
             self.last_name = "Doe"
             self.is_approved = True
+            self.department = None  # For pharma users, department can be None
+            self.branch_id = None
+            self.hospital_id = None
+            self.status = True
+            self.approved_status = "approved"
 
     mock_user = MockUser()
 

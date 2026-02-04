@@ -87,6 +87,13 @@ def _create_test_client(monkeypatch):
             self.role = "manager"  # Role that can create tasks
             self.email = "test@example.com"
             self.is_approved = True
+            self.department = None  # For pharma users, department can be None
+            self.branch_id = None
+            self.hospital_id = None
+            self.status = True
+            self.approved_status = "approved"
+            self.first_name = "Test"
+            self.last_name = "User"
 
     mock_user = MockUser()
 
@@ -165,6 +172,7 @@ def test_create_task_success(client):
                 role="manager"
             ),
             patient_id=None,
+            canister_number=None,
             due_date=None,
             priority=TaskPriority.MEDIUM,
             status=TaskStatus.NOT_STARTED,
@@ -302,6 +310,7 @@ def test_get_all_tasks_success(client):
                     role="manager"
                 ),
                 patient_id=None,
+                canister_number=None,
                 due_date=None,
                 priority=TaskPriority.HIGH,
                 status=TaskStatus.NOT_STARTED,
@@ -333,6 +342,7 @@ def test_get_all_tasks_success(client):
                     role="manager"
                 ),
                 patient_id=None,
+                canister_number=None,
                 due_date=None,
                 priority=TaskPriority.MEDIUM,
                 status=TaskStatus.IN_PROGRESS,
@@ -423,6 +433,7 @@ def test_get_task_by_id_success(client):
             role="manager"
         ),
         patient_id=None,
+        canister_number=None,
         due_date=None,
         priority=TaskPriority.MEDIUM,
         status=TaskStatus.NOT_STARTED,
@@ -510,6 +521,7 @@ def test_get_patient_tasks_success(client):
                     role="manager"
                 ),
                 patient_id="PT-123",
+                canister_number=None,
                 due_date=None,
                 priority=TaskPriority.MEDIUM,
                 status=TaskStatus.IN_PROGRESS,
@@ -598,6 +610,7 @@ def test_update_task_success(client):
                 role="manager"
             ),
             patient_id=None,
+            canister_number=None,
             due_date=None,
             priority=TaskPriority.HIGH,
             status=TaskStatus.IN_PROGRESS,
@@ -741,6 +754,7 @@ def test_update_task_status_success(client):
                 role="manager"
             ),
             patient_id=None,
+            canister_number=None,
             due_date=None,
             priority=TaskPriority.MEDIUM,
             status=TaskStatus.DONE,

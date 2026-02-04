@@ -84,6 +84,13 @@ def _create_test_client(monkeypatch):
             self.role = "pharma_admin"  # Role that can access user endpoints
             self.email = "test@example.com"
             self.is_approved = True
+            self.department = None  # For pharma users, department is None
+            self.branch_id = None  # For pharma users, branch_id is None
+            self.hospital_id = None  # For pharma users, hospital_id is None
+            self.status = True  # Account is active
+            self.approved_status = "approved"
+            self.first_name = "Test"
+            self.last_name = "User"
 
     mock_user = MockUser()
 
@@ -2892,25 +2899,23 @@ def test_verify_websocket_token_missing_user_id():
     data = {"pharma_id": 42}
     token = create_access_token(data)
     
-    # Note: Line 88 tries to pass a message to InvalidTokenException() which doesn't accept parameters
-    # This will raise TypeError, but the test covers the line execution
-    with pytest.raises(TypeError):
+    # Missing user_id raises InvalidTokenException
+    with pytest.raises(InvalidTokenException):
         verify_websocket_token(token)
 
 
 def test_verify_websocket_token_missing_pharma_id():
     """Test verify_websocket_token with missing pharma_id (lines 87-88)"""
     from app.auth.auth import verify_websocket_token, create_access_token
-    from app.exceptions import InvalidTokenException
     
     # Create token without 'pharma_id' field
     data = {"sub": "USER-123"}
     token = create_access_token(data)
     
-    # Note: Line 88 tries to pass a message to InvalidTokenException() which doesn't accept parameters
-    # This will raise TypeError, but the test covers the line execution
-    with pytest.raises(TypeError):
-        verify_websocket_token(token)
+    # For IVF/hospital users, pharma_id can be None, so this should succeed
+    result = verify_websocket_token(token)
+    assert result["user_id"] == "USER-123"
+    assert result["pharma_id"] is None
 
 
 def test_get_current_user_from_request_success(client):
@@ -4100,28 +4105,29 @@ def test_validate_otp_verification_invalid_otp():
 
 def test_validate_otp_verification_user_not_found():
     """Test validate_otp_verification when user not found (lines 217-219)"""
-    from app.dependencies.auth_dependencies import validate_otp_verification
-    from app.exceptions import OTPUserNotFoundException
+    from app.service.otp_service import validate_otp_verification
+    from app.exceptions import OTPUserNotFoundException, InvalidOTPException
     from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
-    with patch('app.dependencies.auth_dependencies.verify_otp_service', return_value=True):
-        with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=None):
+    # First verify_otp must return True (OTP is valid), then get_user_by_id returns None
+    with patch('app.service.otp_service.verify_otp', return_value=True):
+        with patch('app.service.otp_service.get_user_by_id', return_value=None):
             with pytest.raises(OTPUserNotFoundException):
                 validate_otp_verification("USER-123", "valid_otp", db_mock)
 
 
 def test_get_validated_user_invalid():
     """Test get_validated_user with invalid user or email mismatch (lines 232-236)"""
-    from app.dependencies.auth_dependencies import get_validated_user
+    from app.service.otp_service import get_validated_user
     from app.exceptions import ResendOTPInvalidUserException
     from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
     # Test user not found
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=None):
+    with patch('app.service.otp_service.get_user_by_id', return_value=None):
         with pytest.raises(ResendOTPInvalidUserException):
             get_validated_user("user@example.com", "USER-123", db_mock)
     
@@ -4133,14 +4139,14 @@ def test_get_validated_user_invalid():
     user.status = True
     user.approved_status = "approved"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPInvalidUserException):
             get_validated_user("user@example.com", "USER-123", db_mock)
 
 
 def test_get_validated_user_not_approved():
     """Test get_validated_user when user is not approved or inactive (lines 239-240)"""
-    from app.dependencies.auth_dependencies import get_validated_user
+    from app.service.otp_service import get_validated_user
     from app.exceptions import ResendOTPUserNotApprovedException
     from app.models.user_model import User
     from unittest.mock import MagicMock, patch
@@ -4152,7 +4158,8 @@ def test_get_validated_user_not_approved():
     user.status = False  # Inactive
     user.approved_status = "approved"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    # User exists and email matches, but status is False
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPUserNotApprovedException):
             get_validated_user("user@example.com", "USER-123", db_mock)
     
@@ -4160,7 +4167,7 @@ def test_get_validated_user_not_approved():
     user.status = True
     user.approved_status = "pending"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPUserNotApprovedException):
             get_validated_user("user@example.com", "USER-123", db_mock)
 
