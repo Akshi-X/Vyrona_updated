@@ -151,12 +151,10 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingChats(true);
     try {
       const response = await chatService.getUnreadMessages();
-      console.log('[Dashboard] Fetched unread messages:', response);
       
       // Update the total unread count from API response
       if (response && typeof response.total_unread === 'number') {
         setApiUnreadCount(response.total_unread);
-        console.log('[Dashboard] API unread count:', response.total_unread);
       }
       
       if (response && response.unread_messages && response.unread_messages.length > 0) {
@@ -170,20 +168,16 @@ export default function Dashboard({ }: DashboardProps) {
           timestamp: new Date(msg.created_at).toLocaleString(),
           isRead: false // These are unread messages
         }));
-        console.log('[Dashboard] Transformed chats:', transformedChats);
         setStakeholderChats(transformedChats);
       } else {
         // No messages found - set empty array and count to 0
-        console.log('[Dashboard] No unread messages found');
         setStakeholderChats([]);
         setApiUnreadCount(0);
       }
     } catch (error) {
-      console.error('[Dashboard] Error fetching stakeholder chats:', error);
       // Only clear chats on error if we don't have any cached data
       // This prevents clearing messages that might have been loaded from WebSocket
       setStakeholderChats(prevChats => {
-        console.log('[Dashboard] Preserving existing chats on error:', prevChats.length);
         return prevChats.length > 0 ? prevChats : [];
       });
       // Don't reset API count on error - keep last known value
@@ -196,7 +190,6 @@ export default function Dashboard({ }: DashboardProps) {
   // Don't clear chats if WebSocket is empty - let API fetch handle initial load
   useEffect(() => {
     if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-      console.log('[Dashboard] Updating chats from WebSocket:', wsUnreadMessages.length, 'messages');
       const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
         id: msg.message_id.toString(),
         sender: msg.sender_name,
@@ -208,9 +201,7 @@ export default function Dashboard({ }: DashboardProps) {
         isRead: false
       }));
       setStakeholderChats(transformedChats);
-    } else {
-      console.log('[Dashboard] WebSocket has no messages, keeping existing chats');
-    }
+    } 
     // Don't clear chats if WebSocket is empty - API fetch will handle it
   }, [wsUnreadMessages]);
 
@@ -246,7 +237,6 @@ export default function Dashboard({ }: DashboardProps) {
         setCriticalAlerts(response.alerts || []);
       }
     } catch (error) {
-      console.error('Error fetching alerts:', error);
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
@@ -290,10 +280,9 @@ export default function Dashboard({ }: DashboardProps) {
           const response = await chatService.getUnreadMessages();
           if (response && typeof response.total_unread === 'number') {
             setApiUnreadCount(response.total_unread);
-            console.log('[Dashboard] Initial unread count from API:', response.total_unread);
           }
-        } catch (error) {
-          console.error('[Dashboard] Error fetching initial unread count:', error);
+        } catch {
+          // Silently handle errors - unread count is not critical
         }
       };
       fetchUnreadCount();
@@ -304,7 +293,6 @@ export default function Dashboard({ }: DashboardProps) {
   // WebSocket handles real-time updates automatically
   useEffect(() => {
     if (showStakeholderChats && isAuthenticated) {
-      console.log('[Dashboard] Modal opened, fetching stakeholder chats...');
       fetchStakeholderChats();
     }
   }, [showStakeholderChats, isAuthenticated]);
@@ -314,18 +302,15 @@ export default function Dashboard({ }: DashboardProps) {
     if (wsUnreadCount !== null && wsUnreadCount !== undefined) {
       // WebSocket count is authoritative when available
       // But we keep API count as fallback
-      console.log('[Dashboard] WebSocket unread count updated:', wsUnreadCount);
     }
   }, [wsUnreadCount]);
 
   // Debug: Log the final calculated count
   useEffect(() => {
-    console.log('[Dashboard] Total unread message count:', stakeholderChatCount, '(WebSocket:', wsUnreadCount, ', API:', apiUnreadCount, ')');
   }, [stakeholderChatCount, wsUnreadCount, apiUnreadCount]);
 
   // Debug: Log when chats state changes
   useEffect(() => {
-    console.log('[Dashboard] Stakeholder chats state changed:', stakeholderChats.length, 'chats');
   }, [stakeholderChats]);
 
   // Fetch user profile to compute initials and get department
@@ -1729,7 +1714,6 @@ export default function Dashboard({ }: DashboardProps) {
             // Refresh alerts after acknowledgment
             fetchCriticalAlerts();
           } catch (error) {
-            console.error('Error acknowledging alert:', error);
             throw error;
           }
         } : undefined}

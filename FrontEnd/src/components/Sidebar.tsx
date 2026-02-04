@@ -48,12 +48,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         
         // Get department (CGT or IVF) - check localStorage first, then API
         let department: string | null = null;
-        try {
-          const storedDept = localStorage.getItem('department');
-          if (storedDept) {
-            department = storedDept.toUpperCase();
-          }
-        } catch {}
+        const storedDept = localStorage.getItem('department');
+        if (storedDept) {
+          department = storedDept.toUpperCase();
+        }
         
         // Fall back to API if not in localStorage
         if (!department) {
@@ -63,13 +61,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         setUserDepartment(department);
       } catch {
         // Try to get department from localStorage even if API fails
-        try {
-          const storedDept = localStorage.getItem('department');
-          if (storedDept) {
-            const department = storedDept.toUpperCase();
-            setUserDepartment(department);
-          }
-        } catch {}
+        const storedDept = localStorage.getItem('department');
+        if (storedDept) {
+          const department = storedDept.toUpperCase();
+          setUserDepartment(department);
+        }
       }
     };
     if (isAuthenticated) {
