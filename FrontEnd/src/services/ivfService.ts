@@ -116,6 +116,7 @@ interface RawEmbryoTrackingApiItem {
   embryo_grading?: string;
   site_name: string;
   status: string;
+  description: string | null;
 }
 
 interface RawEmbryoTrackingApiResponse {
@@ -133,6 +134,7 @@ interface RawCanisterTrackingApiItem {
   cryolock_color: string;
   date_of_vitrification: string;
   move_to: boolean;
+  description: string | null;
 }
 
 interface RawCanisterTrackingApiResponse {
@@ -153,6 +155,7 @@ const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => 
   siteName: item.site_name,
   status: item.status,
   embryoGrading: item.embryo_grading,
+  description: item.description,
 });
 
 const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): IVFTreatment => ({
@@ -167,6 +170,7 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
   siteName: '-', // Not provided by API
   status: '-', // Not provided by API
   embryoGrading: '-', // Not provided by API
+  description: item.description,
 });
 
 export class IvfService extends BaseApiService {
@@ -337,6 +341,69 @@ export class IvfService extends BaseApiService {
     return await this.post<RefillLogItem>(
       `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
       refillLogData
+    );
+  }
+
+  /**
+   * Mark container as moved to embryo transfer
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @returns Promise with success status and response data
+   */
+  async markEmbryoTransfer(
+    canisterNumber: string | number,
+    cryolockNumber: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    embryo_transfer: boolean;
+    in_transit: boolean;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      embryo_transfer: boolean;
+      in_transit: boolean;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/embryo-transfer`,
+      {
+        cryolock_number: cryolockNumber,
+      }
+    );
+  }
+
+  /**
+   * Mark container as in transit with shipment
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @param description - Description of the move (e.g., "From Egmore to ptc, Device ID : XXXXXX")
+   * @returns Promise with success status and response data
+   */
+  async markInTransitWithShipment(
+    canisterNumber: string | number,
+    cryolockNumber: string,
+    description: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    in_transit: boolean;
+    shipment?: Record<string, any>;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      in_transit: boolean;
+      shipment?: Record<string, any>;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/in-transit-with-shipment`,
+      {
+        cryolock_number: cryolockNumber,
+        description: description,
+      }
     );
   }
 
