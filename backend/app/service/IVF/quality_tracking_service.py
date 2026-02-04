@@ -648,25 +648,14 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
 
-            # Validate: Check if cryolock already has an active shipment
+            # Validate: Check in_transit column FIRST - if True, immediately return error
+            # Do not proceed with any shipment creation or database changes
             if cryolock.in_transit:
-                # Check for existing active shipments (not delivered or cancelled)
-                existing_shipment = (
-                    self.db.query(IVFShipment)
-                    .filter(
-                        IVFShipment.cryolock_id == cryolock.cryolock_id,
-                        IVFShipment.shipment_status.notin_(['delivered', 'cancelled'])
-                    )
-                    .order_by(desc(IVFShipment.created_at))
-                    .first()
+                raise AppException(
+                    message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
+                    error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
+                    status_code=HTTPStatus.BAD_REQUEST
                 )
-                
-                if existing_shipment:
-                    raise AppException(
-                        message=ErrorMessages.CRYOLOCK_ACTIVE_SHIPMENT_EXISTS.format(cryolock_number=request.cryolock_number),
-                        error_code=ERROR_CODES["CRYOLOCK_ACTIVE_SHIPMENT_EXISTS"],
-                        status_code=HTTPStatus.BAD_REQUEST
-                    )
 
             # Step 3: Parse description to extract source, destination and device_id
             parsed = self._parse_description(request.description)
@@ -820,7 +809,7 @@ class QualityTrackingService:
                 logger.error(f"Failed to update in_transit flag for cryolock {cryolock.cryolock_id}")
                 raise AppException(
                     message="Failed to update cryolock in_transit status",
-                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    error_code=ERROR_CODES["SERVER_ERROR"],
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR
                 )
 
@@ -875,7 +864,7 @@ class QualityTrackingService:
                 logger.error(f"Database integrity error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
                 raise AppException(
                     message=f"Failed to create shipment due to database constraint violation: {str(e)}",
-                    error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                    error_code=ERROR_CODES["SERVER_ERROR"],
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR
                 )
         except Exception as e:
@@ -883,7 +872,7 @@ class QualityTrackingService:
             logger.error(f"Error in mark_in_transit_with_shipment: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to create shipment: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                error_code=ERROR_CODES["SERVER_ERROR"],
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
