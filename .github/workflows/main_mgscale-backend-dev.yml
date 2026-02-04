@@ -16,26 +16,26 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      #  Install dependencies from backend/app
+      # 🔧 Install dependencies (validate requirements)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      # Upload ONLY backend/app (this is critical)
-      - name: Upload artifact
+      # 📦 Upload ONLY backend folder (this preserves app package)
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: backend/app
+          path: backend
 
   deploy:
     runs-on: ubuntu-latest
@@ -45,13 +45,13 @@ jobs:
       contents: read
 
     steps:
-      - name: Download artifact
+      - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: python-app
-          path: backend/app
+          path: backend
 
-      - name: Azure Login
+      - name: Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E827A6FF6CDB465783FB263473BFB596 }}
@@ -63,4 +63,4 @@ jobs:
         with:
           app-name: mgscale-backend-dev
           slot-name: Production
-          package: backend/app
+          package: backend
