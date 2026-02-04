@@ -7,6 +7,8 @@ interface TrackCanisterModalProps {
   onClose: () => void;
   onTrack?: (canisterId: string) => void;
   error?: string;
+  title?: string;
+  icon?: string;
 }
 
 const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
@@ -14,6 +16,8 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   onClose,
   onTrack,
   error,
+  title = "Track Container Quality",
+  icon = ContainerQualityTrackingIcon,
 }) => {
   const [canisterId, setCanisterId] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,11 +40,11 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Track Container Quality"
+      title={title}
       description="Please enter the canister ID"
       icon={
         <img
-          src={ContainerQualityTrackingIcon}
+          src={icon}
           alt="Track Canister"
           className="w-6 h-6 mt-5"
         />
