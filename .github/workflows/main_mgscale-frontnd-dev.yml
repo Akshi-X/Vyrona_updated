@@ -13,24 +13,24 @@ jobs:
       contents: read
 
     steps:
-      # Checkout source code
+      #  Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup Node.js (KEEP AS IS)
+      #  Setup Node.js (KEEP SAME AS BEFORE)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # Build frontend (KEEP AS IS)
+      #  Install dependencies & build (KEEP SAME)
       - name: Install dependencies and build
         working-directory: FrontEnd
         run: |
           npm install
           npm run build
 
-      # ✅ CHANGE 1: upload ONLY dist
+      # Upload ONLY the build output (dist)
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
@@ -45,7 +45,7 @@ jobs:
       contents: read
 
     steps:
-      # Download artifact
+      #  Download artifact (this becomes wwwroot)
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -60,7 +60,7 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
-      # CHANGE 2: deploy downloaded dist
+      # Deploy static files to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
