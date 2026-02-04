@@ -24,4 +24,3 @@ jobs:
         with:
           app-name: mgscale-backend-dev
           package: backend
-
