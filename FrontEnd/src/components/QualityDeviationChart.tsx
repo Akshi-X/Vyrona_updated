@@ -17,6 +17,48 @@ ChartJS.register(
   Legend
 );
 
+// Plugin to remove gap between different stacks for horizontal bars
+const removeStackGapPlugin = {
+  id: 'removeStackGap',
+  afterUpdate: (chart: any) => {
+    const topRiskDriverStackIndex = chart.data.datasets.findIndex(
+      (ds: any) => ds.stack === 'topRiskDriver'
+    );
+
+    if (topRiskDriverStackIndex === -1) return;
+
+    // Find the background bar from main stack as reference point
+    const backgroundIndex = chart.data.datasets.findIndex(
+      (ds: any) => ds.stack === 'qualityDeviation' && ds.label === 'Remaining'
+    );
+
+    if (backgroundIndex === -1) return;
+
+    const backgroundMeta = chart.getDatasetMeta(backgroundIndex);
+    if (!backgroundMeta || !backgroundMeta.data) return;
+
+    // Adjust top risk driver bar positions to be directly below main stack
+    chart.data.datasets.forEach((dataset: any, datasetIndex: number) => {
+      if (dataset.stack === 'topRiskDriver') {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (meta && meta.data) {
+          meta.data.forEach((bar: any, index: number) => {
+            const mainBar = backgroundMeta.data[index];
+            if (mainBar) {
+              // For horizontal bars, y is the vertical center
+              // To place below, we need to move down by bar thickness (8px)
+              // Since bars are 8px thick, move down by 8px from the bottom of main bar
+              bar.y = mainBar.y + 8; // Move down by bar thickness
+            }
+          });
+        }
+      }
+    });
+  },
+};
+
+ChartJS.register(removeStackGapPlugin);
+
 interface QualityMetric {
   name: string;
   color: string;
@@ -42,14 +84,22 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
 
   const chartData = useMemo(
     () => {
-      // Calculate remaining space for background bar (100 - sum of all metrics for each container)
+      // Separate top risk driver from other metrics
+      const topRiskDriverMetric = metrics.find(
+        (m) => m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk')
+      );
+      const otherMetrics = metrics.filter(
+        (m) => !(m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk'))
+      );
+
+      // Calculate remaining space for background bar (100 - sum of other metrics for each container)
       const backgroundData = containers.map((_, containerIndex) => {
-        const total = metrics.reduce((sum, metric) => sum + (metric.data[containerIndex] || 0), 0);
+        const total = otherMetrics.reduce((sum, metric) => sum + (metric.data[containerIndex] || 0), 0);
         return Math.max(0, 100 - total);
       });
 
-      // Create datasets for metrics
-      const metricDatasets = metrics.map((metric, index) => ({
+      // Create datasets for other metrics (main stack)
+      const mainStackDatasets = otherMetrics.map((metric, index) => ({
         label: metric.name,
         data: metric.data,
         backgroundColor: getColorForMetric(metric.name),
@@ -62,8 +112,8 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
           : 0,
       }));
 
-      // Add background bar as the last dataset (rightmost, gets right rounding)
-      const backgroundDataset = {
+      // Add background bar for main stack
+      const mainBackgroundDataset = {
         label: 'Remaining',
         data: backgroundData,
         backgroundColor: '#F4F4F4',
@@ -74,9 +124,49 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 8, bottomRight: 8 },
       };
 
+      // Create top risk driver dataset (separate stack, appears below)
+      const topRiskDriverDataset = topRiskDriverMetric
+        ? {
+            label: topRiskDriverMetric.name,
+            data: topRiskDriverMetric.data,
+            backgroundColor: getColorForMetric(topRiskDriverMetric.name),
+            borderColor: getColorForMetric(topRiskDriverMetric.name),
+            borderWidth: 0,
+            stack: 'topRiskDriver', // Different stack ID to separate it
+            barThickness: 8, // Fixed 8px height for horizontal bars
+            borderRadius: { topLeft: 8, bottomLeft: 8, topRight: 8, bottomRight: 8 },
+          }
+        : null;
+
+      // Calculate remaining space for top risk driver (if it exists)
+      const topRiskDriverBackgroundData = topRiskDriverMetric
+        ? containers.map((_, containerIndex) => {
+            const riskDriverValue = topRiskDriverMetric.data[containerIndex] || 0;
+            return Math.max(0, 100 - riskDriverValue);
+          })
+        : [];
+
+      const topRiskDriverBackgroundDataset = topRiskDriverMetric
+        ? {
+            label: 'Remaining',
+            data: topRiskDriverBackgroundData,
+            backgroundColor: '#F4F4F4',
+            borderColor: '#F4F4F4',
+            borderWidth: 0,
+            stack: 'topRiskDriver',
+            barThickness: 8, // Fixed 8px height for horizontal bars
+            borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 8, bottomRight: 8 },
+          }
+        : null;
+
       return {
         labels: containers,
-        datasets: [...metricDatasets, backgroundDataset],
+        datasets: [
+          ...mainStackDatasets,
+          mainBackgroundDataset,
+          ...(topRiskDriverDataset ? [topRiskDriverDataset] : []),
+          ...(topRiskDriverBackgroundDataset ? [topRiskDriverBackgroundDataset] : []),
+        ],
       };
     },
     [containers, metrics]
@@ -102,6 +192,9 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
       indexAxis: 'y' as const,
       responsive: true,
       maintainAspectRatio: false,
+      categoryPercentage: 0.8, // Use 80% of category width
+      barPercentage: 1.0, // Bars fill their group completely
+      maxBarThickness: 8, // Fixed bar thickness
       plugins: {
         legend: {
           display: false,

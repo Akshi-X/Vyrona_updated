@@ -48,9 +48,20 @@ export interface AvgQualityLossPerContainerResponse {
   status: string;
 }
 
+export interface TotalDeviationsResponse {
+  total_deviations: number;
+  temperature_deviations: number;
+  humidity_deviations: number;
+  agitation_deviations: number;
+  light_deviations: number;
+  last_updated: string;
+  status: string;
+}
+
 export interface DeviationsGraphDataItem {
-  site_id: number;
-  site_name: string;
+  site_id?: number;
+  site_name?: string;
+  container_name?: string; // Used for user view
   temperature: number;
   humidity: number;
   agitation_vibration: number;
@@ -74,6 +85,11 @@ export interface RefillLogItem {
   refilled_by: string;
   description: string;
   status: string;
+  cryoshipper: string | null;
+  disinfected_shipper_infected_tank_description: string | null;
+  reservoir: string | null;
+  ln2_ordered_date: string | null;
+  ln2_received_date: string | null;
   log_id: number;
   created_at: string;
   updated_at: string;
@@ -91,8 +107,8 @@ interface RawEmbryoTrackingApiItem {
   his_number: string;
   cryolock_number: string;
   canister_number: number;
-  tank_id: string;
-  cane_id: string;
+  tank_code: string;
+  cane_code: string;
   goblet_color: string;
   cryolock_color: string;
   date_of_vitrification: string;
@@ -111,7 +127,7 @@ interface RawCanisterTrackingApiItem {
   his_number: string;
   cryolock_number: string;
   canister_number: number;
-  cane_id: string;
+  cane_code: string;
   goblet_color: string;
   cryolock_color: string;
   date_of_vitrification: string;
@@ -121,14 +137,15 @@ interface RawCanisterTrackingApiItem {
 interface RawCanisterTrackingApiResponse {
   data: RawCanisterTrackingApiItem[];
   total: number;
+  available_slots: number;
 }
 
 const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => ({
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
   canisterNum: item.canister_number,
-  tankId: item.tank_id,
-  caneId: item.cane_id,
+  tankCode: item.tank_code,
+  caneCode: item.cane_code,
   gobletColor: item.goblet_color,
   cryolockColor: item.cryolock_color,
   dateOfVitrification: item.date_of_vitrification,
@@ -141,8 +158,8 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
   hisNumber: item.his_number,
   cryolockNum: item.cryolock_number,
   canisterNum: item.canister_number,
-  tankId: '-', // Not provided by API
-  caneId: item.cane_id,
+  tankCode: '-', // Not provided by API
+  caneCode: item.cane_code,
   gobletColor: item.goblet_color,
   cryolockColor: item.cryolock_color,
   dateOfVitrification: item.date_of_vitrification,
@@ -204,6 +221,13 @@ export class IvfService extends BaseApiService {
     );
   }
 
+  async getTotalDeviations(): Promise<TotalDeviationsResponse> {
+    return await this.request<TotalDeviationsResponse>(
+      '/api/ivf/dashboard/metrics/total-deviations',
+      { method: 'GET' }
+    );
+  }
+
   async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
     return await this.request<DeviationsGraphResponse>(
       '/api/ivf/dashboard/metrics/deviations-graph',
@@ -211,7 +235,7 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse> {
+  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
     const response = await this.request<RawCanisterTrackingApiResponse>(
       `/api/quality-tracking/canisters/${canisterNumber}/tracking-details`,
       { method: 'GET' }
@@ -219,6 +243,7 @@ export class IvfService extends BaseApiService {
     return {
       data: response.data.map(mapCanisterTrackingItemToTreatment),
       total: response.total,
+      available_slots: response.available_slots,
     };
   }
 
