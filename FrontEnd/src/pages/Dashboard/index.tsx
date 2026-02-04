@@ -83,6 +83,8 @@ export default function Dashboard({ }: DashboardProps) {
   const [trackError, setTrackError] = useState<string | undefined>(undefined);
   const [showTrackCanister, setShowTrackCanister] = useState(false);
   const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
+  const [showOutboundQualityTracking, setShowOutboundQualityTracking] = useState(false);
+  const [outboundQualityTrackingError, setOutboundQualityTrackingError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
   const [apiUnreadCount, setApiUnreadCount] = useState<number>(0);
 
@@ -1117,7 +1119,12 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Outbound Quality Tracking */}
-                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden">
+                      <div 
+                        className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        onClick={() => {
+                          setShowOutboundQualityTracking(true);
+                        }}
+                      >
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
                           <img
@@ -1149,6 +1156,7 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setShowOutboundQualityTracking(true);
                               }}
                             >
                               <img
@@ -1770,6 +1778,23 @@ export default function Dashboard({ }: DashboardProps) {
           setCanisterError(undefined);
           setShowTrackCanister(false);
           navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+        }}
+      />
+
+      {/* Outbound Quality Tracking Modal */}
+      <TrackCanisterModal
+        isOpen={showOutboundQualityTracking}
+        onClose={() => {
+          setOutboundQualityTrackingError(undefined);
+          setShowOutboundQualityTracking(false);
+        }}
+        error={outboundQualityTrackingError}
+        title="Outbound Quality Tracking"
+        icon={OutboundQualityTrackingIcon}
+        onTrack={(canisterId) => {
+          setOutboundQualityTrackingError(undefined);
+          setShowOutboundQualityTracking(false);
+          navigate(`/outbound-quality-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
     </div>
