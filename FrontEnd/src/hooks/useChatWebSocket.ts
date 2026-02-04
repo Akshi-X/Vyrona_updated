@@ -177,6 +177,16 @@ export function usePatientChatWebSocket(patientId: string | undefined) {
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
 
+  // Check if user is IVF department - skip WebSocket connection for IVF users
+  const isIvfUser = useCallback(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      return dept && dept.toUpperCase() === 'IVF';
+    } catch {
+      return false;
+    }
+  }, []);
+
   const getWebSocketUrl = useCallback(() => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
@@ -185,6 +195,11 @@ export function usePatientChatWebSocket(patientId: string | undefined) {
   }, []);
 
   const connect = useCallback(() => {
+    // Skip connection for IVF users - they use canisters, not patients
+    if (isIvfUser()) {
+      return;
+    }
+    
     if (!isAuthenticated || !token || !patientId) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -293,7 +308,7 @@ export function usePatientChatWebSocket(patientId: string | undefined) {
       console.error('[Patient Chat WS] Connection error:', error);
       setIsConnected(false);
     }
-  }, [isAuthenticated, token, patientId, getWebSocketUrl]);
+  }, [isAuthenticated, token, patientId, getWebSocketUrl, isIvfUser]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -328,6 +343,12 @@ export function usePatientChatWebSocket(patientId: string | undefined) {
 
   // Connect on mount and when dependencies change
   useEffect(() => {
+    // Skip connection for IVF users - they use canisters, not patients
+    if (isIvfUser()) {
+      disconnect(); // Ensure any existing connection is closed
+      return;
+    }
+    
     if (isAuthenticated && token && patientId) {
       connect();
     } else {
@@ -337,7 +358,7 @@ export function usePatientChatWebSocket(patientId: string | undefined) {
     return () => {
       disconnect();
     };
-  }, [isAuthenticated, token, patientId, connect, disconnect]);
+  }, [isAuthenticated, token, patientId, connect, disconnect, isIvfUser]);
 
   return {
     messages,
