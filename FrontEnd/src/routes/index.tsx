@@ -4,6 +4,7 @@ import Signup from '../pages/Signup'
 import TrackAndTrace from '../pages/TrackAndTrace'
 import TrackPage from '../pages/Track'
 import IVFTrackShipmentPage from '../pages/IVFTrackShipment'
+import OutboundQualityTrackingPage from '../pages/OutboundQualityTracking'
 import UserProfilePage from '../pages/UserProfilePage'
 import Support from '../pages/Support'
 import NotFound from '../pages/NotFound'
@@ -49,6 +50,12 @@ const IVFTrackShipmentWithAuth = () => (
   </RoleBasedRoute>
 )
 
+const OutboundQualityTrackingWithAuth = () => (
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+    <OutboundQualityTrackingPage />
+  </RoleBasedRoute>
+)
+
 export const router = createBrowserRouter([
   { path: '/', element: <AuthRedirect /> },
   { path: '/login', element: <Login /> },
@@ -66,6 +73,8 @@ export const router = createBrowserRouter([
   { path: '/track/:patientId', element: <TrackPageWithAuth /> },
   { path: '/ivf-track-shipment/:canisterId', element: <IVFTrackShipmentWithAuth /> },
   { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
+  { path: '/outbound-quality-tracking/:canisterId', element: <OutboundQualityTrackingWithAuth /> },
+  { path: '/outbound-quality-tracking', element: <OutboundQualityTrackingWithAuth /> },
   { path: '/approval-screen', element: <ApprovalScreen /> },
   { path: '*', element: <NotFound /> },
 ])
