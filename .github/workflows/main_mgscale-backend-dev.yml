@@ -25,17 +25,16 @@ jobs:
 
       # Install dependencies
       - name: Install dependencies
-        working-directory: BackEnd   # 🔁 change if your folder name is different
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Upload application code as artifact
+      # Upload entire app as artifact
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: BackEnd               # 🔁 full app folder (NOT dist)
+          path: .
 
   deploy:
     runs-on: ubuntu-latest
@@ -45,14 +44,14 @@ jobs:
       contents: read
 
     steps:
-      # Download artifact (this becomes wwwroot)
+      # Download artifact (becomes wwwroot)
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: python-app
           path: .
 
-      # Login to Azure using Service Principal
+      # Azure login using Service Principal
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -64,6 +63,6 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: mgscale-backend-dev   # 🔁 your Python Web App name
+          app-name: mgscale-backend-dev
           slot-name: Production
           package: .
