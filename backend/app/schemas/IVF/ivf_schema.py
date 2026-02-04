@@ -147,6 +147,19 @@ class CanisterCreate(CanisterBase):
 class CanisterUpdate(BaseModel):
     """Schema for updating canister information"""
     canister_number: Optional[int] = Field(None, description="Canister number")
+
+
+class CanisterCheckResponse(BaseModel):
+    """Schema for canister existence check response"""
+    exists: bool = Field(..., description="Whether the canister exists")
+    canister_number: str = Field(..., description="The canister number that was checked")
+    canister_id: Optional[int] = Field(None, description="Canister ID if exists")
+    is_active: Optional[bool] = Field(None, description="Whether the canister is active (if exists)")
+    canister_status: Optional[str] = Field(None, description="Canister status (if exists)")
+    message: str = Field(..., description="Response message")
+    
+    class Config:
+        from_attributes = True
     is_active: Optional[bool] = Field(None, description="Whether the canister is active")
     canister_status: Optional[CanisterStatus] = Field(None, description="Canister status (safe, risk, critical)")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
