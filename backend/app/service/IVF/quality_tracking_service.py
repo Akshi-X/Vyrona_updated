@@ -486,13 +486,25 @@ class QualityTrackingService:
         
         Returns dict with: source_location, destination_location, device_id
         """
-        # Normalize description (lowercase for matching)
-        desc_lower = description.lower()
+        # Normalize description - replace newlines and multiple spaces with single space
+        # This handles frontend format with newlines: "From\nEgmore\nto\nErode\nDevice Id:\ndevice ID\n1344t3"
+        description_normalized = re.sub(r'\s+', ' ', description.strip())
+        desc_lower = description_normalized.lower()
         
         # Extract device ID - look for patterns like:
-        # "-deviceid -xxxxx", "-deviceid-xxxxx", "deviceid -xxxxx", "deviceid: xxxxx", etc.
+        # Frontend format: "Device Id: device ID 1344t3" (after normalization)
+        # Standard formats: "-deviceid -xxxxx", "-deviceid-xxxxx", "deviceid -xxxxx", "deviceid: xxxxx", etc.
         device_id = None
         device_patterns = [
+            # Frontend format: "Device Id:" followed by "device ID" and then the actual ID
+            # Example: "Device Id: device ID 1344t3" -> captures "1344t3"
+            # This pattern ensures we skip "device ID" and capture the actual ID after it
+            r'device\s*id\s*:\s*device\s*id\s+([a-zA-Z0-9_-]{3,})',
+            # Frontend format without "device ID" text: "Device Id: 1344t3"
+            r'device\s*id\s*:\s+([a-zA-Z0-9_-]{3,})',
+            # Pattern: "device ID" followed by ID (handles frontend format without colon)
+            r'device\s*id\s+([a-zA-Z0-9_-]{3,})',
+            # Standard formats
             r'-deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
             r'deviceid\s*[-:]\s*([a-zA-Z0-9_-]+)',
             r'-deviceid\s+([a-zA-Z0-9_-]+)',
@@ -504,8 +516,11 @@ class QualityTrackingService:
             if match:
                 device_id = match.group(1).strip()
                 # Remove device_id part from description for location parsing
-                description = re.sub(pattern, '', description, flags=re.IGNORECASE)
+                description_normalized = re.sub(pattern, '', description_normalized, flags=re.IGNORECASE)
                 break
+        
+        # Use normalized description for location parsing
+        description = description_normalized
         
         # Extract source and destination - look for "from X to Y" pattern
         # Patterns: "from <source> to <destination>", "move from <source> to <destination>"
