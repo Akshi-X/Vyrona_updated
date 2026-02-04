@@ -18,7 +18,7 @@ class ChatConnectionManager:
         # {connection_id: {websocket, user_id, pharma_id, connected_at, subscribed_patients: Set[str]}}
         self.active_connections: Dict[str, Dict] = {}
 
-    async def connect(self, websocket: WebSocket, user_id: str, pharma_id: int, connection_id: str = None) -> str:
+    async def connect(self, websocket: WebSocket, user_id: str, pharma_id: Optional[int], connection_id: str = None) -> str:
         """Register WebSocket connection"""
         if connection_id is None:
             connection_id = str(uuid.uuid4())
