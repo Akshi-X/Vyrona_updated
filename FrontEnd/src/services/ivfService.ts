@@ -1,4 +1,5 @@
 import { BaseApiService } from './baseApiService';
+import { authUtils } from '../utils/auth';
 import type {
   EmbryoTrackingApiResponse,
   IVFTreatment,
@@ -115,6 +116,7 @@ interface RawEmbryoTrackingApiItem {
   embryo_grading?: string;
   site_name: string;
   status: string;
+  description: string | null;
 }
 
 interface RawEmbryoTrackingApiResponse {
@@ -132,6 +134,7 @@ interface RawCanisterTrackingApiItem {
   cryolock_color: string;
   date_of_vitrification: string;
   move_to: boolean;
+  description: string | null;
 }
 
 interface RawCanisterTrackingApiResponse {
@@ -152,6 +155,7 @@ const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => 
   siteName: item.site_name,
   status: item.status,
   embryoGrading: item.embryo_grading,
+  description: item.description,
 });
 
 const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): IVFTreatment => ({
@@ -166,6 +170,7 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
   siteName: '-', // Not provided by API
   status: '-', // Not provided by API
   embryoGrading: '-', // Not provided by API
+  description: item.description,
 });
 
 export class IvfService extends BaseApiService {
@@ -326,12 +331,155 @@ export class IvfService extends BaseApiService {
       refilled_by: string;
       description: string;
       status: string;
+      cryoshipper?: string | null;
+      disinfected_shipper_infected_tank_description?: string | null;
+      reservoir?: string | null;
+      ln2_ordered_date?: string | null;
+      ln2_received_date?: string | null;
     }
   ): Promise<RefillLogItem> {
     return await this.post<RefillLogItem>(
       `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
       refillLogData
     );
+  }
+
+  /**
+   * Mark container as moved to embryo transfer
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @returns Promise with success status and response data
+   */
+  async markEmbryoTransfer(
+    canisterNumber: string | number,
+    cryolockNumber: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    embryo_transfer: boolean;
+    in_transit: boolean;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      embryo_transfer: boolean;
+      in_transit: boolean;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/embryo-transfer`,
+      {
+        cryolock_number: cryolockNumber,
+      }
+    );
+  }
+
+  /**
+   * Mark container as in transit with shipment
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @param description - Description of the move (e.g., "From Egmore to ptc, Device ID : XXXXXX")
+   * @returns Promise with success status and response data
+   */
+  async markInTransitWithShipment(
+    canisterNumber: string | number,
+    cryolockNumber: string,
+    description: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    in_transit: boolean;
+    shipment?: Record<string, any>;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      in_transit: boolean;
+      shipment?: Record<string, any>;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/in-transit-with-shipment`,
+      {
+        cryolock_number: cryolockNumber,
+        description: description,
+      }
+    );
+  }
+
+  /**
+   * Export combined refill logs and KPI threshold deviations to Excel
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param year - Year for the report (e.g., 2024). Optional - defaults to current year.
+   * @param month - Month for the report (1-12). Optional - if not provided, exports entire year.
+   * @returns Promise that resolves when download is triggered
+   */
+  async exportCombinedReportExcel(
+    canisterNumber: string | number,
+    year?: number,
+    month?: number
+  ): Promise<void> {
+    const url = `${this.getBaseUrl()}/api/quality-tracking/canisters/${canisterNumber}/combined-report/export-excel`;
+    const params = new URLSearchParams();
+    if (year !== undefined) {
+      params.append('year', year.toString());
+    }
+    if (month !== undefined) {
+      params.append('month', month.toString());
+    }
+    const queryString = params.toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+    const token = authUtils.getToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Export failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Get the blob from the response
+    const blob = await response.blob();
+
+    // Get filename from Content-Disposition header or use a default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `combined_report_${canisterNumber}_${year || new Date().getFullYear()}${month ? `_${month}` : ''}.xlsx`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    // Create a download link and trigger it
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   }
 }
 
