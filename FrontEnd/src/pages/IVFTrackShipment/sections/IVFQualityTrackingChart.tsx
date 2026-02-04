@@ -11,7 +11,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { authUtils } from '../../../utils/auth';
-
+ 
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -20,7 +20,7 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
+ 
 interface DataPoint {
   timestamp: string;
   temp_internal: number;
@@ -28,14 +28,14 @@ interface DataPoint {
   humidity: number;
   shock: number;
 }
-
-
+ 
+ 
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
-
+ 
 interface IVFQualityTrackingChartProps {
   canisterNumber?: string;
 }
-
+ 
 export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTrackingChartProps) {
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -45,12 +45,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const isConnectingRef = useRef(false);
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
-
+ 
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [batteryPercentage, setBatteryPercentage] = useState<number | null>(null);
-
+ 
   // Get base URL for WebSocket
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -58,7 +58,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
   };
-
+ 
   // Format timestamp for display
   const formatTimestamp = (timestamp: string): string => {
     try {
@@ -73,7 +73,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       return timestamp;
     }
   };
-
+ 
   // Cleanup function to close WebSocket properly
   const closeWebSocket = () => {
     if (wsRef.current) {
@@ -89,7 +89,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           wsRef.current.close(1000, 'Component unmounting');
         }
       } catch (err) {
-        console.error('Error closing WebSocket:', err);
+        // Error closing WebSocket
       }
       wsRef.current = null;
     }
@@ -102,7 +102,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     
     isConnectingRef.current = false;
   };
-
+ 
   // Connect to WebSocket
   useEffect(() => {
     isMountedRef.current = true;
@@ -111,36 +111,36 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       setError('Canister number missing');
       return;
     }
-
+ 
     // Get token from context or cookies as fallback
     const authToken = token || authUtils.getToken();
     if (!authToken) {
       setError('Authentication token missing');
       return;
     }
-
+ 
     // Prevent multiple simultaneous connections
     if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
-
+ 
     const connectWebSocket = () => {
       // Check if component is still mounted
       if (!isMountedRef.current) {
         return;
       }
-
+ 
       // Prevent duplicate connections
       if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED)) {
         return;
       }
-
+ 
       try {
         isConnectingRef.current = true;
         const wsUrl = getWebSocketUrl();
         const url = `${wsUrl}?token=${encodeURIComponent(authToken)}`;
         const ws = new WebSocket(url);
-
+ 
         ws.onopen = () => {
           if (!isMountedRef.current) {
             ws.close();
@@ -151,30 +151,28 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           setError(null);
           reconnectAttemptsRef.current = 0;
           isConnectingRef.current = false;
-
+ 
           // Subscribe to canister_number
           if (ws.readyState === WebSocket.OPEN && canisterNumber) {
             ws.send(JSON.stringify({ canister_number: canisterNumber }));
           }
         };
-
+ 
         ws.onmessage = (event) => {
           if (!isMountedRef.current) {
             return;
           }
-
+ 
           try {
             const data: any = JSON.parse(event.data);
-
+ 
             // Check if this is a subscription confirmation
             if (data.type === 'subscription_confirmed') {
-              console.log('IVF WebSocket subscription confirmed:', data);
               return;
             }
-
+ 
             // Check if this is an error message
             if (data.type === 'error') {
-              console.error('WebSocket error:', data.message);
               setError(data.message || 'Unknown error');
               // Don't reconnect on authentication/authorization errors
               if (data.message && (data.message.includes('token') || data.message.includes('Invalid canister'))) {
@@ -182,7 +180,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               }
               return;
             }
-
+ 
             // Check if this is quality data (has canister_number or canister_id and timestamp)
             // IVF data uses temp_internal, temp_external, humidity, and shock
             const hasCanisterId = data.canister_number || data.canister_id;
@@ -202,8 +200,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               }
               
               // Only add if we have valid numeric values for required fields
-              if (temp_internal !== undefined && temp_internal !== null && 
-                  humidity !== undefined && humidity !== null && 
+              if (temp_internal !== undefined && temp_internal !== null &&
+                  humidity !== undefined && humidity !== null &&
                   shock !== undefined && shock !== null) {
                 const qualityData: DataPoint = {
                   timestamp: data.timestamp,
@@ -213,55 +211,44 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                   shock: typeof shock === 'number' ? shock : parseFloat(shock),
                 };
                 
-                console.log('Received IVF quality data:', qualityData);
-                
                 // Add new data point
                 setDataPoints((prev) => {
                   const newPoints = [
                     ...prev,
                     qualityData,
                   ];
-
+ 
                   // Keep only last MAX_DATA_POINTS
                   if (newPoints.length > MAX_DATA_POINTS) {
                     return newPoints.slice(-MAX_DATA_POINTS);
                   }
                   return newPoints;
                 });
-              } else {
-                console.warn('IVF quality data missing required fields:', { temp_internal, humidity, shock, data });
-              }
-            } else {
-              // Log other message types for debugging
-              if (data.type !== 'ivf_geolocation_history') {
-                console.log('Received WebSocket message (not quality data):', data.type || 'unknown', Object.keys(data));
               }
             }
           } catch (err) {
-            console.error('Error parsing WebSocket message:', err, event.data);
+            // Error parsing WebSocket message
           }
         };
-
-        ws.onerror = (error) => {
+ 
+        ws.onerror = () => {
           if (!isMountedRef.current) {
             return;
           }
           
-          console.error('WebSocket error:', error);
           setIsConnected(false);
           setError('WebSocket connection error');
           isConnectingRef.current = false;
         };
-
+ 
         ws.onclose = (event) => {
           if (!isMountedRef.current) {
             return;
           }
-
-          console.log('WebSocket closed', event.code, event.reason);
+ 
           setIsConnected(false);
           isConnectingRef.current = false;
-
+ 
           // Don't reconnect if:
           // 1. Component is unmounting
           // 2. Close was intentional (code 1000)
@@ -274,13 +261,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             wsRef.current = null;
             return;
           }
-
+ 
           // Attempt to reconnect only if component is still mounted
           if (isMountedRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
             reconnectAttemptsRef.current++;
             reconnectTimeoutRef.current = setTimeout(() => {
               if (isMountedRef.current) {
-                console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
                 connectWebSocket();
               }
             }, reconnectDelay);
@@ -291,25 +277,24 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             wsRef.current = null;
           }
         };
-
+ 
         wsRef.current = ws;
       } catch (err) {
-        console.error('Failed to create WebSocket connection:', err);
         setError('Failed to connect to WebSocket');
         setIsConnected(false);
         isConnectingRef.current = false;
       }
     };
-
+ 
     connectWebSocket();
-
+ 
     // Cleanup on unmount or when dependencies change
     return () => {
       isMountedRef.current = false;
       closeWebSocket();
     };
   }, [canisterNumber, token]);
-
+ 
   const chartData = useMemo(() => {
     const palette = {
       temp_internal: '#8AB6F9',
@@ -317,7 +302,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       humidity: '#DE88E6',
       shock: '#BDBDBD',
     } as const;
-
+ 
     const labels = dataPoints.map((point) => formatTimestamp(point.timestamp));
     
     // Show only first, middle, and last labels to avoid clutter
@@ -328,7 +313,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       if (index === labels.length - 1) return label;
       return '';
     });
-
+ 
     return {
       labels: displayLabels,
       datasets: [
@@ -392,7 +377,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       ],
     };
   }, [dataPoints]);
-
+ 
   const chartOptions = useMemo(
     () => ({
       responsive: true,
@@ -439,7 +424,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const index = context.dataIndex;
               const point = dataPoints[index];
               if (!point) return '';
-
+ 
               const label = context.dataset.label || '';
               const fmt = (v: number | null) => {
                 if (v === null || v === undefined) return 'N/A';
@@ -525,7 +510,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     }),
     [dataPoints]
   );
-
+ 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px]">
       <div className="flex items-center justify-between mb-1">
@@ -539,12 +524,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 {/* Battery terminal */}
                 <line x1="22" y1="11" x2="22" y2="13" />
                 {/* Battery fill - fills from left to right based on percentage */}
-                <rect 
-                  x="3" 
-                  y="8" 
-                  width={Math.max(0, Math.min(14, (14 * Math.round(batteryPercentage)) / 100))} 
-                  height="8" 
-                  rx="1.5" 
+                <rect
+                  x="3"
+                  y="8"
+                  width={Math.max(0, Math.min(14, (14 * Math.round(batteryPercentage)) / 100))}
+                  height="8"
+                  rx="1.5"
                   fill="#9C3AA6"
                 />
               </svg>
@@ -562,13 +547,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           )}
         </div>
       </div>
-
+ 
       {error && !isConnected && (
         <div className="text-red-500 text-xs mb-2" role="alert">
           {error}
         </div>
       )}
-
+ 
       <div className="h-[380px]">
         {dataPoints.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
@@ -581,4 +566,3 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     </div>
   );
 }
-

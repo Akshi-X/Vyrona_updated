@@ -4,13 +4,13 @@ import { authUtils } from '../../../utils/auth';
 import ExtractIcon from '../../../assets/TrackAndTraceIcons/Extract.svg';
 import LightExtractIcon from '../../../assets/TrackAndTraceIcons/LightExtract.svg';
 import QualityLossModal from '../../../components/QualityLossModal';
- 
+
 interface Threshold {
   min: number | null;
   max: number | null;
   unit: string;
 }
- 
+
 interface QualityPayload {
   temp_internal: number;
   temp_external: number | null;
@@ -32,11 +32,11 @@ interface QualityPayload {
   quality_status?: string;
   quality_percentage?: number;
 }
- 
+
 interface IVFQualityParametersTableProps {
   canisterNumber?: string;
 }
- 
+
 export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -45,40 +45,38 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [showQualityLossModal, setShowQualityLossModal] = useState(false);
   const [latest, setLatest] = useState<QualityPayload | null>(null);
- 
+
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
   };
- 
+
   useEffect(() => {
     isMountedRef.current = true;
- 
+
     if (!canisterNumber) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
- 
+
     try {
       const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
- 
+
       ws.onopen = () => {
         if (canisterNumber) ws.send(JSON.stringify({ canister_number: canisterNumber }));
       };
- 
+
       ws.onmessage = (event) => {
         if (!isMountedRef.current) return;
         try {
           const data: any = JSON.parse(event.data);
           
           if (data.type === 'subscription_confirmed') {
-            console.log('IVF WebSocket subscription confirmed:', data);
             return;
           }
           
           if (data.type === 'error') {
-            console.error('WebSocket error:', data.message);
             return;
           }
           
@@ -96,8 +94,8 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             const shock = data.shock !== undefined ? data.shock : data.agitation;
             
             // Only process if we have valid numeric values for required fields
-            if (temp_internal !== undefined && temp_internal !== null &&
-                humidity !== undefined && humidity !== null &&
+            if (temp_internal !== undefined && temp_internal !== null && 
+                humidity !== undefined && humidity !== null && 
                 shock !== undefined && shock !== null) {
               // Map the data to QualityPayload format
               const qualityPayload: QualityPayload = {
@@ -122,30 +120,22 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
                 quality_percentage: data.quality_percentage,
               };
               
-              console.log('Received IVF quality data for table:', qualityPayload);
               setLatest(qualityPayload);
-            } else {
-              console.warn('IVF quality data missing required fields:', { temp_internal, humidity, shock, data });
-            }
-          } else {
-            // Log other message types for debugging
-            if (data.type !== 'ivf_geolocation_history') {
-              console.log('Received WebSocket message (not quality data):', data.type || 'unknown', Object.keys(data));
             }
           }
         } catch (e) {
-          console.error('Error parsing WebSocket message:', e, event.data);
+          // Error parsing WebSocket message
         }
       };
- 
+
       ws.onerror = () => {};
       ws.onclose = () => {};
- 
+
       wsRef.current = ws;
     } catch (e) {
       // ignore connection errors here
     }
- 
+
     return () => {
       isMountedRef.current = false;
       if (wsRef.current) {
@@ -156,7 +146,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       }
     };
   }, [canisterNumber, token]);
- 
+
   type Row = {
     key: keyof QualityPayload['thresholds'];
     label: string;
@@ -164,24 +154,24 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     threshold: Threshold;
     violated: boolean;
   };
- 
+
   const rows: Row[] = useMemo(() => {
     if (!latest) return [];
- 
+
     const mapping: Array<{ key: Row['key']; label: string; value: number | null }> = [
       { key: 'temp_internal', label: 'Temperature Internal (°C)', value: latest.temp_internal },
       { key: 'temp_external', label: 'Temperature External (°C)', value: latest.temp_external },
       { key: 'humidity', label: 'Humidity (%)', value: latest.humidity },
       { key: 'shock', label: 'Shock (G)', value: latest.shock },
     ];
- 
+
     const isViolated = (value: number | null, t: Threshold) => {
       if (value === null || value === undefined) return false;
       const belowMin = t.min !== null && t.min !== undefined && value < t.min;
       const aboveMax = t.max !== null && t.max !== undefined && value > t.max;
       return belowMin || aboveMax;
     };
- 
+
     return mapping
       .filter((m) => m.value !== null && m.value !== undefined) // Filter out null values
       .map((m) => {
@@ -195,13 +185,13 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         };
       });
   }, [latest]);
- 
+
   const filteredRows = useMemo(() => {
     return showAnomalies ? rows.filter((r) => r.violated) : rows;
   }, [rows, showAnomalies]);
- 
+
   const hasRows = filteredRows.length > 0;
- 
+
   const formatRange = (t: Threshold) => {
     const min = t.min !== null && t.min !== undefined ? `${t.min}` : '-';
     const max = t.max !== null && t.max !== undefined ? `${t.max}` : '-';
@@ -211,7 +201,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     if (max !== '-') return `≤ ${max}${unit ? ` ${unit}` : ''}`;
     return '—';
   };
- 
+
   const formatValueWithUnit = (value: number, t: Threshold, label: string) => {
     if (t.unit) return `${value}${t.unit ? ` ${t.unit}` : ''}`;
     if (label.includes('Temperature')) return `${value} °C`;
@@ -219,7 +209,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     if (label.includes('Shock')) return `${value} G`;
     return `${value}`;
   };
- 
+
   return (
     <div className="rounded-[5px] border border-gray-200 h-[460px] bg-white p-4">
       <div className="mb-3">
@@ -275,7 +265,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
           </div>
         </div>
       </div>
- 
+
       <div
         className={`overflow-x-auto ${hasRows ? 'h-[224px] overflow-y-auto' : ''}`}
         style={{ scrollbarWidth: 'thin' as any }}
@@ -321,7 +311,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
           </tbody>
         </table>
       </div>
- 
+
       <QualityLossModal
         isOpen={showQualityLossModal}
         onClose={() => setShowQualityLossModal(false)}
@@ -332,6 +322,4 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     </div>
   );
 }
- 
- 
- 
+
