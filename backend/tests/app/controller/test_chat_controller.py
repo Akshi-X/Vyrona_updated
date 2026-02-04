@@ -376,7 +376,8 @@ def test_get_unread_messages_success(client):
     mock_response = UnreadMessagesResponse(
         unread_messages=[],
         total_unread=0,
-        unread_by_patient={}
+        unread_by_patient={},
+        unread_by_canister={}
     )
 
     service_mocks['get_unread_messages'].return_value = mock_response

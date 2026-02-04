@@ -101,9 +101,15 @@ def acknowledge_alert(
         service = CriticalAlertService(db)
         result = service.acknowledge_alert(request_data.alert_id, user_id)
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # Check if it's an AppException
+        from app.exceptions.custom_exceptions import AppException
+        if isinstance(e, AppException):
+            raise HTTPException(status_code=e.status_code, detail=e.message)
         raise HTTPException(status_code=500, detail=f"Error acknowledging alert: {str(e)}")
 
 
