@@ -11,11 +11,13 @@ import { userService, type UserProfileDto } from '../../services/userService';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
+import ExportTrackPageIcon from '../../assets/ExportTrackPage.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
+import { ivfService } from '../../services/ivfService';
 import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
@@ -37,6 +39,7 @@ export default function IVFTrackShipmentPage() {
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const [currentUser, setCurrentUser] = useState<UserProfileDto | null>(null);
     const [stakeholderChats, setStakeholderChats] = useState<Array<{ id: string; sender: string; patientId: string; message: string; timestamp: string; isRead: boolean }>>([]);
+    const [exporting, setExporting] = useState(false);
 
     // WebSocket for unread count
     const { unreadMessages: wsUnreadMessages } = useDashboardChatWebSocket();
@@ -116,6 +119,27 @@ export default function IVFTrackShipmentPage() {
         }
     };
 
+    const handleExport = async () => {
+        if (!canisterId) {
+            console.error('Canister ID is required for export');
+            return;
+        }
+
+        setExporting(true);
+        try {
+            const currentDate = new Date();
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
+            
+            await ivfService.exportCombinedReportExcel(canisterId, year, month);
+        } catch (e: any) {
+            console.error('Error exporting report:', e);
+            // You could show a toast notification here
+        } finally {
+            setExporting(false);
+        }
+    };
+
     useEffect(() => {
         fetchCriticalAlerts();
         fetchMyTasks();
@@ -174,6 +198,36 @@ export default function IVFTrackShipmentPage() {
                             <span className="text-black font-semibold">Container ID: {canisterId || 'C1'}</span>
                         </div>
                         <div className="flex items-center gap-6">
+                            {/* Export Excel */}
+                            <div className="relative group">
+                                <button
+                                    type="button"
+                                    onClick={handleExport}
+                                    disabled={exporting || !canisterId}
+                                    className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Export Combined Report to Excel"
+                                >
+                                    {exporting ? (
+                                        <svg className="animate-spin h-[25px] w-[25px] text-[#6B1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    ) : (
+                                        <img
+                                            className="w-[25px] h-[25px]"
+                                            alt="Export Excel"
+                                            src={ExportTrackPageIcon}
+                                        />
+                                    )}
+                                </button>
+                                {/* Tooltip */}
+                                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="font-semibold text-black text-xs whitespace-nowrap">
+                                        Export Combined Report
+                                    </div>
+                                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                                </div>
+                            </div>
                             {/* Critical Alerts */}
                             <div className="relative group">
                                 <img

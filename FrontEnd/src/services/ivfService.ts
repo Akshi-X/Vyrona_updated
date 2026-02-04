@@ -1,4 +1,5 @@
 import { BaseApiService } from './baseApiService';
+import { authUtils } from '../utils/auth';
 import type {
   EmbryoTrackingApiResponse,
   IVFTreatment,
@@ -337,6 +338,81 @@ export class IvfService extends BaseApiService {
       `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
       refillLogData
     );
+  }
+
+  /**
+   * Export combined refill logs and KPI threshold deviations to Excel
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param year - Year for the report (e.g., 2024). Optional - defaults to current year.
+   * @param month - Month for the report (1-12). Optional - if not provided, exports entire year.
+   * @returns Promise that resolves when download is triggered
+   */
+  async exportCombinedReportExcel(
+    canisterNumber: string | number,
+    year?: number,
+    month?: number
+  ): Promise<void> {
+    const url = `${this.getBaseUrl()}/api/quality-tracking/canisters/${canisterNumber}/combined-report/export-excel`;
+    const params = new URLSearchParams();
+    if (year !== undefined) {
+      params.append('year', year.toString());
+    }
+    if (month !== undefined) {
+      params.append('month', month.toString());
+    }
+    const queryString = params.toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+    const token = authUtils.getToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Export failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Get the blob from the response
+    const blob = await response.blob();
+
+    // Get filename from Content-Disposition header or use a default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `combined_report_${canisterNumber}_${year || new Date().getFullYear()}${month ? `_${month}` : ''}.xlsx`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    // Create a download link and trigger it
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   }
 }
 
