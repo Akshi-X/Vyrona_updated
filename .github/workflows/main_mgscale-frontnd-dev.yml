@@ -1,4 +1,4 @@
-name: Build and deploy Node.js app to Azure Web App - mgscale-frontnd-dev
+name: Build and deploy Frontend (DEV) to Azure Web App
 
 on:
   push:
@@ -13,29 +13,29 @@ jobs:
       contents: read
 
     steps:
-      # Checkout source code
-      - name: Checkout code
+      # 1️⃣ Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Setup Node.js (Azure-supported version)
+      # 2️⃣ Setup Node.js (use same as Azure: Node 24)
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24.x'
 
-      # Install dependencies & build (Frontend folder)
-      - name: Install dependencies and build
+      # 3️⃣ Install dependencies & build (Vite)
+      - name: Install dependencies and build frontend
         working-directory: FrontEnd
         run: |
           npm install
           npm run build
 
-      # Upload frontend artifact only
-      - name: Upload artifact for deployment
+      # 4️⃣ Upload ONLY the build output (dist)
+      - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: FrontEnd
+          name: frontend-dist
+          path: FrontEnd/dist
 
   deploy:
     runs-on: ubuntu-latest
@@ -45,22 +45,23 @@ jobs:
       contents: read
 
     steps:
-      # Download artifact
-      - name: Download artifact
+      # 5️⃣ Download build artifact
+      - name: Download frontend build artifact
         uses: actions/download-artifact@v4
         with:
-          name: node-app
+          name: frontend-dist
+          path: .
 
-      # Login to Azure
-      - name: Azure Login
+      # 6️⃣ Azure Login
+      - name: Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3F8F541F3D8546418162DF69EEC5261C }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
-      # Deploy to Azure App Service
-      - name: Deploy to Azure Web App
+      # 7️⃣ Deploy static files to Azure Web App
+      - name: Deploy to Azure Web App (DEV)
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-frontnd-dev
