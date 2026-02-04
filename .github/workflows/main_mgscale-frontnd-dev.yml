@@ -1,4 +1,4 @@
-name: Build and deploy Frontend (DEV) to Azure Web App
+name: Build and deploy Node.js app to Azure Web App - mgscale-frontnd-dev
 
 on:
   push:
@@ -13,27 +13,28 @@ jobs:
       contents: read
 
     steps:
-      # Checkout code
-      - uses: actions/checkout@v4
+      # Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # Node version (same as Azure)
+      # Setup Node.js (KEEP AS IS)
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '24.x'
+          node-version: '18.x'
 
-      # Build frontend
-      - name: Install & build frontend
+      # Build frontend (KEEP AS IS)
+      - name: Install dependencies and build
         working-directory: FrontEnd
         run: |
           npm install
           npm run build
 
-      # 🔑 Upload ONLY dist
-      - name: Upload frontend build artifact
+      # ✅ CHANGE 1: upload ONLY dist
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
+          name: node-app
           path: FrontEnd/dist
 
   deploy:
@@ -45,13 +46,13 @@ jobs:
 
     steps:
       # Download artifact
-      - name: Download frontend artifact
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
+          name: node-app
           path: .
 
-      # Azure login
+      # Login to Azure
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -59,8 +60,8 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
-      # 🔑 Deploy static files
-      - name: Deploy to Azure Web App (DEV)
+      # CHANGE 2: deploy downloaded dist
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-frontnd-dev
