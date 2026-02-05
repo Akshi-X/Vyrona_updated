@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { GoogleMap, useJsApiLoader, OverlayView } from "@react-google-maps/api";
+import { GoogleMap, OverlayView } from "@react-google-maps/api";
 import { trackingService, type TrackingPosition, type TrackingUpdate, type LocationInfo } from "../../../services/trackingService";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useGoogleMaps } from "../../../contexts/GoogleMapsProvider";
 
 const TrackAndTraceMap = () => {
   const { patientId } = useParams<{ patientId: string }>();
@@ -30,23 +31,7 @@ const TrackAndTraceMap = () => {
   const completedPathPolylineRef = useRef<google.maps.Polyline | null>(null);
   const remainingPathPolylineRef = useRef<google.maps.Polyline | null>(null);
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      'VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables. ' +
-      'Please ensure the .env file exists in the FrontEnd directory and restart the dev server.'
-    );
-  }
-
-  // Use the same loader configuration as ControlTowerMap to avoid conflicts
-  // Include both 'maps' and 'geometry' libraries to support all features
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: apiKey,
-    libraries: ['geometry', 'maps'],
-    preventGoogleFontsLoading: true
-  });
+  const { isLoaded } = useGoogleMaps();
 
   // Automatically connect to WebSocket when tracking data should be loaded
   useEffect(() => {

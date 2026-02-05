@@ -6,6 +6,19 @@
   <link rel="icon" type="image/svg+xml" href="/tabLogo.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>mG Scale</title>
+  <script>
+    // Clear any existing Google Maps script tags and loader cache before React loads
+    (function() {
+      // Remove all Google Maps script tags
+      const scripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+      scripts.forEach(script => script.remove());
+      
+      // Clear any cached loader instances
+      if (window.__googleMapsLoaderCache) {
+        delete window.__googleMapsLoaderCache['google-map-script-ivf'];
+      }
+    })();
+  </script>
 </head>
 
 <body>

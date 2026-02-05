@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { GoogleMap, useJsApiLoader, OverlayView } from "@react-google-maps/api";
+import { GoogleMap, OverlayView } from "@react-google-maps/api";
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
+import { useGoogleMaps } from '../../../contexts/GoogleMapsProvider';
 
 interface GeolocationData {
   type: string;
@@ -39,20 +40,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const pathPolylineRef = useRef<google.maps.Polyline | null>(null);
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      'VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables.'
-    );
-  }
-
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script-ivf',
-    googleMapsApiKey: apiKey,
-    libraries: ['geometry', 'maps'],
-    preventGoogleFontsLoading: true
-  });
+  const { isLoaded } = useGoogleMaps();
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
