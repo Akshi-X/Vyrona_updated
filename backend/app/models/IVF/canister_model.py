@@ -38,4 +38,3 @@ class Canister(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
-

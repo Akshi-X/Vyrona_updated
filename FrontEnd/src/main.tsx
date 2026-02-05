@@ -6,11 +6,14 @@ import "@fontsource/work-sans";
 import "@fontsource/open-sans";
 import router from './routes'
 import { AuthProvider } from './contexts/AuthContext'
+import { GoogleMapsProvider } from './contexts/GoogleMapsProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <GoogleMapsProvider>
+        <RouterProvider router={router} />
+      </GoogleMapsProvider>
     </AuthProvider>
   </StrictMode>,
 )
