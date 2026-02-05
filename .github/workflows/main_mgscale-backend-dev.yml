@@ -1,4 +1,4 @@
-name: Build and Push Docker Image to ACR - mgscale-backend-dev
+name: Build, Push & Deploy Docker Image - mgscale-backend-dev
 
 on:
   push:
@@ -7,19 +7,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build-push-deploy:
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      id-token: write 
+      id-token: write   # REQUIRED for azure/login
 
     steps:
-      # Checkout source code
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Azure Login
+      # 2️⃣ Azure Login (OIDC)
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -27,22 +27,28 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4A612E608EAF473F8845FCACCC6A05FE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E047935FC2B142BEAFF7D9170EC2DE11 }}
 
-      # Login to ACR (HARDCODED as requested)
+      # 3️⃣ Login to ACR (hardcoded as requested)
       - name: Login to ACR
         run: |
           docker login myscaledev.azurecr.io \
             -u myscaledev \
             -p 8deM4F5yZBqNh7CY37IkxYqaG6VbuoKz1xJiw4KCgPqZrUJFGUVyJQQJ99CBAC5RqLJEqg7NAAACAZCRdHtK
 
-      # Build Docker Image with build number tag
+      # 4️⃣ Build Docker image using backend Dockerfile
       - name: Build Docker Image
         run: |
           docker build \
             -t myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }} \
             ./backend
 
-      # Push Docker Image
-      - name: Push Docker Image to ACR
+      # 5️⃣ Push image to ACR
+      - name: Push Docker Image
         run: |
           docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
 
+      # 6️⃣ Deploy image to Azure App Service (Container)
+      - name: Deploy to Azure Web App (Container)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: mgscale-backend-service-dev
+          images: myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
