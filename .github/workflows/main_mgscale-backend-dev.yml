@@ -27,14 +27,25 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4A612E608EAF473F8845FCACCC6A05FE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E047935FC2B142BEAFF7D9170EC2DE11 }}
 
-      # 3️⃣ Login to ACR (hardcoded as requested)
+      # ✅ 2.1️⃣ Explicitly set subscription (CRITICAL FIX)
+      - name: Set Azure subscription
+        run: az account set --subscription 34ad4daa-8b1e-47c5-b00b-2ed490424e0a
+
+      # 🔍 2.2️⃣ Verify Web App exists (optional but recommended)
+      - name: Verify Web App
+        run: |
+          az webapp show \
+            --name mgscale-backend-service-dev \
+            --resource-group Mgscale
+
+      # 3️⃣ Login to ACR
       - name: Login to ACR
         run: |
           docker login myscaledev.azurecr.io \
             -u myscaledev \
             -p 8deM4F5yZBqNh7CY37IkxYqaG6VbuoKz1xJiw4KCgPqZrUJFGUVyJQQJ99CBAC5RqLJEqg7NAAACAZCRdHtK
 
-      # 4️⃣ Build Docker image using backend Dockerfile
+      # 4️⃣ Build Docker image
       - name: Build Docker Image
         run: |
           docker build \
