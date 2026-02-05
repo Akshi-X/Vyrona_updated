@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'FrontEnd/**'
   workflow_dispatch:
 
 jobs:
@@ -13,17 +15,14 @@ jobs:
       contents: read
 
     steps:
-      # Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup Node.js (client-safe, Azure-aligned)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22.x'
 
-      # Install dependencies & build
       - name: Install dependencies and build
         working-directory: FrontEnd
         run: |
@@ -31,8 +30,7 @@ jobs:
           npm run build
           cp web.config dist/
 
-      # Upload ONLY the build output (dist)
-      - name: Upload artifact for deployment
+      - name: Upload build artifact (dist only)
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -46,14 +44,12 @@ jobs:
       contents: read
 
     steps:
-      # Download artifact (this becomes wwwroot)
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: .
+          path: dist
 
-      # Login to Azure
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -61,10 +57,9 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
 
-      # Deploy static files to Azure Web App
-      - name: Deploy to Azure Web App
+      - name: Deploy ONLY dist to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-frontnd-dev
           slot-name: Production
-          package: .
+          package: dist
