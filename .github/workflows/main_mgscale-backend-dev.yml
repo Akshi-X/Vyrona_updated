@@ -3,9 +3,7 @@ name: Build and deploy Python app to Azure Web App - mgscale-backend-dev
 on:
   push:
     branches:
-      - main
-    paths:
-      - "backend/**"   # 🔹 Trigger only if backend folder changes
+      - main    # 🔹 Trigger only if backend folder changes
   workflow_dispatch:
 
 jobs:
@@ -35,3 +33,4 @@ jobs:
           app-name: mgscale-backend-dev
           slot-name: Production
           package: backend
+
