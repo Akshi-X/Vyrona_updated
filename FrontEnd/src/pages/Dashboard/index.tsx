@@ -1790,7 +1790,7 @@ export default function Dashboard({ }: DashboardProps) {
           setShowOutboundQualityTracking(false);
         }}
         error={outboundQualityTrackingError}
-        title="Outbound Qualit Tracking"
+        title="Outbound Quality Tracking"
         icon={OutboundModelIcon}
         onTrack={(canisterId) => {
           setOutboundQualityTrackingError(undefined);
