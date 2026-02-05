@@ -10,6 +10,10 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write 
+
     steps:
       # Checkout source code
       - name: Checkout repository
@@ -41,3 +45,4 @@ jobs:
       - name: Push Docker Image to ACR
         run: |
           docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
+
