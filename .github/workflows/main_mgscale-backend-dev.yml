@@ -1,17 +1,14 @@
-name: Build and deploy Python app to Azure Web App - mgscale-backend-dev
+name: Build and Push Docker Image to ACR - mgscale-backend-dev
 
 on:
   push:
     branches:
-      - main    # 🔹 Trigger only if backend folder changes
+      - main
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       # Checkout source code
@@ -26,11 +23,21 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4A612E608EAF473F8845FCACCC6A05FE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E047935FC2B142BEAFF7D9170EC2DE11 }}
 
-      # Deploy ONLY backend folder
-      - name: Deploy backend to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: mgscale-backend-dev
-          slot-name: Production
-          package: backend
+      # Login to ACR (HARDCODED as requested)
+      - name: Login to ACR
+        run: |
+          docker login myscaledev.azurecr.io \
+            -u myscaledev \
+            -p 8deM4F5yZBqNh7CY37IkxYqaG6VbuoKz1xJiw4KCgPqZrUJFGUVyJQQJ99CBAC5RqLJEqg7NAAACAZCRdHtK
 
+      # Build Docker Image with build number tag
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }} \
+            ./backend
+
+      # Push Docker Image
+      - name: Push Docker Image to ACR
+        run: |
+          docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
