@@ -1,4 +1,4 @@
-name: Build and deploy Node.js app to Azure Web App - mgscale-frontnd-dev
+name: Build and deploy Frontend (Vite) to Azure Web App - mgscale-frontnd-dev
 
 on:
   push:
@@ -13,28 +13,29 @@ jobs:
       contents: read
 
     steps:
-      #  Checkout source code
+      # Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      #  Setup Node.js (KEEP SAME AS BEFORE)
+      # Setup Node.js (client-safe, Azure-aligned)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: '22.x'
 
-      #  Install dependencies & build (KEEP SAME)
+      # Install dependencies & build
       - name: Install dependencies and build
         working-directory: FrontEnd
         run: |
-          npm install
+          npm ci
           npm run build
+          cp web.config dist/
 
       # Upload ONLY the build output (dist)
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
+          name: frontend-dist
           path: FrontEnd/dist
 
   deploy:
@@ -45,11 +46,11 @@ jobs:
       contents: read
 
     steps:
-      #  Download artifact (this becomes wwwroot)
+      # Download artifact (this becomes wwwroot)
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: node-app
+          name: frontend-dist
           path: .
 
       # Login to Azure
