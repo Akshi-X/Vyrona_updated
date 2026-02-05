@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 
 interface GoogleMapsContextType {
@@ -25,37 +25,6 @@ export const GoogleMapsProvider: React.FC<GoogleMapsProviderProps> = ({ children
       'Please ensure the .env file exists in the FrontEnd directory and restart the dev server.'
     );
   }
-
-  // Clear any existing Google Maps script tags and loader instances before initializing
-  useEffect(() => {
-    // Remove ALL existing Google Maps script tags to prevent conflicts
-    const existingScripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
-    existingScripts.forEach((script) => {
-      script.remove();
-    });
-
-    // Clear the @googlemaps/js-api-loader internal cache
-    // The library stores loader instances in a Map internally
-    if (typeof window !== 'undefined') {
-      try {
-        // Try to access and clear the Loader's internal instances cache
-        // The Loader class from @googlemaps/js-api-loader maintains a static cache
-        const Loader = (window as any).google?.maps?.Loader;
-        if (Loader && (Loader as any)._instances) {
-          // Clear all instances
-          (Loader as any)._instances.clear();
-        }
-        
-        // Also try to clear any cached loaders by ID
-        if ((window as any).__googleMapsLoaderCache) {
-          delete (window as any).__googleMapsLoaderCache['google-map-script-ivf'];
-          delete (window as any).__googleMapsLoaderCache['google-map-script'];
-        }
-      } catch (e) {
-        // Silently ignore if cache doesn't exist or can't be cleared
-      }
-    }
-  }, []);
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
