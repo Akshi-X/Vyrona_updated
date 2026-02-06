@@ -50,14 +50,15 @@ def get_redis() -> redis.Redis:
 
 
 def get_pubsub() -> redis.client.PubSub:
-    """Get or create Redis publish/subscribe"""
+    """Get or create Redis publish/subscribe - subscribes to both CGT and IVF channels"""
     global _pubsub
     if _pubsub is None:
         try:
             r = get_redis()
             _pubsub = r.pubsub()
-            _pubsub.subscribe('quality_channel')
-            logger.info("Redis pub/sub subscription established")
+            # Subscribe to both CGT (quality_channel) and IVF (ivf_quality_channel) channels
+            _pubsub.subscribe('quality_channel', 'ivf_quality_channel')
+            logger.info("Redis pub/sub subscription established for both CGT and IVF channels")
         except Exception as e:
             logger.error(f"Failed to create pub/sub connection: {e}")
             raise

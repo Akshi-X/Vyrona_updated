@@ -263,10 +263,16 @@ class IVFDashboardService:
         
         Metric 4: Top Deviation Driver (For all Sites)
         
-        Deviation drivers considered:
-        - Critical canister status
-        - Risk canister status
-        - Low LN2 levels
+        Returns the KPI (Key Performance Indicator) with the highest deviation count.
+        KPIs tracked:
+        - Temperature deviations (is_temp_loss)
+        - Humidity deviations (is_humidity_loss)
+        - Agitation deviations (is_agitation_loss)
+        
+        Role-based access:
+        - Manager (IVF): See metrics across all sites
+        - User (IVF): See metrics only for their assigned branch
+        - Admin: See metrics across all sites
         
         Args:
             branch_id: Optional branch ID to filter by
@@ -278,70 +284,54 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Count critical canisters
-        critical_query = (
-            self.db.query(func.count(Canister.canister_id))
-            .filter(
-                Canister.is_active == True,
-                Canister.canister_status == CanisterStatus.CRITICAL
-            )
-        )
-        
-        # Count risk canisters
-        risk_query = (
-            self.db.query(func.count(Canister.canister_id))
-            .filter(
-                Canister.is_active == True,
-                Canister.canister_status == CanisterStatus.RISK
-            )
-        )
-        
-        # Count low LN2 level events
-        ln2_query = (
-            self.db.query(func.count(CanisterLn2Log.log_id))
-            .filter(
-                or_(
-                    CanisterLn2Log.ln2_level_before < 50.0,
-                    CanisterLn2Log.ln2_level_after < 50.0
-                )
-            )
-        )
+        # Base query conditions for quality logs with deviations
+        # Join through: IVFQualityLog -> Canister -> Tank -> Branch
+        base_conditions = [
+            Canister.is_active == True
+        ]
         
         # Apply branch filtering if needed
         if filter_branch_id is not None:
-            # For canisters: Join through Canister -> Tank -> Branch
-            critical_query = (
-                critical_query
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-            
-            risk_query = (
-                risk_query
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-            
-            # For logs: Join through CanisterLn2Log -> Canister -> Tank -> Branch
-            ln2_query = (
-                ln2_query
-                .join(Canister, CanisterLn2Log.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
+            base_conditions.append(HospitalBranch.branch_id == filter_branch_id)
         
-        critical_count = critical_query.scalar() or 0
-        risk_count = risk_query.scalar() or 0
-        ln2_count = ln2_query.scalar() or 0
+        # Count temperature deviations
+        temp_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_temp_loss == True)
+        )
+        temp_count = temp_query.scalar() or 0
+        
+        # Count humidity deviations
+        humidity_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_humidity_loss == True)
+        )
+        humidity_count = humidity_query.scalar() or 0
+        
+        # Count agitation deviations
+        agitation_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_agitation_loss == True)
+        )
+        agitation_count = agitation_query.scalar() or 0
         
         # Determine top driver
         drivers = {
-            "Critical Canister Status": critical_count,
-            "Risk Canister Status": risk_count,
-            "Low LN2 Levels": ln2_count
+            "Temperature": temp_count,
+            "Humidity": humidity_count,
+            "Agitation": agitation_count
         }
         
         # Find top driver
@@ -349,7 +339,8 @@ class IVFDashboardService:
             return {
                 "driver_name": "N/A",
                 "count": 0,
-                "percentage": 0.0
+                "percentage": 0.0,
+                "all_drivers": drivers
             }
         
         top_driver = max(drivers.items(), key=lambda x: x[1])
@@ -363,6 +354,112 @@ class IVFDashboardService:
             "count": driver_count,
             "percentage": percentage,
             "all_drivers": drivers
+        }
+    
+    def get_total_deviations(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+        """
+        Get total count of deviations from IVF quality logs.
+        
+        Counts all records in IVFQualityLog where any deviation flag is True:
+        - is_temp_loss (Temperature)
+        - is_humidity_loss (Humidity)
+        - is_agitation_loss (Agitation/Vibration)
+        - is_light_loss (Light)
+        
+        Role-based access:
+        - Manager (IVF): Count deviations across all branches
+        - User (IVF): Count deviations only for their assigned branch
+        - Admin: Count deviations across all branches
+        
+        Args:
+            branch_id: Optional branch ID to filter by
+            role: User's role to determine filtering
+            
+        Returns:
+            Dictionary with total deviations and breakdown by type
+        """
+        # Apply branch filter based on role
+        filter_branch_id = self._get_branch_filter(branch_id, role)
+        
+        # Base query conditions for quality logs with deviations
+        # Join through: IVFQualityLog -> Canister -> Tank -> Branch
+        base_conditions = [
+            Canister.is_active == True
+        ]
+        
+        # Apply branch filtering if needed
+        if filter_branch_id is not None:
+            base_conditions.append(HospitalBranch.branch_id == filter_branch_id)
+        
+        # Count temperature deviations
+        temp_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_temp_loss == True)
+        )
+        temp_count = temp_query.scalar() or 0
+        
+        # Count humidity deviations
+        humidity_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_humidity_loss == True)
+        )
+        humidity_count = humidity_query.scalar() or 0
+        
+        # Count agitation deviations
+        agitation_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_agitation_loss == True)
+        )
+        agitation_count = agitation_query.scalar() or 0
+        
+        # Count light deviations
+        light_query = (
+            self.db.query(func.count(IVFQualityLog.id))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(IVFQualityLog.is_light_loss == True)
+        )
+        light_count = light_query.scalar() or 0
+        
+        # Count total deviations (any flag is True)
+        # Use distinct count to avoid double-counting records with multiple violations
+        total_query = (
+            self.db.query(func.count(func.distinct(IVFQualityLog.id)))
+            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
+            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .filter(and_(*base_conditions))
+            .filter(
+                or_(
+                    IVFQualityLog.is_temp_loss == True,
+                    IVFQualityLog.is_humidity_loss == True,
+                    IVFQualityLog.is_agitation_loss == True,
+                    IVFQualityLog.is_light_loss == True
+                )
+            )
+        )
+        total_count = total_query.scalar() or 0
+        
+        return {
+            "total_deviations": total_count,
+            "temperature_deviations": temp_count,
+            "humidity_deviations": humidity_count,
+            "agitation_deviations": agitation_count,
+            "light_deviations": light_count
         }
     
     def get_outbound_shipments(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
@@ -420,68 +517,20 @@ class IVFDashboardService:
             "total_outbound_shipments": total_shipments
         }
 
-    def get_avg_quality_loss_per_container(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
-        """
-        Calculate average quality loss per container.
-        
-        Quality loss per container is calculated as the average quality_loss
-        from IVF quality logs for all time.
-        
-        Args:
-            branch_id: Optional branch ID to filter by
-            role: User's role to determine filtering
-            
-        Returns:
-            Dictionary with avg_quality_loss_per_container and total_containers
-        """
-        filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        per_container_query = (
-            self.db.query(
-                IVFQualityLog.canister_id.label("canister_id"),
-                func.avg(IVFQualityLog.quality_loss).label("avg_loss")
-            )
-            .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
-            .filter(
-                Canister.is_active == True,
-                IVFQualityLog.quality_loss.isnot(None)
-            )
-            .group_by(IVFQualityLog.canister_id)
-        )
-        
-        if filter_branch_id is not None:
-            per_container_query = (
-                per_container_query
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        
-        per_container_subquery = per_container_query.subquery()
-        
-        avg_quality_loss = (
-            self.db.query(func.avg(per_container_subquery.c.avg_loss))
-            .scalar()
-        )
-        total_containers = (
-            self.db.query(func.count(per_container_subquery.c.canister_id))
-            .scalar()
-        )
-        
-        avg_quality_loss_value = round(float(avg_quality_loss), 2) if avg_quality_loss is not None else 0.0
-        total_containers_value = int(total_containers) if total_containers is not None else 0
-        
-        return {
-            "avg_quality_loss_per_container": avg_quality_loss_value,
-            "total_containers": total_containers_value
-        }
-
     def get_deviations_graph(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get deviations graph data for IVF dashboard.
         
-        User view: container-wise deviations within the site.
-        Manager/Admin view: cumulative deviations per site.
+        Returns data for a horizontal bar chart showing:
+        - Stacked bar: Temperature, Humidity, Agitation/Vibration deviations
+        - Top risk driver bar: Maximum deviation value for each container
+        
+        Chart structure (Quality deviation):
+        - Y-axis: Containers (A, B, C, D, E)
+        - X-axis: Deviation values (0-100)
+        - For each container: Two horizontal bars
+          1. Stacked bar: Temperature (purple), Humidity (grey), Agitation/Vibration (pink)
+          2. Solid bar: Top risk driver (blue) - maximum deviation value
         
         Deviation types are mapped from IVF quality logs:
         - temperature: is_temp_loss
@@ -504,6 +553,7 @@ class IVFDashboardService:
         
         if is_user_view:
             # Container-wise deviations within the user's branch
+            # User sees: container name, individual driver counts, highest top risk driver name and count per container
             query = (
                 self.db.query(
                     Canister.canister_id.label("container_id"),
@@ -528,30 +578,37 @@ class IVFDashboardService:
             )
             
             data = []
-            totals = {"temperature": 0, "humidity": 0, "agitation": 0}
             for row in results:
-                total_deviations = int(row.temperature_deviations + row.humidity_deviations + row.agitation_deviations)
+                temp_val = int(row.temperature_deviations)
+                humidity_val = int(row.humidity_deviations)
+                agitation_val = int(row.agitation_deviations)
+                
+                # Determine the highest top risk driver name and count for this container
+                container_drivers = {
+                    "temperature": temp_val,
+                    "humidity": humidity_val,
+                    "agitation": agitation_val
+                }
+                top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(container_drivers)
+                
                 data.append({
-                    "container_id": row.container_id,
-                    "container_number": row.container_number,
-                    "temperature_deviations": int(row.temperature_deviations),
-                    "humidity_deviations": int(row.humidity_deviations),
-                    "agitation_deviations": int(row.agitation_deviations),
-                    "total_deviations": total_deviations
+                    "container_name": str(row.container_number) if row.container_number else None,  # Container number/code
+                    "temperature": temp_val,  # Individual driver count
+                    "humidity": humidity_val,  # Individual driver count
+                    "agitation_vibration": agitation_val,  # Individual driver count
+                    "top_risk_driver_name": top_risk_driver_name,  # Highest top risk driver name
+                    "top_risk_driver_count": top_risk_driver_count,  # Highest top risk driver count
+                    "top_risk_driver": top_risk_driver_count  # For backward compatibility with chart
                 })
-                totals["temperature"] += int(row.temperature_deviations)
-                totals["humidity"] += int(row.humidity_deviations)
-                totals["agitation"] += int(row.agitation_deviations)
-            
-            top_deviation_type = self._get_top_deviation_type(totals)
             
             return {
                 "view_level": "container",
-                "top_deviation_type": top_deviation_type,
                 "data": data
             }
         
-        # Manager/Admin view: cumulative deviations per site
+        # Manager/Admin view: site-wise cumulative deviations
+        # Manager sees: site name with cumulative counts of temperature, humidity, agitation for all containers in that site
+        # and top risk driver name with cumulative count per site
         query = (
             self.db.query(
                 HospitalBranch.branch_id.label("site_id"),
@@ -568,35 +625,38 @@ class IVFDashboardService:
             .order_by(HospitalBranch.branch_name)
         )
         
+        if filter_branch_id is not None:
+            query = query.filter(HospitalBranch.branch_id == filter_branch_id)
+        
         results = query.all()
         
         data = []
-        totals = {"temperature": 0, "humidity": 0, "agitation": 0}
         for row in results:
-            total_deviations = int(row.temperature_deviations + row.humidity_deviations + row.agitation_deviations)
-            site_totals = {
-                "temperature": int(row.temperature_deviations),
-                "humidity": int(row.humidity_deviations),
-                "agitation": int(row.agitation_deviations)
+            temp_val = int(row.temperature_deviations)
+            humidity_val = int(row.humidity_deviations)
+            agitation_val = int(row.agitation_deviations)
+            
+            # Determine top risk driver name and count for this site
+            site_drivers = {
+                "temperature": temp_val,
+                "humidity": humidity_val,
+                "agitation": agitation_val
             }
+            top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(site_drivers)
+            
             data.append({
                 "site_id": row.site_id,
-                "site_name": row.site_name,
-                "temperature_deviations": site_totals["temperature"],
-                "humidity_deviations": site_totals["humidity"],
-                "agitation_deviations": site_totals["agitation"],
-                "total_deviations": total_deviations,
-                "top_deviation_type": self._get_top_deviation_type(site_totals)
+                "site_name": row.site_name,  # Site name
+                "temperature": temp_val,  # Cumulative count for all containers in this site
+                "humidity": humidity_val,  # Cumulative count for all containers in this site
+                "agitation_vibration": agitation_val,  # Cumulative count for all containers in this site
+                "top_risk_driver_name": top_risk_driver_name,  # Top risk driver name for this site
+                "top_risk_driver_count": top_risk_driver_count,  # Top risk driver cumulative count for this site
+                "top_risk_driver": top_risk_driver_count  # For backward compatibility with chart
             })
-            totals["temperature"] += site_totals["temperature"]
-            totals["humidity"] += site_totals["humidity"]
-            totals["agitation"] += site_totals["agitation"]
-        
-        top_deviation_type = self._get_top_deviation_type(totals)
         
         return {
             "view_level": "site",
-            "top_deviation_type": top_deviation_type,
             "data": data
         }
 
@@ -606,4 +666,32 @@ class IVFDashboardService:
         if not totals or not any(totals.values()):
             return "N/A"
         return max(totals.items(), key=lambda item: item[1])[0]
+    
+    @staticmethod
+    def _get_top_risk_driver_with_count(drivers: Dict[str, int]) -> tuple:
+        """
+        Return the top risk driver name and count.
+        
+        Args:
+            drivers: Dictionary with driver names as keys and counts as values
+                    e.g., {"temperature": 10, "humidity": 5, "agitation": 15}
+        
+        Returns:
+            Tuple of (driver_name, count)
+        """
+        if not drivers or not any(drivers.values()):
+            return ("N/A", 0)
+        
+        # Map internal names to display names
+        name_mapping = {
+            "temperature": "Temperature",
+            "humidity": "Humidity",
+            "agitation": "Agitation / Vibration"
+        }
+        
+        top_driver_key = max(drivers.items(), key=lambda item: item[1])[0]
+        top_driver_name = name_mapping.get(top_driver_key, top_driver_key.title())
+        top_driver_count = drivers[top_driver_key]
+        
+        return (top_driver_name, top_driver_count)
     

@@ -1,0 +1,487 @@
+import { BaseApiService } from './baseApiService';
+import { authUtils } from '../utils/auth';
+import type {
+  EmbryoTrackingApiResponse,
+  IVFTreatment,
+} from '../types/ivf.ts';
+
+export interface TotalEmbryosCryolocksResponse {
+  total_embryos: number;
+  total_cryolocks: number;
+  total_embryos_cryolocks: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface TotalContainersResponse {
+  total_containers: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface QualityDeviationsFlaggedResponse {
+  total_quality_deviations: number;
+  canister_status_deviations: number;
+  ln2_level_deviations: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface TopDeviationDriverResponse {
+  driver_name: string;
+  count: number;
+  percentage: number;
+  all_drivers: Record<string, number>;
+  last_updated: string;
+  status: string;
+}
+
+export interface OutboundShipmentsResponse {
+  total_outbound_shipments: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface AvgQualityLossPerContainerResponse {
+  avg_quality_loss_per_container: number;
+  total_containers: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface TotalDeviationsResponse {
+  total_deviations: number;
+  temperature_deviations: number;
+  humidity_deviations: number;
+  agitation_deviations: number;
+  light_deviations: number;
+  last_updated: string;
+  status: string;
+}
+
+export interface DeviationsGraphDataItem {
+  site_id?: number;
+  site_name?: string;
+  container_name?: string; // Used for user view
+  temperature: number;
+  humidity: number;
+  agitation_vibration: number;
+  top_risk_driver_name: string;
+  top_risk_driver_count: number;
+  top_risk_driver: number;
+}
+
+export interface DeviationsGraphResponse {
+  view_level: string;
+  data: DeviationsGraphDataItem[];
+  top_deviation_type: string | null;
+  last_updated: string;
+  status: string;
+}
+
+export interface RefillLogItem {
+  canister_id: number;
+  refill_date: string;
+  refill_time: string;
+  refilled_by: string;
+  description: string;
+  status: string;
+  cryoshipper: string | null;
+  disinfected_shipper_infected_tank_description: string | null;
+  reservoir: string | null;
+  ln2_ordered_date: string | null;
+  ln2_received_date: string | null;
+  log_id: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string | null;
+}
+
+export interface RefillLogsResponse {
+  refill_logs: RefillLogItem[];
+  count: number;
+}
+
+// Internal type for raw API response (snake_case)
+interface RawEmbryoTrackingApiItem {
+  his_number: string;
+  cryolock_number: string;
+  canister_number: number;
+  tank_code: string;
+  cane_code: string;
+  goblet_color: string;
+  cryolock_color: string;
+  date_of_vitrification: string;
+  embryo_grading?: string;
+  site_name: string;
+  status: string;
+  description: string | null;
+}
+
+interface RawEmbryoTrackingApiResponse {
+  data: RawEmbryoTrackingApiItem[];
+  total: number;
+}
+
+// Type for canister tracking details API response (snake_case)
+interface RawCanisterTrackingApiItem {
+  his_number: string;
+  cryolock_number: string;
+  canister_number: number;
+  cane_code: string;
+  goblet_color: string;
+  cryolock_color: string;
+  date_of_vitrification: string;
+  move_to: boolean;
+  description: string | null;
+}
+
+interface RawCanisterTrackingApiResponse {
+  data: RawCanisterTrackingApiItem[];
+  total: number;
+  available_slots: number;
+}
+
+const mapApiItemToTreatment = (item: RawEmbryoTrackingApiItem): IVFTreatment => ({
+  hisNumber: item.his_number,
+  cryolockNum: item.cryolock_number,
+  canisterNum: item.canister_number,
+  tankCode: item.tank_code,
+  caneCode: item.cane_code,
+  gobletColor: item.goblet_color,
+  cryolockColor: item.cryolock_color,
+  dateOfVitrification: item.date_of_vitrification,
+  siteName: item.site_name,
+  status: item.status,
+  embryoGrading: item.embryo_grading,
+  description: item.description,
+});
+
+const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): IVFTreatment => ({
+  hisNumber: item.his_number,
+  cryolockNum: item.cryolock_number,
+  canisterNum: item.canister_number,
+  tankCode: '-', // Not provided by API
+  caneCode: item.cane_code,
+  gobletColor: item.goblet_color,
+  cryolockColor: item.cryolock_color,
+  dateOfVitrification: item.date_of_vitrification,
+  siteName: '-', // Not provided by API
+  status: '-', // Not provided by API
+  embryoGrading: '-', // Not provided by API
+  description: item.description,
+});
+
+export class IvfService extends BaseApiService {
+  async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
+    const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
+      method: 'GET',
+    });
+    return {
+      data: response.data.map(mapApiItemToTreatment),
+      total: response.total,
+    };
+  }
+
+  async getTotalEmbryosCryolocks(): Promise<TotalEmbryosCryolocksResponse> {
+    return await this.request<TotalEmbryosCryolocksResponse>(
+      '/api/ivf/dashboard/metrics/total-embryos-cryolocks',
+      { method: 'GET' }
+    );
+  }
+
+  async getTotalContainers(): Promise<TotalContainersResponse> {
+    return await this.request<TotalContainersResponse>(
+      '/api/ivf/dashboard/metrics/total-containers',
+      { method: 'GET' }
+    );
+  }
+
+  async getQualityDeviationsFlagged(): Promise<QualityDeviationsFlaggedResponse> {
+    return await this.request<QualityDeviationsFlaggedResponse>(
+      '/api/ivf/dashboard/metrics/quality-deviations-flagged',
+      { method: 'GET' }
+    );
+  }
+
+  async getTopDeviationDriver(): Promise<TopDeviationDriverResponse> {
+    return await this.request<TopDeviationDriverResponse>(
+      '/api/ivf/dashboard/metrics/top-deviation-driver',
+      { method: 'GET' }
+    );
+  }
+
+  async getOutboundShipments(): Promise<OutboundShipmentsResponse> {
+    return await this.request<OutboundShipmentsResponse>(
+      '/api/ivf/dashboard/metrics/outbound-shipments',
+      { method: 'GET' }
+    );
+  }
+
+  async getAvgQualityLossPerContainer(): Promise<AvgQualityLossPerContainerResponse> {
+    return await this.request<AvgQualityLossPerContainerResponse>(
+      '/api/ivf/dashboard/metrics/avg-quality-loss-per-container',
+      { method: 'GET' }
+    );
+  }
+
+  async getTotalDeviations(): Promise<TotalDeviationsResponse> {
+    return await this.request<TotalDeviationsResponse>(
+      '/api/ivf/dashboard/metrics/total-deviations',
+      { method: 'GET' }
+    );
+  }
+
+  async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
+    return await this.request<DeviationsGraphResponse>(
+      '/api/ivf/dashboard/metrics/deviations-graph',
+      { method: 'GET' }
+    );
+  }
+
+  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
+    const response = await this.request<RawCanisterTrackingApiResponse>(
+      `/api/quality-tracking/canisters/${canisterNumber}/tracking-details`,
+      { method: 'GET' }
+    );
+    return {
+      data: response.data.map(mapCanisterTrackingItemToTreatment),
+      total: response.total,
+      available_slots: response.available_slots,
+    };
+  }
+
+  async getCanisterRefillLogs(canisterNumber: string | number): Promise<RefillLogsResponse> {
+    return await this.request<RefillLogsResponse>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Update goblet color for a specific cryolock within a canister
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+   * @param gobletColor - The goblet color value to set (e.g., "Yellow", "Red", "Blue")
+   */
+  async updateGobletColor(
+    canisterNumber: string | number,
+    cryolockNumber: string,
+    gobletColor: string
+  ): Promise<{ success: boolean; message: string; updated_color: string }> {
+    return await this.patch<{ success: boolean; message: string; updated_color: string }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/goblet-color`,
+      {
+        cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+        goblet_color: gobletColor,
+      }
+    );
+  }
+
+  /**
+   * Update cryolock color for a specific cryolock within a canister
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+   * @param cryolockColor - The cryolock color value to set (e.g., "Yellow", "Red", "Blue")
+   */
+  async updateCryolockColor(
+    canisterNumber: string | number,
+    cryolockNumber: string,
+    cryolockColor: string
+  ): Promise<{ success: boolean; message: string; updated_color: string }> {
+    return await this.patch<{ success: boolean; message: string; updated_color: string }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/cryolock-color`,
+      {
+        cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
+        cryolock_color: cryolockColor,
+      }
+    );
+  }
+
+  /**
+   * Update refill log status for a specific log
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param logId - The refill log ID
+   * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
+   */
+  async updateRefillLogStatus(
+    canisterNumber: string | number,
+    logId: number,
+    status: string
+  ): Promise<RefillLogItem> {
+    return await this.patch<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs/${logId}/status`,
+      {
+        status: status,
+      }
+    );
+  }
+
+  /**
+   * Create a new refill log for a canister
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param refillLogData - The refill log data
+   */
+  async createRefillLog(
+    canisterNumber: string | number,
+    refillLogData: {
+      refill_date: string;
+      refill_time: string;
+      refilled_by: string;
+      description: string;
+      status: string;
+      cryoshipper?: string | null;
+      disinfected_shipper_infected_tank_description?: string | null;
+      reservoir?: string | null;
+      ln2_ordered_date?: string | null;
+      ln2_received_date?: string | null;
+    }
+  ): Promise<RefillLogItem> {
+    return await this.post<RefillLogItem>(
+      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      refillLogData
+    );
+  }
+
+  /**
+   * Mark container as moved to embryo transfer
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @returns Promise with success status and response data
+   */
+  async markEmbryoTransfer(
+    canisterNumber: string | number,
+    cryolockNumber: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    embryo_transfer: boolean;
+    in_transit: boolean;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      embryo_transfer: boolean;
+      in_transit: boolean;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/embryo-transfer`,
+      {
+        cryolock_number: cryolockNumber,
+      }
+    );
+  }
+
+  /**
+   * Mark container as in transit with shipment
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
+   * @param description - Description of the move (e.g., "From Egmore to ptc, Device ID : XXXXXX")
+   * @returns Promise with success status and response data
+   */
+  async markInTransitWithShipment(
+    canisterNumber: string | number,
+    cryolockNumber: string,
+    description: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    cryolock_number: string;
+    in_transit: boolean;
+    shipment?: Record<string, any>;
+  }> {
+    return await this.patch<{
+      success: boolean;
+      message: string;
+      cryolock_number: string;
+      in_transit: boolean;
+      shipment?: Record<string, any>;
+    }>(
+      `/api/quality-tracking/canisters/${canisterNumber}/in-transit-with-shipment`,
+      {
+        cryolock_number: cryolockNumber,
+        description: description,
+      }
+    );
+  }
+
+  /**
+   * Export combined refill logs and KPI threshold deviations to Excel
+   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param year - Year for the report (e.g., 2024). Optional - defaults to current year.
+   * @param month - Month for the report (1-12). Optional - if not provided, exports entire year.
+   * @returns Promise that resolves when download is triggered
+   */
+  async exportCombinedReportExcel(
+    canisterNumber: string | number,
+    year?: number,
+    month?: number
+  ): Promise<void> {
+    const url = `${this.getBaseUrl()}/api/quality-tracking/canisters/${canisterNumber}/combined-report/export-excel`;
+    const params = new URLSearchParams();
+    if (year !== undefined) {
+      params.append('year', year.toString());
+    }
+    if (month !== undefined) {
+      params.append('month', month.toString());
+    }
+    const queryString = params.toString();
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+    const token = authUtils.getToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Export failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Get the blob from the response
+    const blob = await response.blob();
+
+    // Get filename from Content-Disposition header or use a default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `combined_report_${canisterNumber}_${year || new Date().getFullYear()}${month ? `_${month}` : ''}.xlsx`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    // Create a download link and trigger it
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+}
+
+export const ivfService = new IvfService();
+

@@ -26,7 +26,7 @@ export class BaseApiService {
   constructor() {
     // Get the API base URL from environment variables
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    this.baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://127.0.0.1:8000';
+    this.baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     this.useMock = false; // Set to true for mock responses
   }
 

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -18,6 +18,9 @@ class Cryolock(Base):
     # Cryolock Information
     cryolock_number = Column(String(255), nullable=True)
     cryolock_color = Column(String(255), nullable=True)
+    goblet_color = Column(String(255), nullable=True)
+    embryo_transfer = Column(Boolean, default=False, nullable=False)
+    in_transit = Column(Boolean, default=False, nullable=False)
     
     # Relationships
     cane = relationship("Cane", back_populates="cryolocks")

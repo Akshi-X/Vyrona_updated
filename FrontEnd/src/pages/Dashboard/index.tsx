@@ -11,7 +11,9 @@ import StakeholderChatsModal from '../../components/StakeholderChatsModal';
 import QualityDeviationChart from '../../components/QualityDeviationChart';
 import { patientService } from '../../services/patientService';
 import TrackShipmentModal from '../../components/TrackShipmentModal';
+import TrackCanisterModal from '../../components/TrackCanisterModal';
 import { criticalAlertsService, type CriticalAlert as ServiceCriticalAlert } from '../../services/criticalAlertsService';
+import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { logisticsService, type PatientStatistics, type LogisticsMetrics } from '../../services/logisticsService';
 import { performanceService, type AvgQualityDeviationsResponse, type OnTimePercentageResponse, type AvgLeadTimeResponse, type SuccessRateResponse } from '../../services/performanceService';
@@ -40,13 +42,14 @@ import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
 import OutboundQualityTrackingIcon from '../../assets/DashBoardIcons/OutboundQualityTracking.svg';
+import OutboundModelIcon from '../../assets/OutboundModel.svg';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
 import DeviationDriverIcon from '../../assets/DashBoardIcons/DeviationDriver.svg';
 import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.svg';
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
-// Mock data
-import ivfDashboardMock from '../../data/ivfDashboardMock.json';
+import { ivfService } from '../../services/ivfService';
+import type { IVFTreatment } from '../../types/ivf.ts';
 
 interface StakeholderChat {
   id: string;
@@ -65,21 +68,26 @@ import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
 interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, userRole } = useAuth();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showStakeholderChats, setShowStakeholderChats] = useState(false);
 
   // Real data from APIs
-  const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[]>([]);
+  const [criticalAlerts, setCriticalAlerts] = useState<ServiceCriticalAlert[] | IVFAlert[]>([]);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [stakeholderChats, setStakeholderChats] = useState<StakeholderChat[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTrackShipment, setShowTrackShipment] = useState(false);
   const [trackError, setTrackError] = useState<string | undefined>(undefined);
+  const [showTrackCanister, setShowTrackCanister] = useState(false);
+  const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
+  const [showOutboundQualityTracking, setShowOutboundQualityTracking] = useState(false);
+  const [outboundQualityTrackingError, setOutboundQualityTrackingError] = useState<string | undefined>(undefined);
   const [loadingChats, setLoadingChats] = useState(false);
+  const [apiUnreadCount, setApiUnreadCount] = useState<number>(0);
 
   // WebSocket for unread chat count (tagged messages only)
   const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket();
@@ -95,71 +103,142 @@ export default function Dashboard({ }: DashboardProps) {
       return null;
     }
   });
-  // IVF mock data
-  const [ivfData, setIvfData] = useState<any>(() => {
-    try {
-      const dept = localStorage.getItem('department');
-      if (dept?.toUpperCase() === 'IVF') {
-        return ivfDashboardMock;
-      }
-    } catch {}
-    return null;
-  });
+
+  // IVF embryo tracking (live API data)
+  const [ivfEmbryoTracking, setIvfEmbryoTracking] = useState<IVFTreatment[]>([]);
+  const [loadingIvfEmbryoTracking, setLoadingIvfEmbryoTracking] = useState(false);
+  const [ivfEmbryoTrackingError, setIvfEmbryoTrackingError] = useState<string | null>(null);
+
+  // IVF total embryos/cryolocks metric (live API data)
+  const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
+  const [ivfTotalCryolocks, setIvfTotalCryolocks] = useState<number | null>(null);
+  const [loadingIvfTotals, setLoadingIvfTotals] = useState(false);
+  const [ivfTotalsError, setIvfTotalsError] = useState<string | null>(null);
+
+  // IVF total containers metric (live API data)
+  const [ivfTotalContainers, setIvfTotalContainers] = useState<number | null>(null);
+  const [loadingIvfContainers, setLoadingIvfContainers] = useState(false);
+  const [ivfContainersError, setIvfContainersError] = useState<string | null>(null);
+
+  // IVF quality deviations flagged metric (live API data)
+  const [ivfQualityDeviations, setIvfQualityDeviations] = useState<number | null>(null);
+  const [loadingIvfQualityDeviations, setLoadingIvfQualityDeviations] = useState(false);
+  const [ivfQualityDeviationsError, setIvfQualityDeviationsError] = useState<string | null>(null);
+
+  // IVF top deviation driver metric (live API data)
+  const [ivfTopDeviationDriverName, setIvfTopDeviationDriverName] = useState<string | null>(null);
+  const [loadingIvfTopDeviationDriver, setLoadingIvfTopDeviationDriver] = useState(false);
+  const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
+
+  // IVF outbound shipments metric (live API data)
+  const [ivfOutboundShipments, setIvfOutboundShipments] = useState<number | null>(null);
+  const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
+  const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
+
+
+  // IVF total deviations metric (live API data)
+  const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
+  const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
+  const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
+
+  // IVF quality deviation chart data (live API data)
+  const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
+    containers: string[];
+    metrics: Array<{ name: string; color: string; data: number[] }>;
+  } | null>(null);
+  const [loadingIvfQualityDeviationChart, setLoadingIvfQualityDeviationChart] = useState(false);
+  const [ivfQualityDeviationChartError, setIvfQualityDeviationChartError] = useState<string | null>(null);
 
   // Fetch stakeholder chats from API (for modal display)
   const fetchStakeholderChats = async () => {
     setLoadingChats(true);
     try {
       const response = await chatService.getUnreadMessages();
-      const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
-        id: msg.message_id.toString(),
-        sender: msg.sender_name,
-        patientId: `Patient ID: ${msg.patient_id}`,
-        message: msg.message_content,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        isRead: false // These are unread messages
-      }));
-      setStakeholderChats(transformedChats);
+      
+      // Update the total unread count from API response
+      if (response && typeof response.total_unread === 'number') {
+        setApiUnreadCount(response.total_unread);
+      }
+      
+      if (response && response.unread_messages && response.unread_messages.length > 0) {
+        const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
+          id: msg.message_id.toString(),
+          sender: msg.sender_name,
+          patientId: msg.canister_number 
+            ? `Canister ID: ${msg.canister_number}` 
+            : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
+          message: msg.message_content,
+          timestamp: new Date(msg.created_at).toLocaleString(),
+          isRead: false // These are unread messages
+        }));
+        setStakeholderChats(transformedChats);
+      } else {
+        // No messages found - set empty array and count to 0
+        setStakeholderChats([]);
+        setApiUnreadCount(0);
+      }
     } catch (error) {
-      setStakeholderChats([]);
+      // Only clear chats on error if we don't have any cached data
+      // This prevents clearing messages that might have been loaded from WebSocket
+      setStakeholderChats(prevChats => {
+        return prevChats.length > 0 ? prevChats : [];
+      });
+      // Don't reset API count on error - keep last known value
     } finally {
       setLoadingChats(false);
     }
   };
 
-  // Update stakeholder chats from WebSocket data
+  // Update stakeholder chats from WebSocket data (only when WebSocket has data)
+  // Don't clear chats if WebSocket is empty - let API fetch handle initial load
   useEffect(() => {
     if (wsUnreadMessages && wsUnreadMessages.length > 0) {
       const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
         id: msg.message_id.toString(),
         sender: msg.sender_name,
-        patientId: `Patient ID: ${msg.patient_id}`,
+        patientId: msg.canister_number 
+          ? `Canister ID: ${msg.canister_number}` 
+          : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
         message: msg.message_content,
         timestamp: new Date(msg.created_at).toLocaleString(),
         isRead: false
       }));
       setStakeholderChats(transformedChats);
-    } else {
-      setStakeholderChats([]);
-    }
+    } 
+    // Don't clear chats if WebSocket is empty - API fetch will handle it
   }, [wsUnreadMessages]);
 
   // Calculate dynamic notification counts
-  // Use WebSocket unread count (tagged messages only) for badge
-  const stakeholderChatCount = wsUnreadCount || 0;
+  // Use the maximum of WebSocket count and API count to ensure accuracy
+  // This handles cases where WebSocket might not be connected yet or API has more recent data
+  const stakeholderChatCount = Math.max(wsUnreadCount || 0, apiUnreadCount || 0);
   const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
   const myTasksCount = myTasks.length; // Show total tasks count
+
+  // Format count for display (show "9+" for counts > 9)
+  const formatCount = (count: number): string => {
+    return count > 9 ? '9+' : count.toString();
+  };
 
 
   // Fetch critical alerts from API
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      // TODO: Get pharma_id from user context or modify API to use current user context
-      // For now, using a default pharma_id - this should be replaced with actual user's pharma_id
-      const pharmaId = '1'; // Default pharma_id - needs to be replaced with actual user's pharma_id
-      const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
-      setCriticalAlerts(response.alerts || []);
+      const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+      
+      if (isIVF) {
+        // Use IVF alerts service for IVF department
+        const response = await ivfAlertsService.getHospitalAlerts();
+        setCriticalAlerts(response.alerts || []);
+      } else {
+        // Use CGT alerts service for CGT department
+        // TODO: Get pharma_id from user context or modify API to use current user context
+        // For now, using a default pharma_id - this should be replaced with actual user's pharma_id
+        const pharmaId = '1'; // Default pharma_id - needs to be replaced with actual user's pharma_id
+        const response = await criticalAlertsService.getCriticalAlerts(pharmaId);
+        setCriticalAlerts(response.alerts || []);
+      }
     } catch (error) {
       setCriticalAlerts([]);
     } finally {
@@ -167,10 +246,10 @@ export default function Dashboard({ }: DashboardProps) {
     }
   };
 
-  // Fetch critical alerts on component mount
+  // Fetch critical alerts on component mount and when department changes
   useEffect(() => {
     fetchCriticalAlerts();
-  }, []);
+  }, [userDepartment]);
 
   // Fetch my tasks from API
   const fetchMyTasks = async () => {
@@ -195,6 +274,24 @@ export default function Dashboard({ }: DashboardProps) {
     fetchMyTasks();
   }, []);
 
+  // Fetch unread count on component mount (for badge display)
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch unread messages to get the count (without opening modal)
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await chatService.getUnreadMessages();
+          if (response && typeof response.total_unread === 'number') {
+            setApiUnreadCount(response.total_unread);
+          }
+        } catch {
+          // Silently handle errors - unread count is not critical
+        }
+      };
+      fetchUnreadCount();
+    }
+  }, [isAuthenticated]);
+
   // Fetch stakeholder chats when modal opens (for display)
   // WebSocket handles real-time updates automatically
   useEffect(() => {
@@ -202,6 +299,22 @@ export default function Dashboard({ }: DashboardProps) {
       fetchStakeholderChats();
     }
   }, [showStakeholderChats, isAuthenticated]);
+
+  // Update API count when WebSocket count changes (as a fallback/sync)
+  useEffect(() => {
+    if (wsUnreadCount !== null && wsUnreadCount !== undefined) {
+      // WebSocket count is authoritative when available
+      // But we keep API count as fallback
+    }
+  }, [wsUnreadCount]);
+
+  // Debug: Log the final calculated count
+  useEffect(() => {
+  }, [stakeholderChatCount, wsUnreadCount, apiUnreadCount]);
+
+  // Debug: Log when chats state changes
+  useEffect(() => {
+  }, [stakeholderChats]);
 
   // Fetch user profile to compute initials and get department
   useEffect(() => {
@@ -228,11 +341,6 @@ export default function Dashboard({ }: DashboardProps) {
         }
         
         setUserDepartment(department);
-        
-        // Load IVF mock data if user is IVF
-        if (department === 'IVF') {
-          setIvfData(ivfDashboardMock);
-        }
       } catch {
         // Try to get department from localStorage even if API fails
         try {
@@ -240,9 +348,6 @@ export default function Dashboard({ }: DashboardProps) {
           if (storedDept) {
             const department = storedDept.toUpperCase();
             setUserDepartment(department);
-            if (department === 'IVF') {
-              setIvfData(ivfDashboardMock);
-            }
           }
         } catch {}
         setUserInitials('U');
@@ -252,6 +357,275 @@ export default function Dashboard({ }: DashboardProps) {
       fetchUserProfile();
     }
   }, [isAuthenticated]);
+
+  // Fetch IVF embryo tracking (ongoing treatments) from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchEmbryoTracking = async () => {
+      setLoadingIvfEmbryoTracking(true);
+      setIvfEmbryoTrackingError(null);
+      try {
+        const response = await ivfService.getEmbryoTracking();
+        if (!cancelled) setIvfEmbryoTracking(response?.data || []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfEmbryoTracking([]);
+          setIvfEmbryoTrackingError(e?.message || 'Failed to load embryo tracking data');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfEmbryoTracking(false);
+      }
+    };
+
+    fetchEmbryoTracking();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF totals (Total Embryos/Cryolocks) from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotals = async () => {
+      setLoadingIvfTotals(true);
+      setIvfTotalsError(null);
+      try {
+        const response = await ivfService.getTotalEmbryosCryolocks();
+        if (!cancelled) {
+          setIvfTotalEmbryos(response?.total_embryos ?? 0);
+          setIvfTotalCryolocks(response?.total_cryolocks ?? 0);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalEmbryos(null);
+          setIvfTotalCryolocks(null);
+          setIvfTotalsError(e?.message || 'Failed to load totals');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTotals(false);
+      }
+    };
+
+    fetchTotals();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF total containers from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotalContainers = async () => {
+      setLoadingIvfContainers(true);
+      setIvfContainersError(null);
+      try {
+        const response = await ivfService.getTotalContainers();
+        if (!cancelled) setIvfTotalContainers(response?.total_containers ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalContainers(null);
+          setIvfContainersError(e?.message || 'Failed to load total containers');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfContainers(false);
+      }
+    };
+
+    fetchTotalContainers();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF quality deviations flagged from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchQualityDeviations = async () => {
+      setLoadingIvfQualityDeviations(true);
+      setIvfQualityDeviationsError(null);
+      try {
+        const response = await ivfService.getQualityDeviationsFlagged();
+        if (!cancelled) setIvfQualityDeviations(response?.total_quality_deviations ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfQualityDeviations(null);
+          setIvfQualityDeviationsError(e?.message || 'Failed to load quality deviations');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfQualityDeviations(false);
+      }
+    };
+
+    fetchQualityDeviations();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF top deviation driver from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTopDeviationDriver = async () => {
+      setLoadingIvfTopDeviationDriver(true);
+      setIvfTopDeviationDriverError(null);
+      try {
+        const response = await ivfService.getTopDeviationDriver();
+        if (!cancelled) setIvfTopDeviationDriverName(response?.driver_name ?? 'N/A');
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTopDeviationDriverName(null);
+          setIvfTopDeviationDriverError(e?.message || 'Failed to load top deviation driver');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTopDeviationDriver(false);
+      }
+    };
+
+    fetchTopDeviationDriver();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF outbound shipments from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchOutboundShipments = async () => {
+      setLoadingIvfOutboundShipments(true);
+      setIvfOutboundShipmentsError(null);
+      try {
+        const response = await ivfService.getOutboundShipments();
+        if (!cancelled) setIvfOutboundShipments(response?.total_outbound_shipments ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfOutboundShipments(null);
+          setIvfOutboundShipmentsError(e?.message || 'Failed to load outbound shipments');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfOutboundShipments(false);
+      }
+    };
+
+    fetchOutboundShipments();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+
+  // Fetch IVF total deviations from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchTotalDeviations = async () => {
+      setLoadingIvfTotalDeviations(true);
+      setIvfTotalDeviationsError(null);
+      try {
+        const response = await ivfService.getTotalDeviations();
+        if (!cancelled) setIvfTotalDeviations(response?.total_deviations ?? 0);
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfTotalDeviations(null);
+          setIvfTotalDeviationsError(e?.message || 'Failed to load total deviations');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfTotalDeviations(false);
+      }
+    };
+
+    fetchTotalDeviations();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated]);
+
+  // Fetch IVF quality deviation chart from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchQualityDeviationChart = async () => {
+      setLoadingIvfQualityDeviationChart(true);
+      setIvfQualityDeviationChartError(null);
+      try {
+        const response = await ivfService.getDeviationsGraph();
+        if (!cancelled && response?.data) {
+          // Transform API response to chart format
+          // Use container_name if role is 'user', otherwise use site_name
+          const containers = response.data.map((item) => 
+            userRole === 'user' ? (item.container_name || '') : (item.site_name || '')
+          );
+          
+          // Extract data for each metric
+          const temperatureData = response.data.map((item) => item.temperature);
+          const humidityData = response.data.map((item) => item.humidity);
+          const agitationVibrationData = response.data.map((item) => item.agitation_vibration);
+          const topRiskDriverData = response.data.map((item) => item.top_risk_driver);
+
+          const metrics = [
+            {
+              name: 'Temperature',
+              color: '#C7A0E8',
+              data: temperatureData,
+            },
+            {
+              name: 'Humidity',
+              color: '#C9CBCD',
+              data: humidityData,
+            },
+            {
+              name: 'Agitation / Vibration',
+              color: '#F5A9E1',
+              data: agitationVibrationData,
+            },
+            {
+              name: 'Top risk driver',
+              color: '#85A2DF',
+              data: topRiskDriverData,
+            },
+          ];
+
+          setIvfQualityDeviationChart({
+            containers,
+            metrics,
+          });
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIvfQualityDeviationChart(null);
+          setIvfQualityDeviationChartError(e?.message || 'Failed to load quality deviation chart');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfQualityDeviationChart(false);
+      }
+    };
+
+    fetchQualityDeviationChart();
+    return () => {
+      cancelled = true;
+    };
+  }, [userDepartment, isAuthenticated, userRole]);
 
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
@@ -286,15 +660,39 @@ export default function Dashboard({ }: DashboardProps) {
     }
   });
 
-  const transformedAlerts = criticalAlerts.map(alert => ({
-    id: alert.id,
-    type: alert.type,
-    severity: alert.severity,
-    patientId: alert.patient_id,
-    message: alert.message,
-    timestamp: alert.timestamp,
-    status: alert.status
-  }));
+  const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+  
+  const transformedAlerts = criticalAlerts.map(alert => {
+    // Check if it's an IVF alert (has alert_id) or CGT alert (has id)
+    if ('alert_id' in alert) {
+      // IVF alert
+      const ivfAlert = alert as IVFAlert;
+      const severity: 'Low' | 'Medium' | 'High' | 'Critical' = 
+        ivfAlert.severity === 'High' ? 'High' : 
+        ivfAlert.severity === 'Medium' ? 'Medium' : 'Low';
+      return {
+        id: ivfAlert.alert_id,
+        type: ivfAlert.alert_type,
+        severity,
+        patientId: ivfAlert.canister_number || `Canister ${ivfAlert.canister_id}`,
+        message: ivfAlert.message,
+        timestamp: new Date(ivfAlert.occurred_at).toLocaleString(),
+        status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
+      };
+    } else {
+      // CGT alert
+      const cgtAlert = alert as ServiceCriticalAlert;
+      return {
+        id: cgtAlert.id,
+        type: cgtAlert.type,
+        severity: cgtAlert.severity,
+        patientId: cgtAlert.patient_id,
+        message: cgtAlert.message,
+        timestamp: cgtAlert.timestamp,
+        status: cgtAlert.status
+      };
+    }
+  });
 
   const handleLogout = () => {
     logout();
@@ -314,6 +712,7 @@ export default function Dashboard({ }: DashboardProps) {
   const [, setError] = useState<string | null>(null);
 
   // Fetch patient statistics and logistics metrics on component mount
+  // Only fetch CGT APIs if user is NOT IVF (i.e., is CGT)
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -347,10 +746,23 @@ export default function Dashboard({ }: DashboardProps) {
       }
     };
 
-    if (isAuthenticated) {
+    // Only fetch CGT APIs if user is authenticated AND is NOT IVF (i.e., is CGT)
+    const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+    if (isAuthenticated && !isIVF) {
       fetchDashboardData();
+    } else {
+      // If IVF user, set loading to false and clear CGT data
+      setLoading(false);
+      setPatientStats(null);
+      setLogisticsMetrics(null);
+      setRiskMetrics(null);
+      setComplianceMetrics(null);
+      setQualityDeviations(null);
+      setOnTimePercentage(null);
+      setAvgLeadTime(null);
+      setSuccessRate(null);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userDepartment]);
 
   // Icon mapping function
   const getIcon = (iconName: string) => {
@@ -444,7 +856,7 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {userDepartment === 'IVF' && ivfData ? (
+          {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
               <div className="flex gap-6 flex-1 flex-col lg:flex-row">
@@ -463,10 +875,14 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Embryos/Cryolocks
+                            Total Embryos
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.monthlySummary?.volume?.totalEmbryosCryolocks || '0'}
+                            {loadingIvfTotals
+                              ? '--/--'
+                              : ivfTotalsError
+                                ? '0/0'
+                                : `${ivfTotalEmbryos ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -481,7 +897,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Total number of Containers
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.monthlySummary?.volume?.totalContainers || '0'}
+                            {loadingIvfContainers
+                              ? '--'
+                              : ivfContainersError
+                                ? '0'
+                                : `${ivfTotalContainers ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -502,7 +922,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.qualityDeviationsFlagged || '0'}
+                            {loadingIvfQualityDeviations
+                              ? '--'
+                              : ivfQualityDeviationsError
+                                ? '0'
+                                : `${ivfQualityDeviations ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -517,7 +941,11 @@ export default function Dashboard({ }: DashboardProps) {
                             Top Deviation Driver
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.topDeviationDriver?.count || '0'}
+                            {loadingIvfTopDeviationDriver
+                              ? '--'
+                              : ivfTopDeviationDriverError
+                                ? 'N/A'
+                                : ivfTopDeviationDriverName ?? 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -528,7 +956,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <section>
                     <h2 className="font-semibold text-black text-base mb-4">Outbound Shipments</h2>
                     <div className="grid grid-cols-2 gap-6">
-                      {/* Outbound Shipments */}
+                      {/* Outbond Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
@@ -538,22 +966,30 @@ export default function Dashboard({ }: DashboardProps) {
                             Outbound Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.outboundShipments || '0'}
+                            {loadingIvfOutboundShipments
+                              ? '--'
+                              : ivfOutboundShipmentsError
+                                ? '0'
+                                : `${ivfOutboundShipments ?? 0}`}
                           </div>
                         </div>
                       </div>
 
-                      {/* Avg Quality Lost/Patient */}
+                      {/* Deviations */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Avg Quality Lost Patient" src={AvgQualityLostPatientIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Avg Quality Lost/Patient:
+                          Deviations
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {ivfData.performance?.avgQualityLostPerPatient || '0'}
+                            {loadingIvfTotalDeviations
+                              ? '--'
+                              : ivfTotalDeviationsError
+                                ? '0'
+                                : `${ivfTotalDeviations ?? 0}`}
                           </div>
                         </div>
                       </div>
@@ -597,8 +1033,10 @@ export default function Dashboard({ }: DashboardProps) {
                           }}
                         />
                         {stakeholderChatCount > 0 && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                            <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
+                            stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
+                          }`}>
+                            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
                           </div>
                         )}
                       </div>
@@ -630,9 +1068,8 @@ export default function Dashboard({ }: DashboardProps) {
                       <div 
                         className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
-                          // Navigate to IVF Track Shipment page
-                          // For now, navigate without patientId - the page will handle it
-                          navigate('/ivf-track-shipment');
+                          setShowTrackCanister(true);
+                          setCanisterError(undefined);
                         }}
                       >
                         {/* Background Graphic - Subtle Icon */}
@@ -668,7 +1105,8 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/ivf-track-shipment');
+                                setShowTrackCanister(true);
+                                setCanisterError(undefined);
                               }}
                             >
                               <img
@@ -682,7 +1120,12 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Outbound Quality Tracking */}
-                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden">
+                      <div 
+                        className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        onClick={() => {
+                          setShowOutboundQualityTracking(true);
+                        }}
+                      >
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
                           <img
@@ -714,6 +1157,7 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setShowOutboundQualityTracking(true);
                               }}
                             >
                               <img
@@ -775,12 +1219,20 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Quality Deviation Chart - Below Quality Tracking */}
                   <section className="flex-1 h-[347px]">
-                    {ivfData.qualityDeviation && (
+                    {loadingIvfQualityDeviationChart ? (
+                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                        <p className="text-gray-500">Loading quality deviation data...</p>
+                      </div>
+                    ) : ivfQualityDeviationChartError ? (
+                      <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
+                        <p className="text-red-500">Error: {ivfQualityDeviationChartError}</p>
+                      </div>
+                    ) : ivfQualityDeviationChart ? (
                       <QualityDeviationChart
-                        timestamps={ivfData.qualityDeviation.timestamps}
-                        metrics={ivfData.qualityDeviation.metrics}
+                        containers={ivfQualityDeviationChart.containers}
+                        metrics={ivfQualityDeviationChart.metrics}
                       />
-                    )}
+                    ) : null}
                   </section>
                 </div>
               </div>
@@ -788,9 +1240,13 @@ export default function Dashboard({ }: DashboardProps) {
               {/* Ongoing Treatments Section */}
               <section>
                 <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
-                <h2 className="font-semibold text-black text-base mb-4">Ongoing Treatments</h2>
-                {ivfData.ongoingTreatments && (
-                  <IVFOngoingTreatments treatments={ivfData.ongoingTreatments} />
+                <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
+                {loadingIvfEmbryoTracking ? (
+                  <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
+                ) : ivfEmbryoTrackingError ? (
+                  <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
+                ) : (
+                  <IVFOngoingTreatments treatments={ivfEmbryoTracking} />
                 )}
                 </div>
               </section>
@@ -1015,9 +1471,11 @@ export default function Dashboard({ }: DashboardProps) {
                       }}
                     />
                     {stakeholderChatCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                      <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
+                        stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
+                      }`}>
                         <span className="font-semibold text-white text-[10px]">
-                          {stakeholderChatCount}
+                          {formatCount(stakeholderChatCount)}
                         </span>
                       </div>
                     )}
@@ -1259,6 +1717,15 @@ export default function Dashboard({ }: DashboardProps) {
         onClose={() => setShowCriticalAlerts(false)}
         alerts={transformedAlerts}
         loading={loadingAlerts}
+        onAcknowledge={isIVF ? async (alertId) => {
+          try {
+            await ivfAlertsService.acknowledgeAlert(alertId);
+            // Refresh alerts after acknowledgment
+            fetchCriticalAlerts();
+          } catch (error) {
+            throw error;
+          }
+        } : undefined}
       />
 
       {/* My Tasks Modal */}
@@ -1297,6 +1764,38 @@ export default function Dashboard({ }: DashboardProps) {
             const msg = (e?.message as string) || 'Failed to fetch patient';
             setTrackError(msg);
           }
+        }}
+      />
+
+      {/* Track Canister Modal */}
+      <TrackCanisterModal
+        isOpen={showTrackCanister}
+        onClose={() => {
+          setCanisterError(undefined);
+          setShowTrackCanister(false);
+        }}
+        error={canisterError}
+        onTrack={(canisterId) => {
+          setCanisterError(undefined);
+          setShowTrackCanister(false);
+          navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+        }}
+      />
+
+      {/* Outbound Quality Tracking Modal */}
+      <TrackCanisterModal
+        isOpen={showOutboundQualityTracking}
+        onClose={() => {
+          setOutboundQualityTrackingError(undefined);
+          setShowOutboundQualityTracking(false);
+        }}
+        error={outboundQualityTrackingError}
+        title="Outbound Quality Tracking"
+        icon={OutboundModelIcon}
+        onTrack={(canisterId) => {
+          setOutboundQualityTrackingError(undefined);
+          setShowOutboundQualityTracking(false);
+          navigate(`/outbound-quality-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
     </div>
