@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, date
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, Date, UniqueConstraint
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, Date, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -44,9 +44,13 @@ class PatientCrylockInfo(Base):
     branch = relationship("HospitalBranch", foreign_keys=[branch_id])
     tank = relationship("Tank", foreign_keys=[tank_id], back_populates="patient_crylocks")
     
-    # Constraints
+    # Constraints and Indexes
     __table_args__ = (
         UniqueConstraint('his_number', 'crylock_number', name='uq_patient_crylock_his_crylock'),
+        # Index for filtering by embryo_transfer (common query pattern)
+        Index('idx_patient_crylock_embryo_transfer', 'embryo_transfer'),
+        # Composite index for common query: branch_id + embryo_transfer
+        Index('idx_patient_crylock_branch_embryo_transfer', 'branch_id', 'embryo_transfer'),
     )
     
     # Audit Trail

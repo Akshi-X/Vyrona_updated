@@ -250,8 +250,9 @@ class IVFService:
         Returns data in the format matching the table structure.
         
         Args:
-            branch_id: Optional branch ID to filter by. If provided, only returns embryos for that branch.
-                      If None, returns embryos for all branches (Admin role).
+            branch_id: Optional branch ID to filter by. 
+                      - User role: Filter by their assigned branch (branch_id provided)
+                      - Manager/Admin roles: No filtering (branch_id is None) - see all branches
             user_role: User's role ("User", "Manager", "Admin") to determine field visibility.
         
         Returns:
@@ -260,8 +261,8 @@ class IVFService:
                 - his_number: Patient HIS Number
                 - cryolock_number: Cryolock Number
                 - canister_number: Canister Number
-                - tank_id: Tank ID (formatted as "Tank {tank_id}" or tank_code)
-                - cane_id: Cane ID (formatted as cane_code or "Cane-{cane_id}")
+                - tank_code: Tank Code
+                - cane_code: Cane Code
                 - goblet_color: Goblet Color
                 - cryolock_color: Cryolock Color
                 - date_of_vitrification: Date of Vitrification
@@ -274,147 +275,88 @@ class IVFService:
             # Determine which fields to include based on role
             is_user_role = user_role and user_role.title() == "User"
             
-            # Query embryos with all related data
-            # Join: Embryo -> Patient, Cryolock -> Cane -> Canister -> Tank -> Branch
-            if is_user_role:
-                # User role: Aggregate embryo_grading by cryolock (one row per cryolock)
-                # Group ONLY by cryolock_id to ensure one row per cryolock
-                # Some cryolocks have embryos from multiple patients, so we use MIN/MAX for other fields
-                query = (
-                    self.db.query(
-                        func.min(IVFPatient.his_number).label('his_number'),
-                        Cryolock.cryolock_number,
-                        func.min(Canister.canister_number).label('canister_number'),
-                        func.min(Tank.tank_code).label('tank_code'),
-                        func.min(Cane.cane_code).label('cane_code'),
-                        func.min(Cryolock.goblet_color).label('goblet_color'),
-                        func.min(Cryolock.cryolock_color).label('cryolock_color'),
-                        Cryolock.date_of_vitrification,  # Date is now stored at cryolock level
-                        func.min(HospitalBranch.branch_name).label('branch_name'),
-                        Cryolock.cryolock_id,
-                        # Aggregate embryo_grading for grouping by cryolock
-                        func.string_agg(
-                            func.coalesce(Embryo.embryo_grading, ''), 
-                            ', '
-                        ).label('embryo_grading')
-                    )
-                    .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-                    .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
-                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                    .join(Canister, Cane.canister_id == Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(Embryo.is_active == True)
+            # Optimized query with LEFT JOIN for shipment descriptions to avoid N+1 query
+            # Use subquery to get latest shipment per patient crylock
+            latest_shipments_subq = (
+                self.db.query(
+                    IVFShipment.patient_crylock_info_id,
+                    func.max(IVFShipment.id).label('latest_shipment_id')
                 )
-                
-                # Apply branch filter if provided (User role)
-                if branch_id is not None:
-                    query = query.filter(HospitalBranch.branch_id == branch_id)
-                
-                # Group ONLY by cryolock_id to get exactly ONE row per cryolock
-                # This ensures the total count matches the number of cryolocks (containers)
-                query = query.group_by(
-                    Cryolock.cryolock_id,
-                    Cryolock.cryolock_number,  # cryolock_number is unique, so safe to include
-                    Cryolock.date_of_vitrification  # Include in group_by since we're selecting it directly
-                ).order_by(func.min(IVFPatient.his_number), Cryolock.cryolock_number)
-            else:
-                # Manager/Admin roles: Show individual embryos with status (no aggregation)
-                query = (
-                    self.db.query(
-                        IVFPatient.his_number,
-                        Cryolock.cryolock_number,
-                        Canister.canister_number,
-                        Tank.tank_code,
-                        Cane.cane_code,
-                        Cryolock.goblet_color,
-                        Cryolock.cryolock_color,
-                        Cryolock.date_of_vitrification,  # Date is now stored at cryolock level
-                        Embryo.status,
-                        HospitalBranch.branch_name,
-                        Cryolock.cryolock_id,
-                        Embryo.embryo_grading  # Individual grading, not aggregated
-                    )
-                    .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-                    .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
-                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                    .join(Canister, Cane.canister_id == Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(Embryo.is_active == True)
+                .filter(IVFShipment.description.isnot(None))
+                .group_by(IVFShipment.patient_crylock_info_id)
+                .subquery()
+            )
+            
+            # Query PatientCrylockInfo with all related data and shipment descriptions in one query
+            # Join: PatientCrylockInfo -> Tank -> Branch -> (LEFT JOIN) Latest Shipment
+            query = (
+                self.db.query(
+                    PatientCrylockInfo.his_number,
+                    PatientCrylockInfo.crylock_number,
+                    PatientCrylockInfo.canister_number,
+                    PatientCrylockInfo.tank_code,
+                    PatientCrylockInfo.cane_code,
+                    PatientCrylockInfo.goblet_color,
+                    PatientCrylockInfo.crylock_color,
+                    PatientCrylockInfo.date_of_vitrification,
+                    PatientCrylockInfo.id,
+                    HospitalBranch.branch_name,
+                    IVFShipment.description.label('shipment_description')
                 )
-                
-                # Apply branch filter if provided (Manager role)
-                if branch_id is not None:
-                    query = query.filter(HospitalBranch.branch_id == branch_id)
-                
-                # No grouping - show individual embryos
-                query = query.order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+                .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .outerjoin(
+                    latest_shipments_subq,
+                    PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id
+                )
+                .outerjoin(
+                    IVFShipment,
+                    and_(
+                        IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                        IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id
+                    )
+                )
+            )
+            
+            # Apply branch filter only for User role (Manager and Admin see all branches)
+            # branch_id is None for Manager/Admin roles, so they see all branches
+            if branch_id is not None:
+                query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+            
+            # Exclude cryolocks that have been moved to embryo transfer
+            query = query.filter(PatientCrylockInfo.embryo_transfer != True)
+            
+            # Order by HIS number and cryolock number
+            query = query.order_by(PatientCrylockInfo.his_number, PatientCrylockInfo.crylock_number)
             
             results = query.all()
-            
-            # Get cryolock IDs to fetch shipment descriptions
-            cryolock_ids = [row.cryolock_id for row in results]
-            
-            # Fetch descriptions from ivf_shipment table for cryolocks
-            # Get the most recent shipment description for each cryolock
-            shipment_descriptions = {}
-            if cryolock_ids:
-                # Use a subquery to get the latest shipment per cryolock
-                latest_shipments = (
-                    self.db.query(
-                        IVFShipment.cryolock_id,
-                        func.max(IVFShipment.id).label('latest_shipment_id')
-                    )
-                    .filter(
-                        IVFShipment.cryolock_id.in_(cryolock_ids),
-                        IVFShipment.description.isnot(None)
-                    )
-                    .group_by(IVFShipment.cryolock_id)
-                    .subquery()
-                )
-                
-                shipment_descriptions_query = (
-                    self.db.query(
-                        IVFShipment.cryolock_id,
-                        IVFShipment.description
-                    )
-                    .join(
-                        latest_shipments,
-                        IVFShipment.id == latest_shipments.c.latest_shipment_id
-                    )
-                )
-                
-                for shipment_row in shipment_descriptions_query.all():
-                    shipment_descriptions[shipment_row.cryolock_id] = shipment_row.description
             
             tracking_list = []
             
             for row in results:
-                # Get description for this cryolock if it exists
-                description = shipment_descriptions.get(row.cryolock_id)
+                # Get description from the joined query result
+                description = row.shipment_description if hasattr(row, 'shipment_description') else None
                 
                 tracking_data = {
                     "his_number": row.his_number or "",
-                    "cryolock_number": row.cryolock_number or "",
+                    "cryolock_number": row.crylock_number or "",
                     "canister_number": str(row.canister_number) if row.canister_number else None,
                     "tank_code": row.tank_code or "",
                     "cane_code": row.cane_code or "",
                     "goblet_color": row.goblet_color or "",
-                    "cryolock_color": row.cryolock_color or "",
+                    "cryolock_color": row.crylock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,
                     "description": description
                 }
                 
                 # Role-based field visibility
                 if is_user_role:
-                    # User role: Include embryo_grading (aggregated), exclude site_name and status
-                    tracking_data["embryo_grading"] = row.embryo_grading or ""
+                    # User role: Include embryo_grading (not available in current model, return empty)
+                    tracking_data["embryo_grading"] = ""
                 else:
-                    # Manager/Admin roles: Include site_name and status, exclude embryo_grading
+                    # Manager/Admin roles: Include site_name and status (status not available in current model)
                     tracking_data["site_name"] = row.branch_name or ""
-                    # Status is selected in the query for Manager/Admin roles
-                    tracking_data["status"] = getattr(row, 'status', None) or ""
+                    tracking_data["status"] = ""  # Status field not available in PatientCrylockInfo model
                 
                 # Append the tracking data to the list
                 tracking_list.append(tracking_data)

@@ -134,7 +134,7 @@ def get_embryo_tracking(
     
     Role-based access and field visibility:
     - User: Only see data from their assigned branch. Includes embryo_grading, excludes site_name and status.
-    - Manager: Only see data from their assigned branch. Includes site_name and status, excludes embryo_grading.
+    - Manager: See data from all branches. Includes site_name and status, excludes embryo_grading.
     - Admin: See data from all branches. Includes site_name and status, excludes embryo_grading.
     
     This endpoint returns embryo tracking information in a table format showing:
