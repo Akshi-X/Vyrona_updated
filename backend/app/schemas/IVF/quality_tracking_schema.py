@@ -11,7 +11,7 @@ from app.constants.enums import TaskStatus
 
 class RefillLogBase(BaseModel):
     """Base schema for refill log"""
-    canister_id: int = Field(..., description="Canister ID identifier")
+    tank_id: int = Field(..., description="Tank ID identifier")
     refill_date: date = Field(..., description="Date when refill was performed")
     refill_time: time = Field(..., description="Time when refill was performed")
     refilled_by: str = Field(..., description="Name of person who performed the refill")
