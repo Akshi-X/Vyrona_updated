@@ -16,7 +16,7 @@ class CreateTaskRequest(BaseModel):
     description: Optional[str] = None
     assignee_id: str
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     due_date: Optional[datetime] = None
     priority: TaskPriority
     status: Optional[TaskStatus] = TaskStatus.NOT_STARTED
@@ -46,7 +46,7 @@ class UpdateTaskRequest(BaseModel):
     description: Optional[str] = None
     assignee_id: Optional[str] = None
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     due_date: Optional[datetime] = None
     priority: Optional[TaskPriority] = None
     status: Optional[TaskStatus] = None
@@ -72,20 +72,20 @@ class UpdateTaskRequest(BaseModel):
         return v.strip() if v else None
     
     @model_validator(mode='after')
-    def validate_patient_or_canister(self):
-        """Validate that patient_id and canister_number are not both provided"""
+    def validate_patient_or_tank(self):
+        """Validate that patient_id and tank_code are not both provided"""
         # Treat empty strings as None
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
-        canister_number = self.canister_number.strip() if self.canister_number and isinstance(self.canister_number, str) else self.canister_number
+        tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
         
         # If both are provided, raise error
-        if patient_id and canister_number:
-            raise ValueError("Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        if patient_id and tank_code:
+            raise ValueError("Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
         
         # Update the model with cleaned values
-        if patient_id is not None or canister_number is not None:
+        if patient_id is not None or tank_code is not None:
             self.patient_id = patient_id if patient_id else None
-            self.canister_number = canister_number if canister_number else None
+            self.tank_code = tank_code if tank_code else None
         return self
 
 
@@ -136,7 +136,7 @@ class TaskResponse(BaseModel):
     assignee: TaskAssigneeInfo
     created_by: TaskCreatorInfo
     patient_id: Optional[str]  # For CGT flow
-    canister_number: Optional[str]  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str]  # For IVF flow (e.g., "T1")
     due_date: Optional[datetime]
     priority: TaskPriority
     status: TaskStatus
@@ -180,10 +180,10 @@ class TaskListResponse(BaseModel):
 
 
 class PatientTaskListResponse(BaseModel):
-    """Response schema for tasks associated with a patient or canister"""
+    """Response schema for tasks associated with a patient or tank"""
     message: str
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     total: int
     page: int
     page_size: int

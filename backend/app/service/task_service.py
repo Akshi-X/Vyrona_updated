@@ -23,7 +23,6 @@ from app.exceptions import (
 from app.models.patient_model import Patient
 from app.models.task_model import Tasks
 from app.models.user_model import User
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
 from app.schemas.task_schema import (
     CreateTaskRequest,
@@ -44,24 +43,24 @@ from app.utils.utils import get_user_by_id, normalize_role_to_title_case
 from app.utils.user_helpers import is_hospital_department
 
 
-def _resolve_canister_number_to_id(canister_number: str, db: Session) -> int:
+def _resolve_tank_code_to_id(tank_code: str, db: Session) -> int:
     """
-    Resolve canister_number (string) to canister_id (int) for internal database operations.
+    Resolve tank_code (string) to tank_id (int) for internal database operations.
     
     Args:
-        canister_number: Canister number/code (e.g., "C1")
+        tank_code: Tank code (e.g., "T1")
         db: Database session
         
     Returns:
-        canister_id (int)
+        tank_id (int)
         
     Raises:
-        TaskInvalidPatientException: If canister not found
+        TaskInvalidPatientException: If tank not found
     """
-    canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
-    if not canister:
-        raise TaskInvalidPatientException(patient_id=f"Canister with number '{canister_number}' not found")
-    return canister.canister_id
+    tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+    if not tank:
+        raise TaskInvalidPatientException(patient_id=f"Tank with code '{tank_code}' not found")
+    return tank.tank_id
 
 
 def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskResponse:
@@ -104,12 +103,12 @@ def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskRe
         can_edit_status_only=can_edit_status_only
     )
     
-    # Get canister_number if canister_id exists
-    canister_number = None
-    if task.canister_id:
-        canister = db.query(Canister).filter(Canister.canister_id == task.canister_id).first()
-        if canister:
-            canister_number = canister.canister_number
+    # Get tank_code if tank_id exists (backward compatibility: map to canister_number)
+    tank_code = None
+    if task.tank_id:
+        tank = db.query(Tank).filter(Tank.tank_id == task.tank_id).first()
+        if tank:
+            tank_code = tank.tank_code
     
     return TaskResponse(
         id=task.id,
@@ -118,7 +117,7 @@ def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskRe
         assignee=assignee_info,
         created_by=creator_info,
         patient_id=task.patient_id,
-        canister_number=canister_number,
+        tank_code=tank_code,
         due_date=task.due_date,
         priority=task.priority,
         status=task.status,
@@ -205,10 +204,10 @@ def create_task(
             if not patient:
                 raise TaskInvalidPatientException(patient_id=request.patient_id)
         
-        # Resolve canister_number to canister_id if provided (for IVF flow)
-        canister_id = None
-        if request.canister_number:
-            canister_id = _resolve_canister_number_to_id(request.canister_number, db)
+        # Resolve tank_code to tank_id if provided (for IVF flow)
+        tank_id = None
+        if request.tank_code:
+            tank_id = _resolve_tank_code_to_id(request.tank_code, db)
         
         # Create task
         task = Tasks(
@@ -218,7 +217,7 @@ def create_task(
             created_by_id=current_user.user_id,
             updated_by_id=current_user.user_id,
             patient_id=request.patient_id,
-            canister_id=canister_id,
+            tank_id=tank_id,
             due_date=request.due_date,
             priority=request.priority,
             status=request.status or TaskStatus.NOT_STARTED,
@@ -376,7 +375,7 @@ def get_tasks_by_patient(
 
 
 def get_tasks_by_canister(
-    canister_number: str,
+    tank_code: str,
     current_user: User,
     db: Session,
     *,
@@ -386,20 +385,20 @@ def get_tasks_by_canister(
     page_size: int = DEFAULT_PAGE_SIZE
 ) -> PatientTaskListResponse:
     """
-    Retrieve tasks associated with a specific canister with pagination/filtering (IVF flow).
+    Retrieve tasks associated with a specific tank with pagination/filtering (IVF flow).
 
-    Managers and pharma admins in the same pharma can see all canister tasks.
+    Managers and pharma admins in the same pharma can see all tank tasks.
     Other roles are limited to tasks they created or are assigned to.
     """
     try:
-        if not canister_number:
-            raise TaskInvalidPatientException(patient_id=f"Invalid canister_number: {canister_number}")
+        if not tank_code:
+            raise TaskInvalidPatientException(patient_id=f"Invalid tank_code: {tank_code}")
 
-        # Resolve canister_number to canister_id
-        canister_id = _resolve_canister_number_to_id(canister_number, db)
-        canister = db.query(Canister).filter(Canister.canister_id == canister_id).first()
-        if not canister:
-            raise TaskInvalidPatientException(patient_id=f"Canister {canister_number} not found")
+        # Resolve tank_code to tank_id
+        tank_id = _resolve_tank_code_to_id(tank_code, db)
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise TaskInvalidPatientException(patient_id=f"Tank {tank_code} not found")
 
         sanitized_page = max(page, 1)
         sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
@@ -410,7 +409,7 @@ def get_tasks_by_canister(
                 selectinload(Tasks.assignee),
                 selectinload(Tasks.created_by)
             )
-            .filter(Tasks.canister_id == canister_id)
+            .filter(Tasks.tank_id == tank_id)
         )
 
         privileged_roles = {"manager", "pharma_admin", "admin", "mygrape_admin"}
@@ -441,7 +440,7 @@ def get_tasks_by_canister(
         return PatientTaskListResponse(
             message=SuccessMessages.TASKS_RETRIEVED,
             patient_id=None,
-            canister_number=canister_number,
+            tank_code=tank_code,
             total=total,
             page=sanitized_page,
             page_size=sanitized_page_size,
@@ -559,8 +558,8 @@ def update_task(
             task.assignee_id = request.assignee_id
         
         # Validate that only one is provided (not both) - schema validation should catch this, but double-check
-        if request.patient_id and request.canister_number:
-            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        if request.patient_id and request.tank_code:
+            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
         
         # Validate new patient (if provided for CGT flow)
         if request.patient_id:
@@ -568,13 +567,13 @@ def update_task(
             if not patient:
                 raise TaskInvalidPatientException(patient_id=request.patient_id)
             task.patient_id = request.patient_id
-            task.canister_id = None  # Clear canister_id when setting patient_id
+            task.tank_id = None  # Clear tank_id when setting patient_id
         
-        # Resolve canister_number to canister_id if provided (for IVF flow)
-        if request.canister_number:
-            canister_id = _resolve_canister_number_to_id(request.canister_number, db)
-            task.canister_id = canister_id
-            task.patient_id = None  # Clear patient_id when setting canister_id
+        # Resolve tank_code to tank_id if provided (for IVF flow)
+        if request.tank_code:
+            tank_id = _resolve_tank_code_to_id(request.tank_code, db)
+            task.tank_id = tank_id
+            task.patient_id = None  # Clear patient_id when setting tank_id
         
         # Update fields (only if provided)
         if request.task_name is not None:

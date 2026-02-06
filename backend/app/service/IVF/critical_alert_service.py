@@ -166,15 +166,15 @@ class CriticalAlertService:
         
         return None
     
-    def _check_refill_log(self, canister_id: int) -> Optional[Dict[str, Any]]:
+    def _check_refill_log(self, tank_id: int) -> Optional[Dict[str, Any]]:
         """
         Check if refill log is missing (not created within last 3 days).
         Returns dict with alert info if refill log missing, None otherwise.
         """
-        # Get the most recent refill log for this canister
+        # Get the most recent refill log for this tank
         latest_refill = (
             self.db.query(CanisterLn2Log)
-            .filter(CanisterLn2Log.canister_id == canister_id)
+            .filter(CanisterLn2Log.tank_id == tank_id)
             .order_by(desc(CanisterLn2Log.refill_date), desc(CanisterLn2Log.created_at))
             .first()
         )
@@ -470,7 +470,7 @@ class CriticalAlertService:
                 Canister.is_active == True
             ).all()
             for canister in canisters:
-                refill_alert = self._check_refill_log(canister.canister_id)
+                refill_alert = self._check_refill_log(tank.tank_id)
                 if refill_alert:
                     dedup_key = self._generate_dedup_key(
                         tank.tank_id, 

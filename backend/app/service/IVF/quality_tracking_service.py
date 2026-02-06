@@ -304,11 +304,11 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> RefillLogResponse:
         """
-        Create a new Liquid Nitrogen (LN2) refill log entry for a canister in a tank.
+        Create a new Liquid Nitrogen (LN2) refill log entry for a tank.
         
         Args:
             tank_id: Tank ID
-            canister_number: Optional canister number. If not provided, uses first canister in tank.
+            canister_number: Optional canister number (kept for backward compatibility, not used)
             refill_log_data: Refill log data to create
             created_by: Username of the user creating the log
             branch_id: Optional branch ID for filtering
@@ -316,9 +316,8 @@ class QualityTrackingService:
         Returns:
             RefillLogResponse with created log details
         """
-        canister_id = self._get_canister_id_from_tank(tank_id, canister_number, branch_id)
         return self.create_refill_log(
-            canister_id=canister_id,
+            tank_id=tank_id,
             refill_log_data=refill_log_data,
             created_by=created_by,
             branch_id=branch_id
@@ -326,7 +325,7 @@ class QualityTrackingService:
     
     def create_refill_log(
         self,
-        canister_id: int,
+        tank_id: int,
         refill_log_data: RefillLogCreate,
         created_by: Optional[str] = None,
         branch_id: Optional[int] = None
@@ -335,7 +334,7 @@ class QualityTrackingService:
         Create a new refill log entry
         
         Args:
-            canister_id: Canister ID from URL path
+            tank_id: Tank ID from URL path
             refill_log_data: Refill log data to create
             created_by: Username of the user creating the log
             
@@ -346,9 +345,9 @@ class QualityTrackingService:
             AppException: If creation fails
         """
         try:
-            # Calculate counts based on latest log for this canister
+            # Calculate counts based on latest log for this tank
             last_log = self.db.query(CanisterLn2Log).filter(
-                CanisterLn2Log.canister_id == canister_id
+                CanisterLn2Log.tank_id == tank_id
             ).order_by(
                 desc(CanisterLn2Log.created_at)
             ).first()
@@ -358,7 +357,7 @@ class QualityTrackingService:
 
             # Create new refill log using CanisterLn2Log model
             refill_log = CanisterLn2Log(
-                canister_id=canister_id,
+                tank_id=tank_id,
                 refill_date=refill_log_data.refill_date,
                 refill_time=refill_log_data.refill_time,
                 refilled_by=refill_log_data.refilled_by,
@@ -379,7 +378,7 @@ class QualityTrackingService:
             self.db.commit()
             self.db.refresh(refill_log)
             
-            logger.info(f"Created refill log with ID {refill_log.log_id} for canister {canister_id}")
+            logger.info(f"Created refill log with ID {refill_log.log_id} for tank {tank_id}")
             
             return RefillLogResponse.model_validate(refill_log)
             
@@ -394,16 +393,16 @@ class QualityTrackingService:
     
     def get_refill_logs(
         self,
-        canister_id: int,
+        tank_id: int,
         status: Optional[str] = None,
         limit: Optional[int] = None,
         branch_id: Optional[int] = None
     ) -> RefillLogListResponse:
         """
-        Get refill logs for a specific canister with optional filtering
+        Get refill logs for a specific tank with optional filtering
         
         Args:
-            canister_id: Canister ID to filter by (required)
+            tank_id: Tank ID to filter by (required)
             status: Optional status to filter by
             limit: Optional limit on number of results
             
@@ -413,8 +412,8 @@ class QualityTrackingService:
         try:
             query = self.db.query(CanisterLn2Log)
             
-            # Filter by canister_id
-            query = query.filter(CanisterLn2Log.canister_id == canister_id)
+            # Filter by tank_id
+            query = query.filter(CanisterLn2Log.tank_id == tank_id)
 
             # Enforce branch filter when provided
             if branch_id is not None:
@@ -460,11 +459,11 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> RefillLogListResponse:
         """
-        Get refill logs for canisters in a specific tank.
+        Get refill logs for a specific tank.
         
         Args:
             tank_id: Tank ID
-            canister_number: Optional canister number to filter by. If not provided, returns logs for all canisters in tank.
+            canister_number: Optional canister number (kept for backward compatibility, not used)
             status: Optional status to filter by
             limit: Optional limit on number of results
             branch_id: Optional branch ID for filtering
@@ -473,27 +472,9 @@ class QualityTrackingService:
             List of refill logs matching the criteria
         """
         try:
-            # Get canister IDs in the tank
-            canister_query = (
-                self.db.query(Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .filter(Canister.tank_id == tank_id)
-            )
-            
-            if canister_number:
-                canister_query = canister_query.filter(Canister.canister_number == canister_number)
-            
-            if branch_id is not None:
-                canister_query = canister_query.filter(Tank.branch_id == branch_id)
-            
-            canister_ids = [c[0] for c in canister_query.all()]
-            
-            if not canister_ids:
-                return RefillLogListResponse(refill_logs=[], count=0)
-            
-            # Query refill logs for all canisters in tank
+            # Query refill logs directly by tank_id
             query = self.db.query(CanisterLn2Log).filter(
-                CanisterLn2Log.canister_id.in_(canister_ids)
+                CanisterLn2Log.tank_id == tank_id
             )
             
             if branch_id is not None:
@@ -531,7 +512,7 @@ class QualityTrackingService:
 
     def update_refill_log_status(
         self,
-        canister_id: int,
+        tank_id: int,
         log_id: int,
         status_update: RefillLogStatusUpdate,
         updated_by: Optional[str] = None,
@@ -543,7 +524,7 @@ class QualityTrackingService:
         try:
             query = self.db.query(CanisterLn2Log).filter(
                 CanisterLn2Log.log_id == log_id,
-                CanisterLn2Log.canister_id == canister_id
+                CanisterLn2Log.tank_id == tank_id
             )
 
             if branch_id is not None:
@@ -564,9 +545,9 @@ class QualityTrackingService:
             self.db.refresh(refill_log)
 
             logger.info(
-                "Updated refill log status | log_id=%s canister_id=%s status=%s",
+                "Updated refill log status | log_id=%s tank_id=%s status=%s",
                 log_id,
-                canister_id,
+                tank_id,
                 status_update.status
             )
 
@@ -592,29 +573,12 @@ class QualityTrackingService:
     ) -> RefillLogResponse:
         """
         Update only the status of a refill log. The log_id uniquely identifies the log.
-        Validates that the log belongs to a canister in the specified tank.
+        Validates that the log belongs to the specified tank.
         """
         try:
-            # Get canister IDs in the tank
-            canister_ids = [
-                c[0] for c in (
-                    self.db.query(Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .filter(Canister.tank_id == tank_id)
-                    .all()
-                )
-            ]
-            
-            if not canister_ids:
-                raise AppException(
-                    message=f"No canisters found in tank",
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-            
             query = self.db.query(CanisterLn2Log).filter(
                 CanisterLn2Log.log_id == log_id,
-                CanisterLn2Log.canister_id.in_(canister_ids)
+                CanisterLn2Log.tank_id == tank_id
             )
             
             if branch_id is not None:
@@ -1641,7 +1605,7 @@ class QualityTrackingService:
     
     def export_combined_refill_logs_and_deviations_excel(
         self,
-        canister_id: int,
+        tank_id: int,
         year: Optional[int] = None,
         month: Optional[int] = None,
         branch_id: Optional[int] = None,
@@ -1651,10 +1615,11 @@ class QualityTrackingService:
         Export combined refill logs and KPI threshold deviations to Excel format with two sheets.
         
         Args:
-            canister_id: Canister ID to export logs for
+            tank_id: Tank ID to export logs for
             year: Year for the report (e.g., 2024). If not provided, uses current year.
             month: Month for the report (1-12). If not provided, exports entire year.
             branch_id: Optional branch ID for filtering
+            tank_code: Optional tank code for display
             
         Returns:
             FastAPI Response with Excel file containing two sheets:
@@ -1662,7 +1627,7 @@ class QualityTrackingService:
             - Sheet 2: KPI Threshold Deviations
             
         Raises:
-            AppException: If export fails or canister not found
+            AppException: If export fails or tank not found
         """
         try:
             # Use current year if year not provided
@@ -1687,21 +1652,20 @@ class QualityTrackingService:
                         status_code=HTTPStatus.BAD_REQUEST
                     )
             
-            # Get canister information
-            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
-            if not canister:
+            # Get tank information
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
                 raise AppException(
-                    message=f"Canister with ID {canister_id} not found",
+                    message=f"Tank with ID {tank_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            canister_number = canister.canister_number or f"Canister-{canister_id}"
+            display_tank_code = tank_code or tank.tank_code or f"Tank-{tank_id}"
             
-            # Use tank_code if provided, otherwise use canister_number
-            # If tank_code is provided, it means we're exporting for a tank, so show tank code
-            display_id = tank_code if tank_code else canister_number
-            display_label = "Tank Code" if tank_code else "Container ID"
+            # Use tank_code for display
+            display_id = display_tank_code
+            display_label = "Tank Code"
             
             # Calculate date range based on whether month is provided
             if month is not None:
@@ -1735,7 +1699,7 @@ class QualityTrackingService:
             refill_logs_query = (
                 self.db.query(CanisterLn2Log)
                 .filter(
-                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.tank_id == tank_id,
                     CanisterLn2Log.refill_date >= start_date,
                     CanisterLn2Log.refill_date < end_date
                 )
@@ -1774,7 +1738,7 @@ class QualityTrackingService:
             current_year_total_query = (
                 self.db.query(CanisterLn2Log)
                 .filter(
-                    CanisterLn2Log.canister_id == canister_id,
+                    CanisterLn2Log.tank_id == tank_id,
                     CanisterLn2Log.refill_date >= current_year_start,
                     CanisterLn2Log.refill_date < current_year_end
                 )
@@ -1800,17 +1764,16 @@ class QualityTrackingService:
             deviations_query = (
                 self.db.query(
                     IVFQualityLog,
-                    Canister.canister_number,
+                    Tank.tank_code,
                     HospitalBranch.branch_name
                 )
-                .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .filter(
                     IVFQualityLog.reading_timestamp >= start_datetime,
                     IVFQualityLog.reading_timestamp < end_datetime,
-                    IVFQualityLog.canister_id == canister_id,
-                    Canister.is_active == True
+                    IVFQualityLog.tank_id == tank_id,
+                    Tank.is_active == True
                 )
             )
             
@@ -1984,8 +1947,8 @@ class QualityTrackingService:
             excel_content = output.read()
             output.close()
             
-            # Generate filename - use tank_code if available, otherwise canister_number
-            file_id = tank_code if tank_code else canister_number
+            # Generate filename - use tank_code
+            file_id = display_tank_code
             if month is not None:
                 filename = f"combined_report_{file_id}_{year}_{month:02d}.xlsx"
             else:
