@@ -231,14 +231,14 @@ def get_deviations_graph(
     Get deviations graph data for Quality deviation chart.
     
     Chart structure (Horizontal bar chart):
-    - Y-axis: Containers (User view) or Sites (Manager/Admin view)
+    - Y-axis: Tanks (User view) or Sites (Manager/Admin view)
     - X-axis: Deviation values (0-100)
-    - For each container/site: Two horizontal bars
-      1. Stacked bar: Temperature (purple), Humidity (grey), Agitation/Vibration (pink)
+    - For each tank/site: Two horizontal bars
+      1. Stacked bar: Internal Temperature, External Temperature, Humidity, Shock
       2. Solid bar: Top risk driver (blue) - maximum deviation value
     
     Role-based access:
-    - User (IVF): Container-wise deviations within the site
+    - User (IVF): Tank-wise deviations within the site (tank-level monitoring)
     - Manager/Admin (IVF): Cumulative deviations per site with top deviation type
     """
     try:
