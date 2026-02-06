@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
-from ...constants.enums import CanisterStatus
 
 
 class Canister(Base):
@@ -19,8 +18,6 @@ class Canister(Base):
     # Canister Information
     canister_number = Column(String(255), nullable=True, comment="Canister number/code (e.g., 'C1' from ARC IVF API)")
     is_active = Column(Boolean, default=True, nullable=False)
-    canister_status = Column(SQLEnum(CanisterStatus, values_callable=lambda obj: [e.value for e in obj], name='canister_status'), 
-                            default=CanisterStatus.SAFE, nullable=False)
     tive_device_id = Column(
         String(255),
         nullable=True,

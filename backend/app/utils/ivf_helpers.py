@@ -8,8 +8,8 @@ from ..models.user_model import User
 from ..utils.user_helpers import is_hospital_department
 
 
-# Roles that should be filtered by branch (User and Manager)
-ROLES_WITH_BRANCH_FILTER = ["User", "Manager"]
+# Roles that should be filtered by branch (only User)
+ROLES_WITH_BRANCH_FILTER = ["User"]
 
 
 def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[str]]:
@@ -20,8 +20,9 @@ def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[st
     to determine if data should be filtered by branch.
     
     Rules:
-    - User/Manager: Filter by their branch_id (return branch_id)
-    - Admin: No filtering (return None for branch_id)
+    - User: Filter by their branch_id (return branch_id)
+    - Manager: No filtering (return None for branch_id) - can see all branches
+    - Admin: No filtering (return None for branch_id) - can see all branches
     - Non-IVF users: No filtering (return None for branch_id)
     
     Args:
@@ -47,15 +48,15 @@ def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[st
     role = user.role.value if hasattr(user.role, 'value') else str(user.role)
     role_normalized = role  # Already in correct format from enum
     
-    # Admin role: no branch filtering (can see all branches)
-    if role_normalized == "Admin":
+    # Admin and Manager roles: no branch filtering (can see all branches)
+    if role_normalized in ["Admin", "Manager"]:
         return None, role_normalized
     
-    # User and Manager roles: filter by their branch
+    # User role: filter by their branch
     if role_normalized in ROLES_WITH_BRANCH_FILTER:
         branch_id = user.branch_id
         if branch_id is None:
-            # User/Manager without branch_id - shouldn't happen, but handle gracefully
+            # User without branch_id - shouldn't happen, but handle gracefully
             return None, role_normalized
         return branch_id, role_normalized
     

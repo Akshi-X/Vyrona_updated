@@ -8,6 +8,7 @@ from app.config.database import get_db
 from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
 from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
 from app.service.IVF.arc_ivf_service import ARCIVFService
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
@@ -78,20 +79,19 @@ def get_active_canisters(
     db: Session = Depends(get_db)
 ):
     """
-    Get active canisters grouped by branch with their status and last updated time.
+    Get active tanks grouped by branch for the current logged-in user's branch.
     
     Role-based access:
-    - User/Manager: Only see canisters from their assigned branch
-    - Admin: See canisters from all branches
+    - User (IVF): Only see tanks from their assigned branch
+    - Manager (IVF): See tanks from all branches
+    - Admin: See tanks from all branches
     
-    This endpoint returns all active canisters (is_active = True) grouped by branch with:
+    This endpoint returns all active tanks (is_active = True) grouped by branch with:
     - branch_id: The ID of the branch
     - branch_name: The name of the branch
-    - canisters: List of canisters for this branch with:
-        - canister_number: The canister number/code (e.g., 'C1')
-        - canister_status: Status (safe, risk, or critical)
-        - updated_at: Last updated date and time from the most recent canister log refill_date+refill_time (if available),
-                      otherwise from canisters table created_at
+    - tanks: List of tanks for this branch with:
+        - tank_code: The tank code (e.g., 'T1')
+        - updated_at: Last updated date and time from tanks table updated_at
     
     Response format:
     {
@@ -99,32 +99,19 @@ def get_active_canisters(
             {
                 "branch_id": 1,
                 "branch_name": "Egmore",
-                "canisters": [
+                "tanks": [
                     {
-                        "canister_number": "C1",
-                        "canister_status": "safe",
+                        "tank_code": "T1",
                         "updated_at": "2024-01-15T10:30:00Z"
                     },
                     {
-                        "canister_number": "C2",
-                        "canister_status": "risk",
+                        "tank_code": "T2",
                         "updated_at": "2024-01-15T09:15:00Z"
-                    }
-                ]
-            },
-            {
-                "branch_id": 2,
-                "branch_name": "Anna Nagar",
-                "canisters": [
-                    {
-                        "canister_number": "C1",
-                        "canister_status": "safe",
-                        "updated_at": "2024-01-15T11:00:00Z"
                     }
                 ]
             }
         ],
-        "total": 3
+        "total": 2
     }
     """
     try:
@@ -132,10 +119,10 @@ def get_active_canisters(
         branch_id, role = get_branch_filter_info(request)
         
         service = IVFService(db)
-        canisters_data = service.get_active_canisters(branch_id=branch_id)
-        return ActiveCanistersResponse(**canisters_data)
+        tanks_data = service.get_active_tanks(branch_id=branch_id)
+        return ActiveCanistersResponse(**tanks_data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting active canisters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
 
 
 @router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
@@ -214,72 +201,85 @@ def get_embryo_tracking(
         raise HTTPException(status_code=500, detail=f"Error getting embryo tracking data: {str(e)}")
 
 
-@router.get("/canisters/{canister_number}/check", response_model=CanisterCheckResponse)
-def check_canister_exists(
-    canister_number: str = Path(..., description="Canister number/code to check (e.g., 'C1')"),
+@router.get("/canisters/{tank_code}/check", response_model=CanisterCheckResponse)
+def check_tank_exists(
+    tank_code: str = Path(..., description="Tank code to check (e.g., 'T1')"),
     request: Request = None,
     db: Session = Depends(get_db)
 ):
     """
-    Check if a canister exists in the system by canister number.
+    Check if a tank exists in the system by tank code for the current logged-in user's branch.
     
-    This endpoint allows users to verify if a canister number exists before performing operations.
+    This endpoint allows users to verify if a tank code exists before performing operations.
+    Role-based access:
+    - User (IVF): Only see tanks from their assigned branch
+    - Manager (IVF): See tanks from all branches
+    - Admin: See tanks from all branches
     
     Path Parameters:
-    - canister_number: Canister number/code to check (e.g., 'C1')
+    - tank_code: Tank code to check (e.g., 'T1')
     
     Response:
-    - exists: Boolean indicating if the canister exists
-    - canister_number: The canister number that was checked
-    - canister_id: Canister ID if exists (null if not found)
-    - is_active: Whether the canister is active (null if not found)
-    - canister_status: Canister status (null if not found)
+    - exists: Boolean indicating if the tank exists
+    - canister_number: The tank code that was checked (kept as canister_number for backward compatibility)
+    - canister_id: Tank ID if exists (null if not found) - kept as canister_id for backward compatibility
+    - is_active: Whether the tank is active (null if not found)
+    - canister_status: Always null for tanks (kept for backward compatibility)
     - message: Descriptive message about the result
     
     Example Response (exists):
     {
         "exists": true,
-        "canister_number": "C1",
+        "canister_number": "T1",
         "canister_id": 1,
         "is_active": true,
-        "canister_status": "safe",
-        "message": "Canister C1 exists and is active"
+        "canister_status": null,
+        "message": "Tank T1 exists and is active"
     }
     
     Example Response (not exists):
     {
         "exists": false,
-        "canister_number": "C999",
+        "canister_number": "T999",
         "canister_id": null,
         "is_active": null,
         "canister_status": null,
-        "message": "Canister C999 does not exist"
+        "message": "Tank T999 does not exist"
     }
     """
     try:
-        # Query canister by canister_number
-        canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request) if request else (None, None)
         
-        if canister:
+        # Query tank by tank_code
+        query = db.query(Tank).filter(Tank.tank_code == tank_code)
+        
+        # Apply branch filter if provided (User role only)
+        if branch_id is not None:
+            query = query.filter(Tank.branch_id == branch_id)
+        
+        tank = query.first()
+        
+        if tank:
             return CanisterCheckResponse(
                 exists=True,
-                canister_number=canister_number,
-                canister_id=canister.canister_id,
-                is_active=canister.is_active,
-                canister_status=canister.canister_status.value if canister.canister_status else None,
-                message=f"Canister {canister_number} exists and is {'active' if canister.is_active else 'inactive'}"
+                canister_number=tank_code,  # Tank code stored in canister_number field for backward compatibility
+                canister_id=tank.tank_id,  # Tank ID stored in canister_id field for backward compatibility
+                is_active=tank.is_active,
+                canister_status=tank.status.value if tank.status else None,  # Tank status
+                message=f"Tank {tank_code} exists and is {'active' if tank.is_active else 'inactive'}"
             )
         else:
             return CanisterCheckResponse(
                 exists=False,
-                canister_number=canister_number,
+                canister_number=tank_code,
                 canister_id=None,
                 is_active=None,
                 canister_status=None,
-                message=f"Canister {canister_number} does not exist"
+                message=f"Tank {tank_code} does not exist" + (f" in your branch" if branch_id is not None else "")
             )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error checking canister existence: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
 @router.get("/storage", response_model=ARCIVFStorageResponse)
 def get_ivf_storage(
     db: Session = Depends(get_db)

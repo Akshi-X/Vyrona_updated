@@ -50,8 +50,9 @@ from .ivf_schema import (
     GeoLocationSchema,
     BranchSchema,
     IVFControlTowerResponse,
-    # Active Canisters schemas
-    ActiveCanisterItem,
+    # Active Tanks schemas (renamed from ActiveCanisterItem)
+    ActiveTankItem,
+    BranchTanks,
     ActiveCanistersResponse,
     # Embryo Tracking schemas
     EmbryoTrackingItem,
@@ -109,8 +110,9 @@ __all__ = [
     "GeoLocationSchema",
     "BranchSchema",
     "IVFControlTowerResponse",
-    # Active Canisters schemas
-    "ActiveCanisterItem",
+    # Active Tanks schemas (renamed from ActiveCanisterItem)
+    "ActiveTankItem",
+    "BranchTanks",
     "ActiveCanistersResponse",
     # Embryo Tracking schemas
     "EmbryoTrackingItem",
