@@ -55,7 +55,7 @@ class IVFService:
             # Query hospital branches with optional branch filtering
             query = self.db.query(HospitalBranch).join(Hospital)
             
-            # Apply branch filter if provided (User/Manager roles)
+            # Apply branch filter if provided (User role only)
             if branch_id is not None:
                 query = query.filter(HospitalBranch.branch_id == branch_id)
             
@@ -131,94 +131,64 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching IVF control tower map locations: {str(e)}")
     
-    def get_active_canisters(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_active_tanks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Get active canisters grouped by branch with their status and last updated time.
+        Get active tanks grouped by branch for the current logged-in user's branch.
         
         Args:
-            branch_id: Optional branch ID to filter by. If provided, only returns canisters for that branch.
-                      If None, returns canisters for all branches (Admin role).
+            branch_id: Optional branch ID to filter by. If provided, only returns tanks for that branch (User role).
+                      If None, returns tanks for all branches (Manager/Admin roles).
         
         Returns:
             Dictionary containing:
-            - branches: List of branches with their canisters:
+            - branches: List of branches with their tanks:
                 - branch_id: Branch ID
                 - branch_name: Branch name
-                - canisters: List of active canisters with:
-                    - canister_id: Canister ID
-                    - canister_status: Status (safe, risk, critical)
-                    - updated_at: Last updated date and time from canister log refill_date+refill_time (if available),
-                                  otherwise from canisters table created_at
-            - total: Total number of active canisters across all branches
+                - tanks: List of active tanks with:
+                    - tank_code: Tank code (e.g., 'T1')
+                    - updated_at: Last updated date and time from tanks table updated_at
+            - total: Total number of active tanks across all branches
         """
         try:
-            # Optimized query: Use subquery to get latest log per canister in one query
-            # This eliminates N+1 query problem
-            # Get latest refill_date and refill_time separately, then combine in Python
-            latest_logs_subquery = (
-                self.db.query(
-                    CanisterLn2Log.canister_id,
-                    func.max(CanisterLn2Log.refill_date).label('latest_refill_date'),
-                    func.max(CanisterLn2Log.refill_time).label('latest_refill_time')
-                )
-                .filter(CanisterLn2Log.refill_date.isnot(None))
-                .group_by(CanisterLn2Log.canister_id)
-                .subquery()
-            )
-            
-            # Query active canisters with branch information and latest log
+            # Query active tanks with branch information
             query = (
                 self.db.query(
-                    Canister,
+                    Tank,
                     HospitalBranch.branch_id,
-                    HospitalBranch.branch_name,
-                    latest_logs_subquery.c.latest_refill_date,
-                    latest_logs_subquery.c.latest_refill_time
+                    HospitalBranch.branch_name
                 )
-                .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .outerjoin(
-                    latest_logs_subquery,
-                    Canister.canister_id == latest_logs_subquery.c.canister_id
-                )
-                .filter(Canister.is_active == True)
+                .filter(Tank.is_active == True)
             )
             
-            # Apply branch filter if provided (User/Manager roles)
+            # Apply branch filter if provided (User role only)
             if branch_id is not None:
                 query = query.filter(HospitalBranch.branch_id == branch_id)
             
             results = query.all()
             
-            # Group canisters by branch
+            # Group tanks by branch
             branches_dict = defaultdict(lambda: {
                 "branch_id": None,
                 "branch_name": None,
-                "canisters": []
+                "tanks": []
             })
             
-            total_canisters = 0
+            total_tanks = 0
             
-            for canister, branch_id_val, branch_name, latest_refill_date, latest_refill_time in results:
+            for tank, branch_id_val, branch_name in results:
                 # Initialize branch if not already in dict
                 if branches_dict[branch_id_val]["branch_id"] is None:
                     branches_dict[branch_id_val]["branch_id"] = branch_id_val
                     branches_dict[branch_id_val]["branch_name"] = branch_name or "Unknown"
                 
-                # Combine refill_date and refill_time if both are available, otherwise use created_at from canisters table
-                if latest_refill_date and latest_refill_time:
-                    updated_at = dt.combine(latest_refill_date, latest_refill_time)
-                else:
-                    updated_at = canister.created_at
-                
-                canister_data = {
-                    "canister_number": canister.canister_number or "",
-                    "canister_status": canister.canister_status.value if canister.canister_status else "safe",
-                    "updated_at": updated_at
+                tank_data = {
+                    "tank_code": tank.tank_code or "",
+                    "updated_at": tank.updated_at or tank.created_at
                 }
                 
-                branches_dict[branch_id_val]["canisters"].append(canister_data)
-                total_canisters += 1
+                branches_dict[branch_id_val]["tanks"].append(tank_data)
+                total_tanks += 1
             
             # Convert to list and sort by branch name
             branches_list = sorted(
@@ -228,21 +198,21 @@ class IVFService:
             
             return {
                 "branches": branches_list,
-                "total": total_canisters
+                "total": total_tanks
             }
             
         except Exception as e:
-            raise Exception(f"Error fetching active canisters: {str(e)}")
+            raise Exception(f"Error fetching active tanks: {str(e)}")
     
     def _calculate_branch_status(self, branch_id: int) -> str:
         """
-        Calculate branch status based on canister statuses.
+        Calculate branch status based on tank statuses.
         
         Logic:
-        - If any active canister is "critical" -> branch status = "critical"
-        - Else if any active canister is "risk" -> branch status = "risk"
+        - If any active tank is "critical" -> branch status = "critical"
+        - Else if any active tank is "risk" -> branch status = "risk"
         - Else -> branch status = "safe"
-        - If no active canisters -> default to "safe"
+        - If no active tanks -> default to "safe"
         
         Args:
             branch_id: The branch ID to calculate status for
@@ -251,27 +221,27 @@ class IVFService:
             Branch status string: "critical", "risk", or "safe"
         """
         try:
-            # Get all active canisters for this branch through tanks
-            active_canisters = self.db.query(Canister).join(Tank).filter(
+            # Get all active tanks for this branch
+            active_tanks = self.db.query(Tank).filter(
                 Tank.branch_id == branch_id,
-                Canister.is_active == True
+                Tank.is_active == True
             ).all()
             
-            # If no active canisters, default to safe
-            if not active_canisters:
+            # If no active tanks, default to safe
+            if not active_tanks:
                 return "safe"
             
             # Check for critical status (highest priority)
-            for canister in active_canisters:
-                if canister.canister_status == CanisterStatus.CRITICAL:
+            for tank in active_tanks:
+                if tank.status == CanisterStatus.CRITICAL:
                     return "critical"
             
             # Check for risk status
-            for canister in active_canisters:
-                if canister.canister_status == CanisterStatus.RISK:
+            for tank in active_tanks:
+                if tank.status == CanisterStatus.RISK:
                     return "risk"
             
-            # All canisters are safe
+            # All tanks are safe
             return "safe"
             
         except Exception as e:
