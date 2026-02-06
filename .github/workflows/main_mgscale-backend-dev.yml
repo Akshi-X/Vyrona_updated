@@ -57,3 +57,5 @@ jobs:
         with:
           app-name: mgscale-backend-service-dev
           images: myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
+
+
