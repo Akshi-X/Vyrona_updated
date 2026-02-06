@@ -3,10 +3,16 @@ ARC IVF External API Service
 Handles integration with ARC IVF Storage API
 """
 import logging
+import os
 from typing import Dict, Optional, Any
 from datetime import datetime, date, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.config.config import settings
+from ...models.IVF.hospital_model import Hospital
+from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.tank_model import Tank
+from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +58,6 @@ class ARCIVFService:
         token_id = settings.ARC_API_TOKEN or settings.ARC_IVF_TOKEN_ID
         
         if not token_id:
-            import os
             # Get the backend directory (go up from app/service/IVF/arc_ivf_service.py)
             backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             env_file_path = os.path.join(backend_dir, ".env")
@@ -327,12 +332,6 @@ class ARCIVFService:
             Exception: If data saving fails
         """
         try:
-            # Import models here to avoid circular imports
-            from ...models.IVF.hospital_model import Hospital
-            from ...models.IVF.hospital_branch_model import HospitalBranch
-            from ...models.IVF.tank_model import Tank
-            from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
-            
             # Extract data from API response
             his_number = api_data.get("hisNumber")
             crylock_number = api_data.get("cryolockNumber")  # Format: "T10/C5/E1/3"
@@ -400,7 +399,6 @@ class ARCIVFService:
             
             # Find or create Hospital Branch (based on siteName)
             # Use case-insensitive matching for branch_name to handle variations
-            from sqlalchemy import func
             branch = None
             if site_name:
                 site_name_clean = site_name.strip()

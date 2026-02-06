@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Path
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Path, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 import logging
@@ -8,9 +7,9 @@ from app.config.database import get_db
 from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
 from app.service.IVF.arc_ivf_service import ARCIVFService
-from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
 from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
 
@@ -352,7 +351,6 @@ def get_ivf_storage(
         # Get branch name if branch filtering is needed
         branch_name = None
         if branch_id is not None:
-            from app.models.IVF.hospital_branch_model import HospitalBranch
             branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == branch_id).first()
             if branch:
                 branch_name = branch.branch_name

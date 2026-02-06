@@ -2,8 +2,11 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Float, Boolean, Index, event
 from sqlalchemy.orm import relationship
 import logging
+import threading
+import time
 
-from ...config.database import Base
+from ...config.database import Base, SessionLocal
+from ...models.IVF.tank_model import Tank
 
 logger = logging.getLogger(__name__)
 
@@ -97,19 +100,14 @@ def _trigger_quality_alert_after_insert(mapper, connection, target):
         logger.info(f"Quality deviations/loss detected in quality_log id={quality_log_id} (tank_id={tank_id}) - triggering alert check...")
         
         # Trigger alert in background thread to ensure transaction commits first
-        import threading
-        import time
-        
         def trigger_alert_in_background():
             """Trigger alert creation in background thread after a short delay"""
             # Wait a bit to ensure transaction is committed
             time.sleep(0.5)
             
             try:
-                # Import here to avoid circular imports
-                from ...config.database import SessionLocal
+                # Import here to avoid circular import with critical_alert_service
                 from ...service.IVF.critical_alert_service import CriticalAlertService
-                from ...models.IVF.tank_model import Tank
                 
                 # Create a new session for the alert service
                 db = SessionLocal()
