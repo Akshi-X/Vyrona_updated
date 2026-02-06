@@ -27,17 +27,14 @@ from ...constants.error_codes import ERROR_CODES
 from ...constants.http_status import HTTPStatus
 from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
-from ...models.IVF.cane_model import Cane
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
-from ...models.IVF.canister_model import Canister
-from ...models.IVF.cryolock_model import Cryolock
-from ...models.IVF.embryo_model import Embryo
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from ...models.IVF.ivf_shipment_model import IVFShipment
-from ...models.IVF.patient_model import IVFPatient
+from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
+from ...utils.ivf_helpers import find_tank_by_code, find_crylock_by_tank_code
 from ...schemas.IVF.quality_tracking_schema import (
     ColorUpdateResponse,
     CryolockColorUpdate,
@@ -67,6 +64,7 @@ class QualityTrackingService:
     def resolve_tank_id(self, tank_code: str, branch_id: Optional[int] = None) -> int:
         """
         Resolve a tank_code (external identifier) to the internal tank_id.
+        Uses optimized helper function with direct references.
 
         Args:
             tank_code: Tank code (e.g., "T1", "T10")
@@ -79,37 +77,8 @@ class QualityTrackingService:
             AppException: If the tank_code is not found (or not accessible under branch filter)
         """
         try:
-            # Try exact match first
-            tank_query = self.db.query(Tank).filter(Tank.tank_code == tank_code)
-            if branch_id is not None:
-                tank_query = tank_query.filter(Tank.branch_id == branch_id)
-            
-            tank = tank_query.first()
-            
-            # If not found, try case-insensitive match
-            if not tank:
-                tank_query = self.db.query(Tank).filter(func.lower(Tank.tank_code) == func.lower(tank_code))
-                if branch_id is not None:
-                    tank_query = tank_query.filter(Tank.branch_id == branch_id)
-                tank = tank_query.first()
-            
-            # If still not found, try to match by extracting tank identifier from cryolockNumber
-            if not tank:
-                cryolock_tank_query = (
-                    self.db.query(func.distinct(Tank.tank_id))
-                    .join(Canister, Tank.tank_id == Canister.tank_id)
-                    .join(Cane, Canister.canister_id == Cane.canister_id)
-                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                    .filter(Cryolock.cryolock_number.like(f"{tank_code}/%"))
-                )
-                if branch_id is not None:
-                    cryolock_tank_query = cryolock_tank_query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    cryolock_tank_query = cryolock_tank_query.filter(HospitalBranch.branch_id == branch_id)
-                
-                matching_tank_ids = [t[0] for t in cryolock_tank_query.all()]
-                if matching_tank_ids:
-                    tank_query = self.db.query(Tank).filter(Tank.tank_id.in_(matching_tank_ids))
-                    tank = tank_query.first()
+            # Use optimized helper function
+            tank = find_tank_by_code(self.db, tank_code, branch_id)
             
             if not tank:
                 available_tanks = []
@@ -248,38 +217,153 @@ class QualityTrackingService:
         self,
         tank_id: int,
         cryolock_number: str,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> int:
         """
         Get canister_id from tank_id and cryolock_number by finding the cryolock in the tank.
         
         Args:
-            tank_id: Tank ID
+            tank_id: Tank ID (may be incorrect if multiple tanks have same tank_code)
             cryolock_number: Cryolock number to find
             branch_id: Optional branch filter for authorization
+            tank_code: Optional tank code - if provided, search by tank_code directly to handle duplicates
             
         Returns:
             canister_id (int)
         """
         try:
-            query = (
-                self.db.query(Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(Cane, Canister.canister_id == Cane.canister_id)
-                .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                .filter(
-                    Tank.tank_id == tank_id,
-                    Cryolock.cryolock_number == cryolock_number
+            # Trim whitespace from cryolock_number
+            cryolock_number_trimmed = cryolock_number.strip() if cryolock_number else None
+            
+            # If tank_code is provided, search by tank_code directly (handles duplicate tank_codes)
+            # This matches the pattern used in get_tank_tracking_details
+            if tank_code:
+                query = (
+                    self.db.query(Canister.canister_id)
+                    .join(Cane, Canister.canister_id == Cane.canister_id)
+                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .filter(
+                        Tank.tank_code == tank_code,
+                        Cryolock.cryolock_number == cryolock_number_trimmed
+                    )
                 )
-            )
+                
+                # Apply branch filter if provided
+                if branch_id is not None:
+                    query = (
+                        query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                        .filter(HospitalBranch.branch_id == branch_id)
+                    )
+                
+                result = query.first()
+                
+                # If not found with exact match, try case-insensitive match
+                if not result:
+                    query = (
+                        self.db.query(Canister.canister_id)
+                        .join(Cane, Canister.canister_id == Cane.canister_id)
+                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                        .join(Tank, Canister.tank_id == Tank.tank_id)
+                        .filter(
+                            Tank.tank_code == tank_code,
+                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
+                        )
+                    )
+                    
+                    if branch_id is not None:
+                        query = (
+                            query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                            .filter(HospitalBranch.branch_id == branch_id)
+                        )
+                    
+                    result = query.first()
+            else:
+                # Fallback to tank_id search (original behavior)
+                query = (
+                    self.db.query(Canister.canister_id)
+                    .join(Cane, Canister.canister_id == Cane.canister_id)
+                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .filter(
+                        Tank.tank_id == tank_id,
+                        Cryolock.cryolock_number == cryolock_number_trimmed
+                    )
+                )
+                
+                if branch_id is not None:
+                    query = (
+                        query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                        .filter(HospitalBranch.branch_id == branch_id)
+                    )
+                
+                result = query.first()
+                
+                # If not found with exact match, try case-insensitive match
+                if not result:
+                    query = (
+                        self.db.query(Canister.canister_id)
+                        .join(Cane, Canister.canister_id == Cane.canister_id)
+                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                        .join(Tank, Canister.tank_id == Tank.tank_id)
+                        .filter(
+                            Tank.tank_id == tank_id,
+                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
+                        )
+                    )
+                    
+                    if branch_id is not None:
+                        query = (
+                            query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                            .filter(HospitalBranch.branch_id == branch_id)
+                        )
+                    
+                    result = query.first()
             
-            if branch_id is not None:
-                query = query.filter(Tank.branch_id == branch_id)
-            
-            result = query.first()
             if not result:
+                # Get tank info for better error message
+                tank_info = self.db.query(Tank.tank_code, Tank.branch_id).filter(Tank.tank_id == tank_id).first()
+                tank_code_msg = tank_code or (tank_info.tank_code if tank_info else f"tank_id={tank_id}")
+                
+                error_msg = f"Cryolock with number '{cryolock_number_trimmed}' not found in tank {tank_code_msg}"
+                if branch_id:
+                    error_msg += f" (branch_id={branch_id})"
+                
+                # Debug: Check if cryolock exists at all
+                cryolock_exists = (
+                    self.db.query(Cryolock.cryolock_id)
+                    .filter(
+                        or_(
+                            Cryolock.cryolock_number == cryolock_number_trimmed,
+                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
+                        )
+                    )
+                    .first()
+                )
+                
+                if cryolock_exists:
+                    # Check which tank this cryolock is actually in
+                    actual_tank = (
+                        self.db.query(Tank.tank_id, Tank.tank_code, Tank.branch_id)
+                        .join(Canister, Tank.tank_id == Canister.tank_id)
+                        .join(Cane, Canister.canister_id == Cane.canister_id)
+                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                        .filter(Cryolock.cryolock_id == cryolock_exists[0])
+                        .first()
+                    )
+                    
+                    if actual_tank:
+                        logger.warning(
+                            "Cryolock exists but in different tank | requested_tank_id=%s requested_tank_code=%s "
+                            "actual_tank_id=%s actual_tank_code=%s actual_branch_id=%s requested_branch_id=%s cryolock_number=%s",
+                            tank_id, tank_code_msg, actual_tank.tank_id, actual_tank.tank_code,
+                            actual_tank.branch_id, branch_id, cryolock_number_trimmed
+                        )
+                        error_msg += f". Cryolock exists in tank {actual_tank.tank_code} (tank_id={actual_tank.tank_id}, branch_id={actual_tank.branch_id})"
+                
                 raise AppException(
-                    message=f"Cryolock with number '{cryolock_number}' not found in tank",
+                    message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -630,43 +714,9 @@ class QualityTrackingService:
         total_slots - count(cryolocks where embryo_transfer OR in_transit OR embryo_grading is set on any embryo)
         """
         try:
-            # Validate tank exists and get tank_id
-            # Try exact match first
-            tank_query = self.db.query(Tank).filter(Tank.tank_code == tank_code)
-            if branch_id is not None:
-                tank_query = tank_query.filter(Tank.branch_id == branch_id)
+            # Use optimized helper function to find tank
+            tank = find_tank_by_code(self.db, tank_code, branch_id)
             
-            tank = tank_query.first()
-            
-            # If not found, try case-insensitive match
-            if not tank:
-                tank_query = self.db.query(Tank).filter(func.lower(Tank.tank_code) == func.lower(tank_code))
-                if branch_id is not None:
-                    tank_query = tank_query.filter(Tank.branch_id == branch_id)
-                tank = tank_query.first()
-            
-            # If still not found, try to match by extracting tank identifier from cryolockNumber
-            # Format: "T1/C1/A11/2" -> extract "T1" and match against cryolockNumber patterns
-            if not tank:
-                # Find tanks that have cryolocks with cryolockNumber starting with "{tank_code}/"
-                cryolock_tank_query = (
-                    self.db.query(func.distinct(Tank.tank_id))
-                    .join(Canister, Tank.tank_id == Canister.tank_id)
-                    .join(Cane, Canister.canister_id == Cane.canister_id)
-                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                    .filter(Cryolock.cryolock_number.like(f"{tank_code}/%"))
-                )
-                if branch_id is not None:
-                    cryolock_tank_query = cryolock_tank_query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    cryolock_tank_query = cryolock_tank_query.filter(HospitalBranch.branch_id == branch_id)
-                
-                matching_tank_ids = [t[0] for t in cryolock_tank_query.all()]
-                if matching_tank_ids:
-                    # Use the first matching tank
-                    tank_query = self.db.query(Tank).filter(Tank.tank_id.in_(matching_tank_ids))
-                    tank = tank_query.first()
-            
-            # If still not found, provide helpful error message
             if not tank:
                 available_tanks = []
                 if branch_id is not None:
@@ -692,16 +742,15 @@ class QualityTrackingService:
                 )
             
             # total_slots = distinct cryolocks in all canisters in this tank
+            # Use direct tank_id reference for optimization
             total_slots_query = (
                 self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(Tank.tank_code == tank_code)
+                .filter(Cryolock.tank_id == tank.tank_id)
             )
             if branch_id is not None:
-                total_slots_query = total_slots_query.filter(HospitalBranch.branch_id == branch_id)
+                total_slots_query = total_slots_query.filter(Cryolock.branch_id == branch_id)
+            elif tank.branch_id:
+                total_slots_query = total_slots_query.filter(Cryolock.branch_id == tank.branch_id)
             total_slots = total_slots_query.scalar() or 0
 
             # moved_by_grading = cryolocks with any active embryo that has embryo_grading set (non-empty)
@@ -717,15 +766,12 @@ class QualityTrackingService:
             )
 
             # moved_count = distinct cryolocks where embryo_transfer OR in_transit OR embryo_grading is set
+            # Use direct tank_id reference for optimization
             moved_count_query = (
                 self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .outerjoin(moved_by_grading_subq, Cryolock.cryolock_id == moved_by_grading_subq.c.cryolock_id)
                 .filter(
-                    Tank.tank_code == tank_code,
+                    Cryolock.tank_id == tank.tank_id,
                     or_(
                         Cryolock.embryo_transfer == True,
                         Cryolock.in_transit == True,
@@ -734,11 +780,14 @@ class QualityTrackingService:
                 )
             )
             if branch_id is not None:
-                moved_count_query = moved_count_query.filter(HospitalBranch.branch_id == branch_id)
+                moved_count_query = moved_count_query.filter(Cryolock.branch_id == branch_id)
+            elif tank.branch_id:
+                moved_count_query = moved_count_query.filter(Cryolock.branch_id == tank.branch_id)
             moved_count = moved_count_query.scalar() or 0
             available_slots = max(total_slots - moved_count, 0)
 
             # Data rows - return ALL cryolocks in the specified tank
+            # Use direct tank_id reference for optimization
             # Start from Cryolock and LEFT JOIN to Embryo to include cryolocks without active embryos
             # Include all cryolocks (both available and in_transit) to show descriptions
             # Exclude only embryo_transfer=True cryolocks
@@ -760,17 +809,18 @@ class QualityTrackingService:
                 .join(Cane, Cryolock.cane_id == Cane.cane_id)
                 .join(Canister, Cane.canister_id == Canister.canister_id)
                 .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .outerjoin(Embryo, (Embryo.cryolock_id == Cryolock.cryolock_id) & (Embryo.is_active == True))  # LEFT JOIN to get active embryos
                 .outerjoin(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)  # LEFT JOIN to get patient info
                 .filter(
-                    Tank.tank_code == tank_code,
+                    Cryolock.tank_id == tank.tank_id,  # Use direct reference
                     # Exclude only embryo_transfer cryolocks (include in_transit to show descriptions)
                     Cryolock.embryo_transfer != True
                 )
             )
             if branch_id is not None:
-                query = query.filter(HospitalBranch.branch_id == branch_id)
+                query = query.filter(Cryolock.branch_id == branch_id)
+            elif tank.branch_id:
+                query = query.filter(Cryolock.branch_id == tank.branch_id)
 
             query = query.group_by(
                 IVFPatient.his_number,
@@ -881,13 +931,15 @@ class QualityTrackingService:
         tank_id: int,
         flag_update: CryolockFlagUpdate,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> CryolockFlagUpdateResponse:
         """Mark a cryolock as moved to embryo transfer (embryo_transfer = True) within a tank."""
         canister_id = self._get_canister_id_from_tank_and_cryolock(
             tank_id=tank_id,
             cryolock_number=flag_update.cryolock_number,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
         return self._set_cryolock_flag(
             canister_id=canister_id,
@@ -1009,7 +1061,8 @@ class QualityTrackingService:
         canister_id: int,
         request: InTransitWithShipmentRequest,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> InTransitWithShipmentResponse:
         """
         Mark a cryolock as in transit AND create IoT shipment.
@@ -1030,36 +1083,66 @@ class QualityTrackingService:
         10. Return response with shipment details
         """
         try:
-            # Step 1 & 2: Get cryolock, canister, tank, and source branch in a single optimized query
-            query = (
-                self.db.query(
-                    Cryolock,
-                    Canister,
-                    Tank,
-                    HospitalBranch
-                )
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(
-                    Canister.canister_id == canister_id,
-                    Cryolock.cryolock_number == request.cryolock_number
-                )
-            )
-
-            if branch_id is not None:
-                query = query.filter(HospitalBranch.branch_id == branch_id)
-
-            result = query.first()
-            if not result:
-                raise AppException(
-                    message=f"Cryolock with number '{request.cryolock_number}' not found in canister {canister_id}",
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
+            # Step 1 & 2: Get cryolock, canister, tank, and source branch
+            # Use optimized helper function with direct references
+            cryolock = None
+            canister = None
+            tank = None
+            source_branch = None
             
-            cryolock, canister, tank, source_branch = result
+            if tank_code:
+                cryolock = self._find_cryolock_by_tank_code(tank_code, request.cryolock_number, branch_id)
+                if cryolock:
+                    # Get tank and branch from cryolock's direct references (optimized)
+                    if cryolock.tank_id:
+                        tank = self.db.query(Tank).filter(Tank.tank_id == cryolock.tank_id).first()
+                        if tank and cryolock.branch_id:
+                            source_branch = self.db.query(HospitalBranch).filter(
+                                HospitalBranch.branch_id == cryolock.branch_id
+                            ).first()
+                    
+                    # Get canister through cane relationship (still needed for canister_id)
+                    if cryolock.cane_id:
+                        cane = self.db.query(Cane).filter(Cane.cane_id == cryolock.cane_id).first()
+                        if cane and cane.canister_id:
+                            canister = self.db.query(Canister).filter(Canister.canister_id == cane.canister_id).first()
+            
+            # Fallback to canister_id query
+            if not cryolock or not tank or not source_branch:
+                query = (
+                    self.db.query(
+                        Cryolock,
+                        Canister,
+                        Tank,
+                        HospitalBranch
+                    )
+                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                    .join(Canister, Cane.canister_id == Canister.canister_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(
+                        Canister.canister_id == canister_id,
+                        Cryolock.cryolock_number == request.cryolock_number
+                    )
+                )
+
+                if branch_id is not None:
+                    query = query.filter(HospitalBranch.branch_id == branch_id)
+
+                result = query.first()
+                if not result:
+                    error_msg = f"Cryolock with number '{request.cryolock_number}' not found"
+                    if tank_code:
+                        error_msg += f" in tank {tank_code}"
+                    else:
+                        error_msg += f" in canister {canister_id}"
+                    raise AppException(
+                        message=error_msg,
+                        error_code=ErrorMessages.NOT_FOUND,
+                        status_code=HTTPStatus.NOT_FOUND
+                    )
+                
+                cryolock, canister, tank, source_branch = result
             
             # Validate all required objects exist
             if not canister:
@@ -1316,28 +1399,44 @@ class QualityTrackingService:
         tank_id: int,
         request: InTransitWithShipmentRequest,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> InTransitWithShipmentResponse:
         """Mark a cryolock as in transit AND create IoT shipment within a tank."""
         canister_id = self._get_canister_id_from_tank_and_cryolock(
             tank_id=tank_id,
             cryolock_number=request.cryolock_number,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
         return self.mark_in_transit_with_shipment(
             canister_id=canister_id,
             request=request,
             updated_by=updated_by,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
             )
 
+    def _find_cryolock_by_tank_code(
+        self,
+        tank_code: str,
+        cryolock_number: str,
+        branch_id: Optional[int] = None
+    ) -> Optional[PatientCrylockInfo]:
+        """
+        Find cryolock by tank_code and cryolock_number, using direct tank_id/branch_id if available.
+        Uses optimized helper function.
+        """
+        return find_crylock_by_tank_code(self.db, tank_code, cryolock_number, branch_id)
+    
     def _set_cryolock_flag(
         self,
         canister_id: int,
         cryolock_number: str,
         flag_field: str,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> CryolockFlagUpdateResponse:
         if flag_field not in {"embryo_transfer", "in_transit"}:
             raise AppException(
@@ -1347,27 +1446,39 @@ class QualityTrackingService:
             )
 
         try:
-            query = (
-                self.db.query(Cryolock)
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .filter(
-                    Canister.canister_id == canister_id,
-                    Cryolock.cryolock_number == cryolock_number
-                )
-            )
-
-            if branch_id is not None:
-                query = (
-                    query.join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == branch_id)
-                )
-
-            cryolock = query.first()
+            cryolock = None
+            
+            # Try direct query using tank_code if provided (optimized)
+            if tank_code:
+                cryolock = self._find_cryolock_by_tank_code(tank_code, cryolock_number, branch_id)
+            
+            # Fallback: Find by canister_number (canister_id is now tank_id)
             if not cryolock:
+                # Find PatientCrylockInfo by canister_number (extracted from cryolock_number)
+                # Since canisters are removed, we find by canister_number field in PatientCrylockInfo
+                query = (
+                    self.db.query(PatientCrylockInfo)
+                    .filter(
+                        PatientCrylockInfo.canister_number == cryolock_number.split('/')[1] if '/' in cryolock_number else None,
+                        PatientCrylockInfo.crylock_number == cryolock_number
+                    )
+                )
+
+                if branch_id is not None:
+                    query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+                
+                cryolock = query.first()
+
+                cryolock = query.first()
+            
+            if not cryolock:
+                error_msg = f"Cryolock with number '{cryolock_number}' not found"
+                if tank_code:
+                    error_msg += f" in tank {tank_code}"
+                else:
+                    error_msg += f" in canister {canister_id}"
                 raise AppException(
-                    message=f"Cryolock with number '{cryolock_number}' not found in canister {canister_id}",
+                    message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -1401,7 +1512,8 @@ class QualityTrackingService:
         canister_id: int,
         color_update: GobletColorUpdate,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """
         Update goblet color for a specific cryolock within a canister.
@@ -1412,6 +1524,7 @@ class QualityTrackingService:
             color_update: Goblet color update data containing cryolock_number and goblet_color
             updated_by: Username of the user updating the color
             branch_id: Optional branch ID for filtering
+            tank_code: Optional tank code for direct query
             
         Returns:
             ColorUpdateResponse with update details
@@ -1420,30 +1533,35 @@ class QualityTrackingService:
             AppException: If update fails or cryolock not found
         """
         try:
-            # Find the cryolock by canister_id and cryolock_number
-            query = (
-                self.db.query(Cryolock)
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .filter(
-                    Canister.canister_id == canister_id,
-                    Cryolock.cryolock_number == color_update.cryolock_number
-                )
-            )
+            cryolock = None
             
-            # Apply branch filter if provided
-            if branch_id is not None:
+            # Try direct query using tank_code if provided (optimized)
+            if tank_code:
+                cryolock = self._find_cryolock_by_tank_code(tank_code, color_update.cryolock_number, branch_id)
+            
+            # Fallback: Find by canister_number (canister_id is now tank_id)
+            if not cryolock:
+                # Find PatientCrylockInfo by crylock_number
                 query = (
-                    query.join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == branch_id)
+                    self.db.query(PatientCrylockInfo)
+                    .filter(
+                        PatientCrylockInfo.crylock_number == color_update.cryolock_number
+                    )
                 )
-            
-            cryolock = query.first()
+                
+                if branch_id is not None:
+                    query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+                
+                cryolock = query.first()
             
             if not cryolock:
+                error_msg = f"Cryolock with number '{color_update.cryolock_number}' not found"
+                if tank_code:
+                    error_msg += f" in tank {tank_code}"
+                else:
+                    error_msg += f" in canister {canister_id}"
                 raise AppException(
-                    message=f"Cryolock with number '{color_update.cryolock_number}' not found in canister {canister_id}",
+                    message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -1485,19 +1603,22 @@ class QualityTrackingService:
         tank_id: int,
         color_update: GobletColorUpdate,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """Update goblet color for a specific cryolock within a tank."""
         canister_id = self._get_canister_id_from_tank_and_cryolock(
             tank_id=tank_id,
             cryolock_number=color_update.cryolock_number,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
         return self.update_goblet_color(
             canister_id=canister_id,
             color_update=color_update,
             updated_by=updated_by,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
             )
     
     def update_cryolock_color(
@@ -1505,7 +1626,8 @@ class QualityTrackingService:
         canister_id: int,
         color_update: CryolockColorUpdate,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """
         Update cryolock color for a specific cryolock within a canister.
@@ -1515,6 +1637,7 @@ class QualityTrackingService:
             color_update: Cryolock color update data containing cryolock_number and cryolock_color
             updated_by: Username of the user updating the color
             branch_id: Optional branch ID for filtering
+            tank_code: Optional tank code for direct query
             
         Returns:
             ColorUpdateResponse with update details
@@ -1523,30 +1646,35 @@ class QualityTrackingService:
             AppException: If update fails or cryolock not found
         """
         try:
-            # Find the cryolock by canister_id and cryolock_number
-            query = (
-                self.db.query(Cryolock)
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .filter(
-                    Canister.canister_id == canister_id,
-                    Cryolock.cryolock_number == color_update.cryolock_number
-                )
-            )
+            cryolock = None
             
-            # Apply branch filter if provided
-            if branch_id is not None:
+            # Try direct query using tank_code if provided (optimized)
+            if tank_code:
+                cryolock = self._find_cryolock_by_tank_code(tank_code, color_update.cryolock_number, branch_id)
+            
+            # Fallback: Find by canister_number (canister_id is now tank_id)
+            if not cryolock:
+                # Find PatientCrylockInfo by crylock_number
                 query = (
-                    query.join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == branch_id)
+                    self.db.query(PatientCrylockInfo)
+                    .filter(
+                        PatientCrylockInfo.crylock_number == color_update.cryolock_number
+                    )
                 )
-            
-            cryolock = query.first()
+                
+                if branch_id is not None:
+                    query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+                
+                cryolock = query.first()
             
             if not cryolock:
+                error_msg = f"Cryolock with number '{color_update.cryolock_number}' not found"
+                if tank_code:
+                    error_msg += f" in tank {tank_code}"
+                else:
+                    error_msg += f" in canister {canister_id}"
                 raise AppException(
-                    message=f"Cryolock with number '{color_update.cryolock_number}' not found in canister {canister_id}",
+                    message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -1588,19 +1716,22 @@ class QualityTrackingService:
         tank_id: int,
         color_update: CryolockColorUpdate,
         updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """Update cryolock color for a specific cryolock within a tank."""
         canister_id = self._get_canister_id_from_tank_and_cryolock(
             tank_id=tank_id,
             cryolock_number=color_update.cryolock_number,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
         return self.update_cryolock_color(
             canister_id=canister_id,
             color_update=color_update,
             updated_by=updated_by,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
             )
     
     def export_combined_refill_logs_and_deviations_excel(

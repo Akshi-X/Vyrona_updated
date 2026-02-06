@@ -27,8 +27,10 @@ class ARCIVFService:
     def __init__(self):
         """Initialize the service"""
         if HTTPX_AVAILABLE:
+            # Increased timeout: 60 seconds total, 20 seconds for connection
+            # ARC API can be slow, especially when fetching large datasets
             self._http_client = httpx.Client(
-                timeout=httpx.Timeout(30.0, connect=10.0),
+                timeout=httpx.Timeout(60.0, connect=20.0),
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             )
         else:
@@ -66,8 +68,9 @@ class ARCIVFService:
             raise Exception("httpx library not available. Cannot make external API calls.")
         
         if not self._http_client:
+            # Increased timeout: 60 seconds total, 20 seconds for connection
             self._http_client = httpx.Client(
-                timeout=httpx.Timeout(30.0, connect=10.0),
+                timeout=httpx.Timeout(60.0, connect=20.0),
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             )
         
@@ -116,15 +119,42 @@ class ARCIVFService:
                     "errorCode": response.status_code
                 }
         
+        except httpx.ConnectTimeout as e:
+            # Handle connection timeout specifically (more specific than TimeoutException)
+            logger.error(f"ARC IVF API connection timeout after 20 seconds: {str(e)}")
+            return {
+                "storageList": [],
+                "status": "FAILURE",
+                "errorCode": 408,  # Request Timeout
+                "errorMessage": f"ARC IVF API connection timed out after 20 seconds. Unable to connect to the server. Please check your network connection and try again."
+            }
         except httpx.TimeoutException as e:
-            logger.error(f"ARC IVF API timeout: {str(e)}")
-            raise Exception(f"ARC IVF API request timed out: {str(e)}")
+            # Handle general timeout (read timeout, etc.)
+            logger.error(f"ARC IVF API timeout after 60 seconds: {str(e)}")
+            return {
+                "storageList": [],
+                "status": "FAILURE",
+                "errorCode": 408,  # Request Timeout
+                "errorMessage": f"ARC IVF API request timed out after 60 seconds. The API may be slow or unavailable. Please try again later."
+            }
         except httpx.RequestError as e:
             logger.error(f"ARC IVF API request error: {str(e)}")
-            raise Exception(f"ARC IVF API request failed: {str(e)}")
+            # Return failure response instead of raising exception
+            return {
+                "storageList": [],
+                "status": "FAILURE",
+                "errorCode": 500,
+                "errorMessage": f"ARC IVF API request failed: {str(e)}"
+            }
         except Exception as e:
             logger.error(f"Unexpected error calling ARC IVF API: {str(e)}", exc_info=True)
-            raise Exception(f"Failed to fetch IVF storage data: {str(e)}")
+            # Return failure response instead of raising exception
+            return {
+                "storageList": [],
+                "status": "FAILURE",
+                "errorCode": 500,
+                "errorMessage": f"Failed to fetch IVF storage data: {str(e)}"
+            }
     
     def _extract_tank_code_from_cryolock_number(self, cryolock_number: str) -> Optional[str]:
         """
@@ -277,13 +307,13 @@ class ARCIVFService:
         created_by: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Save ARC IVF storage data to database using normalized structure.
+        Save ARC IVF storage data to database using simplified patient_crylock_info structure.
         
-        This method now uses the same normalized structure as Excel import:
-        - Extracts position_number from cryolockNumber (e.g., "T1/C1/A11/2" -> position = 2)
-        - Uses position_number for cryolock lookup instead of combined string
-        - Links patients to branches
-        - Does not store derived fields (total_number_of_embryos, total_number_of_containers)
+        This method:
+        - Extracts components from cryolockNumber (e.g., "T10/C5/E1/3")
+        - Creates/finds tank by tank_code + branch_id (unique per branch)
+        - Saves all data to patient_crylock_info table
+        - Each patient has their own branch
         
         Args:
             db: Database session
@@ -301,56 +331,47 @@ class ARCIVFService:
             from ...models.IVF.hospital_model import Hospital
             from ...models.IVF.hospital_branch_model import HospitalBranch
             from ...models.IVF.tank_model import Tank
-            from ...models.IVF.canister_model import Canister
-            from ...models.IVF.cane_model import Cane
-            from ...models.IVF.cryolock_model import Cryolock
-            from ...models.IVF.patient_model import IVFPatient
-            from ...models.IVF.embryo_model import Embryo
+            from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
             
             # Extract data from API response
             his_number = api_data.get("hisNumber")
-            cryolock_number = api_data.get("cryolockNumber")  # Format: "T1/C1/A11/2"
+            crylock_number = api_data.get("cryolockNumber")  # Format: "T10/C5/E1/3"
             canister_number_str = api_data.get("canisterNumber")
-            tank_id_str = api_data.get("tankID")  # Legacy field - may be numeric like "1428"
-            cane_id_str = api_data.get("caneID")
+            tank_id_str = api_data.get("tankID")  # ARC API tankID (e.g., "575")
+            cane_id_str = api_data.get("caneID")  # ARC API caneID (e.g., "575")
             dateof_vitrification_str = api_data.get("dateofVitrification")
             site_name = api_data.get("siteName")
             
             if not his_number or not site_name:
                 raise Exception("Missing required fields: hisNumber or siteName")
             
-            # Extract components from cryolockNumber format: "T10/C2/B14/1"
-            # Format breakdown: Tank Number / Canister Number / Location / Cryolock Serial Number
-            # - T10 → tank_code (Tank Number)
-            # - C2 → canister_number (Canister Number)
-            # - B14 → cane_code (Location - cane identifier/location within canister)
-            # - 1 → position_number (Cryolock Serial Number)
-            tank_code_from_cryolock = self._extract_tank_code_from_cryolock_number(cryolock_number)
-            canister_code_from_cryolock = self._extract_canister_code_from_cryolock_number(cryolock_number)
-            location_from_cryolock = self._extract_location_from_cryolock_number(cryolock_number)  # This is the cane identifier
-            position_number = self._extract_position_from_cryolock_number(cryolock_number)
+            if not crylock_number:
+                raise Exception("Missing required field: cryolockNumber")
+            
+            # Extract components from cryolockNumber format: "T10/C5/E1/3"
+            # Format breakdown: Tank Code / Canister Number / Cane Code / Position Number
+            # - T10 → tank_code (Tank Code)
+            # - C5 → canister_number (Canister Number)
+            # - E1 → cane_code (Cane Code)
+            # - 3 → position_number (Position Number)
+            tank_code_from_crylock = self._extract_tank_code_from_cryolock_number(crylock_number)
+            canister_code_from_crylock = self._extract_canister_code_from_cryolock_number(crylock_number)
+            cane_code_from_crylock = self._extract_location_from_cryolock_number(crylock_number)  # This is the cane code
+            position_number = self._extract_position_from_cryolock_number(crylock_number)
             
             if position_number is None:
                 # Skip records without a valid numeric position in cryolockNumber
                 return {
                     "status": "SKIPPED",
-                    "message": f"Skipped record: cryolockNumber '{cryolock_number}' does not have a numeric position",
+                    "message": f"Skipped record: cryolockNumber '{crylock_number}' does not have a numeric position",
                     "reason": "INVALID_CRYOLOCK_POSITION",
-                    "cryolock_number": cryolock_number
+                    "crylock_number": crylock_number
                 }
             
-            # Use tank_code from cryolockNumber if available, otherwise fall back to tankID
-            # Priority: cryolockNumber format (T10) > tankID field (1428)
-            tank_code_to_use = tank_code_from_cryolock if tank_code_from_cryolock else tank_id_str
-            
-            # Use canister_code from cryolockNumber if available, otherwise fall back to canisterNumber field
-            # Priority: cryolockNumber format (C2) > canisterNumber field
-            canister_code_to_use = canister_code_from_cryolock if canister_code_from_cryolock else canister_number_str
-            
-            # Use location from cryolockNumber as cane_code (Location = cane identifier)
-            # Priority: cryolockNumber format (B14, A11) > caneID field
-            # The Location segment represents the cane identifier within the canister
-            cane_code_to_use = location_from_cryolock if location_from_cryolock else cane_id_str
+            # Use extracted values, fallback to API fields if not available
+            tank_code_to_use = tank_code_from_crylock if tank_code_from_crylock else None
+            canister_number_to_use = canister_code_from_crylock if canister_code_from_crylock else canister_number_str
+            cane_code_to_use = cane_code_from_crylock if cane_code_from_crylock else None
             
             # Parse date of vitrification
             date_of_vitrification = None
@@ -377,193 +398,157 @@ class ARCIVFService:
                 db.flush()
                 logger.info(f"Created new hospital: {hospital.hospital_id}")
             
-            # Find or create Hospital Branch (no derived fields stored)
-            branch = db.query(HospitalBranch).filter(
-                HospitalBranch.branch_name == site_name,
-                HospitalBranch.hospital_id == hospital.hospital_id
-            ).first()
+            # Find or create Hospital Branch (based on siteName)
+            # Use case-insensitive matching for branch_name to handle variations
+            from sqlalchemy import func
+            branch = None
+            if site_name:
+                site_name_clean = site_name.strip()
+                branch = db.query(HospitalBranch).filter(
+                    func.lower(HospitalBranch.branch_name) == func.lower(site_name_clean),
+                    HospitalBranch.hospital_id == hospital.hospital_id
+                ).first()
+                
+                if branch:
+                    logger.debug(f"Found existing branch: {branch.branch_id} - {branch.branch_name} (matched siteName: {site_name_clean})")
+                else:
+                    # Log warning if branch not found - might indicate data inconsistency
+                    existing_branches = db.query(HospitalBranch.branch_name).filter(
+                        HospitalBranch.hospital_id == hospital.hospital_id
+                    ).all()
+                    existing_branch_names = [b[0] for b in existing_branches if b[0]]
+                    logger.warning(
+                        f"Branch not found for siteName '{site_name_clean}'. "
+                        f"Existing branches: {existing_branch_names}. Creating new branch."
+                    )
             
             if not branch:
                 branch = HospitalBranch(
                     hospital_id=hospital.hospital_id,
-                    branch_name=site_name,
+                    branch_name=site_name.strip() if site_name else None,
                     created_by=created_by
                 )
                 db.add(branch)
                 db.flush()
-                logger.info(f"Created new branch: {branch.branch_id} - {branch.branch_name}")
+                logger.info(f"Created new branch: {branch.branch_id} - {branch.branch_name} (from ARC API siteName: {site_name})")
             
-            # Find or create Tank using tank_code from cryolockNumber (e.g., "T1")
+            # Find or create Tank by tank_code + branch_id (unique per branch)
+            # Each branch can have T1, T2, etc. (e.g., Branch 1 (Tambaram) has T1, T2; Branch 5 has T1, T2, T3)
             tank = None
-            if tank_code_to_use:
-                # Find tank by tank_code and branch_id (tanks belong to branches)
+            if tank_code_to_use and branch:
+                # Find tank by tank_code and branch_id (unique constraint ensures one tank per code per branch)
                 tank = db.query(Tank).filter(
                     Tank.tank_code == tank_code_to_use,
                     Tank.branch_id == branch.branch_id
                 ).first()
                 
                 if not tank:
-                    # Create new tank with code from cryolockNumber format
+                    # Create new tank with tank_code (unique per branch)
                     tank = Tank(
                         branch_id=branch.branch_id,
-                        tank_code=tank_code_to_use,
+                        tank_code=tank_code_to_use,  # e.g., "T10", "T1", "T2"
+                        tank_id_arc=tank_id_str,  # Store ARC API tankID for reference
                         is_active=True,
                         created_by=created_by
                     )
                     db.add(tank)
                     db.flush()
-                    logger.info(f"Created new tank: {tank.tank_id} - {tank.tank_code} (from cryolockNumber: {cryolock_number})")
-            
-            # Find or create Canister using canister_code from cryolockNumber (e.g., "C1")
-            canister = None
-            if canister_code_to_use and tank:
-                # Find canister by canister_number and tank_id (canisters belong to tanks)
-                canister = db.query(Canister).filter(
-                    Canister.canister_number == canister_code_to_use,
-                    Canister.tank_id == tank.tank_id
-                ).first()
-                
-                if not canister:
-                    # Create new canister with code from cryolockNumber format
-                    canister = Canister(
-                        tank_id=tank.tank_id,
-                        canister_number=canister_code_to_use,
-                        is_active=True,
-                        created_by=created_by
-                    )
-                    db.add(canister)
-                    db.flush()
-                    logger.info(f"Created new canister: {canister.canister_id} - {canister.canister_number} (from cryolockNumber: {cryolock_number})")
-            
-            # Find or create Cane using location from cryolockNumber (e.g., "B14", "A11")
-            # Location segment represents the cane identifier/location within the canister
-            cane = None
-            if cane_code_to_use and canister:
-                # Find cane by cane_code (location identifier) and canister_id (canes belong to canisters)
-                cane = db.query(Cane).filter(
-                    Cane.cane_code == cane_code_to_use,
-                    Cane.canister_id == canister.canister_id
-                ).first()
-                
-                if not cane:
-                    # Create new cane with location identifier from cryolockNumber format
-                    # Location (B14, A11) is stored as cane_code
-                    cane = Cane(
-                        canister_id=canister.canister_id,
-                        cane_code=cane_code_to_use,  # Location identifier from ARC format
-                        is_active=True,
-                        created_by=created_by
-                    )
-                    db.add(cane)
-                    db.flush()
-                    logger.info(f"Created new cane: {cane.cane_id} - {cane.cane_code} (Location from cryolockNumber: {cryolock_number})")
-            
-            # Find or create Cryolock using normalized structure (cane_id + position_number)
-            cryolock = None
-            if cane and position_number is not None:
-                # Use normalized lookup: cane_id + position_number (unique constraint)
-                cryolock = db.query(Cryolock).filter(
-                    Cryolock.cane_id == cane.cane_id,
-                    Cryolock.position_number == position_number
-                ).first()
-                
-                if not cryolock:
-                    # Create new cryolock with position_number and date_of_vitrification
-                    cryolock = Cryolock(
-                        cane_id=cane.cane_id,
-                        position_number=position_number,
-                        cryolock_number=cryolock_number,  # Store original string for reference
-                        date_of_vitrification=date_of_vitrification,  # Store date at cryolock level
-                        created_by=created_by
-                    )
-                    db.add(cryolock)
-                    db.flush()
-                    logger.info(f"Created new cryolock: {cryolock.cryolock_id} - position {position_number} in cane {cane.cane_id}")
+                    logger.info(f"Created new tank: {tank.tank_id} - tank_code: {tank_code_to_use} (branch: {branch.branch_name}, tankID: {tank_id_str})")
                 else:
-                    # Update cryolock_number or date_of_vitrification if changed
-                    updated = False
-                    if cryolock.cryolock_number != cryolock_number:
-                        cryolock.cryolock_number = cryolock_number
-                        updated = True
-                    if date_of_vitrification and cryolock.date_of_vitrification != date_of_vitrification:
-                        cryolock.date_of_vitrification = date_of_vitrification
-                        updated = True
-                    
-                    if updated:
-                        cryolock.updated_by = created_by
-                        cryolock.updated_at = datetime.now(timezone.utc)
+                    # Update tank_id_arc if it's different or missing
+                    if tank_id_str and tank.tank_id_arc != tank_id_str:
+                        tank.tank_id_arc = tank_id_str
+                        tank.updated_by = created_by
+                        tank.updated_at = datetime.now(timezone.utc)
                         db.flush()
-                        logger.debug(f"Updated cryolock {cryolock.cryolock_id}")
+                        logger.debug(f"Updated tank {tank.tank_id} tank_id_arc to {tank_id_str}")
             
-            # Find or create Patient (with branch_id link)
-            patient = db.query(IVFPatient).filter(
-                IVFPatient.his_number == his_number
+            if not tank:
+                raise Exception(f"Cannot create patient_crylock_info without a tank. tank_code: {tank_code_to_use}, branch: {branch.branch_name if branch else 'N/A'}")
+            
+            # Find or create PatientCrylockInfo record
+            # Unique constraint on (his_number, crylock_number) ensures one record per patient per crylock
+            patient_crylock = db.query(PatientCrylockInfo).filter(
+                PatientCrylockInfo.his_number == his_number,
+                PatientCrylockInfo.crylock_number == crylock_number
             ).first()
             
-            if not patient:
-                patient = IVFPatient(
-                    his_number=his_number,
-                    branch_id=branch.branch_id,  # Link patient to branch
+            if not patient_crylock:
+                # Create new patient_crylock_info record
+                patient_crylock = PatientCrylockInfo(
+                    branch_id=branch.branch_id,  # Branch based on siteName
+                    tank_id=tank.tank_id,  # Reference to tank
+                    his_number=his_number,  # Patient HIS number
+                    crylock_number=crylock_number,  # Full crylock number (e.g., "T10/C5/E1/3")
+                    # Extracted components
+                    tank_code=tank_code_to_use,  # Extracted from crylockNumber (e.g., "T10")
+                    canister_number=canister_number_to_use,  # Extracted from crylockNumber (e.g., "C5")
+                    cane_code=cane_code_to_use,  # Extracted from crylockNumber (e.g., "E1")
+                    position_number=position_number,  # Extracted from crylockNumber (e.g., 3)
+                    # ARC API IDs
+                    tank_id_arc=tank_id_str,  # Tank ID from ARC API
+                    cane_id_arc=cane_id_str,  # Cane ID from ARC API
+                    # Crylock details
+                    date_of_vitrification=date_of_vitrification,
+                    crylock_color=None,  # Can be updated later
+                    goblet_color=None,  # Can be updated later
+                    in_transit=False,
+                    embryo_transfer=False,
+                    description=None,
                     created_by=created_by
                 )
-                db.add(patient)
+                db.add(patient_crylock)
                 db.flush()
-                logger.info(f"Created new patient: {patient.patient_id} - {patient.his_number}")
+                logger.info(f"Created new patient_crylock_info: id={patient_crylock.id}, HIS={his_number}, crylock={crylock_number} (branch: {branch.branch_name})")
             else:
-                # Update branch_id if it's different
-                if patient.branch_id != branch.branch_id:
-                    patient.branch_id = branch.branch_id
-                    patient.updated_by = created_by
-                    patient.updated_at = datetime.now(timezone.utc)
-                    db.flush()
-                    logger.debug(f"Updated patient {patient.patient_id} branch_id to {branch.branch_id}")
-            
-            # Create or update Embryo (one per cryolock - validation)
-            embryo = None
-            if cryolock and patient:
-                # Check if embryo already exists for this cryolock (one embryo per cryolock)
-                embryo = db.query(Embryo).filter(
-                    Embryo.cryolock_id == cryolock.cryolock_id,
-                    Embryo.is_active == True
-                ).first()
+                # Update existing record if needed
+                updated = False
+                # Update branch_id if different (patient should belong to their branch)
+                if patient_crylock.branch_id != branch.branch_id:
+                    patient_crylock.branch_id = branch.branch_id
+                    updated = True
+                # Update tank_id if different
+                if patient_crylock.tank_id != tank.tank_id:
+                    patient_crylock.tank_id = tank.tank_id
+                    updated = True
+                # Update extracted components if different
+                if tank_code_to_use and patient_crylock.tank_code != tank_code_to_use:
+                    patient_crylock.tank_code = tank_code_to_use
+                    updated = True
+                if canister_number_to_use and patient_crylock.canister_number != canister_number_to_use:
+                    patient_crylock.canister_number = canister_number_to_use
+                    updated = True
+                if cane_code_to_use and patient_crylock.cane_code != cane_code_to_use:
+                    patient_crylock.cane_code = cane_code_to_use
+                    updated = True
+                if position_number and patient_crylock.position_number != position_number:
+                    patient_crylock.position_number = position_number
+                    updated = True
+                # Update ARC IDs if different
+                if tank_id_str and patient_crylock.tank_id_arc != tank_id_str:
+                    patient_crylock.tank_id_arc = tank_id_str
+                    updated = True
+                if cane_id_str and patient_crylock.cane_id_arc != cane_id_str:
+                    patient_crylock.cane_id_arc = cane_id_str
+                    updated = True
+                # Update date if different
+                if date_of_vitrification and patient_crylock.date_of_vitrification != date_of_vitrification:
+                    patient_crylock.date_of_vitrification = date_of_vitrification
+                    updated = True
                 
-                if not embryo:
-                    # Create new embryo
-                    # Note: date_of_vitrification is now stored at cryolock level, not embryo level
-                    embryo = Embryo(
-                        patient_id=patient.patient_id,
-                        cryolock_id=cryolock.cryolock_id,
-                        is_active=True,
-                        created_by=created_by
-                    )
-                    db.add(embryo)
+                if updated:
+                    patient_crylock.updated_by = created_by
+                    patient_crylock.updated_at = datetime.now(timezone.utc)
                     db.flush()
-                    logger.info(f"Created new embryo: {embryo.embryo_id} in cryolock {cryolock.cryolock_id}")
-                else:
-                    # Update existing embryo if patient changed
-                    # Note: date_of_vitrification is now managed at cryolock level
-                    updated = False
-                    if embryo.patient_id != patient.patient_id:
-                        embryo.patient_id = patient.patient_id
-                        updated = True
-                    
-                    if updated:
-                        embryo.updated_by = created_by
-                        embryo.updated_at = datetime.now(timezone.utc)
-                        db.flush()
-                        logger.info(f"Updated embryo: {embryo.embryo_id}")
+                    logger.debug(f"Updated patient_crylock_info: id={patient_crylock.id}, HIS={his_number}")
             
             # Don't commit here - let the caller batch commits for better performance
             
             return {
                 "status": "SUCCESS",
                 "message": "ARC IVF data saved successfully",
-                "patient_id": patient.patient_id if patient else None,
+                "patient_crylock_info_id": patient_crylock.id if patient_crylock else None,
                 "tank_id": tank.tank_id if tank else None,
-                "canister_id": canister.canister_id if canister else None,
-                "cane_id": cane.cane_id if cane else None,
-                "cryolock_id": cryolock.cryolock_id if cryolock else None,
-                "embryo_id": embryo.embryo_id if embryo else None,
                 "position_number": position_number
             }
             

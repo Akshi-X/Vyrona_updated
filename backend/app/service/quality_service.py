@@ -18,8 +18,8 @@ from app.models.patient_model import Patient
 from app.models.user_model import User
 from app.models.geolocation_model import Geolocation
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
 from app.exceptions.patient_exceptions import PatientNotFoundException
@@ -568,43 +568,38 @@ class QualityService:
             logger.error(f"Error retrieving geolocation history for canister {canister_id}: {e}")
             return []
     
-    def validate_canister_belongs_to_branch(self, canister_id: int, branch_id: Optional[int]) -> bool:
+    def validate_tank_belongs_to_branch(self, tank_id: int, branch_id: Optional[int]) -> bool:
         """
-        Validate that a canister belongs to the user's branch.
-        Admin users (branch_id is None) can access all canisters.
+        Validate that a tank belongs to the user's branch.
+        Admin users (branch_id is None) can access all tanks.
         
         Args:
-            canister_id: The canister ID to validate
+            tank_id: The tank ID to validate
             branch_id: The user's branch ID (None for Admin users)
         
         Returns:
-            True if canister belongs to branch (or user is Admin), False otherwise
+            True if tank belongs to branch (or user is Admin), False otherwise
         
         Raises:
-            Exception: If canister doesn't exist or validation fails
+            Exception: If tank doesn't exist or validation fails
         """
         try:
-            # Get canister
-            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
-            if not canister:
-                raise Exception(f"Canister {canister_id} not found")
+            # Get tank
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
+                raise Exception(f"Tank {tank_id} not found")
             
-            # Admin users (branch_id is None) can access all canisters
+            # Admin users (branch_id is None) can access all tanks
             if branch_id is None:
                 return True
             
-            # Get canister's branch through tank
-            tank = self.db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
-            if not tank:
-                raise Exception(f"Tank for canister {canister_id} not found")
-            
             # Validate branch match
             if tank.branch_id != branch_id:
-                raise Exception(f"Canister {canister_id} does not belong to your branch")
+                raise Exception(f"Tank {tank_id} does not belong to your branch")
             
             return True
         except Exception as e:
-            logger.error(f"Error validating canister {canister_id} for branch {branch_id}: {e}")
+            logger.error(f"Error validating tank {tank_id} for branch {branch_id}: {e}")
             raise
     
     async def redis_listener(self, connection_manager: 'ConnectionManager'):

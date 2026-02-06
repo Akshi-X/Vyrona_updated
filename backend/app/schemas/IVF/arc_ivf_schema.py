@@ -27,6 +27,7 @@ class ARCIVFStorageResponse(BaseModel):
     storage_list: List[ARCIVFStorageItem] = Field(default_factory=list, description="List of storage items", alias="storageList")
     status: str = Field(..., description="Status of the API call (SUCCESS/FAILURE)")
     error_code: int = Field(..., description="API Call status code", alias="errorCode")
+    error_message: Optional[str] = Field(None, description="Error message if API call failed", alias="errorMessage")
     
     class Config:
         populate_by_name = True
