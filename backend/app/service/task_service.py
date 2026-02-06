@@ -191,12 +191,12 @@ def create_task(
                 raise TaskInvalidAssigneeException(user_id=request.assignee_id)
         
         # Validate that only one is provided (not both)
-        if request.patient_id and request.canister_number:
-            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        if request.patient_id and request.tank_code:
+            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
         
-        # Ensure at least one is provided (patient_id for CGT or canister_number for IVF)
-        if not request.patient_id and not request.canister_number:
-            raise TaskInvalidPatientException(patient_id="Either patient_id (CGT) or canister_number (IVF) must be provided")
+        # Ensure at least one is provided (patient_id for CGT or tank_code for IVF)
+        if not request.patient_id and not request.tank_code:
+            raise TaskInvalidPatientException(patient_id="Either patient_id (CGT) or tank_code (IVF) must be provided")
         
         # Validate patient exists (if provided for CGT flow)
         if request.patient_id:

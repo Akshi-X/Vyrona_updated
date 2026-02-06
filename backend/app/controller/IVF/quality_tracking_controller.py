@@ -237,7 +237,8 @@ def update_goblet_color(
             tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in update_goblet_color endpoint: {str(e)}", exc_info=True)
@@ -283,7 +284,8 @@ def update_cryolock_color(
             tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in update_cryolock_color endpoint: {str(e)}", exc_info=True)
@@ -317,7 +319,8 @@ def mark_embryo_transfer(
             tank_id=tank_id,
             flag_update=flag_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in mark_embryo_transfer endpoint: {str(e)}", exc_info=True)
@@ -371,7 +374,8 @@ def mark_in_transit_with_shipment(
             tank_id=tank_id,
             request=shipment_request,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in mark_in_transit_with_shipment endpoint: {str(e)}", exc_info=True)
