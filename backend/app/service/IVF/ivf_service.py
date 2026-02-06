@@ -311,18 +311,20 @@ class IVFService:
             # Query embryos with all related data
             # Join: Embryo -> Patient, Cryolock -> Cane -> Canister -> Tank -> Branch
             if is_user_role:
-                # User role: Aggregate embryo_grading by cryolock
+                # User role: Aggregate embryo_grading by cryolock (one row per cryolock)
+                # Group ONLY by cryolock_id to ensure one row per cryolock
+                # Some cryolocks have embryos from multiple patients, so we use MIN/MAX for other fields
                 query = (
                     self.db.query(
-                        IVFPatient.his_number,
+                        func.min(IVFPatient.his_number).label('his_number'),
                         Cryolock.cryolock_number,
-                        Canister.canister_number,
-                        Tank.tank_code,
-                        Cane.cane_code,
-                        Cryolock.goblet_color,
-                        Cryolock.cryolock_color,
-                        Embryo.date_of_vitrification,
-                        HospitalBranch.branch_name,
+                        func.min(Canister.canister_number).label('canister_number'),
+                        func.min(Tank.tank_code).label('tank_code'),
+                        func.min(Cane.cane_code).label('cane_code'),
+                        func.min(Cryolock.goblet_color).label('goblet_color'),
+                        func.min(Cryolock.cryolock_color).label('cryolock_color'),
+                        Cryolock.date_of_vitrification,  # Date is now stored at cryolock level
+                        func.min(HospitalBranch.branch_name).label('branch_name'),
                         Cryolock.cryolock_id,
                         # Aggregate embryo_grading for grouping by cryolock
                         func.string_agg(
@@ -343,19 +345,13 @@ class IVFService:
                 if branch_id is not None:
                     query = query.filter(HospitalBranch.branch_id == branch_id)
                 
-                # Group by cryolock to aggregate embryo_grading
+                # Group ONLY by cryolock_id to get exactly ONE row per cryolock
+                # This ensures the total count matches the number of cryolocks (containers)
                 query = query.group_by(
-                    IVFPatient.his_number,
-                    Cryolock.cryolock_number,
-                    Canister.canister_number,
-                    Tank.tank_code,
-                    Cane.cane_code,
-                    Cryolock.goblet_color,
-                    Cryolock.cryolock_color,
-                    Embryo.date_of_vitrification,
-                    HospitalBranch.branch_name,
-                    Cryolock.cryolock_id
-                ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
+                    Cryolock.cryolock_id,
+                    Cryolock.cryolock_number,  # cryolock_number is unique, so safe to include
+                    Cryolock.date_of_vitrification  # Include in group_by since we're selecting it directly
+                ).order_by(func.min(IVFPatient.his_number), Cryolock.cryolock_number)
             else:
                 # Manager/Admin roles: Show individual embryos with status (no aggregation)
                 query = (
@@ -367,7 +363,7 @@ class IVFService:
                         Cane.cane_code,
                         Cryolock.goblet_color,
                         Cryolock.cryolock_color,
-                        Embryo.date_of_vitrification,
+                        Cryolock.date_of_vitrification,  # Date is now stored at cryolock level
                         Embryo.status,
                         HospitalBranch.branch_name,
                         Cryolock.cryolock_id,

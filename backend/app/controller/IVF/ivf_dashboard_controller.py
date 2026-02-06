@@ -106,9 +106,12 @@ def get_total_containers(
     db: Session = Depends(get_db)
 ):
     """
-    Get total number of containers (canisters).
+    Get total number of containers (cryolocks).
     
     Metric 2: Total number of Containers (For all Sites)
+    
+    Note: "Containers" in the ARC IVF API context refers to cryolocks, not canisters.
+    This matches the source API's totalNumberofContainers field.
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
