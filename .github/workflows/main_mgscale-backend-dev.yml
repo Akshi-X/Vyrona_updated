@@ -11,54 +11,47 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read   # ✅ no id-token needed for client-secret auth
+      contents: read
 
     steps:
       # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Azure Login (Service Principal with Client Secret)
+      # 2️⃣ Azure Login (Service Principal using AZURE_CREDENTIALS)
       - name: Azure Login
         uses: azure/login@v2
         with:
-          auth-type: service-principal   # 🔴 THIS WAS MISSING
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          auth-type: SERVICE_PRINCIPAL
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3️⃣ Set subscription
-      - name: Set Azure subscription
-        run: az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # 4️⃣ Verify Web App (RBAC check)
+      # 3️⃣ Verify Web App access (RBAC check)
       - name: Verify Web App
         run: |
           az webapp show \
             --name mgscale-backend-service-dev \
             --resource-group Mgscale
 
-      # 5️⃣ Login to ACR
+      # 4️⃣ Login to ACR
       - name: Login to ACR
         run: |
           docker login myscaledev.azurecr.io \
             -u myscaledev \
             -p ${{ secrets.ACR_ADMIN_PASSWORD }}
 
-      # 6️⃣ Build Docker image
+      # 5️⃣ Build Docker image
       - name: Build Docker Image
         run: |
           docker build \
             -t myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }} \
             ./backend
 
-      # 7️⃣ Push Docker image
+      # 6️⃣ Push Docker image
       - name: Push Docker Image
         run: |
           docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
 
-      # 8️⃣ Deploy to Azure Web App
+      # 7️⃣ Deploy image to Azure Web App (Container)
       - name: Deploy to Azure Web App (Container)
         uses: azure/webapps-deploy@v3
         with:
