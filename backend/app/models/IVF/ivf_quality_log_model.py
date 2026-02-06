@@ -26,21 +26,21 @@ class IVFQualityLog(Base):
     # Optional device identifier (if provided by IoT system)
     device_id = Column(String, nullable=True, index=True)
 
-    # Telemetry Data - KPIs monitored: Temperature, Humidity, Shock/Vibration, Light
+    # Telemetry Data - KPIs monitored: Internal Temperature, External Temperature, Humidity, Shock
     # Note: Motion (latitude/longitude) is stored in geolocation table, not here
-    temperature = Column(Float, nullable=True, comment="Temperature in °C")
+    temperature_internal = Column(Float, nullable=True, comment="Internal Temperature in °C")
+    temperature_external = Column(Float, nullable=True, comment="External Temperature in °C")
     humidity = Column(Float, nullable=True, comment="Humidity in %")
-    agitation = Column(Float, nullable=True, comment="Shock/Vibration/Agitation")
-    light = Column(Float, nullable=True, comment="Light level")
+    shock = Column(Float, nullable=True, comment="Shock/G-force value")
 
     # Quality Loss Tracking
     quality_loss = Column(Float, nullable=True, comment="Amount of quality loss (percentage)")
 
     # Boolean flags indicating which parameter(s) caused quality loss
-    is_temp_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if temperature violation caused quality loss")
+    is_temp_internal_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if internal temperature violation caused quality loss")
+    is_temp_external_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if external temperature violation caused quality loss")
     is_humidity_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if humidity violation caused quality loss")
-    is_agitation_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if shock/vibration/agitation violation caused quality loss")
-    is_light_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if light violation caused quality loss")
+    is_shock_loss = Column(Boolean, default=False, nullable=False, index=True, comment="True if shock violation caused quality loss")
 
     # Timestamp of the telemetry reading
     reading_timestamp = Column(DateTime, nullable=False, index=True, comment="Timestamp when telemetry data was recorded")
@@ -61,7 +61,7 @@ class IVFQualityLog(Base):
         Index('idx_ivf_quality_log_device_timestamp', 'device_id', 'reading_timestamp'),
         Index('idx_ivf_quality_log_telemetry_timestamp', 'telemetry_data_id', 'reading_timestamp'),
         Index('idx_ivf_quality_log_tank_loss', 'tank_id', 'quality_loss'),
-        Index('idx_ivf_quality_log_violations', 'is_temp_loss', 'is_humidity_loss', 'is_agitation_loss', 'is_light_loss'),
+        Index('idx_ivf_quality_log_violations', 'is_temp_internal_loss', 'is_temp_external_loss', 'is_humidity_loss', 'is_shock_loss'),
     )
 
 
@@ -80,10 +80,10 @@ def _trigger_quality_alert_after_insert(mapper, connection, target):
         # Check if there are violations or quality loss
         has_violations = (
             (target.quality_loss is not None and target.quality_loss > 0)
-            or target.is_temp_loss
+            or target.is_temp_internal_loss
+            or target.is_temp_external_loss
             or target.is_humidity_loss
-            or target.is_agitation_loss
-            or target.is_light_loss
+            or target.is_shock_loss
         )
         
         if not has_violations:
