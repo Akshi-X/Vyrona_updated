@@ -3,6 +3,7 @@ IVF Dashboard Controller
 Controller for IVF dashboard metrics endpoints with role-based access control.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.requests import Request
 from sqlalchemy.orm import Session
 
 from app.config.database import get_db
@@ -13,11 +14,9 @@ from app.schemas.IVF.ivf_dashboard_schema import (
     QualityDeviationsFlaggedResponse,
     TopDeviationDriverResponse,
     OutboundShipmentsResponse,
-    AvgQualityLossPerContainerResponse,
-    DeviationsGraphResponse
+    DeviationsGraphResponse,
+    TotalDeviationsResponse
 )
-from app.utils.ivf_helpers import get_branch_filter_info
-from app.utils.user_helpers import is_hospital_department
 
 router = APIRouter(prefix="/ivf/dashboard", tags=["IVF Dashboard"])
 
@@ -165,12 +164,13 @@ def get_top_deviation_driver(
     """
     Get top deviation driver.
     
-    Metric 4: Top Deviation Driver (For all Sites)
+    Metric 4: Top Deviation Driver
     
-    Deviation drivers considered:
-    - Critical canister status
-    - Risk canister status
-    - Low LN2 levels
+    Returns the KPI (Key Performance Indicator) with the highest deviation count.
+    KPIs tracked:
+    - Temperature deviations
+    - Humidity deviations
+    - Agitation deviations
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -219,46 +219,20 @@ def get_outbound_shipments(
         raise HTTPException(status_code=500, detail=f"Error getting outbound shipments: {str(e)}")
 
 
-@router.get("/metrics/avg-quality-loss-per-container", response_model=AvgQualityLossPerContainerResponse)
-def get_avg_quality_loss_per_container(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """
-    Get average quality loss per container.
-    
-    Metric 6: Avg quality loss per container (for all sites)
-    
-    Quality loss is calculated as average quality_loss per container
-    from IVF quality logs for all time.
-    
-    Role-based access:
-    - Manager (IVF): See metrics across all sites
-    - User (IVF): See metrics only for their assigned branch
-    - Admin: See metrics across all sites
-    """
-    try:
-        branch_id, role = get_dashboard_branch_filter(request)
-        
-        service = IVFDashboardService(db)
-        result = service.get_avg_quality_loss_per_container(branch_id=branch_id, role=role)
-        
-        return AvgQualityLossPerContainerResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting avg quality loss per container: {str(e)}")
-
-
 @router.get("/metrics/deviations-graph", response_model=DeviationsGraphResponse)
 def get_deviations_graph(
     request: Request,
     db: Session = Depends(get_db)
 ):
     """
-    Get deviations graph data.
+    Get deviations graph data for Quality deviation chart.
     
-    X-axis: Containers (User view) or Sites (Manager/Admin view)
-    Y-axis: Number of deviations
-    Graph type: Stacked bar chart (temperature, humidity, agitation)
+    Chart structure (Horizontal bar chart):
+    - Y-axis: Containers (User view) or Sites (Manager/Admin view)
+    - X-axis: Deviation values (0-100)
+    - For each container/site: Two horizontal bars
+      1. Stacked bar: Temperature (purple), Humidity (grey), Agitation/Vibration (pink)
+      2. Solid bar: Top risk driver (blue) - maximum deviation value
     
     Role-based access:
     - User (IVF): Container-wise deviations within the site
@@ -273,3 +247,33 @@ def get_deviations_graph(
         return DeviationsGraphResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting deviations graph: {str(e)}")
+
+
+@router.get("/metrics/total-deviations", response_model=TotalDeviationsResponse)
+def get_total_deviations(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get total count of deviations from IVF quality logs.
+    
+    Counts all records in IVFQualityLog where any deviation flag is True:
+    - Temperature deviations (is_temp_loss)
+    - Humidity deviations (is_humidity_loss)
+    - Agitation/Vibration deviations (is_agitation_loss)
+    - Light deviations (is_light_loss)
+    
+    Role-based access:
+    - Manager (IVF): Count deviations across all branches
+    - User (IVF): Count deviations only for their assigned branch/site
+    - Admin: Count deviations across all branches
+    """
+    try:
+        branch_id, role = get_dashboard_branch_filter(request)
+        
+        service = IVFDashboardService(db)
+        result = service.get_total_deviations(branch_id=branch_id, role=role)
+        
+        return TotalDeviationsResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting total deviations: {str(e)}")

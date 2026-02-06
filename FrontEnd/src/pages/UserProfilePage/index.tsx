@@ -343,7 +343,7 @@ const UserProfilePage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header
         title="User Profile"
-        showBackButton={!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin')}
+        showBackButton={role?.toLowerCase() !== 'mygrape_admin'}
         onBackClick={handleBackNavigation}
         rightContent={
           (role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (

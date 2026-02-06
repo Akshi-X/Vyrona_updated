@@ -17,7 +17,6 @@ class Cane(Base):
     
     # Cane Information
     cane_code = Column(String(255), nullable=True)
-    goblet_color = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Relationships

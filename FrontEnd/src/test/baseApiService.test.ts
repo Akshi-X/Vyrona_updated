@@ -28,14 +28,14 @@ describe('BaseApiService', () => {
 
   describe('Constructor', () => {
     it('should initialize with default base URL', () => {
-      expect(service.getBaseUrl()).toBe('http://127.0.0.1:8000')
+      expect(service.getBaseUrl()).toBe('http://localhost:8000')
     })
 
     it('should use environment variable for base URL when available', () => {
       // This test is skipped because we can't easily mock import.meta.env in vitest
       // The actual implementation correctly uses VITE_API_BASE_URL when available
       // In a real environment, this would work correctly
-      expect(service.getBaseUrl()).toBe('http://127.0.0.1:8000')
+      expect(service.getBaseUrl()).toBe('http://localhost:8000')
     })
   })
 
@@ -69,7 +69,7 @@ describe('BaseApiService', () => {
       const result = await (service as any).request('/api/test')
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ describe('BaseApiService', () => {
       })
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(requestData),
@@ -195,7 +195,7 @@ describe('BaseApiService', () => {
       const result = await (service as any).requestFormData('/api/upload', formData)
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/upload',
+        'http://localhost:8000/api/upload',
         expect.objectContaining({
           body: formData,
           headers: expect.objectContaining({
@@ -240,7 +240,7 @@ describe('BaseApiService', () => {
       const result = await (service as any).unauthenticatedRequest('/api/public')
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/public',
+        'http://localhost:8000/api/public',
         expect.objectContaining({
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
@@ -282,7 +282,7 @@ describe('BaseApiService', () => {
       const result = await service.get('/api/test')
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'GET',
         })
@@ -301,7 +301,7 @@ describe('BaseApiService', () => {
       const result = await service.post('/api/test', data)
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(data),
@@ -321,7 +321,7 @@ describe('BaseApiService', () => {
       const result = await service.put('/api/test', data)
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify(data),
@@ -340,7 +340,7 @@ describe('BaseApiService', () => {
       const result = await service.delete('/api/test')
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'DELETE',
         })
@@ -359,7 +359,7 @@ describe('BaseApiService', () => {
       const result = await service.patch('/api/test', data)
 
       expect(window.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/api/test',
+        'http://localhost:8000/api/test',
         expect.objectContaining({
           method: 'PATCH',
           body: JSON.stringify(data),
@@ -376,7 +376,7 @@ describe('BaseApiService', () => {
     })
 
     it('should get current base URL', () => {
-      expect(service.getBaseUrl()).toBe('http://127.0.0.1:8000')
+      expect(service.getBaseUrl()).toBe('http://localhost:8000')
     })
   })
 

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
-from datetime import datetime, date
+from datetime import datetime, date, time
 
 from app.constants.enums import CanisterStatus
 
@@ -147,6 +147,19 @@ class CanisterCreate(CanisterBase):
 class CanisterUpdate(BaseModel):
     """Schema for updating canister information"""
     canister_number: Optional[int] = Field(None, description="Canister number")
+
+
+class CanisterCheckResponse(BaseModel):
+    """Schema for canister existence check response"""
+    exists: bool = Field(..., description="Whether the canister exists")
+    canister_number: str = Field(..., description="The canister number that was checked")
+    canister_id: Optional[int] = Field(None, description="Canister ID if exists")
+    is_active: Optional[bool] = Field(None, description="Whether the canister is active (if exists)")
+    canister_status: Optional[str] = Field(None, description="Canister status (if exists)")
+    message: str = Field(..., description="Response message")
+    
+    class Config:
+        from_attributes = True
     is_active: Optional[bool] = Field(None, description="Whether the canister is active")
     canister_status: Optional[CanisterStatus] = Field(None, description="Canister status (safe, risk, critical)")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
@@ -168,9 +181,11 @@ class CanisterResponse(CanisterBase):
 
 class CanisterLn2LogBase(BaseModel):
     """Base schema for canister LN2 log"""
-    canister_id: int = Field(..., description="Reference to canister")
-    opened_at: Optional[datetime] = Field(None, description="When the canister was opened")
-    opened_by: Optional[str] = Field(None, description="User who opened the canister")
+    canister_id: Optional[int] = Field(None, description="Reference to canister (for IVF)")
+    container_id: Optional[str] = Field(None, description="Container ID (for quality tracking)")
+    refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
+    refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
+    refilled_by: Optional[str] = Field(None, description="Name of person who performed the refill/opening")
     ln2_level_before: Optional[float] = Field(None, description="LN2 level before opening")
     ln2_level_after: Optional[float] = Field(None, description="LN2 level after opening")
     remarks: Optional[str] = Field(None, description="Remarks or notes")
@@ -186,8 +201,9 @@ class CanisterLn2LogCreate(CanisterLn2LogBase):
 
 class CanisterLn2LogUpdate(BaseModel):
     """Schema for updating canister LN2 log information"""
-    opened_at: Optional[datetime] = Field(None, description="When the canister was opened")
-    opened_by: Optional[str] = Field(None, description="User who opened the canister")
+    refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
+    refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
+    refilled_by: Optional[str] = Field(None, description="Name of person who performed the refill/opening")
     ln2_level_before: Optional[float] = Field(None, description="LN2 level before opening")
     ln2_level_after: Optional[float] = Field(None, description="LN2 level after opening")
     remarks: Optional[str] = Field(None, description="Remarks or notes")
@@ -400,9 +416,9 @@ class IVFControlTowerResponse(BaseModel):
 
 class ActiveCanisterItem(BaseModel):
     """Schema for a single active canister in control tower"""
-    canister_id: int = Field(..., description="Canister ID")
+    canister_number: str = Field(..., description="Canister number/code (e.g., 'C1')")
     canister_status: CanisterStatus = Field(..., description="Canister status (safe, risk, critical)")
-    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log opened_at")
+    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log refill_date+refill_time")
     
     class Config:
         from_attributes = True
@@ -435,15 +451,16 @@ class EmbryoTrackingItem(BaseModel):
     """Schema for embryo tracking table row"""
     his_number: str = Field(..., description="Patient HIS Number")
     cryolock_number: Optional[str] = Field(None, description="Cryolock Number")
-    canister_number: Optional[int] = Field(None, description="Canister Number")
-    tank_id: Optional[str] = Field(None, description="Tank ID (formatted)")
-    cane_id: Optional[str] = Field(None, description="Cane ID (formatted)")
+    canister_number: Optional[str] = Field(None, description="Canister Number/Code")
+    tank_code: Optional[str] = Field(None, description="Tank Code")
+    cane_code: Optional[str] = Field(None, description="Cane Code")
     goblet_color: Optional[str] = Field(None, description="Goblet Color")
     cryolock_color: Optional[str] = Field(None, description="Cryolock Color")
     date_of_vitrification: Optional[date] = Field(None, description="Date of Vitrification")
     embryo_grading: Optional[str] = Field(None, description="Comma-separated embryo gradings (User role only)")
     site_name: Optional[str] = Field(None, description="Branch name (Manager/Admin roles only)")
     status: Optional[str] = Field(None, description="Embryo status (Manager/Admin roles only)")
+    description: Optional[str] = Field(None, description="Shipment description if cryolock is in transit (from ivf_shipment table)")
     
     class Config:
         from_attributes = True

@@ -3,17 +3,24 @@ from sqlalchemy import desc, func, and_
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 from collections import defaultdict
+from datetime import datetime as dt, date, time
+import logging
 
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.canister_model import Canister
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.cane_model import Cane
 from ...models.IVF.cryolock_model import Cryolock
 from ...models.IVF.patient_model import IVFPatient
 from ...models.IVF.embryo_model import Embryo
+from ...models.IVF.ivf_shipment_model import IVFShipment
+from ...models.shipment_model import Shipment
 from ...constants.enums import CanisterStatus
+
+logger = logging.getLogger(__name__)
 
 # Roles that should be filtered by branch (User and Manager)
 ROLES_WITH_BRANCH_FILTER = ["User", "Manager"]
@@ -140,19 +147,21 @@ class IVFService:
                 - canisters: List of active canisters with:
                     - canister_id: Canister ID
                     - canister_status: Status (safe, risk, critical)
-                    - updated_at: Last updated date and time from canister log opened_at (if available),
+                    - updated_at: Last updated date and time from canister log refill_date+refill_time (if available),
                                   otherwise from canisters table created_at
             - total: Total number of active canisters across all branches
         """
         try:
             # Optimized query: Use subquery to get latest log per canister in one query
             # This eliminates N+1 query problem
+            # Get latest refill_date and refill_time separately, then combine in Python
             latest_logs_subquery = (
                 self.db.query(
                     CanisterLn2Log.canister_id,
-                    func.max(CanisterLn2Log.opened_at).label('latest_opened_at')
+                    func.max(CanisterLn2Log.refill_date).label('latest_refill_date'),
+                    func.max(CanisterLn2Log.refill_time).label('latest_refill_time')
                 )
-                .filter(CanisterLn2Log.opened_at.isnot(None))
+                .filter(CanisterLn2Log.refill_date.isnot(None))
                 .group_by(CanisterLn2Log.canister_id)
                 .subquery()
             )
@@ -163,7 +172,8 @@ class IVFService:
                     Canister,
                     HospitalBranch.branch_id,
                     HospitalBranch.branch_name,
-                    latest_logs_subquery.c.latest_opened_at
+                    latest_logs_subquery.c.latest_refill_date,
+                    latest_logs_subquery.c.latest_refill_time
                 )
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
@@ -189,17 +199,20 @@ class IVFService:
             
             total_canisters = 0
             
-            for canister, branch_id_val, branch_name, latest_opened_at in results:
+            for canister, branch_id_val, branch_name, latest_refill_date, latest_refill_time in results:
                 # Initialize branch if not already in dict
                 if branches_dict[branch_id_val]["branch_id"] is None:
                     branches_dict[branch_id_val]["branch_id"] = branch_id_val
                     branches_dict[branch_id_val]["branch_name"] = branch_name or "Unknown"
                 
-                # Use opened_at from log if available, otherwise use created_at from canisters table
-                updated_at = latest_opened_at if latest_opened_at else canister.created_at
+                # Combine refill_date and refill_time if both are available, otherwise use created_at from canisters table
+                if latest_refill_date and latest_refill_time:
+                    updated_at = dt.combine(latest_refill_date, latest_refill_time)
+                else:
+                    updated_at = canister.created_at
                 
                 canister_data = {
-                    "canister_id": canister.canister_id,
+                    "canister_number": canister.canister_number or "",
                     "canister_status": canister.canister_status.value if canister.canister_status else "safe",
                     "updated_at": updated_at
                 }
@@ -302,17 +315,15 @@ class IVFService:
                 query = (
                     self.db.query(
                         IVFPatient.his_number,
-                        Cryolock.cryolock_id,
                         Cryolock.cryolock_number,
                         Canister.canister_number,
-                        Tank.tank_id,
                         Tank.tank_code,
-                        Cane.cane_id,
                         Cane.cane_code,
-                        Cane.goblet_color,
+                        Cryolock.goblet_color,
                         Cryolock.cryolock_color,
                         Embryo.date_of_vitrification,
                         HospitalBranch.branch_name,
+                        Cryolock.cryolock_id,
                         # Aggregate embryo_grading for grouping by cryolock
                         func.string_agg(
                             func.coalesce(Embryo.embryo_grading, ''), 
@@ -335,35 +346,31 @@ class IVFService:
                 # Group by cryolock to aggregate embryo_grading
                 query = query.group_by(
                     IVFPatient.his_number,
-                    Cryolock.cryolock_id,
                     Cryolock.cryolock_number,
                     Canister.canister_number,
-                    Tank.tank_id,
                     Tank.tank_code,
-                    Cane.cane_id,
                     Cane.cane_code,
-                    Cane.goblet_color,
+                    Cryolock.goblet_color,
                     Cryolock.cryolock_color,
                     Embryo.date_of_vitrification,
-                    HospitalBranch.branch_name
+                    HospitalBranch.branch_name,
+                    Cryolock.cryolock_id
                 ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
             else:
                 # Manager/Admin roles: Show individual embryos with status (no aggregation)
                 query = (
                     self.db.query(
                         IVFPatient.his_number,
-                        Cryolock.cryolock_id,
                         Cryolock.cryolock_number,
                         Canister.canister_number,
-                        Tank.tank_id,
                         Tank.tank_code,
-                        Cane.cane_id,
                         Cane.cane_code,
-                        Cane.goblet_color,
+                        Cryolock.goblet_color,
                         Cryolock.cryolock_color,
                         Embryo.date_of_vitrification,
                         Embryo.status,
                         HospitalBranch.branch_name,
+                        Cryolock.cryolock_id,
                         Embryo.embryo_grading  # Individual grading, not aggregated
                     )
                     .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
@@ -384,24 +391,57 @@ class IVFService:
             
             results = query.all()
             
+            # Get cryolock IDs to fetch shipment descriptions
+            cryolock_ids = [row.cryolock_id for row in results]
+            
+            # Fetch descriptions from ivf_shipment table for cryolocks
+            # Get the most recent shipment description for each cryolock
+            shipment_descriptions = {}
+            if cryolock_ids:
+                # Use a subquery to get the latest shipment per cryolock
+                latest_shipments = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        func.max(IVFShipment.id).label('latest_shipment_id')
+                    )
+                    .filter(
+                        IVFShipment.cryolock_id.in_(cryolock_ids),
+                        IVFShipment.description.isnot(None)
+                    )
+                    .group_by(IVFShipment.cryolock_id)
+                    .subquery()
+                )
+                
+                shipment_descriptions_query = (
+                    self.db.query(
+                        IVFShipment.cryolock_id,
+                        IVFShipment.description
+                    )
+                    .join(
+                        latest_shipments,
+                        IVFShipment.id == latest_shipments.c.latest_shipment_id
+                    )
+                )
+                
+                for shipment_row in shipment_descriptions_query.all():
+                    shipment_descriptions[shipment_row.cryolock_id] = shipment_row.description
+            
             tracking_list = []
             
             for row in results:
-                # Format tank_id: use tank_code if available, otherwise "Tank {tank_id}"
-                tank_display = row.tank_code if row.tank_code else f"Tank {row.tank_id}"
-                
-                # Format cane_id: use cane_code if available, otherwise format as "Cane-{cane_id}"
-                cane_display = row.cane_code if row.cane_code else f"Cane-{row.cane_id}"
+                # Get description for this cryolock if it exists
+                description = shipment_descriptions.get(row.cryolock_id)
                 
                 tracking_data = {
                     "his_number": row.his_number or "",
                     "cryolock_number": row.cryolock_number or "",
-                    "canister_number": row.canister_number,
-                    "tank_id": tank_display,
-                    "cane_id": cane_display,
+                    "canister_number": str(row.canister_number) if row.canister_number else None,
+                    "tank_code": row.tank_code or "",
+                    "cane_code": row.cane_code or "",
                     "goblet_color": row.goblet_color or "",
                     "cryolock_color": row.cryolock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,
+                    "description": description
                 }
                 
                 # Role-based field visibility

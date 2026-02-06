@@ -27,8 +27,11 @@ class Tasks(Base):
     priority = Column(SQLEnum(TaskPriority, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     status = Column(SQLEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.NOT_STARTED, nullable=False)
     
-    # Patient Reference
+    # Patient Reference (for CGT flow)
     patient_id = Column(String, ForeignKey("patient.id"), nullable=True)
+    
+    # Canister Reference (for IVF flow)
+    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=True)
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -39,4 +42,5 @@ class Tasks(Base):
     created_by = relationship("User", foreign_keys=[created_by_id], backref="created_tasks")
     updated_by = relationship("User", foreign_keys=[updated_by_id], backref="updated_tasks")
     patient = relationship("Patient", backref="tasks")
+    canister = relationship("Canister", backref="tasks")
 

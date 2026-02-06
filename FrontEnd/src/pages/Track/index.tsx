@@ -103,7 +103,7 @@ export default function TrackPage() {
     try {
       const response = await criticalAlertsService.getCriticalAlerts('pharma_12345');
       setCriticalAlerts(response.alerts || []);
-    } catch (e) {
+    } catch {
       setCriticalAlerts([]);
     } finally {
       setLoadingAlerts(false);
@@ -149,7 +149,7 @@ export default function TrackPage() {
         const last = profile.last_name?.trim?.() || '';
         const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
         setUserInitials(initials);
-    } catch (error) {
+    } catch {
       // Error handled silently
     }
   };
@@ -206,9 +206,10 @@ export default function TrackPage() {
         return reengineeringStatus ? 5 : 2;
       
       // For other stages, find the first matching index
-      default:
+      default: {
         const foundIndex = steps.findIndex(s => s.key === stage);
         return foundIndex >= 0 ? foundIndex : -1;
+      }
     }
   })();
 
@@ -577,7 +578,7 @@ export default function TrackPage() {
             }
 
             // Get assigneeId from the task (it should be stored when user selects from dropdown)
-            const assigneeId = (task as any).assigneeId;
+            const assigneeId = task.assigneeId;
             
             // Prepare update data
             const updateData: {
@@ -638,7 +639,7 @@ export default function TrackPage() {
             console.error('Error updating task:', error);
           }
         }}
-        onDelete={(_taskId) => {
+        onDelete={() => {
           // TODO: Implement delete task functionality
         }}
       />

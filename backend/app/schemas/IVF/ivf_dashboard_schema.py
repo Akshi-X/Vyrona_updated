@@ -49,22 +49,26 @@ class OutboundShipmentsResponse(BaseModel):
     status: str = Field(default="success", description="Response status")
 
 
-class AvgQualityLossPerContainerResponse(BaseModel):
-    """Response for average quality loss per container metric"""
-    avg_quality_loss_per_container: float = Field(
-        ...,
-        description="Average quality loss per container from IVF quality logs for current month"
-    )
-    total_containers: int = Field(..., description="Total containers included in the calculation")
+class DeviationsGraphResponse(BaseModel):
+    """Response for deviations graph metric
+    
+    User view: Returns containers from user's branch/site with individual driver counts and top risk driver per container
+    Manager view: Returns sites with cumulative driver counts and top risk driver per site
+    """
+    view_level: str = Field(..., description="View level: container (user) or site (manager/admin)")
+    data: List[Dict[str, Any]] = Field(..., description="Deviation data for charting. For user: list of containers. For manager: list of sites.")
+    top_deviation_type: Optional[str] = Field(None, description="Top contributing deviation type overall (deprecated, kept for backward compatibility)")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 
 
-class DeviationsGraphResponse(BaseModel):
-    """Response for deviations graph metric"""
-    view_level: str = Field(..., description="View level: container (user) or site (manager/admin)")
-    top_deviation_type: str = Field(..., description="Top contributing deviation type overall")
-    data: List[Dict[str, Any]] = Field(..., description="Deviation data for charting")
+class TotalDeviationsResponse(BaseModel):
+    """Response for total deviations metric"""
+    total_deviations: int = Field(..., description="Total number of deviations (any KPI violation)")
+    temperature_deviations: int = Field(..., description="Count of temperature deviations")
+    humidity_deviations: int = Field(..., description="Count of humidity deviations")
+    agitation_deviations: int = Field(..., description="Count of agitation/vibration deviations")
+    light_deviations: int = Field(..., description="Count of light deviations")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 
@@ -76,7 +80,6 @@ class IVFDashboardMetricsResponse(BaseModel):
     quality_deviations_flagged: Dict = Field(..., description="Quality deviations flagged metric")
     top_deviation_driver: Dict = Field(..., description="Top deviation driver metric")
     outbound_shipments: Dict = Field(..., description="Outbound shipments metric")
-    avg_quality_loss_per_container: Dict = Field(..., description="Average quality loss per container metric")
     deviations_graph: Dict = Field(..., description="Deviations graph metric")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")

@@ -77,7 +77,7 @@ export default function QualityTrackingChart() {
   // Get base URL for WebSocket
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
-    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://127.0.0.1:8000';
+    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/quality/ws`;
   };

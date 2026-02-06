@@ -140,6 +140,26 @@ def get_pharma_id_from_request(request: Request) -> int:
     return request.state.pharma_id
 
 
+def get_hospital_id_from_request(request: Request) -> int:
+    """
+    Get hospital_id from request state (set by middleware for hospital users).
+    
+    This is for hospital users (IVF flow) to get their hospital_id.
+    
+    Usage:
+        @router.get("/canisters")
+        def get_canisters(request: Request):
+            hospital_id = get_hospital_id_from_request(request)
+            return get_canisters_by_hospital(hospital_id)
+    """
+    if not hasattr(request.state, "hospital_id") or request.state.hospital_id is None:
+        raise UserNotFoundException(
+            user_id="unknown"
+        )
+    
+    return request.state.hospital_id
+
+
 def validate_login_request(email: str, password: str, db: Session) -> User:
     """
     Validate login request.
@@ -295,8 +315,16 @@ async def authenticate_websocket(
             if pharma_id is None:
                 pharma_id = user.pharma_id
 
+            # For hospital/IVF users, pharma_id can be None - this is allowed
+            # Hospital users have branch_id but no pharma_id
+            # Pharma users have pharma_id but may not have branch_id
             if pharma_id is None:
-                raise ChatWebSocketAuthFailedException(reason="Pharma ID not found")
+                # Check if user is a hospital user (has branch_id)
+                if not user.branch_id:
+                    # Not a hospital user and no pharma_id - this is an error
+                    raise ChatWebSocketAuthFailedException(reason="Pharma ID not found")
+                # Hospital user with branch_id but no pharma_id - this is OK
+                logger.debug(f"Hospital user {user_id} connecting without pharma_id (has branch_id: {user.branch_id})")
 
             db.expunge(user)
 

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { GoogleMap, Marker, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polyline, OverlayView } from '@react-google-maps/api';
 import { shipmentService } from '../services/shipmentService';
 import MarkerGreen from '../assets/ControlTower/MarkerGreen.svg';
 import MarkerRed from '../assets/ControlTower/MarkerRed.svg';
 import MarkerYellow from '../assets/ControlTower/MarkerYellow.svg';
+import { useGoogleMaps } from '../contexts/GoogleMapsProvider';
 
 type MapRoute = {
   shipment_id: number | string;
@@ -125,35 +126,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
 
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-
-
-  if (!apiKey || apiKey.trim() === '') {
-
-    throw new Error(
-
-      'VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables. ' +
-
-      'Please ensure the .env file exists in the FrontEnd directory and restart the dev server.'
-
-    );
-
-  }
-
-
-
-  const { isLoaded } = useJsApiLoader({
-
-    id: 'google-map-script',
-
-    googleMapsApiKey: apiKey,
-
-    libraries: ['geometry', 'maps'],
-
-    preventGoogleFontsLoading: true
-
-  });
+  const { isLoaded } = useGoogleMaps();
 
 
 
