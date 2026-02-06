@@ -10,10 +10,8 @@ from sqlalchemy import func, and_, or_, case
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
-from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_shipment_model import IVFShipment
-from ...constants.enums import CanisterStatus
 
 
 class IVFDashboardService:

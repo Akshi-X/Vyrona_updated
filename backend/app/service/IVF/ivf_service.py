@@ -1,26 +1,18 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, and_
-from typing import List, Dict, Any, Optional
-from decimal import Decimal
+from typing import Dict, Any, Optional
 from collections import defaultdict
-from datetime import datetime as dt, date, time
+from datetime import date
 import logging
 
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
-from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
-from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.ivf_shipment_model import IVFShipment
-from ...models.shipment_model import Shipment
 from ...constants.enums import CanisterStatus
 
 logger = logging.getLogger(__name__)
-
-# Roles that should be filtered by branch (User and Manager)
-ROLES_WITH_BRANCH_FILTER = ["User", "Manager"]
-
 
 class IVFService:
     """Service for IVF control tower operations"""
