@@ -66,6 +66,7 @@ class IVFCanisterTrackingItem(BaseModel):
     his_number: str = Field(..., description="Patient HIS Number (PK)")
     cryolock_number: str = Field(..., description="Cryolock number")
     canister_number: Optional[str] = Field(None, description="Canister number/code")
+    tank_code: str = Field(..., description="Tank code (e.g., T1, T2) - from ARC API format: Tank Number / Canister Number / Location / Cryolock Serial Number")
     cane_code: str = Field(..., description="Cane code")
     goblet_color: str = Field(..., description="Goblet color")
     cryolock_color: str = Field(..., description="Cryolock color")

@@ -27,9 +27,13 @@ class HospitalBranch(Base):
     latitude = Column(Numeric(10, 7), nullable=True)
     longitude = Column(Numeric(10, 7), nullable=True)
     
+    # Note: total_number_of_embryos and total_number_of_containers removed
+    # These should be calculated via queries, not stored as derived fields
+    
     # Relationships
     hospital = relationship("Hospital", back_populates="branches")
     tanks = relationship("Tank", back_populates="branch", cascade="all, delete-orphan")
+    patients = relationship("IVFPatient", back_populates="branch", cascade="all, delete-orphan")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

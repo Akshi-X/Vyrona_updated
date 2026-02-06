@@ -1,11 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Path
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
+from typing import Optional
+import logging
 
 from app.config.database import get_db
+from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
 from app.models.IVF.canister_model import Canister
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
+from app.service.IVF.arc_ivf_service import ARCIVFService
+from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
+from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
 
@@ -271,4 +280,234 @@ def check_canister_exists(
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking canister existence: {str(e)}")
+@router.get("/storage", response_model=ARCIVFStorageResponse)
+def get_ivf_storage(
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch IVF storage information from ARC IVF external API.
+    
+    This endpoint calls the ARC IVF Storage API to retrieve all storage information
+    using a TokenId for authentication. The TokenId is automatically read from the 
+    ARC_API_TOKEN (or ARC_IVF_TOKEN_ID) environment variable in your .env file.
+    
+    **No Input Parameters Required:**
+    The TokenId is automatically retrieved from the ARC_API_TOKEN environment variable.
+    
+    **Response Fields:**
+    - storageList: List of storage items, each containing:
+        - hisNumber: Patient Hospital ID
+        - cryolockNumber: Format T10/C2/B14/1 (Tank/Canister/Location/Cryolock Serial)
+        - canisterNumber: Canister Number
+        - tankID: Tank Unique ID
+        - caneID: Cane Unique ID
+        - dateofVitrification: Date of OCR
+        - siteName: Branch Name
+        - totalNumberofEmbryos: Total Embryos for the branch
+        - totalNumberofContainers: Total Cryolocks for the branch
+    - status: API call status (SUCCESS/FAILURE)
+    - errorCode: API call status code
+    
+    **Example Request:**
+    ```
+    GET /api/ivf/storage
+    ```
+    
+    **Note:** Make sure ARC_API_TOKEN (or ARC_IVF_TOKEN_ID) is set in your .env file.
+    
+    **Example Success Response:**
+    ```json
+    {
+        "storageList": [
+            {
+                "hisNumber": "3222044212F",
+                "cryolockNumber": "T1/C1/A11/2",
+                "canisterNumber": "C1",
+                "tankID": "6216",
+                "caneID": "6216",
+                "dateofVitrification": "2023-03-11",
+                "siteName": "Tambaram",
+                "totalNumberofEmbryos": "640",
+                "totalNumberofContainers": "384"
+            }
+        ],
+        "status": "SUCCESS",
+        "errorCode": 200
+    }
+    ```
+    
+    **Example Failure Response:**
+    ```json
+    {
+        "storageList": [],
+        "status": "FAILURE",
+        "errorCode": 412
+    }
+    ```
+    """
+    try:
+        service = ARCIVFService()
+        # Fetch data from ARC IVF API (TokenId is automatically read from .env)
+        result = service.get_ivf_storage()
+        
+        # Save data to database if API call was successful
+        if result.get("status") == "SUCCESS":
+            storage_list = result.get("storageList", [])
+            
+            # Count unique patients, tanks, canisters, canes, and cryolocks
+            unique_patients = set()
+            unique_tanks = set()
+            unique_canisters = set()
+            unique_canes = set()
+            unique_cryolocks = set()
+            
+            for storage_item in storage_list:
+                if storage_item.get("hisNumber"):
+                    unique_patients.add(storage_item.get("hisNumber"))
+                if storage_item.get("tankID"):
+                    unique_tanks.add(storage_item.get("tankID"))
+                if storage_item.get("canisterNumber"):
+                    unique_canisters.add(storage_item.get("canisterNumber"))
+                if storage_item.get("caneID"):
+                    unique_canes.add(storage_item.get("caneID"))
+                if storage_item.get("cryolockNumber"):
+                    unique_cryolocks.add(storage_item.get("cryolockNumber"))
+            
+            logger.info(
+                f"Storage data statistics: "
+                f"Total items: {len(storage_list)}, "
+                f"Unique patients: {len(unique_patients)}, "
+                f"Unique tanks: {len(unique_tanks)}, "
+                f"Unique canisters: {len(unique_canisters)}, "
+                f"Unique canes: {len(unique_canes)}, "
+                f"Unique cryolocks: {len(unique_cryolocks)}"
+            )
+            
+            saved_count = 0
+            failed_count = 0
+            skipped_count = 0
+            failed_items = []  # Track failed items with details
+            BATCH_SIZE = 100  # Commit every 100 items for better performance
+            
+            # Save each storage item to database
+            for idx, storage_item in enumerate(storage_list, 1):
+                try:
+                    # Save to database (created_by will be None for now, can be enhanced later with auth)
+                    save_result = service.save_ivf_storage_to_db(
+                        db=db,
+                        api_data=storage_item,
+                        created_by=None
+                    )
+                    
+                    # Check if record was skipped (e.g., invalid cryolock position)
+                    if save_result.get("status") == "SKIPPED":
+                        skipped_count += 1
+                        # Log skipped records at debug level (not error)
+                        logger.debug(
+                            f"Skipped ARC IVF data item {idx}/{len(storage_list)} "
+                            f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                            f"Cryolock={storage_item.get('cryolockNumber')}): {save_result.get('message')}"
+                        )
+                    else:
+                        saved_count += 1
+                    
+                    # Log progress every 100 items or at milestones
+                    if idx % 100 == 0 or idx == len(storage_list):
+                        logger.info(f"Progress: {idx}/{len(storage_list)} items processed ({saved_count} saved, {skipped_count} skipped, {failed_count} failed)")
+                    elif idx % 10 == 0:
+                        # Less verbose logging every 10 items
+                        logger.debug(f"Processing item {idx}/{len(storage_list)}")
+                        
+                except Exception as save_error:
+                    failed_count += 1
+                    error_type = type(save_error).__name__
+                    error_message = str(save_error)
+                    
+                    # Track failed item details
+                    failed_item = {
+                        "index": idx,
+                        "hisNumber": storage_item.get('hisNumber'),
+                        "siteName": storage_item.get('siteName'),
+                        "cryolockNumber": storage_item.get('cryolockNumber'),
+                        "canisterNumber": storage_item.get('canisterNumber'),
+                        "tankID": storage_item.get('tankID'),
+                        "caneID": storage_item.get('caneID'),
+                        "error_type": error_type,
+                        "error_message": error_message
+                    }
+                    failed_items.append(failed_item)
+                    
+                    # Log the error but don't fail the API response
+                    logger.error(
+                        f"Failed to save ARC IVF data item {idx}/{len(storage_list)} "
+                        f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                        f"Cryolock={storage_item.get('cryolockNumber')}): "
+                        f"[{error_type}] {error_message}",
+                        exc_info=True
+                    )
+                
+                # Batch commit every BATCH_SIZE items for better performance
+                if idx % BATCH_SIZE == 0:
+                    try:
+                        db.commit()
+                        logger.debug(f"Committed batch at item {idx}")
+                    except Exception as commit_error:
+                        db.rollback()
+                        logger.error(f"Error committing batch at item {idx}: {str(commit_error)}")
+            
+            # Final commit for remaining items
+            try:
+                db.commit()
+                logger.info(f"Final commit completed")
+            except Exception as commit_error:
+                db.rollback()
+                logger.error(f"Error in final commit: {str(commit_error)}")
+            
+            logger.info(f"Database save summary: {saved_count} saved, {skipped_count} skipped, {failed_count} failed out of {len(storage_list)} total items")
+            
+            # Log failure analysis if there are failures
+            if failed_count > 0:
+                # Group failures by error type
+                error_types = {}
+                for item in failed_items:
+                    error_type = item['error_type']
+                    if error_type not in error_types:
+                        error_types[error_type] = []
+                    error_types[error_type].append(item)
+                
+                logger.warning(f"Failure Analysis:")
+                logger.warning(f"  Total failures: {failed_count}")
+                for error_type, items in error_types.items():
+                    logger.warning(f"  {error_type}: {len(items)} failures")
+                    # Log first 5 examples of each error type
+                    for item in items[:5]:
+                        logger.warning(
+                            f"    - Item {item['index']}: HIS={item['hisNumber']}, "
+                            f"Site={item['siteName']}, Cryolock={item['cryolockNumber']}, "
+                            f"Error: {item['error_message'][:100]}"
+                        )
+                    if len(items) > 5:
+                        logger.warning(f"    ... and {len(items) - 5} more {error_type} errors")
+                
+                # Check for common failure patterns
+                missing_position = [item for item in failed_items if 'position' in item['error_message'].lower() or 'extract' in item['error_message'].lower()]
+                missing_fields = [item for item in failed_items if 'missing' in item['error_message'].lower() or 'required' in item['error_message'].lower()]
+                constraint_violations = [item for item in failed_items if 'unique' in item['error_message'].lower() or 'constraint' in item['error_message'].lower()]
+                
+                if missing_position:
+                    logger.warning(f"  Pattern: {len(missing_position)} failures due to position extraction issues")
+                if missing_fields:
+                    logger.warning(f"  Pattern: {len(missing_fields)} failures due to missing required fields")
+                if constraint_violations:
+                    logger.warning(f"  Pattern: {len(constraint_violations)} failures due to database constraint violations")
+        
+        return ARCIVFStorageResponse(**result)
+    except Exception as e:
+        logger.error(f"Error in get_ivf_storage: {str(e)}", exc_info=True)
+        # Return failure response format on exception
+        return ARCIVFStorageResponse(
+            storage_list=[],
+            status="FAILURE",
+            error_code=500
+        )
 

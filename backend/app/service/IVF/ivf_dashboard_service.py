@@ -152,34 +152,39 @@ class IVFDashboardService:
     
     def get_total_containers(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
-        Get total number of containers (canisters).
+        Get total number of containers (cryolocks).
         
         Metric 2: Total number of Containers (For all Sites)
+        
+        Note: "Containers" in the ARC IVF API context refers to cryolocks, not canisters.
+        This matches the source API's totalNumberofContainers field which counts cryolocks.
         
         Args:
             branch_id: Optional branch ID to filter by
             role: User's role to determine filtering
             
         Returns:
-            Dictionary with total_containers count
+            Dictionary with total_containers count (cryolocks)
         """
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Base query for canisters
-        canister_query = self.db.query(func.count(Canister.canister_id)).filter(Canister.is_active == True)
+        # Base query for cryolocks (containers)
+        cryolock_query = self.db.query(func.count(Cryolock.cryolock_id))
         
         # Apply branch filtering if needed
         if filter_branch_id is not None:
-            # Join through: Canister -> Tank -> Branch
-            canister_query = (
-                canister_query
+            # Join through: Cryolock -> Cane -> Canister -> Tank -> Branch
+            cryolock_query = (
+                cryolock_query
+                .join(Cane, Cryolock.cane_id == Cane.cane_id)
+                .join(Canister, Cane.canister_id == Canister.canister_id)
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .filter(HospitalBranch.branch_id == filter_branch_id)
             )
         
-        total_containers = canister_query.scalar() or 0
+        total_containers = cryolock_query.scalar() or 0
         
         return {
             "total_containers": total_containers

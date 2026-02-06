@@ -64,6 +64,86 @@ class QualityTrackingService:
     def __init__(self, db: Session):
         self.db = db
 
+    def resolve_tank_id(self, tank_code: str, branch_id: Optional[int] = None) -> int:
+        """
+        Resolve a tank_code (external identifier) to the internal tank_id.
+
+        Args:
+            tank_code: Tank code (e.g., "T1", "T10")
+            branch_id: Optional branch filter for authorization (when present)
+
+        Returns:
+            tank_id (int)
+
+        Raises:
+            AppException: If the tank_code is not found (or not accessible under branch filter)
+        """
+        try:
+            # Try exact match first
+            tank_query = self.db.query(Tank).filter(Tank.tank_code == tank_code)
+            if branch_id is not None:
+                tank_query = tank_query.filter(Tank.branch_id == branch_id)
+            
+            tank = tank_query.first()
+            
+            # If not found, try case-insensitive match
+            if not tank:
+                tank_query = self.db.query(Tank).filter(func.lower(Tank.tank_code) == func.lower(tank_code))
+                if branch_id is not None:
+                    tank_query = tank_query.filter(Tank.branch_id == branch_id)
+                tank = tank_query.first()
+            
+            # If still not found, try to match by extracting tank identifier from cryolockNumber
+            if not tank:
+                cryolock_tank_query = (
+                    self.db.query(func.distinct(Tank.tank_id))
+                    .join(Canister, Tank.tank_id == Canister.tank_id)
+                    .join(Cane, Canister.canister_id == Cane.canister_id)
+                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                    .filter(Cryolock.cryolock_number.like(f"{tank_code}/%"))
+                )
+                if branch_id is not None:
+                    cryolock_tank_query = cryolock_tank_query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    cryolock_tank_query = cryolock_tank_query.filter(HospitalBranch.branch_id == branch_id)
+                
+                matching_tank_ids = [t[0] for t in cryolock_tank_query.all()]
+                if matching_tank_ids:
+                    tank_query = self.db.query(Tank).filter(Tank.tank_id.in_(matching_tank_ids))
+                    tank = tank_query.first()
+            
+            if not tank:
+                available_tanks = []
+                if branch_id is not None:
+                    available_tanks_query = (
+                        self.db.query(Tank.tank_code)
+                        .filter(Tank.branch_id == branch_id)
+                        .limit(10)
+                    )
+                    available_tanks = [t[0] for t in available_tanks_query.all()]
+                
+                error_msg = f"Tank with code '{tank_code}' not found"
+                if branch_id:
+                    error_msg += f" in branch {branch_id}"
+                if available_tanks:
+                    error_msg += f". Available tanks in this branch: {', '.join(map(str, available_tanks))}"
+                
+                raise AppException(
+                    message=error_msg,
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            return tank.tank_id
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error resolving tank_id for tank_code={tank_code}: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to resolve tank: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
     def resolve_canister_id(self, canister_number: str, branch_id: Optional[int] = None) -> int:
         """
         Resolve a canister_number (external identifier) to the internal canister_id.
@@ -105,6 +185,143 @@ class QualityTrackingService:
                 message=f"Failed to resolve canister: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_canister_id_from_tank(
+        self,
+        tank_id: int,
+        canister_number: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> int:
+        """
+        Get canister_id from tank_id. If canister_number is provided, returns that specific canister.
+        Otherwise, returns the first canister in the tank.
+        
+        Args:
+            tank_id: Tank ID
+            canister_number: Optional canister number to filter by
+            branch_id: Optional branch filter for authorization
+            
+        Returns:
+            canister_id (int)
+        """
+        try:
+            query = (
+                self.db.query(Canister)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .filter(Canister.tank_id == tank_id)
+            )
+            
+            if canister_number:
+                query = query.filter(Canister.canister_number == canister_number)
+            
+            if branch_id is not None:
+                query = query.filter(Tank.branch_id == branch_id)
+            
+            canister = query.first()
+            if not canister:
+                if canister_number:
+                    raise AppException(
+                        message=f"Canister '{canister_number}' not found in tank",
+                        error_code=ErrorMessages.NOT_FOUND,
+                        status_code=HTTPStatus.NOT_FOUND
+                    )
+                else:
+                    raise AppException(
+                        message=f"No canisters found in tank",
+                        error_code=ErrorMessages.NOT_FOUND,
+                        status_code=HTTPStatus.NOT_FOUND
+                    )
+            
+            return canister.canister_id
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting canister_id from tank_id={tank_id}: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to get canister from tank: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_canister_id_from_tank_and_cryolock(
+        self,
+        tank_id: int,
+        cryolock_number: str,
+        branch_id: Optional[int] = None
+    ) -> int:
+        """
+        Get canister_id from tank_id and cryolock_number by finding the cryolock in the tank.
+        
+        Args:
+            tank_id: Tank ID
+            cryolock_number: Cryolock number to find
+            branch_id: Optional branch filter for authorization
+            
+        Returns:
+            canister_id (int)
+        """
+        try:
+            query = (
+                self.db.query(Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .join(Cane, Canister.canister_id == Cane.canister_id)
+                .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                .filter(
+                    Tank.tank_id == tank_id,
+                    Cryolock.cryolock_number == cryolock_number
+                )
+            )
+            
+            if branch_id is not None:
+                query = query.filter(Tank.branch_id == branch_id)
+            
+            result = query.first()
+            if not result:
+                raise AppException(
+                    message=f"Cryolock with number '{cryolock_number}' not found in tank",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            return result[0]
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting canister_id from tank_id={tank_id} and cryolock_number={cryolock_number}: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to get canister from tank and cryolock: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def create_refill_log_for_tank(
+        self,
+        tank_id: int,
+        canister_number: Optional[str],
+        refill_log_data: RefillLogCreate,
+        created_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> RefillLogResponse:
+        """
+        Create a new Liquid Nitrogen (LN2) refill log entry for a canister in a tank.
+        
+        Args:
+            tank_id: Tank ID
+            canister_number: Optional canister number. If not provided, uses first canister in tank.
+            refill_log_data: Refill log data to create
+            created_by: Username of the user creating the log
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            RefillLogResponse with created log details
+        """
+        canister_id = self._get_canister_id_from_tank(tank_id, canister_number, branch_id)
+        return self.create_refill_log(
+            canister_id=canister_id,
+            refill_log_data=refill_log_data,
+            created_by=created_by,
+            branch_id=branch_id
             )
     
     def create_refill_log(
@@ -233,6 +450,84 @@ class QualityTrackingService:
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
+    
+    def get_refill_logs_for_tank(
+        self,
+        tank_id: int,
+        canister_number: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+        branch_id: Optional[int] = None
+    ) -> RefillLogListResponse:
+        """
+        Get refill logs for canisters in a specific tank.
+        
+        Args:
+            tank_id: Tank ID
+            canister_number: Optional canister number to filter by. If not provided, returns logs for all canisters in tank.
+            status: Optional status to filter by
+            limit: Optional limit on number of results
+            branch_id: Optional branch ID for filtering
+            
+        Returns:
+            List of refill logs matching the criteria
+        """
+        try:
+            # Get canister IDs in the tank
+            canister_query = (
+                self.db.query(Canister.canister_id)
+                .join(Tank, Canister.tank_id == Tank.tank_id)
+                .filter(Canister.tank_id == tank_id)
+            )
+            
+            if canister_number:
+                canister_query = canister_query.filter(Canister.canister_number == canister_number)
+            
+            if branch_id is not None:
+                canister_query = canister_query.filter(Tank.branch_id == branch_id)
+            
+            canister_ids = [c[0] for c in canister_query.all()]
+            
+            if not canister_ids:
+                return RefillLogListResponse(refill_logs=[], count=0)
+            
+            # Query refill logs for all canisters in tank
+            query = self.db.query(CanisterLn2Log).filter(
+                CanisterLn2Log.canister_id.in_(canister_ids)
+            )
+            
+            if branch_id is not None:
+                query = query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            if status:
+                query = query.filter(CanisterLn2Log.status == status)
+            
+            # Order by most recent first
+            query = query.order_by(
+                desc(CanisterLn2Log.refill_date),
+                desc(CanisterLn2Log.refill_time),
+                desc(CanisterLn2Log.created_at)
+            )
+            
+            # Apply limit if provided
+            if limit:
+                query = query.limit(limit)
+            
+            refill_logs = query.all()
+            refill_log_responses = [RefillLogResponse.model_validate(log) for log in refill_logs]
+            
+            return RefillLogListResponse(
+                refill_logs=refill_log_responses,
+                count=len(refill_log_responses)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching refill logs for tank: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to fetch refill logs: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
     def update_refill_log_status(
         self,
@@ -287,27 +582,159 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
-    def get_canister_tracking_details(
+    def update_refill_log_status_for_tank(
         self,
-        canister_id: int,
+        tank_id: int,
+        log_id: int,
+        status_update: RefillLogStatusUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> RefillLogResponse:
+        """
+        Update only the status of a refill log. The log_id uniquely identifies the log.
+        Validates that the log belongs to a canister in the specified tank.
+        """
+        try:
+            # Get canister IDs in the tank
+            canister_ids = [
+                c[0] for c in (
+                    self.db.query(Canister.canister_id)
+                    .join(Tank, Canister.tank_id == Tank.tank_id)
+                    .filter(Canister.tank_id == tank_id)
+                    .all()
+                )
+            ]
+            
+            if not canister_ids:
+                raise AppException(
+                    message=f"No canisters found in tank",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            query = self.db.query(CanisterLn2Log).filter(
+                CanisterLn2Log.log_id == log_id,
+                CanisterLn2Log.canister_id.in_(canister_ids)
+            )
+            
+            if branch_id is not None:
+                query = query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            refill_log = query.first()
+            if not refill_log:
+                raise AppException(
+                    message=f"Refill log with ID {log_id} not found in tank",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            refill_log.status = status_update.status
+            refill_log.updated_by = updated_by
+            
+            self.db.commit()
+            self.db.refresh(refill_log)
+            
+            logger.info(
+                "Updated refill log status | log_id=%s tank_id=%s status=%s",
+                log_id,
+                tank_id,
+                status_update.status
+            )
+            
+            return RefillLogResponse.model_validate(refill_log)
+        except AppException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating refill log status: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to update refill log status: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+
+    def get_tank_tracking_details(
+        self,
+        tank_code: str,
         branch_id: Optional[int] = None
     ) -> IVFCanisterTrackingResponse:
         """
-        Fetch tracking details for a specific canister (grouped by cryolock).
+        Fetch tracking details for all canisters in a specific tank (grouped by cryolock).
 
         Response includes cryolock flags: embryo_transfer and in_transit.
         Also returns available_slots calculated as:
         total_slots - count(cryolocks where embryo_transfer OR in_transit OR embryo_grading is set on any embryo)
         """
         try:
-            # total_slots = distinct cryolocks in this canister
+            # Validate tank exists and get tank_id
+            # Try exact match first
+            tank_query = self.db.query(Tank).filter(Tank.tank_code == tank_code)
+            if branch_id is not None:
+                tank_query = tank_query.filter(Tank.branch_id == branch_id)
+            
+            tank = tank_query.first()
+            
+            # If not found, try case-insensitive match
+            if not tank:
+                tank_query = self.db.query(Tank).filter(func.lower(Tank.tank_code) == func.lower(tank_code))
+                if branch_id is not None:
+                    tank_query = tank_query.filter(Tank.branch_id == branch_id)
+                tank = tank_query.first()
+            
+            # If still not found, try to match by extracting tank identifier from cryolockNumber
+            # Format: "T1/C1/A11/2" -> extract "T1" and match against cryolockNumber patterns
+            if not tank:
+                # Find tanks that have cryolocks with cryolockNumber starting with "{tank_code}/"
+                cryolock_tank_query = (
+                    self.db.query(func.distinct(Tank.tank_id))
+                    .join(Canister, Tank.tank_id == Canister.tank_id)
+                    .join(Cane, Canister.canister_id == Cane.canister_id)
+                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
+                    .filter(Cryolock.cryolock_number.like(f"{tank_code}/%"))
+                )
+                if branch_id is not None:
+                    cryolock_tank_query = cryolock_tank_query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    cryolock_tank_query = cryolock_tank_query.filter(HospitalBranch.branch_id == branch_id)
+                
+                matching_tank_ids = [t[0] for t in cryolock_tank_query.all()]
+                if matching_tank_ids:
+                    # Use the first matching tank
+                    tank_query = self.db.query(Tank).filter(Tank.tank_id.in_(matching_tank_ids))
+                    tank = tank_query.first()
+            
+            # If still not found, provide helpful error message
+            if not tank:
+                available_tanks = []
+                if branch_id is not None:
+                    available_tanks_query = (
+                        self.db.query(Tank.tank_code)
+                        .filter(Tank.branch_id == branch_id)
+                        .limit(10)
+                    )
+                    available_tanks = [t[0] for t in available_tanks_query.all()]
+                
+                error_msg = f"Tank with code '{tank_code}' not found"
+                if branch_id:
+                    error_msg += f" in branch {branch_id}"
+                if available_tanks:
+                    error_msg += f". Available tanks in this branch: {', '.join(map(str, available_tanks))}"
+                else:
+                    error_msg += ". No tanks found in this branch."
+                
+                raise AppException(
+                    message=error_msg,
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # total_slots = distinct cryolocks in all canisters in this tank
             total_slots_query = (
                 self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
                 .join(Cane, Cryolock.cane_id == Cane.cane_id)
                 .join(Canister, Cane.canister_id == Canister.canister_id)
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(Canister.canister_id == canister_id)
+                .filter(Tank.tank_code == tank_code)
             )
             if branch_id is not None:
                 total_slots_query = total_slots_query.filter(HospitalBranch.branch_id == branch_id)
@@ -334,7 +761,7 @@ class QualityTrackingService:
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .outerjoin(moved_by_grading_subq, Cryolock.cryolock_id == moved_by_grading_subq.c.cryolock_id)
                 .filter(
-                    Canister.canister_id == canister_id,
+                    Tank.tank_code == tank_code,
                     or_(
                         Cryolock.embryo_transfer == True,
                         Cryolock.in_transit == True,
@@ -347,7 +774,8 @@ class QualityTrackingService:
             moved_count = moved_count_query.scalar() or 0
             available_slots = max(total_slots - moved_count, 0)
 
-            # Data rows (group by cryolock so we don't duplicate on multiple embryos)
+            # Data rows - return ALL cryolocks in the specified tank
+            # Start from Cryolock and LEFT JOIN to Embryo to include cryolocks without active embryos
             # Include all cryolocks (both available and in_transit) to show descriptions
             # Exclude only embryo_transfer=True cryolocks
             query = (
@@ -355,23 +783,24 @@ class QualityTrackingService:
                     IVFPatient.his_number,
                     Cryolock.cryolock_number,
                     Canister.canister_number,
+                    Tank.tank_code,
                     Cane.cane_code,
                     Cryolock.goblet_color,
                     Cryolock.cryolock_color,
-                    func.max(Embryo.date_of_vitrification).label('date_of_vitrification'),
+                    Cryolock.date_of_vitrification,
                     Cryolock.embryo_transfer,
                     Cryolock.in_transit,
                     Cryolock.cryolock_id
                 )
-                .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-                .join(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)
+                .select_from(Cryolock)  # Explicitly start from Cryolock
                 .join(Cane, Cryolock.cane_id == Cane.cane_id)
                 .join(Canister, Cane.canister_id == Canister.canister_id)
                 .join(Tank, Canister.tank_id == Tank.tank_id)
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .outerjoin(Embryo, (Embryo.cryolock_id == Cryolock.cryolock_id) & (Embryo.is_active == True))  # LEFT JOIN to get active embryos
+                .outerjoin(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)  # LEFT JOIN to get patient info
                 .filter(
-                    Embryo.is_active == True,
-                    Canister.canister_id == canister_id,
+                    Tank.tank_code == tank_code,
                     # Exclude only embryo_transfer cryolocks (include in_transit to show descriptions)
                     Cryolock.embryo_transfer != True
                 )
@@ -383,9 +812,11 @@ class QualityTrackingService:
                 IVFPatient.his_number,
                 Cryolock.cryolock_number,
                 Canister.canister_number,
+                Tank.tank_code,
                 Cane.cane_code,
                 Cryolock.goblet_color,
                 Cryolock.cryolock_color,
+                Cryolock.date_of_vitrification,
                 Cryolock.embryo_transfer,
                 Cryolock.in_transit,
                 Cryolock.cryolock_id
@@ -433,11 +864,15 @@ class QualityTrackingService:
                 # Get description for this cryolock if it exists
                 description = shipment_descriptions.get(row.cryolock_id)
                 
+                # Handle NULL his_number for cryolocks without active embryos
+                his_number = row.his_number if row.his_number else ""
+                
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
-                        his_number=row.his_number or "",
+                        his_number=his_number,
                         cryolock_number=row.cryolock_number or "",
                         canister_number=str(row.canister_number) if row.canister_number else None,
+                        tank_code=row.tank_code or "",
                         cane_code=row.cane_code or "",
                         goblet_color=row.goblet_color or "",
                         cryolock_color=row.cryolock_color or "",
@@ -469,6 +904,27 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> CryolockFlagUpdateResponse:
         """Mark a cryolock as moved to embryo transfer (embryo_transfer = True)."""
+        return self._set_cryolock_flag(
+            canister_id=canister_id,
+            cryolock_number=flag_update.cryolock_number,
+            flag_field="embryo_transfer",
+            updated_by=updated_by,
+            branch_id=branch_id
+        )
+    
+    def mark_embryo_transfer_for_tank(
+        self,
+        tank_id: int,
+        flag_update: CryolockFlagUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> CryolockFlagUpdateResponse:
+        """Mark a cryolock as moved to embryo transfer (embryo_transfer = True) within a tank."""
+        canister_id = self._get_canister_id_from_tank_and_cryolock(
+            tank_id=tank_id,
+            cryolock_number=flag_update.cryolock_number,
+            branch_id=branch_id
+        )
         return self._set_cryolock_flag(
             canister_id=canister_id,
             cryolock_number=flag_update.cryolock_number,
@@ -890,6 +1346,26 @@ class QualityTrackingService:
                 error_code=ERROR_CODES["SERVER_ERROR"],
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
+    
+    def mark_in_transit_with_shipment_for_tank(
+        self,
+        tank_id: int,
+        request: InTransitWithShipmentRequest,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> InTransitWithShipmentResponse:
+        """Mark a cryolock as in transit AND create IoT shipment within a tank."""
+        canister_id = self._get_canister_id_from_tank_and_cryolock(
+            tank_id=tank_id,
+            cryolock_number=request.cryolock_number,
+            branch_id=branch_id
+        )
+        return self.mark_in_transit_with_shipment(
+            canister_id=canister_id,
+            request=request,
+            updated_by=updated_by,
+            branch_id=branch_id
+            )
 
     def _set_cryolock_flag(
         self,
@@ -1040,6 +1516,26 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
     
+    def update_goblet_color_for_tank(
+        self,
+        tank_id: int,
+        color_update: GobletColorUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> ColorUpdateResponse:
+        """Update goblet color for a specific cryolock within a tank."""
+        canister_id = self._get_canister_id_from_tank_and_cryolock(
+            tank_id=tank_id,
+            cryolock_number=color_update.cryolock_number,
+            branch_id=branch_id
+        )
+        return self.update_goblet_color(
+            canister_id=canister_id,
+            color_update=color_update,
+            updated_by=updated_by,
+            branch_id=branch_id
+            )
+    
     def update_cryolock_color(
         self,
         canister_id: int,
@@ -1123,528 +1619,24 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
-    def export_monthly_refill_logs_excel(
+    def update_cryolock_color_for_tank(
         self,
-        canister_id: int,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
+        tank_id: int,
+        color_update: CryolockColorUpdate,
+        updated_by: Optional[str] = None,
         branch_id: Optional[int] = None
-    ) -> Response:
-        """
-        Export refill logs to Excel format.
-        
-        Args:
-            canister_id: Canister ID to export logs for
-            year: Year for the report (e.g., 2024). If not provided, uses current year.
-            month: Month for the report (1-12). If not provided, exports entire year.
-            branch_id: Optional branch ID for filtering
-            
-        Returns:
-            FastAPI Response with Excel file
-            
-        Raises:
-            AppException: If export fails or canister not found
-        """
-        try:
-            # Use current year if year not provided
-            current_date = datetime.now()
-            if year is None:
-                year = current_date.year
-            
-            # Validate year
-            if not (2000 <= year <= 2100):
-                raise AppException(
-                    message="Year must be between 2000 and 2100",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
-            
-            # Validate month if provided
-            if month is not None:
-                if not (1 <= month <= 12):
-                    raise AppException(
-                        message="Month must be between 1 and 12",
-                        error_code=ErrorMessages.INVALID_INPUT,
-                        status_code=HTTPStatus.BAD_REQUEST
-                    )
-            
-            # Get canister information
-            canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
-            if not canister:
-                raise AppException(
-                    message=f"Canister with ID {canister_id} not found",
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-            
-            canister_number = canister.canister_number or f"Canister-{canister_id}"
-            
-            # Calculate date range based on whether month is provided
-            if month is not None:
-                # Export specific month
-                start_date = date(year, month, 1)
-                if month == 12:
-                    end_date = date(year + 1, 1, 1)
-                else:
-                    end_date = date(year, month + 1, 1)
-                # Format month-year for metadata
-                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                date_range_display = f"{month_names[month]}-{year}"
-                date_range_str = f"{year}-{month:02d}"
-            else:
-                # Export entire year
-                start_date = date(year, 1, 1)
-                end_date = date(year + 1, 1, 1)
-                date_range_display = str(year)
-                date_range_str = str(year)
-            
-            # Query refill logs for the date range
-            query = (
-                self.db.query(CanisterLn2Log)
-                .filter(
-                    CanisterLn2Log.canister_id == canister_id,
-                    CanisterLn2Log.refill_date >= start_date,
-                    CanisterLn2Log.refill_date < end_date
-                )
-            )
-            
-            # Apply branch filter if provided
-            if branch_id is not None:
-                query = query.filter(CanisterLn2Log.branch_id == branch_id)
-            
-            # Order by date and time
-            query = query.order_by(
-                CanisterLn2Log.refill_date,
-                CanisterLn2Log.refill_time
-            )
-            
-            refill_logs = query.all()
-            
-            if not refill_logs:
-                error_msg = f"No refill logs found for canister {canister_number} in {date_range_str}"
-                raise AppException(
-                    message=error_msg,
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-            
-            # Get current year total log count (for metadata)
-            current_year = datetime.now().year
-            current_year_start = date(current_year, 1, 1)
-            current_year_end = date(current_year + 1, 1, 1)
-            
-            current_year_total_query = (
-                self.db.query(CanisterLn2Log)
-                .filter(
-                    CanisterLn2Log.canister_id == canister_id,
-                    CanisterLn2Log.refill_date >= current_year_start,
-                    CanisterLn2Log.refill_date < current_year_end
-                )
-            )
-            
-            if branch_id is not None:
-                current_year_total_query = current_year_total_query.filter(CanisterLn2Log.branch_id == branch_id)
-            
-            current_year_total = current_year_total_query.count()
-            
-            # Format date range for metadata
-            if month is not None:
-                # Format as "Jan-2026" if month is provided
-                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                date_range_display = f"{month_names[month]}-{year}"
-            else:
-                # Format as "2026" if only year
-                date_range_display = str(year)
-            
-            # Prepare data for Excel - remove Container ID and Status columns from data rows
-            excel_data = []
-            for log in refill_logs:
-                excel_data.append({
-                    "Refill Date": log.refill_date.strftime("%Y-%m-%d") if log.refill_date else "",
-                    "Refill Time": log.refill_time.strftime("%H:%M:%S") if log.refill_time else "",
-                    "Cryoshipper": log.cryoshipper or "",
-                    "Disinfected Shipper/Infected Tank Description": log.disinfected_shipper_infected_tank_description or "",
-                    "Reservoir": log.reservoir or "",
-                    "LN2 Ordered Date": log.ln2_ordered_date.strftime("%Y-%m-%d") if log.ln2_ordered_date else "",
-                    "LN2 Received Date": log.ln2_received_date.strftime("%Y-%m-%d") if log.ln2_received_date else "",
-                    "Description": log.description or "",
-                    "Refilled By": log.refilled_by or ""
-                })
-            
-            # Create DataFrame
-            df = pd.DataFrame(excel_data)
-            
-            # Create Excel file in memory
-            output = io.BytesIO()
-            
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Write metadata at the top without "Field" and "Value" headers
-                # Format: Container ID on top, then Year/Month-Year, then Current Year Total
-                # Create metadata as a simple list of rows without column headers
-                metadata_data = [
-                    ["Container ID", canister_number],
-                    ["Year" if month is None else "Month-Year", date_range_display],
-                    ["Current Year Total", str(current_year_total)]
-                ]
-                
-                # Write metadata to first rows without headers
-                metadata_df = pd.DataFrame(metadata_data)
-                metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
-                
-                # Write data starting from row 5 (after metadata: 3 data rows + 1 empty row + 1 header row)
-                # Row 1: Container ID | canister_number
-                # Row 2: Year/Month-Year | 2026 or Jan-2026
-                # Row 3: Current Year Total | count
-                # Row 4: (empty)
-                # Row 5: Data headers
-                # Row 6+: Data rows
-                df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
-                
-                # Get workbook and worksheet for formatting
-                workbook = writer.book
-                worksheet = writer.sheets['Refill Logs']
-                
-                # Format metadata section with brand colors
-                if Font and PatternFill and Alignment:
-                    # Brand colors: #6B1176 (purple), #FDF4FF (light purple background)
-                    brand_purple = "6B1176"  # Primary brand purple
-                    brand_purple_light = "FDF4FF"  # Light purple background
-                    
-                    # Style metadata rows (rows 1-3) - bold purple text for labels, regular for values
-                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
-                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
-                    
-                    for row_idx in range(1, 4):  # Rows 1, 2, 3 (metadata rows)
-                        for col_idx, cell in enumerate(worksheet[row_idx]):
-                            if col_idx == 0:  # First column (labels)
-                                cell.font = metadata_label_font
-                            else:  # Second column (values)
-                                cell.font = metadata_value_font
-                            cell.alignment = Alignment(horizontal="left", vertical="center")
-                    
-                    # Style data header (row 5) - purple background with white text
-                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
-                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
-                    
-                    for cell in worksheet[5]:
-                        cell.fill = data_header_fill
-                        cell.font = data_header_font
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
-                else:
-                    # If openpyxl.styles is not available, skip formatting
-                    logger.warning("openpyxl.styles not available, skipping Excel formatting")
-                
-                # Auto-adjust column widths
-                for column in worksheet.columns:
-                    max_length = 0
-                    column_letter = column[0].column_letter
-                    for cell in column:
-                        try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(str(cell.value))
-                        except:
-                            pass
-                    adjusted_width = min(max_length + 2, 50)
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
-            
-            output.seek(0)
-            excel_content = output.read()
-            output.close()
-            
-            # Generate filename
-            if month is not None:
-                filename = f"refill_logs_{canister_number}_{year}_{month:02d}.xlsx"
-            else:
-                filename = f"refill_logs_{canister_number}_{year}.xlsx"
-            
-            # Create response
-            response = Response(
-                content=excel_content,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"'
-                }
-            )
-            
-            logger.info(
-                f"Exported {len(refill_logs)} refill logs for canister {canister_number} ({date_range_str})"
-            )
-            
-            return response
-            
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error exporting refill logs: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to export refill logs: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-            )
-    
-    def export_kpi_threshold_monthly_excel(
-        self,
-        canister_number: str,
-        year: Optional[int] = None,
-        month: Optional[int] = None,
-        branch_id: Optional[int] = None
-    ) -> Response:
-        """
-        Export KPI threshold deviation data as Excel format for a specific canister.
-        
-        Args:
-            canister_number: Canister number to filter by (e.g., "C1") - required
-            year: Year for the report (e.g., 2024). If not provided, uses current year.
-            month: Month for the report (1-12). If not provided, exports entire year.
-            branch_id: Optional branch ID for filtering
-            
-        Returns:
-            FastAPI Response with Excel file containing KPI threshold deviation data
-            
-        Raises:
-            AppException: If export fails
-        """
-        try:
-            # Validate canister_number is provided
-            if not canister_number or not canister_number.strip():
-                raise AppException(
-                    message="canister_number is required",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
-            
-            # Use current year if year not provided
-            current_date = datetime.now()
-            if year is None:
-                year = current_date.year
-            
-            # Validate year
-            if not (2000 <= year <= 2100):
-                raise AppException(
-                    message="Year must be between 2000 and 2100",
-                    error_code=ErrorMessages.INVALID_INPUT,
-                    status_code=HTTPStatus.BAD_REQUEST
-                )
-            
-            # Validate month if provided
-            if month is not None:
-                if not (1 <= month <= 12):
-                    raise AppException(
-                        message="Month must be between 1 and 12",
-                        error_code=ErrorMessages.INVALID_INPUT,
-                        status_code=HTTPStatus.BAD_REQUEST
-                    )
-            
-            # Resolve canister_id (required)
-            canister_id = self.resolve_canister_id(canister_number, branch_id)
-            
-            # Calculate date range based on whether month is provided
-            if month is not None:
-                # Export specific month
-                start_datetime = datetime(year, month, 1, 0, 0, 0)
-                if month == 12:
-                    end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
-                else:
-                    end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
-                # Format month-year for metadata
-                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                date_range_display = f"{month_names[month]}-{year}"
-                date_range_str = f"{year}-{month:02d}"
-            else:
-                # Export entire year
-                start_datetime = datetime(year, 1, 1, 0, 0, 0)
-                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
-                date_range_display = str(year)
-                date_range_str = str(year)
-            
-            # Query IVF quality logs for the specified month and canister
-            query = (
-                self.db.query(
-                    IVFQualityLog,
-                    Canister.canister_number,
-                    HospitalBranch.branch_name
-                )
-                .join(Canister, IVFQualityLog.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(
-                    IVFQualityLog.reading_timestamp >= start_datetime,
-                    IVFQualityLog.reading_timestamp < end_datetime,
-                    IVFQualityLog.canister_id == canister_id,
-                    Canister.is_active == True
-                )
-            )
-            
-            # Apply branch filter if provided
-            if branch_id is not None:
-                query = query.filter(HospitalBranch.branch_id == branch_id)
-            
-            # Order by timestamp
-            query = query.order_by(IVFQualityLog.reading_timestamp)
-            
-            results = query.all()
-            
-            if not results:
-                raise AppException(
-                    message=f"No KPI threshold deviation data found for {date_range_str}",
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-            
-            # KPI Threshold Targets (from IVF_PARAMETER_TARGETS)
-            kpi_targets = {
-                "temperature": {"target": 5.0, "min": 0.0, "max": 10.0, "unit": "°C"},
-                "humidity": {"target": 50.0, "min": 45.0, "max": 55.0, "unit": "%"},
-                "agitation": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "G"},
-                "light": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "lux"}
-            }
-            
-            # Prepare Excel data
-            excel_data = []
-            for quality_log, canister_num, branch_name in results:
-                # Determine which parameters violated thresholds
-                violations = []
-                if quality_log.is_temp_loss:
-                    violations.append("Temperature")
-                if quality_log.is_humidity_loss:
-                    violations.append("Humidity")
-                if quality_log.is_agitation_loss:
-                    violations.append("Agitation")
-                if quality_log.is_light_loss:
-                    violations.append("Light")
-                
-                excel_data.append({
-                    "Date": quality_log.reading_timestamp.strftime("%Y-%m-%d") if quality_log.reading_timestamp else "",
-                    "Time": quality_log.reading_timestamp.strftime("%H:%M:%S") if quality_log.reading_timestamp else "",
-                    "Canister Number": canister_num or "",
-                    "Branch Name": branch_name or "",
-                    "Device ID": quality_log.device_id or "",
-                    "Temperature (°C)": f"{quality_log.temperature:.2f}" if quality_log.temperature is not None else "",
-                    "Temperature Target (°C)": f"{kpi_targets['temperature']['target']:.1f}",
-                    "Temperature Min (°C)": f"{kpi_targets['temperature']['min']:.1f}",
-                    "Temperature Max (°C)": f"{kpi_targets['temperature']['max']:.1f}",
-                    "Temperature Violation": "Yes" if quality_log.is_temp_loss else "No",
-                    "Humidity (%)": f"{quality_log.humidity:.2f}" if quality_log.humidity is not None else "",
-                    "Humidity Target (%)": f"{kpi_targets['humidity']['target']:.1f}",
-                    "Humidity Min (%)": f"{kpi_targets['humidity']['min']:.1f}",
-                    "Humidity Max (%)": f"{kpi_targets['humidity']['max']:.1f}",
-                    "Humidity Violation": "Yes" if quality_log.is_humidity_loss else "No",
-                    "Agitation (G)": f"{quality_log.agitation:.2f}" if quality_log.agitation is not None else "",
-                    "Agitation Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
-                    "Agitation Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
-                    "Agitation Max (G)": f"{kpi_targets['agitation']['max']:.1f}",
-                    "Agitation Violation": "Yes" if quality_log.is_agitation_loss else "No",
-                    "Light (lux)": f"{quality_log.light:.2f}" if quality_log.light is not None else "",
-                    "Light Target (lux)": f"{kpi_targets['light']['target']:.1f}",
-                    "Light Min (lux)": f"{kpi_targets['light']['min']:.1f}",
-                    "Light Max (lux)": f"{kpi_targets['light']['max']:.1f}",
-                    "Light Violation": "Yes" if quality_log.is_light_loss else "No",
-                    "Quality Loss (%)": f"{quality_log.quality_loss:.2f}" if quality_log.quality_loss is not None else "",
-                    "Violated Parameters": ", ".join(violations) if violations else "None"
-                })
-            
-            # Create DataFrame
-            df = pd.DataFrame(excel_data)
-            
-            # Create Excel file in memory
-            output = io.BytesIO()
-            
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Write metadata at the top without "Field" and "Value" headers
-                # Format: Container ID on top, then Year/Month-Year, then Total Deviations
-                metadata_data = [
-                    ["Container ID", canister_number],
-                    ["Year" if month is None else "Month-Year", date_range_display],
-                    ["Total Deviations", str(len(excel_data))]
-                ]
-                
-                # Write metadata to first rows without headers
-                metadata_df = pd.DataFrame(metadata_data)
-                metadata_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, header=False, startrow=0)
-                
-                # Write data starting from row 5 (after metadata: 3 data rows + 1 empty row + 1 header row)
-                df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, startrow=4)
-                
-                # Get workbook and worksheet for formatting
-                workbook = writer.book
-                worksheet = writer.sheets['KPI Threshold Deviations']
-                
-                # Format metadata section with brand colors
-                if Font and PatternFill and Alignment:
-                    # Brand colors: #6B1176 (purple), #FDF4FF (light purple background)
-                    brand_purple = "6B1176"  # Primary brand purple
-                    brand_purple_light = "FDF4FF"  # Light purple background
-                    
-                    # Style metadata rows (rows 1-3) - bold purple text for labels, regular for values
-                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
-                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
-                    
-                    for row_idx in range(1, 4):  # Rows 1, 2, 3 (metadata rows)
-                        for col_idx, cell in enumerate(worksheet[row_idx]):
-                            if col_idx == 0:  # First column (labels)
-                                cell.font = metadata_label_font
-                            else:  # Second column (values)
-                                cell.font = metadata_value_font
-                            cell.alignment = Alignment(horizontal="left", vertical="center")
-                    
-                    # Style data header (row 5) - purple background with white text
-                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
-                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
-                    
-                    for cell in worksheet[5]:
-                        cell.fill = data_header_fill
-                        cell.font = data_header_font
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
-                else:
-                    # If openpyxl.styles is not available, skip formatting
-                    logger.warning("openpyxl.styles not available, skipping Excel formatting")
-                
-                # Auto-adjust column widths
-                for column in worksheet.columns:
-                    max_length = 0
-                    column_letter = column[0].column_letter
-                    for cell in column:
-                        try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(str(cell.value))
-                        except:
-                            pass
-                    adjusted_width = min(max_length + 2, 50)
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
-            
-            output.seek(0)
-            excel_content = output.read()
-            output.close()
-            
-            # Generate filename
-            if month is not None:
-                filename = f"kpi_threshold_deviations_{canister_number}_{year}_{month:02d}.xlsx"
-            else:
-                filename = f"kpi_threshold_deviations_{canister_number}_{year}.xlsx"
-            
-            # Create response
-            response = Response(
-                content=excel_content,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"'
-                }
-            )
-            
-            logger.info(
-                f"Exported {len(excel_data)} KPI threshold deviation records for {date_range_str}"
-            )
-            
-            return response
-            
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error exporting KPI threshold deviations: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to export KPI threshold deviation data: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+    ) -> ColorUpdateResponse:
+        """Update cryolock color for a specific cryolock within a tank."""
+        canister_id = self._get_canister_id_from_tank_and_cryolock(
+            tank_id=tank_id,
+            cryolock_number=color_update.cryolock_number,
+            branch_id=branch_id
+        )
+        return self.update_cryolock_color(
+            canister_id=canister_id,
+            color_update=color_update,
+            updated_by=updated_by,
+            branch_id=branch_id
             )
     
     def export_combined_refill_logs_and_deviations_excel(
@@ -1652,7 +1644,8 @@ class QualityTrackingService:
         canister_id: int,
         year: Optional[int] = None,
         month: Optional[int] = None,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
     ) -> Response:
         """
         Export combined refill logs and KPI threshold deviations to Excel format with two sheets.
@@ -1704,6 +1697,11 @@ class QualityTrackingService:
                 )
             
             canister_number = canister.canister_number or f"Canister-{canister_id}"
+            
+            # Use tank_code if provided, otherwise use canister_number
+            # If tank_code is provided, it means we're exporting for a tank, so show tank code
+            display_id = tank_code if tank_code else canister_number
+            display_label = "Tank Code" if tank_code else "Container ID"
             
             # Calculate date range based on whether month is provided
             if month is not None:
@@ -1884,7 +1882,7 @@ class QualityTrackingService:
                 if not refill_logs_df.empty:
                     # Write metadata for refill logs
                     refill_metadata_data = [
-                        ["Container ID", canister_number],
+                        [display_label, display_id],
                         ["Year" if month is None else "Month-Year", date_range_display],
                         ["Current Year Total", str(current_year_total)]
                     ]
@@ -1936,7 +1934,7 @@ class QualityTrackingService:
                 if not deviations_df.empty:
                     # Write metadata for deviations
                     deviations_metadata_data = [
-                        ["Container ID", canister_number],
+                        [display_label, display_id],
                         ["Year" if month is None else "Month-Year", date_range_display],
                         ["Total Deviations", str(len(deviations_data))]
                     ]
@@ -1986,11 +1984,12 @@ class QualityTrackingService:
             excel_content = output.read()
             output.close()
             
-            # Generate filename
+            # Generate filename - use tank_code if available, otherwise canister_number
+            file_id = tank_code if tank_code else canister_number
             if month is not None:
-                filename = f"combined_report_{canister_number}_{year}_{month:02d}.xlsx"
+                filename = f"combined_report_{file_id}_{year}_{month:02d}.xlsx"
             else:
-                filename = f"combined_report_{canister_number}_{year}.xlsx"
+                filename = f"combined_report_{file_id}_{year}.xlsx"
             
             # Create response
             response = Response(
@@ -2002,7 +2001,7 @@ class QualityTrackingService:
             )
             
             logger.info(
-                f"Exported combined report for canister {canister_number} ({date_range_str}): "
+                f"Exported combined report for {display_label.lower()} {display_id} ({date_range_str}): "
                 f"{len(refill_logs_data)} refill logs, {len(deviations_data)} deviations"
             )
             
@@ -2016,5 +2015,33 @@ class QualityTrackingService:
                 message=f"Failed to export combined report: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+    
+    def export_combined_refill_logs_and_deviations_excel_for_tank(
+        self,
+        tank_id: int,
+        canister_number: Optional[str] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch_id: Optional[int] = None
+    ) -> Response:
+        """Export combined refill logs and KPI threshold deviations to Excel format for canisters in a specific tank."""
+        # Get tank information for metadata
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise AppException(
+                message=f"Tank with ID {tank_id} not found",
+                error_code=ErrorMessages.NOT_FOUND,
+                status_code=HTTPStatus.NOT_FOUND
+            )
+        tank_code = tank.tank_code or f"Tank-{tank_id}"
+        
+        canister_id = self._get_canister_id_from_tank(tank_id, canister_number, branch_id)
+        return self.export_combined_refill_logs_and_deviations_excel(
+            canister_id=canister_id,
+            year=year,
+            month=month,
+            branch_id=branch_id,
+            tank_code=tank_code  # Pass tank_code for metadata display
             )
     
