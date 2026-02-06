@@ -91,6 +91,13 @@ class IVFDashboardService:
         
         Metric 1: Total Embryos/Cryolocks (for all the sites)
         
+        Note: In the new model structure, we only track cryolocks (containers) in PatientCrylockInfo.
+        Each cryolock can contain embryos, but we don't track individual embryo counts.
+        For backward compatibility:
+        - total_cryolocks: Count of active cryolocks (excluding embryo_transfer=True)
+        - total_embryos: Set to same as total_cryolocks (since each cryolock contains embryos)
+        - total_embryos_cryolocks: Sum of both (effectively 2 * total_cryolocks)
+        
         Args:
             branch_id: Optional branch ID to filter by
             role: User's role to determine filtering
@@ -101,44 +108,22 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Base query for embryos
-        embryo_query = self.db.query(func.count(Embryo.embryo_id)).filter(Embryo.is_active == True)
-        
-        # Base query for cryolocks
-        cryolock_query = self.db.query(func.count(Cryolock.cryolock_id))
+        # Query PatientCrylockInfo for cryolocks
+        # Exclude cryolocks that have been moved to embryo transfer
+        cryolock_query = (
+            self.db.query(func.count(PatientCrylockInfo.id))
+            .filter(PatientCrylockInfo.embryo_transfer != True)
+        )
         
         # Apply branch filtering if needed
         if filter_branch_id is not None:
-            # Join through: Embryo -> Cryolock -> Cane -> Canister -> Tank -> Branch
-            embryo_query = (
-                embryo_query
-                .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-            
-            # For cryolocks, join through: Cryolock -> Cane -> Canister -> Tank -> Branch
-            cryolock_query = (
-                cryolock_query
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        else:
-            # No branch filter - count all active embryos and cryolocks
-            # For embryos, we still need to join to get valid relationships
-            embryo_query = (
-                embryo_query
-                .join(Cryolock, Embryo.cryolock_id == Cryolock.cryolock_id)
-            )
+            cryolock_query = cryolock_query.filter(PatientCrylockInfo.branch_id == filter_branch_id)
         
-        total_embryos = embryo_query.scalar() or 0
         total_cryolocks = cryolock_query.scalar() or 0
+        
+        # For backward compatibility: treat each cryolock as containing embryos
+        # In reality, we don't track individual embryo counts, so we use cryolock count
+        total_embryos = total_cryolocks
         total_embryos_cryolocks = total_embryos + total_cryolocks
         
         return {
@@ -166,20 +151,16 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Base query for cryolocks (containers)
-        cryolock_query = self.db.query(func.count(Cryolock.cryolock_id))
+        # Query PatientCrylockInfo for cryolocks (containers)
+        # Exclude cryolocks that have been moved to embryo transfer
+        cryolock_query = (
+            self.db.query(func.count(PatientCrylockInfo.id))
+            .filter(PatientCrylockInfo.embryo_transfer != True)
+        )
         
         # Apply branch filtering if needed
         if filter_branch_id is not None:
-            # Join through: Cryolock -> Cane -> Canister -> Tank -> Branch
-            cryolock_query = (
-                cryolock_query
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
+            cryolock_query = cryolock_query.filter(PatientCrylockInfo.branch_id == filter_branch_id)
         
         total_containers = cryolock_query.scalar() or 0
         
