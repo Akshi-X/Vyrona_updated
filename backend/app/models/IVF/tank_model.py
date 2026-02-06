@@ -19,6 +19,12 @@ class Tank(Base):
     tank_code = Column(String(255), nullable=True)
     capacity_liters = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    tive_device_id = Column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Tive device identifier mapped to this tank (e.g., EntityName like 'J712149' or a device id) for tank-level monitoring"
+    )
     
     # Relationships
     branch = relationship("HospitalBranch", back_populates="tanks")
