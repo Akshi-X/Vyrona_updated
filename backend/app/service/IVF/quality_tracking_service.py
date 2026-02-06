@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 try:
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Font, PatternFill  # type: ignore
 except ImportError:
     # openpyxl.styles may not be available in all environments
     Alignment = Font = PatternFill = None
@@ -30,7 +30,6 @@ from ...exceptions.custom_exceptions import AppException
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
-from ...models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
@@ -113,271 +112,12 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
     
-    def resolve_canister_id(self, canister_number: str, branch_id: Optional[int] = None) -> int:
-        """
-        Resolve a canister_number (external identifier) to the internal canister_id.
-
-        Args:
-            canister_number: Canister number/code (e.g., "C1")
-            branch_id: Optional branch filter for authorization (when present)
-
-        Returns:
-            canister_id (int)
-
-        Raises:
-            AppException: If the canister_number is not found (or not accessible under branch filter)
-        """
-        try:
-            query = (
-                self.db.query(Canister)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .filter(Canister.canister_number == canister_number)
-            )
-
-            if branch_id is not None:
-                query = query.filter(Tank.branch_id == branch_id)
-
-            canister = query.first()
-            if not canister:
-                raise AppException(
-                    message=f"Canister with number '{canister_number}' not found",
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-
-            return canister.canister_id
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error resolving canister_id for canister_number={canister_number}: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to resolve canister: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-            )
+    # Removed resolve_canister_id method - canisters are no longer used
+    # All functionality now works directly with PatientCrylockInfo and Tank models
     
-    def _get_canister_id_from_tank(
-        self,
-        tank_id: int,
-        canister_number: Optional[str] = None,
-        branch_id: Optional[int] = None
-    ) -> int:
-        """
-        Get canister_id from tank_id. If canister_number is provided, returns that specific canister.
-        Otherwise, returns the first canister in the tank.
-        
-        Args:
-            tank_id: Tank ID
-            canister_number: Optional canister number to filter by
-            branch_id: Optional branch filter for authorization
-            
-        Returns:
-            canister_id (int)
-        """
-        try:
-            query = (
-                self.db.query(Canister)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .filter(Canister.tank_id == tank_id)
-            )
-            
-            if canister_number:
-                query = query.filter(Canister.canister_number == canister_number)
-            
-            if branch_id is not None:
-                query = query.filter(Tank.branch_id == branch_id)
-            
-            canister = query.first()
-            if not canister:
-                if canister_number:
-                    raise AppException(
-                        message=f"Canister '{canister_number}' not found in tank",
-                        error_code=ErrorMessages.NOT_FOUND,
-                        status_code=HTTPStatus.NOT_FOUND
-                    )
-                else:
-                    raise AppException(
-                        message=f"No canisters found in tank",
-                        error_code=ErrorMessages.NOT_FOUND,
-                        status_code=HTTPStatus.NOT_FOUND
-                    )
-            
-            return canister.canister_id
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error getting canister_id from tank_id={tank_id}: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to get canister from tank: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-            )
-    
-    def _get_canister_id_from_tank_and_cryolock(
-        self,
-        tank_id: int,
-        cryolock_number: str,
-        branch_id: Optional[int] = None,
-        tank_code: Optional[str] = None
-    ) -> int:
-        """
-        Get canister_id from tank_id and cryolock_number by finding the cryolock in the tank.
-        
-        Args:
-            tank_id: Tank ID (may be incorrect if multiple tanks have same tank_code)
-            cryolock_number: Cryolock number to find
-            branch_id: Optional branch filter for authorization
-            tank_code: Optional tank code - if provided, search by tank_code directly to handle duplicates
-            
-        Returns:
-            canister_id (int)
-        """
-        try:
-            # Trim whitespace from cryolock_number
-            cryolock_number_trimmed = cryolock_number.strip() if cryolock_number else None
-            
-            # If tank_code is provided, search by tank_code directly (handles duplicate tank_codes)
-            # This matches the pattern used in get_tank_tracking_details
-            if tank_code:
-                query = (
-                    self.db.query(Canister.canister_id)
-                    .join(Cane, Canister.canister_id == Cane.canister_id)
-                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .filter(
-                        Tank.tank_code == tank_code,
-                        Cryolock.cryolock_number == cryolock_number_trimmed
-                    )
-                )
-                
-                # Apply branch filter if provided
-                if branch_id is not None:
-                    query = (
-                        query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                        .filter(HospitalBranch.branch_id == branch_id)
-                    )
-                
-                result = query.first()
-                
-                # If not found with exact match, try case-insensitive match
-                if not result:
-                    query = (
-                        self.db.query(Canister.canister_id)
-                        .join(Cane, Canister.canister_id == Cane.canister_id)
-                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                        .join(Tank, Canister.tank_id == Tank.tank_id)
-                        .filter(
-                            Tank.tank_code == tank_code,
-                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
-                        )
-                    )
-                    
-                    if branch_id is not None:
-                        query = (
-                            query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                            .filter(HospitalBranch.branch_id == branch_id)
-                        )
-                    
-                    result = query.first()
-            else:
-                # Fallback to tank_id search (original behavior)
-                query = (
-                    self.db.query(Canister.canister_id)
-                    .join(Cane, Canister.canister_id == Cane.canister_id)
-                    .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .filter(
-                        Tank.tank_id == tank_id,
-                        Cryolock.cryolock_number == cryolock_number_trimmed
-                    )
-                )
-                
-                if branch_id is not None:
-                    query = (
-                        query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                        .filter(HospitalBranch.branch_id == branch_id)
-                    )
-                
-                result = query.first()
-                
-                # If not found with exact match, try case-insensitive match
-                if not result:
-                    query = (
-                        self.db.query(Canister.canister_id)
-                        .join(Cane, Canister.canister_id == Cane.canister_id)
-                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                        .join(Tank, Canister.tank_id == Tank.tank_id)
-                        .filter(
-                            Tank.tank_id == tank_id,
-                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
-                        )
-                    )
-                    
-                    if branch_id is not None:
-                        query = (
-                            query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                            .filter(HospitalBranch.branch_id == branch_id)
-                        )
-                    
-                    result = query.first()
-            
-            if not result:
-                # Get tank info for better error message
-                tank_info = self.db.query(Tank.tank_code, Tank.branch_id).filter(Tank.tank_id == tank_id).first()
-                tank_code_msg = tank_code or (tank_info.tank_code if tank_info else f"tank_id={tank_id}")
-                
-                error_msg = f"Cryolock with number '{cryolock_number_trimmed}' not found in tank {tank_code_msg}"
-                if branch_id:
-                    error_msg += f" (branch_id={branch_id})"
-                
-                # Debug: Check if cryolock exists at all
-                cryolock_exists = (
-                    self.db.query(Cryolock.cryolock_id)
-                    .filter(
-                        or_(
-                            Cryolock.cryolock_number == cryolock_number_trimmed,
-                            func.lower(func.trim(Cryolock.cryolock_number)) == func.lower(cryolock_number_trimmed)
-                        )
-                    )
-                    .first()
-                )
-                
-                if cryolock_exists:
-                    # Check which tank this cryolock is actually in
-                    actual_tank = (
-                        self.db.query(Tank.tank_id, Tank.tank_code, Tank.branch_id)
-                        .join(Canister, Tank.tank_id == Canister.tank_id)
-                        .join(Cane, Canister.canister_id == Cane.canister_id)
-                        .join(Cryolock, Cane.cane_id == Cryolock.cane_id)
-                        .filter(Cryolock.cryolock_id == cryolock_exists[0])
-                        .first()
-                    )
-                    
-                    if actual_tank:
-                        logger.warning(
-                            "Cryolock exists but in different tank | requested_tank_id=%s requested_tank_code=%s "
-                            "actual_tank_id=%s actual_tank_code=%s actual_branch_id=%s requested_branch_id=%s cryolock_number=%s",
-                            tank_id, tank_code_msg, actual_tank.tank_id, actual_tank.tank_code,
-                            actual_tank.branch_id, branch_id, cryolock_number_trimmed
-                        )
-                        error_msg += f". Cryolock exists in tank {actual_tank.tank_code} (tank_id={actual_tank.tank_id}, branch_id={actual_tank.branch_id})"
-                
-                raise AppException(
-                    message=error_msg,
-                    error_code=ErrorMessages.NOT_FOUND,
-                    status_code=HTTPStatus.NOT_FOUND
-                )
-            
-            return result[0]
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error getting canister_id from tank_id={tank_id} and cryolock_number={cryolock_number}: {str(e)}", exc_info=True)
-            raise AppException(
-                message=f"Failed to get canister from tank and cryolock: {str(e)}",
-                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
-            )
+    # Removed _get_canister_id_from_tank and _get_canister_id_from_tank_and_cryolock methods
+    # These methods referenced deleted models (Canister, Cane, Cryolock) and are no longer needed
+    # All functionality now works directly with PatientCrylockInfo and Tank models
     
     def create_refill_log_for_tank(
         self,
@@ -707,11 +447,11 @@ class QualityTrackingService:
         branch_id: Optional[int] = None
     ) -> IVFCanisterTrackingResponse:
         """
-        Fetch tracking details for all canisters in a specific tank (grouped by cryolock).
+        Fetch tracking details for all patient crylocks in a specific tank.
 
-        Response includes cryolock flags: embryo_transfer and in_transit.
+        Response includes crylock flags: embryo_transfer and in_transit.
         Also returns available_slots calculated as:
-        total_slots - count(cryolocks where embryo_transfer OR in_transit OR embryo_grading is set on any embryo)
+        total_slots - count(crylocks where embryo_transfer OR in_transit)
         """
         try:
             # Use optimized helper function to find tank
@@ -741,127 +481,95 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            # total_slots = distinct cryolocks in all canisters in this tank
-            # Use direct tank_id reference for optimization
+            # For User role: branch_id is provided and must match tank's branch
+            # For Admin/Manager: branch_id is None, but we still filter by tank's branch for security
+            # Always filter by the user's branch_id if provided (User role), otherwise use tank's branch
+            filter_branch_id = branch_id if branch_id is not None else tank.branch_id
+            
+            # Verify tank belongs to user's branch (for User role)
+            if branch_id is not None and tank.branch_id != branch_id:
+                raise AppException(
+                    message=f"Tank '{tank_code}' does not belong to your branch",
+                    error_code=ErrorMessages.FORBIDDEN,
+                    status_code=HTTPStatus.FORBIDDEN
+                )
+            
+            # total_slots = distinct patient crylocks in this tank for the user's branch
             total_slots_query = (
-                self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
-                .filter(Cryolock.tank_id == tank.tank_id)
+                self.db.query(func.count(func.distinct(PatientCrylockInfo.id)))
+                .filter(
+                    PatientCrylockInfo.tank_id == tank.tank_id,
+                    PatientCrylockInfo.branch_id == filter_branch_id
+                )
             )
-            if branch_id is not None:
-                total_slots_query = total_slots_query.filter(Cryolock.branch_id == branch_id)
-            elif tank.branch_id:
-                total_slots_query = total_slots_query.filter(Cryolock.branch_id == tank.branch_id)
             total_slots = total_slots_query.scalar() or 0
 
-            # moved_by_grading = cryolocks with any active embryo that has embryo_grading set (non-empty)
-            moved_by_grading_subq = (
-                self.db.query(Embryo.cryolock_id)
-                .filter(
-                    Embryo.is_active == True,
-                    Embryo.embryo_grading.isnot(None),
-                    Embryo.embryo_grading != ''
-                )
-                .distinct()
-                .subquery()
-            )
-
-            # moved_count = distinct cryolocks where embryo_transfer OR in_transit OR embryo_grading is set
-            # Use direct tank_id reference for optimization
+            # moved_count = distinct crylocks where embryo_transfer OR in_transit (for user's branch)
             moved_count_query = (
-                self.db.query(func.count(func.distinct(Cryolock.cryolock_id)))
-                .outerjoin(moved_by_grading_subq, Cryolock.cryolock_id == moved_by_grading_subq.c.cryolock_id)
+                self.db.query(func.count(func.distinct(PatientCrylockInfo.id)))
                 .filter(
-                    Cryolock.tank_id == tank.tank_id,
+                    PatientCrylockInfo.tank_id == tank.tank_id,
+                    PatientCrylockInfo.branch_id == filter_branch_id,
                     or_(
-                        Cryolock.embryo_transfer == True,
-                        Cryolock.in_transit == True,
-                        moved_by_grading_subq.c.cryolock_id.isnot(None)
+                        PatientCrylockInfo.embryo_transfer == True,
+                        PatientCrylockInfo.in_transit == True
                     )
                 )
             )
-            if branch_id is not None:
-                moved_count_query = moved_count_query.filter(Cryolock.branch_id == branch_id)
-            elif tank.branch_id:
-                moved_count_query = moved_count_query.filter(Cryolock.branch_id == tank.branch_id)
             moved_count = moved_count_query.scalar() or 0
             available_slots = max(total_slots - moved_count, 0)
 
-            # Data rows - return ALL cryolocks in the specified tank
-            # Use direct tank_id reference for optimization
-            # Start from Cryolock and LEFT JOIN to Embryo to include cryolocks without active embryos
-            # Include all cryolocks (both available and in_transit) to show descriptions
-            # Exclude only embryo_transfer=True cryolocks
+            # Data rows - return ALL patient crylocks in the specified tank for the user's branch
+            # Exclude only embryo_transfer=True crylocks (include in_transit to show descriptions)
             query = (
                 self.db.query(
-                    IVFPatient.his_number,
-                    Cryolock.cryolock_number,
-                    Canister.canister_number,
-                    Tank.tank_code,
-                    Cane.cane_code,
-                    Cryolock.goblet_color,
-                    Cryolock.cryolock_color,
-                    Cryolock.date_of_vitrification,
-                    Cryolock.embryo_transfer,
-                    Cryolock.in_transit,
-                    Cryolock.cryolock_id
+                    PatientCrylockInfo.his_number,
+                    PatientCrylockInfo.crylock_number,
+                    PatientCrylockInfo.canister_number,
+                    PatientCrylockInfo.tank_code,
+                    PatientCrylockInfo.cane_code,
+                    PatientCrylockInfo.goblet_color,
+                    PatientCrylockInfo.crylock_color,
+                    PatientCrylockInfo.date_of_vitrification,
+                    PatientCrylockInfo.embryo_transfer,
+                    PatientCrylockInfo.in_transit,
+                    PatientCrylockInfo.id
                 )
-                .select_from(Cryolock)  # Explicitly start from Cryolock
-                .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                .join(Canister, Cane.canister_id == Canister.canister_id)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .outerjoin(Embryo, (Embryo.cryolock_id == Cryolock.cryolock_id) & (Embryo.is_active == True))  # LEFT JOIN to get active embryos
-                .outerjoin(IVFPatient, Embryo.patient_id == IVFPatient.patient_id)  # LEFT JOIN to get patient info
                 .filter(
-                    Cryolock.tank_id == tank.tank_id,  # Use direct reference
-                    # Exclude only embryo_transfer cryolocks (include in_transit to show descriptions)
-                    Cryolock.embryo_transfer != True
+                    PatientCrylockInfo.tank_id == tank.tank_id,
+                    PatientCrylockInfo.branch_id == filter_branch_id,  # Filter by user's branch
+                    # Exclude only embryo_transfer crylocks (include in_transit to show descriptions)
+                    PatientCrylockInfo.embryo_transfer != True
                 )
             )
-            if branch_id is not None:
-                query = query.filter(Cryolock.branch_id == branch_id)
-            elif tank.branch_id:
-                query = query.filter(Cryolock.branch_id == tank.branch_id)
 
-            query = query.group_by(
-                IVFPatient.his_number,
-                Cryolock.cryolock_number,
-                Canister.canister_number,
-                Tank.tank_code,
-                Cane.cane_code,
-                Cryolock.goblet_color,
-                Cryolock.cryolock_color,
-                Cryolock.date_of_vitrification,
-                Cryolock.embryo_transfer,
-                Cryolock.in_transit,
-                Cryolock.cryolock_id
-            ).order_by(IVFPatient.his_number, Cryolock.cryolock_number)
-
+            query = query.order_by(PatientCrylockInfo.his_number, PatientCrylockInfo.crylock_number)
             results = query.all()
 
-            # Get cryolock IDs to fetch shipment descriptions
-            cryolock_ids = [row.cryolock_id for row in results]
+            # Get patient crylock info IDs to fetch shipment descriptions
+            patient_crylock_info_ids = [row.id for row in results]
             
-            # Fetch descriptions from ivf_shipment table for cryolocks
-            # Get the most recent shipment description for each cryolock
+            # Fetch descriptions from ivf_shipment table for patient crylocks
+            # Get the most recent shipment description for each patient crylock
             shipment_descriptions = {}
-            if cryolock_ids:
-                # Use a subquery to get the latest shipment per cryolock
+            if patient_crylock_info_ids:
+                # Use a subquery to get the latest shipment per patient crylock
                 latest_shipments = (
                     self.db.query(
-                        IVFShipment.cryolock_id,
+                        IVFShipment.patient_crylock_info_id,
                         func.max(IVFShipment.id).label('latest_shipment_id')
                     )
                     .filter(
-                        IVFShipment.cryolock_id.in_(cryolock_ids),
+                        IVFShipment.patient_crylock_info_id.in_(patient_crylock_info_ids),
                         IVFShipment.description.isnot(None)
                     )
-                    .group_by(IVFShipment.cryolock_id)
+                    .group_by(IVFShipment.patient_crylock_info_id)
                     .subquery()
                 )
                 
                 shipment_descriptions_query = (
                     self.db.query(
-                        IVFShipment.cryolock_id,
+                        IVFShipment.patient_crylock_info_id,
                         IVFShipment.description
                     )
                     .join(
@@ -871,25 +579,22 @@ class QualityTrackingService:
                 )
                 
                 for shipment_row in shipment_descriptions_query.all():
-                    shipment_descriptions[shipment_row.cryolock_id] = shipment_row.description
+                    shipment_descriptions[shipment_row.patient_crylock_info_id] = shipment_row.description
 
             tracking_rows: List[IVFCanisterTrackingItem] = []
             for row in results:
-                # Get description for this cryolock if it exists
-                description = shipment_descriptions.get(row.cryolock_id)
-                
-                # Handle NULL his_number for cryolocks without active embryos
-                his_number = row.his_number if row.his_number else ""
+                # Get description for this patient crylock if it exists
+                description = shipment_descriptions.get(row.id)
                 
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
-                        his_number=his_number,
-                        cryolock_number=row.cryolock_number or "",
-                        canister_number=str(row.canister_number) if row.canister_number else None,
+                        his_number=row.his_number or "",
+                        cryolock_number=row.crylock_number or "",
+                        canister_number=row.canister_number,
                         tank_code=row.tank_code or "",
                         cane_code=row.cane_code or "",
                         goblet_color=row.goblet_color or "",
-                        cryolock_color=row.cryolock_color or "",
+                        cryolock_color=row.crylock_color or "",
                         date_of_vitrification=row.date_of_vitrification,
                         embryo_transfer=bool(row.embryo_transfer),
                         in_transit=bool(row.in_transit),
@@ -910,22 +615,6 @@ class QualityTrackingService:
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )
 
-    def mark_embryo_transfer(
-        self,
-        canister_id: int,
-        flag_update: CryolockFlagUpdate,
-        updated_by: Optional[str] = None,
-        branch_id: Optional[int] = None
-    ) -> CryolockFlagUpdateResponse:
-        """Mark a cryolock as moved to embryo transfer (embryo_transfer = True)."""
-        return self._set_cryolock_flag(
-            canister_id=canister_id,
-            cryolock_number=flag_update.cryolock_number,
-            flag_field="embryo_transfer",
-            updated_by=updated_by,
-            branch_id=branch_id
-        )
-    
     def mark_embryo_transfer_for_tank(
         self,
         tank_id: int,
@@ -935,18 +624,14 @@ class QualityTrackingService:
         tank_code: Optional[str] = None
     ) -> CryolockFlagUpdateResponse:
         """Mark a cryolock as moved to embryo transfer (embryo_transfer = True) within a tank."""
-        canister_id = self._get_canister_id_from_tank_and_cryolock(
-            tank_id=tank_id,
-            cryolock_number=flag_update.cryolock_number,
-            branch_id=branch_id,
-            tank_code=tank_code
-        )
+        # Work directly with PatientCrylockInfo - no need for canister_id
         return self._set_cryolock_flag(
-            canister_id=canister_id,
+            canister_id=tank_id,  # Pass tank_id as canister_id for compatibility (not used in _set_cryolock_flag)
             cryolock_number=flag_update.cryolock_number,
             flag_field="embryo_transfer",
             updated_by=updated_by,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
 
     def _parse_description(self, description: str) -> dict:
@@ -1083,85 +768,59 @@ class QualityTrackingService:
         10. Return response with shipment details
         """
         try:
-            # Step 1 & 2: Get cryolock, canister, tank, and source branch
-            # Use optimized helper function with direct references
-            cryolock = None
-            canister = None
-            tank = None
-            source_branch = None
+            # Step 1 & 2: Get PatientCrylockInfo, tank, and source branch using new table structure
+            # Find tank by tank_code and branch_id
+            tank = find_tank_by_code(self.db, tank_code, branch_id) if tank_code else None
             
-            if tank_code:
-                cryolock = self._find_cryolock_by_tank_code(tank_code, request.cryolock_number, branch_id)
-                if cryolock:
-                    # Get tank and branch from cryolock's direct references (optimized)
-                    if cryolock.tank_id:
-                        tank = self.db.query(Tank).filter(Tank.tank_id == cryolock.tank_id).first()
-                        if tank and cryolock.branch_id:
-                            source_branch = self.db.query(HospitalBranch).filter(
-                                HospitalBranch.branch_id == cryolock.branch_id
-                            ).first()
-                    
-                    # Get canister through cane relationship (still needed for canister_id)
-                    if cryolock.cane_id:
-                        cane = self.db.query(Cane).filter(Cane.cane_id == cryolock.cane_id).first()
-                        if cane and cane.canister_id:
-                            canister = self.db.query(Canister).filter(Canister.canister_id == cane.canister_id).first()
-            
-            # Fallback to canister_id query
-            if not cryolock or not tank or not source_branch:
-                query = (
-                    self.db.query(
-                        Cryolock,
-                        Canister,
-                        Tank,
-                        HospitalBranch
-                    )
-                    .join(Cane, Cryolock.cane_id == Cane.cane_id)
-                    .join(Canister, Cane.canister_id == Canister.canister_id)
-                    .join(Tank, Canister.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(
-                        Canister.canister_id == canister_id,
-                        Cryolock.cryolock_number == request.cryolock_number
-                    )
-                )
-
-                if branch_id is not None:
-                    query = query.filter(HospitalBranch.branch_id == branch_id)
-
-                result = query.first()
-                if not result:
-                    error_msg = f"Cryolock with number '{request.cryolock_number}' not found"
-                    if tank_code:
-                        error_msg += f" in tank {tank_code}"
-                    else:
-                        error_msg += f" in canister {canister_id}"
-                    raise AppException(
-                        message=error_msg,
-                        error_code=ErrorMessages.NOT_FOUND,
-                        status_code=HTTPStatus.NOT_FOUND
-                    )
-                
-                cryolock, canister, tank, source_branch = result
-            
-            # Validate all required objects exist
-            if not canister:
+            if not tank:
                 raise AppException(
-                    message=f"Canister {canister_id} not found",
+                    message=f"Tank with code '{tank_code}' not found" + (f" in your branch" if branch_id else ""),
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
+            # Find PatientCrylockInfo by tank_id and crylock_number
+            query = (
+                self.db.query(PatientCrylockInfo)
+                .filter(
+                    PatientCrylockInfo.tank_id == tank.tank_id,
+                    PatientCrylockInfo.crylock_number == request.cryolock_number
+                )
+            )
+
+            if branch_id is not None:
+                query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+
+            cryolock = query.first()
+            
+            if not cryolock:
+                error_msg = f"Cryolock with number '{request.cryolock_number}' not found"
+                if tank_code:
+                    error_msg += f" in tank {tank_code}"
+                if branch_id:
+                    error_msg += f" in your branch"
+                raise AppException(
+                    message=error_msg,
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Get tank and source branch from cryolock's direct references
+            tank = self.db.query(Tank).filter(Tank.tank_id == cryolock.tank_id).first()
+            source_branch = self.db.query(HospitalBranch).filter(
+                HospitalBranch.branch_id == cryolock.branch_id
+            ).first()
+            
             if not tank:
                 raise AppException(
-                    message=f"Tank for canister {canister_id} not found",
+                    message=f"Tank {cryolock.tank_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
             if not source_branch:
                 raise AppException(
-                    message=f"Source branch for canister {canister_id} not found",
+                    message=f"Source branch {cryolock.branch_id} not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -1225,10 +884,8 @@ class QualityTrackingService:
                     status_code=HTTPStatus.BAD_REQUEST
                 )
 
-            # Step 5: Generate shipment ID (format: SHIP-YYYYMMDD-CANISTER_ID-CRYOLOCK_ID)
-            # Clean cryolock number for use in shipment ID (replace / with -)
-            clean_cryolock = request.cryolock_number.replace('/', '-')
-            shipment_id = f"SHIP-{datetime.now().strftime('%Y%m%d')}-{canister_id}-{clean_cryolock}"
+            # Step 5: Generate shipment ID (format: SHIP-YYYYMMDD-PATIENT_CRYLOCK_INFO_ID)
+            shipment_id = f"SHIP-{datetime.now().strftime('%Y%m%d')}-{cryolock.id}"
 
             # Step 6: Build IoT shipment payload
             # Build address objects
@@ -1295,12 +952,11 @@ class QualityTrackingService:
             cryolock.in_transit = True
             cryolock.updated_by = updated_by
 
-            # Step 9: Store shipment record in DB
+            # Step 9: Store shipment record in DB using new table structure
             ivf_shipment = IVFShipment(
                 shipment_id=shipment_id,
                 iot_shipment_id=iot_shipment_id,
-                cryolock_id=cryolock.cryolock_id,
-                canister_id=canister_id,
+                patient_crylock_info_id=cryolock.id,  # Use PatientCrylockInfo.id instead of cryolock_id
                 source_branch_id=source_branch.branch_id,
                 destination_branch_id=destination_branch.branch_id,
                 description=request.description,
@@ -1324,7 +980,7 @@ class QualityTrackingService:
             
             # Verify in_transit was updated successfully
             if not cryolock.in_transit:
-                logger.error(f"Failed to update in_transit flag for cryolock {cryolock.cryolock_id}")
+                logger.error(f"Failed to update in_transit flag for cryolock {cryolock.id}")
                 raise AppException(
                     message="Failed to update cryolock in_transit status",
                     error_code=ERROR_CODES["SERVER_ERROR"],
@@ -1359,7 +1015,7 @@ class QualityTrackingService:
             return InTransitWithShipmentResponse(
                 success=True,
                 message="Cryolock marked as in transit and shipment created successfully",
-                cryolock_number=cryolock.cryolock_number or request.cryolock_number,
+                cryolock_number=cryolock.crylock_number or request.cryolock_number,
                 in_transit=True,
                 shipment=shipment_response
             )
@@ -1403,14 +1059,9 @@ class QualityTrackingService:
         tank_code: Optional[str] = None
     ) -> InTransitWithShipmentResponse:
         """Mark a cryolock as in transit AND create IoT shipment within a tank."""
-        canister_id = self._get_canister_id_from_tank_and_cryolock(
-            tank_id=tank_id,
-            cryolock_number=request.cryolock_number,
-            branch_id=branch_id,
-            tank_code=tank_code
-        )
+        # Work directly with PatientCrylockInfo - pass tank_id as canister_id for compatibility
         return self.mark_in_transit_with_shipment(
-            canister_id=canister_id,
+            canister_id=tank_id,  # Pass tank_id as canister_id for compatibility
             request=request,
             updated_by=updated_by,
             branch_id=branch_id,
@@ -1446,43 +1097,44 @@ class QualityTrackingService:
             )
 
         try:
-            cryolock = None
+            # Direct query using tank_code and crylock_number - no fallback needed
+            # Find tank by tank_code and branch_id
+            tank = find_tank_by_code(self.db, tank_code, branch_id) if tank_code else None
             
-            # Try direct query using tank_code if provided (optimized)
-            if tank_code:
-                cryolock = self._find_cryolock_by_tank_code(tank_code, cryolock_number, branch_id)
-            
-            # Fallback: Find by canister_number (canister_id is now tank_id)
-            if not cryolock:
-                # Find PatientCrylockInfo by canister_number (extracted from cryolock_number)
-                # Since canisters are removed, we find by canister_number field in PatientCrylockInfo
-                query = (
-                    self.db.query(PatientCrylockInfo)
-                    .filter(
-                        PatientCrylockInfo.canister_number == cryolock_number.split('/')[1] if '/' in cryolock_number else None,
-                        PatientCrylockInfo.crylock_number == cryolock_number
-                    )
+            if not tank:
+                raise AppException(
+                    message=f"Tank with code '{tank_code}' not found" + (f" in your branch" if branch_id else ""),
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
                 )
+            
+            # Find PatientCrylockInfo by tank_id and crylock_number
+            query = (
+                self.db.query(PatientCrylockInfo)
+                .filter(
+                    PatientCrylockInfo.tank_id == tank.tank_id,
+                    PatientCrylockInfo.crylock_number == cryolock_number
+                )
+            )
 
-                if branch_id is not None:
-                    query = query.filter(PatientCrylockInfo.branch_id == branch_id)
-                
-                cryolock = query.first()
-
-                cryolock = query.first()
+            if branch_id is not None:
+                query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+            
+            cryolock = query.first()
             
             if not cryolock:
                 error_msg = f"Cryolock with number '{cryolock_number}' not found"
                 if tank_code:
                     error_msg += f" in tank {tank_code}"
-                else:
-                    error_msg += f" in canister {canister_id}"
+                if branch_id:
+                    error_msg += f" in your branch"
                 raise AppException(
                     message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
 
+            # Update the flag field (embryo_transfer or in_transit) in PatientCrylockInfo table
             setattr(cryolock, flag_field, True)
             cryolock.updated_by = updated_by
 
@@ -1492,7 +1144,7 @@ class QualityTrackingService:
             return CryolockFlagUpdateResponse(
                 success=True,
                 message=f"Updated {flag_field} successfully",
-                cryolock_number=cryolock.cryolock_number or cryolock_number,
+                cryolock_number=cryolock.crylock_number or cryolock_number,
                 embryo_transfer=bool(getattr(cryolock, "embryo_transfer", False)),
                 in_transit=bool(getattr(cryolock, "in_transit", False))
             )
@@ -1607,14 +1259,9 @@ class QualityTrackingService:
         tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """Update goblet color for a specific cryolock within a tank."""
-        canister_id = self._get_canister_id_from_tank_and_cryolock(
-            tank_id=tank_id,
-            cryolock_number=color_update.cryolock_number,
-            branch_id=branch_id,
-            tank_code=tank_code
-        )
+        # Work directly with PatientCrylockInfo - no need for canister_id
         return self.update_goblet_color(
-            canister_id=canister_id,
+            canister_id=tank_id,  # Pass tank_id as canister_id for compatibility (not used in update_goblet_color)
             color_update=color_update,
             updated_by=updated_by,
             branch_id=branch_id,
@@ -1720,14 +1367,9 @@ class QualityTrackingService:
         tank_code: Optional[str] = None
     ) -> ColorUpdateResponse:
         """Update cryolock color for a specific cryolock within a tank."""
-        canister_id = self._get_canister_id_from_tank_and_cryolock(
-            tank_id=tank_id,
-            cryolock_number=color_update.cryolock_number,
-            branch_id=branch_id,
-            tank_code=tank_code
-        )
+        # Work directly with PatientCrylockInfo - no need for canister_id
         return self.update_cryolock_color(
-            canister_id=canister_id,
+            canister_id=tank_id,  # Pass tank_id as canister_id for compatibility (not used in update_cryolock_color)
             color_update=color_update,
             updated_by=updated_by,
             branch_id=branch_id,
@@ -1917,44 +1559,41 @@ class QualityTrackingService:
             
             # Prepare deviations data
             deviations_data = []
-            for quality_log, canister_num, branch_name in deviations_results:
+            for quality_log, tank_code_val, branch_name in deviations_results:
                 # Determine which parameters violated thresholds
                 violations = []
-                if quality_log.is_temp_loss:
+                if quality_log.is_temp_internal_loss or quality_log.is_temp_external_loss:
                     violations.append("Temperature")
                 if quality_log.is_humidity_loss:
                     violations.append("Humidity")
-                if quality_log.is_agitation_loss:
-                    violations.append("Agitation")
-                if quality_log.is_light_loss:
-                    violations.append("Light")
+                if quality_log.is_shock_loss:
+                    violations.append("Shock")
+                
+                # Use temperature_internal as primary temperature, fallback to temperature_external
+                temp_violation = quality_log.is_temp_internal_loss or quality_log.is_temp_external_loss
                 
                 deviations_data.append({
                     "Date": quality_log.reading_timestamp.strftime("%Y-%m-%d") if quality_log.reading_timestamp else "",
                     "Time": quality_log.reading_timestamp.strftime("%H:%M:%S") if quality_log.reading_timestamp else "",
-                    "Canister Number": canister_num or "",
+                    "Tank Code": tank_code_val or "",
                     "Branch Name": branch_name or "",
                     "Device ID": quality_log.device_id or "",
-                    "Temperature (°C)": f"{quality_log.temperature:.2f}" if quality_log.temperature is not None else "",
+                    "Temperature Internal (°C)": f"{quality_log.temperature_internal:.2f}" if quality_log.temperature_internal is not None else "",
+                    "Temperature External (°C)": f"{quality_log.temperature_external:.2f}" if quality_log.temperature_external is not None else "",
                     "Temperature Target (°C)": f"{kpi_targets['temperature']['target']:.1f}",
                     "Temperature Min (°C)": f"{kpi_targets['temperature']['min']:.1f}",
                     "Temperature Max (°C)": f"{kpi_targets['temperature']['max']:.1f}",
-                    "Temperature Violation": "Yes" if quality_log.is_temp_loss else "No",
+                    "Temperature Violation": "Yes" if temp_violation else "No",
                     "Humidity (%)": f"{quality_log.humidity:.2f}" if quality_log.humidity is not None else "",
                     "Humidity Target (%)": f"{kpi_targets['humidity']['target']:.1f}",
                     "Humidity Min (%)": f"{kpi_targets['humidity']['min']:.1f}",
                     "Humidity Max (%)": f"{kpi_targets['humidity']['max']:.1f}",
                     "Humidity Violation": "Yes" if quality_log.is_humidity_loss else "No",
-                    "Agitation (G)": f"{quality_log.agitation:.2f}" if quality_log.agitation is not None else "",
-                    "Agitation Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
-                    "Agitation Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
-                    "Agitation Max (G)": f"{kpi_targets['agitation']['max']:.1f}",
-                    "Agitation Violation": "Yes" if quality_log.is_agitation_loss else "No",
-                    "Light (lux)": f"{quality_log.light:.2f}" if quality_log.light is not None else "",
-                    "Light Target (lux)": f"{kpi_targets['light']['target']:.1f}",
-                    "Light Min (lux)": f"{kpi_targets['light']['min']:.1f}",
-                    "Light Max (lux)": f"{kpi_targets['light']['max']:.1f}",
-                    "Light Violation": "Yes" if quality_log.is_light_loss else "No",
+                    "Shock (G)": f"{quality_log.shock:.2f}" if quality_log.shock is not None else "",
+                    "Shock Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
+                    "Shock Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
+                    "Shock Max (G)": f"{kpi_targets['agitation']['max']:.1f}",
+                    "Shock Violation": "Yes" if quality_log.is_shock_loss else "No",
                     "Quality Loss (%)": f"{quality_log.quality_loss:.2f}" if quality_log.quality_loss is not None else "",
                     "Violated Parameters": ", ".join(violations) if violations else "None"
                 })
@@ -1966,6 +1605,24 @@ class QualityTrackingService:
             refill_logs_df = pd.DataFrame(refill_logs_data)
             deviations_df = pd.DataFrame(deviations_data)
             
+            # Ensure at least one sheet is created (even if empty)
+            # If both are empty, create empty sheets with headers
+            if refill_logs_df.empty and deviations_df.empty:
+                # Create empty dataframes with column headers
+                refill_logs_df = pd.DataFrame(columns=[
+                    "Refill Date", "Refill Time", "Cryoshipper", 
+                    "Disinfected Shipper/Infected Tank Description", 
+                    "Reservoir", "LN2 Ordered Date", "LN2 Received Date", 
+                    "Description", "Refilled By"
+                ])
+                deviations_df = pd.DataFrame(columns=[
+                    "Date", "Time", "Tank Code", "Branch Name", "Device ID",
+                    "Temperature Internal (°C)", "Temperature External (°C)", "Temperature Target (°C)", "Temperature Min (°C)", "Temperature Max (°C)", "Temperature Violation",
+                    "Humidity (%)", "Humidity Target (%)", "Humidity Min (%)", "Humidity Max (%)", "Humidity Violation",
+                    "Shock (G)", "Shock Target (G)", "Shock Min (G)", "Shock Max (G)", "Shock Violation",
+                    "Quality Loss (%)", "Violated Parameters"
+                ])
+            
             # Create Excel file in memory
             output = io.BytesIO()
             
@@ -1973,106 +1630,110 @@ class QualityTrackingService:
                 # ============================================
                 # SHEET 1: REFILL LOGS
                 # ============================================
-                if not refill_logs_df.empty:
-                    # Write metadata for refill logs
-                    refill_metadata_data = [
-                        [display_label, display_id],
-                        ["Year" if month is None else "Month-Year", date_range_display],
-                        ["Current Year Total", str(current_year_total)]
-                    ]
-                    refill_metadata_df = pd.DataFrame(refill_metadata_data)
-                    refill_metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
+                # Always create the sheet (even if empty)
+                # Write metadata for refill logs
+                refill_metadata_data = [
+                    [display_label, display_id],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Current Year Total", str(current_year_total)]
+                ]
+                refill_metadata_df = pd.DataFrame(refill_metadata_data)
+                refill_metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
+                
+                # Write refill logs data starting from row 5
+                refill_logs_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
+                
+                # Format refill logs sheet
+                refill_worksheet = writer.sheets['Refill Logs']
+                if Font and PatternFill and Alignment:
+                    brand_purple = "6B1176"
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
                     
-                    # Write refill logs data starting from row 5
-                    refill_logs_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
+                    for row_idx in range(1, 4):
+                        for col_idx, cell in enumerate(refill_worksheet[row_idx]):
+                            if col_idx == 0:
+                                cell.font = metadata_label_font
+                            else:
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
                     
-                    # Format refill logs sheet
-                    refill_worksheet = writer.sheets['Refill Logs']
-                    if Font and PatternFill and Alignment:
-                        brand_purple = "6B1176"
-                        metadata_label_font = Font(bold=True, color=brand_purple, size=11)
-                        metadata_value_font = Font(bold=True, color=brand_purple, size=11)
-                        
-                        for row_idx in range(1, 4):
-                            for col_idx, cell in enumerate(refill_worksheet[row_idx]):
-                                if col_idx == 0:
-                                    cell.font = metadata_label_font
-                                else:
-                                    cell.font = metadata_value_font
-                                cell.alignment = Alignment(horizontal="left", vertical="center")
-                        
-                        data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
-                        data_header_font = Font(bold=True, color="FFFFFF", size=11)
-                        
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    # Only format header row if there are columns
+                    if len(refill_logs_df.columns) > 0:
                         for cell in refill_worksheet[5]:
                             cell.fill = data_header_fill
                             cell.font = data_header_font
                             cell.alignment = Alignment(horizontal="center", vertical="center")
-                    
-                    # Auto-adjust column widths for refill logs
-                    for column in refill_worksheet.columns:
-                        max_length = 0
-                        column_letter = column[0].column_letter
-                        for cell in column:
-                            try:
-                                if len(str(cell.value)) > max_length:
-                                    max_length = len(str(cell.value))
-                            except:
-                                pass
-                        adjusted_width = min(max_length + 2, 50)
-                        refill_worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+                # Auto-adjust column widths for refill logs
+                for column in refill_worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    refill_worksheet.column_dimensions[column_letter].width = adjusted_width
                 
                 # ============================================
                 # SHEET 2: KPI THRESHOLD DEVIATIONS
                 # ============================================
-                if not deviations_df.empty:
-                    # Write metadata for deviations
-                    deviations_metadata_data = [
-                        [display_label, display_id],
-                        ["Year" if month is None else "Month-Year", date_range_display],
-                        ["Total Deviations", str(len(deviations_data))]
-                    ]
-                    deviations_metadata_df = pd.DataFrame(deviations_metadata_data)
-                    deviations_metadata_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, header=False, startrow=0)
+                # Always create the sheet (even if empty)
+                # Write metadata for deviations
+                deviations_metadata_data = [
+                    [display_label, display_id],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Total Deviations", str(len(deviations_data))]
+                ]
+                deviations_metadata_df = pd.DataFrame(deviations_metadata_data)
+                deviations_metadata_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, header=False, startrow=0)
+                
+                # Write deviations data starting from row 5
+                deviations_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, startrow=4)
+                
+                # Format deviations sheet
+                deviations_worksheet = writer.sheets['KPI Threshold Deviations']
+                if Font and PatternFill and Alignment:
+                    brand_purple = "6B1176"
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
                     
-                    # Write deviations data starting from row 5
-                    deviations_df.to_excel(writer, sheet_name='KPI Threshold Deviations', index=False, startrow=4)
+                    for row_idx in range(1, 4):
+                        for col_idx, cell in enumerate(deviations_worksheet[row_idx]):
+                            if col_idx == 0:
+                                cell.font = metadata_label_font
+                            else:
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
                     
-                    # Format deviations sheet
-                    deviations_worksheet = writer.sheets['KPI Threshold Deviations']
-                    if Font and PatternFill and Alignment:
-                        brand_purple = "6B1176"
-                        metadata_label_font = Font(bold=True, color=brand_purple, size=11)
-                        metadata_value_font = Font(bold=True, color=brand_purple, size=11)
-                        
-                        for row_idx in range(1, 4):
-                            for col_idx, cell in enumerate(deviations_worksheet[row_idx]):
-                                if col_idx == 0:
-                                    cell.font = metadata_label_font
-                                else:
-                                    cell.font = metadata_value_font
-                                cell.alignment = Alignment(horizontal="left", vertical="center")
-                        
-                        data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
-                        data_header_font = Font(bold=True, color="FFFFFF", size=11)
-                        
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    # Only format header row if there are columns
+                    if len(deviations_df.columns) > 0:
                         for cell in deviations_worksheet[5]:
                             cell.fill = data_header_fill
                             cell.font = data_header_font
                             cell.alignment = Alignment(horizontal="center", vertical="center")
-                    
-                    # Auto-adjust column widths for deviations
-                    for column in deviations_worksheet.columns:
-                        max_length = 0
-                        column_letter = column[0].column_letter
-                        for cell in column:
-                            try:
-                                if len(str(cell.value)) > max_length:
-                                    max_length = len(str(cell.value))
-                            except:
-                                pass
-                        adjusted_width = min(max_length + 2, 50)
-                        deviations_worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+                # Auto-adjust column widths for deviations
+                for column in deviations_worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    deviations_worksheet.column_dimensions[column_letter].width = adjusted_width
             
             output.seek(0)
             excel_content = output.read()
@@ -2114,12 +1775,12 @@ class QualityTrackingService:
     def export_combined_refill_logs_and_deviations_excel_for_tank(
         self,
         tank_id: int,
-        canister_number: Optional[str] = None,
+        canister_number: Optional[str] = None,  # Kept for compatibility but not used
         year: Optional[int] = None,
         month: Optional[int] = None,
         branch_id: Optional[int] = None
     ) -> Response:
-        """Export combined refill logs and KPI threshold deviations to Excel format for canisters in a specific tank."""
+        """Export combined refill logs and KPI threshold deviations to Excel format for a specific tank."""
         # Get tank information for metadata
         tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
@@ -2130,9 +1791,9 @@ class QualityTrackingService:
             )
         tank_code = tank.tank_code or f"Tank-{tank_id}"
         
-        canister_id = self._get_canister_id_from_tank(tank_id, canister_number, branch_id)
+        # Work directly with tank_id - no need for canister_id
         return self.export_combined_refill_logs_and_deviations_excel(
-            canister_id=canister_id,
+            tank_id=tank_id,
             year=year,
             month=month,
             branch_id=branch_id,
