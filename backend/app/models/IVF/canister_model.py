@@ -27,7 +27,6 @@ class Canister(Base):
     
     # Relationships
     tank = relationship("Tank", back_populates="canisters")
-    ln2_logs = relationship("CanisterLn2Log", back_populates="canister", cascade="all, delete-orphan")
     canes = relationship("Cane", back_populates="canister", cascade="all, delete-orphan")
     
     # Audit Trail

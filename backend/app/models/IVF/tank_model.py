@@ -32,6 +32,7 @@ class Tank(Base):
     # Relationships
     branch = relationship("HospitalBranch", back_populates="tanks")
     canisters = relationship("Canister", back_populates="tank", cascade="all, delete-orphan")
+    ln2_logs = relationship("CanisterLn2Log", back_populates="tank", cascade="all, delete-orphan")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

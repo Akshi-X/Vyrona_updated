@@ -178,8 +178,8 @@ class CanisterResponse(CanisterBase):
 # ============================================
 
 class CanisterLn2LogBase(BaseModel):
-    """Base schema for canister LN2 log"""
-    canister_id: Optional[int] = Field(None, description="Reference to canister (for IVF)")
+    """Base schema for tank LN2 log"""
+    tank_id: Optional[int] = Field(None, description="Reference to tank (for IVF)")
     container_id: Optional[str] = Field(None, description="Container ID (for quality tracking)")
     refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
     refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
