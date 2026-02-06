@@ -784,18 +784,18 @@ async def get_patient_messages(
                 for uid in tagged_user_ids
             ] if tagged_user_ids else []
             
-            # Get canister_number for message if canister_id exists
-            msg_canister_number = None
-            if message.canister_id:
-                msg_canister = db.query(Canister).filter(Canister.canister_id == message.canister_id).first()
-                if msg_canister:
-                    msg_canister_number = msg_canister.canister_number
+            # Get tank_code for message if tank_id exists (IVF flow)
+            msg_tank_code = None
+            if message.tank_id:
+                msg_tank = db.query(Tank).filter(Tank.tank_id == message.tank_id).first()
+                if msg_tank:
+                    msg_tank_code = msg_tank.tank_code
             
             message_responses.append(ChatMessageResponse(
                 id=message.id,
                 message_content=message.message_content,
                 patient_id=message.patient_id,
-                canister_number=msg_canister_number,
+                tank_code=msg_tank_code,
                 sender_id=message.sender_id,
                 sender_name=sender_name,
                 sender_role=sender_role,
