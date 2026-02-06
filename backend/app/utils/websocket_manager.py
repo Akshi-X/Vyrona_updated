@@ -9,9 +9,9 @@ from typing import Dict, Optional
 
 from fastapi import WebSocket
 
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
 from app.models.patient_model import Patient
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 
 logger = logging.getLogger(__name__)
 
@@ -116,31 +116,31 @@ class ConnectionManager:
         # Handle IVF messages (canister_id or canister_number)
         canister_number = data.get("canister_number")
         if canister_id or canister_number:
-            # For IVF, validate canister belongs to user's branch
-            # Get canister's branch_id from database
-            # If only canister_number is provided, look up canister_id
+            # For IVF, validate tank belongs to user's branch
+            # Get tank's branch_id from database
+            # If only canister_number is provided, look up tank through PatientCrylockInfo
             if canister_number and not canister_id:
                 # Convert to string (database column is VARCHAR)
                 canister_number_str = str(canister_number)
-                canister = db.query(Canister).filter(Canister.canister_number == canister_number_str).first()
-                if canister:
-                    canister_id = canister.canister_id
+                # Find a PatientCrylockInfo record with this canister_number to get the tank
+                patient_crylock = db.query(PatientCrylockInfo).filter(
+                    PatientCrylockInfo.canister_number == canister_number_str
+                ).first()
+                if patient_crylock:
+                    canister_id = patient_crylock.tank_id  # Use tank_id as canister_id for compatibility
+                    tank_id = patient_crylock.tank_id
+                    canister_branch_id = patient_crylock.branch_id
                 else:
-                    return  # Canister doesn't exist
+                    return  # Canister number doesn't exist
             elif canister_id:
-                canister = db.query(Canister).filter(Canister.canister_id == canister_id).first()
+                # canister_id is now tank_id
+                tank_id = canister_id
+                tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+                if not tank:
+                    return  # Tank doesn't exist
+                canister_branch_id = tank.branch_id
             else:
                 return  # Neither canister_id nor canister_number provided
-            
-            if not canister:
-                return  # Canister doesn't exist
-            
-            # Get canister's branch_id through tank
-            tank = db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
-            if not tank:
-                return  # Tank doesn't exist
-            
-            canister_branch_id = tank.branch_id
             
             disconnected = []
             for connection_id, conn_data in list(self.active_connections.items()):

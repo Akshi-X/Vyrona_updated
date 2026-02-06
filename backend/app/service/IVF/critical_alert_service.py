@@ -11,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 from psycopg2.errors import UniqueViolation
 
 from ...models.IVF.critical_alert_model import CriticalAlert, AlertType, AlertSeverity, AlertStatus
-from ...models.IVF.canister_model import Canister
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
@@ -463,34 +462,29 @@ class CriticalAlertService:
                 else:
                     logger.debug(f"No quality loss found in quality_log id={quality_log.id} (quality_loss={quality_log.quality_loss})")
             
-            # Check refill log (for canisters in the tank)
-            # Note: Refill logs are still canister-based, so we check all canisters in the tank
-            canisters = self.db.query(Canister).filter(
-                Canister.tank_id == tank.tank_id,
-                Canister.is_active == True
-            ).all()
-            for canister in canisters:
-                refill_alert = self._check_refill_log(tank.tank_id)
-                if refill_alert:
-                    dedup_key = self._generate_dedup_key(
-                        tank.tank_id, 
-                        AlertSource.REFILL, 
-                        AlertType.REFILL_LOG_ALERT, 
-                        current_time
-                    )
-                    alert = self._create_alert(
-                        tank_id=tank.tank_id,
-                        alert_type=AlertType.REFILL_LOG_ALERT,
-                        source=AlertSource.REFILL,
-                        severity=refill_alert["severity"],
-                        message=refill_alert["message"],
-                        occurred_at=current_time,
-                        triggered_by=AlertTriggeredBy.SYSTEM
-                    )
-                    if alert:
-                        alerts_created.append(alert)
-                        if dedup_key not in sent_email_dedup_keys:
-                            sent_email_dedup_keys.add(dedup_key)
+            # Check refill log (for the tank)
+            # Refill logs are tank-based
+            refill_alert = self._check_refill_log(tank.tank_id)
+            if refill_alert:
+                dedup_key = self._generate_dedup_key(
+                    tank.tank_id, 
+                    AlertSource.REFILL, 
+                    AlertType.REFILL_LOG_ALERT, 
+                    current_time
+                )
+                alert = self._create_alert(
+                    tank_id=tank.tank_id,
+                    alert_type=AlertType.REFILL_LOG_ALERT,
+                    source=AlertSource.REFILL,
+                    severity=refill_alert["severity"],
+                    message=refill_alert["message"],
+                    occurred_at=current_time,
+                    triggered_by=AlertTriggeredBy.SYSTEM
+                )
+                if alert:
+                    alerts_created.append(alert)
+                    if dedup_key not in sent_email_dedup_keys:
+                        sent_email_dedup_keys.add(dedup_key)
         
         self.db.commit()
         

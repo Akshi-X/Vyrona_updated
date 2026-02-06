@@ -7,7 +7,6 @@ import logging
 from app.config.database import get_db
 from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
 from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
 from app.service.IVF.arc_ivf_service import ARCIVFService
@@ -282,6 +281,7 @@ def check_tank_exists(
         raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
 @router.get("/storage", response_model=ARCIVFStorageResponse)
 def get_ivf_storage(
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -346,6 +346,17 @@ def get_ivf_storage(
     ```
     """
     try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        # Get branch name if branch filtering is needed
+        branch_name = None
+        if branch_id is not None:
+            from app.models.IVF.hospital_branch_model import HospitalBranch
+            branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == branch_id).first()
+            if branch:
+                branch_name = branch.branch_name
+        
         service = ARCIVFService()
         # Fetch data from ARC IVF API (TokenId is automatically read from .env)
         result = service.get_ivf_storage()
@@ -354,6 +365,10 @@ def get_ivf_storage(
         if result.get("status") == "SUCCESS":
             storage_list = result.get("storageList", [])
             
+            # IMPORTANT: Save ALL data from ARC API to database (for all branches)
+            # Don't filter before saving - we want to persist all branch data
+            logger.info(f"Fetched {len(storage_list)} items from ARC API - saving ALL to database for all branches")
+            
             # Count unique patients, tanks, canisters, canes, and cryolocks
             unique_patients = set()
             unique_tanks = set()
@@ -361,6 +376,7 @@ def get_ivf_storage(
             unique_canes = set()
             unique_cryolocks = set()
             
+            # Save ALL items to database (for all branches)
             for storage_item in storage_list:
                 if storage_item.get("hisNumber"):
                     unique_patients.add(storage_item.get("hisNumber"))
@@ -500,7 +516,25 @@ def get_ivf_storage(
                     logger.warning(f"  Pattern: {len(missing_fields)} failures due to missing required fields")
                 if constraint_violations:
                     logger.warning(f"  Pattern: {len(constraint_violations)} failures due to database constraint violations")
+            
+            # Calculate statistics about saved data
+            branches_from_arc = set()
+            for item in result.get("storageList", []):
+                site_name = item.get("siteName")
+                if site_name:
+                    branches_from_arc.add(site_name.strip())
+            
+            logger.info(
+                f"ARC Data Summary: "
+                f"Total records from ARC: {len(result.get('storageList', []))}, "
+                f"Total branches from ARC: {len(branches_from_arc)}, "
+                f"Branches: {', '.join(sorted(branches_from_arc))}, "
+                f"Saved to DB: {saved_count}, "
+                f"Skipped: {skipped_count}, "
+                f"Failed: {failed_count}"
+            )
         
+        # Return all ARC data in response (no filtering)
         return ARCIVFStorageResponse(**result)
     except Exception as e:
         logger.error(f"Error in get_ivf_storage: {str(e)}", exc_info=True)
@@ -508,6 +542,7 @@ def get_ivf_storage(
         return ARCIVFStorageResponse(
             storage_list=[],
             status="FAILURE",
-            error_code=500
+            error_code=500,
+            error_message=f"Internal server error: {str(e)}"
         )
 

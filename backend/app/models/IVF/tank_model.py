@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Numeric, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Numeric, Boolean, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ...config.database import Base
@@ -18,6 +18,7 @@ class Tank(Base):
     
     # Tank Information
     tank_code = Column(String(255), nullable=True)
+    tank_id_arc = Column(String(255), nullable=True, comment="Tank ID from ARC API (e.g., '5471')")
     capacity_liters = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     status = Column(SQLEnum(CanisterStatus, values_callable=lambda obj: [e.value for e in obj], name='tank_status'), 
@@ -31,8 +32,13 @@ class Tank(Base):
     
     # Relationships
     branch = relationship("HospitalBranch", back_populates="tanks")
-    canisters = relationship("Canister", back_populates="tank", cascade="all, delete-orphan")
+    patient_crylocks = relationship("PatientCrylockInfo", back_populates="tank", cascade="all, delete-orphan")
     ln2_logs = relationship("CanisterLn2Log", back_populates="tank", cascade="all, delete-orphan")
+    
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('tank_code', 'branch_id', name='uq_tanks_tank_code_branch'),
+    )
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

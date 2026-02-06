@@ -17,8 +17,8 @@ from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
 from app.config.database import get_db, SessionLocal
 from app.models.user_model import User
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.utils.user_helpers import is_hospital_department
 from app.exceptions import InvalidTokenException
 
@@ -143,31 +143,31 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                         canister_number = message["canister_number"]
                         logger.info(f"Received canister_number: {canister_number}")
                         
-                        # Convert canister_number to canister_id for internal operations
+                        # Convert canister_number to tank_id for internal operations
+                        # Note: Since canisters are removed, we find the tank through PatientCrylockInfo
                         try:
                             # Convert canister_number to string (database column is VARCHAR/character varying)
                             canister_number_str = str(canister_number)
                             
-                            # First, look up canister_id from canister_number (without branch filter)
-                            # This allows us to check if canister exists first, then validate branch access
-                            canister = db.query(Canister).filter(Canister.canister_number == canister_number_str).first()
+                            # Find a PatientCrylockInfo record with this canister_number to get the tank
+                            patient_crylock = db.query(PatientCrylockInfo).filter(
+                                PatientCrylockInfo.canister_number == canister_number_str
+                            ).first()
                             
-                            if not canister:
+                            if not patient_crylock:
                                 raise Exception(f"Canister number {canister_number} not found")
                             
-                            canister_id = canister.canister_id
+                            tank_id = patient_crylock.tank_id
                             
-                            # For non-admin users, validate that canister belongs to their branch
+                            # For non-admin users, validate that tank belongs to their branch
                             if role_normalized != "Admin" and branch_id is not None:
-                                # Get canister's branch through tank
-                                tank = db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
-                                if not tank:
-                                    raise Exception(f"Tank for canister {canister_number} not found")
-                                
-                                if tank.branch_id != branch_id:
+                                if patient_crylock.branch_id != branch_id:
                                     raise Exception(f"Canister number {canister_number} does not belong to your branch")
                             
-                            logger.info(f"Converted canister_number {canister_number} to canister_id {canister_id}")
+                            # Use tank_id as the identifier (canister_id is now tank_id)
+                            canister_id = tank_id  # Keep variable name for compatibility
+                            
+                            logger.info(f"Converted canister_number {canister_number} to tank_id {tank_id}")
                         except Exception as e:
                             await websocket.send_json({
                                 "type": "error",
@@ -175,25 +175,26 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             })
                             continue
                         
-                        # Validate canister belongs to user's branch (if user is not admin)
+                        # Validate tank belongs to user's branch (if user is not admin)
                         try:
-                            # Admin users (branch_id is None) can access all canisters
+                            # Admin users (branch_id is None) can access all tanks
                             # User/Manager users must match branch
                             if role_normalized != "Admin" and branch_id is not None:
-                                quality_service.validate_canister_belongs_to_branch(canister_id, branch_id)
+                                quality_service.validate_tank_belongs_to_branch(canister_id, branch_id)
                             
                             # Client is subscribing to a canister (IVF) - track by canister_number only
                             # Store canister_number as string (database stores as VARCHAR)
                             canister_number_for_sub = str(canister_number)
                             
                             # Store subscription using canister_number (primary identifier)
-                            # canister_id is stored for internal operations but subscription is tracked by canister_number
+                            # canister_id (now tank_id) is stored for internal operations but subscription is tracked by canister_number
                             manager.set_canister_subscription(connection_id, canister_id, canister_number_for_sub)
                             
-                            # Get last 12 IVF quality logs from Redis for this canister
+                            # Get last 12 IVF quality logs from Redis for this tank (using tank_id as canister_id for Redis key compatibility)
                             ivf_history = quality_service.get_canister_redis_history(canister_id, limit=12)
                             
-                            # Get IVF geolocation records from database
+                            # Get IVF geolocation records from database (using tank_id)
+                            # Note: IVFGeolocation might still reference canister_id, but we'll use tank_id
                             ivf_geolocation_history = quality_service.get_canister_geolocation_history(canister_id, limit=100)
                             
                             # Send IVF geolocation history as a single array message

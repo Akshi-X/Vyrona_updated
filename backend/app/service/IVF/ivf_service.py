@@ -9,13 +9,9 @@ import logging
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
-from ...models.IVF.canister_model import Canister
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
-from ...models.IVF.cane_model import Cane
-from ...models.IVF.cryolock_model import Cryolock
-from ...models.IVF.patient_model import IVFPatient
-from ...models.IVF.embryo_model import Embryo
+from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.shipment_model import Shipment
 from ...constants.enums import CanisterStatus

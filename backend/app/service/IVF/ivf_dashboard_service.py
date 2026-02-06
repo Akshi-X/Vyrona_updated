@@ -7,10 +7,7 @@ from typing import Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, case
 
-from ...models.IVF.embryo_model import Embryo
-from ...models.IVF.cryolock_model import Cryolock
-from ...models.IVF.cane_model import Cane
-from ...models.IVF.canister_model import Canister
+from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
