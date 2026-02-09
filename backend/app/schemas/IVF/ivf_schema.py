@@ -481,6 +481,76 @@ class BranchListResponse(BaseModel):
         from_attributes = True
 
 
+class EmbryoTransferCrylockItem(BaseModel):
+    """Schema for embryo transfer crylock item"""
+    his_number: str = Field(..., description="Patient HIS Number")
+    cryolock_number: str = Field(..., description="Cryolock number")
+    canister_number: str = Field(..., description="Canister number")
+    tank_code: str = Field(..., description="Tank code")
+    cane_code: str = Field(..., description="Cane code")
+    goblet_color: str = Field(..., description="Goblet color")
+    cryolock_color: str = Field(..., description="Cryolock color")
+    date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
+    branch_name: str = Field(..., description="Branch name")
+    tank_id: int = Field(..., description="Tank ID")
+
+
+class EmbryoTransferResponse(BaseModel):
+    """Response schema for embryo transfer crylocks"""
+    data: List[EmbryoTransferCrylockItem] = Field(..., description="List of embryo transfer crylocks")
+    total: int = Field(..., description="Total number of embryo transfer crylocks")
+    
+    class Config:
+        from_attributes = True
+
+
+class ShipmentDetails(BaseModel):
+    """Schema for shipment details"""
+    shipment_id: Optional[str] = Field(None, description="Shipment ID")
+    iot_shipment_id: Optional[str] = Field(None, description="IoT shipment ID from Tive")
+    source_branch_id: Optional[int] = Field(None, description="Source branch ID")
+    destination_branch_id: Optional[int] = Field(None, description="Destination branch ID")
+    source_location: Optional[str] = Field(None, description="Source location name")
+    destination_location: Optional[str] = Field(None, description="Destination location name")
+    source_latitude: Optional[float] = Field(None, description="Source latitude")
+    source_longitude: Optional[float] = Field(None, description="Source longitude")
+    destination_latitude: Optional[float] = Field(None, description="Destination latitude")
+    destination_longitude: Optional[float] = Field(None, description="Destination longitude")
+    description: Optional[str] = Field(None, description="Shipment description")
+    device_id: Optional[str] = Field(None, description="IoT tracker device ID")
+    shipment_status: Optional[str] = Field(None, description="Shipment status (created, in_transit, delivered, cancelled, failed)")
+    departure_time: Optional[datetime] = Field(None, description="Actual departure time")
+    arrival_time: Optional[datetime] = Field(None, description="Actual arrival time")
+    scheduled_departure_time: Optional[datetime] = Field(None, description="Scheduled departure time")
+    
+    class Config:
+        from_attributes = True
+
+
+class InTransitCrylockItem(BaseModel):
+    """Schema for in-transit crylock item"""
+    his_number: str = Field(..., description="Patient HIS Number")
+    cryolock_number: str = Field(..., description="Cryolock number")
+    canister_number: str = Field(..., description="Canister number")
+    tank_code: str = Field(..., description="Tank code")
+    cane_code: str = Field(..., description="Cane code")
+    goblet_color: str = Field(..., description="Goblet color")
+    cryolock_color: str = Field(..., description="Cryolock color")
+    date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
+    branch_name: str = Field(..., description="Branch name")
+    tank_id: int = Field(..., description="Tank ID")
+    shipment_details: Optional[ShipmentDetails] = Field(None, description="Shipment details if available")
+
+
+class InTransitResponse(BaseModel):
+    """Response schema for in-transit crylocks"""
+    data: List[InTransitCrylockItem] = Field(..., description="List of in-transit crylocks")
+    total: int = Field(..., description="Total number of in-transit crylocks")
+    
+    class Config:
+        from_attributes = True
+
+
 class EmbryoTrackingResponse(BaseModel):
     """Schema for embryo tracking API response"""
     data: List[EmbryoTrackingItem] = Field(..., description="List of embryo tracking records")

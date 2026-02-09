@@ -12,7 +12,9 @@ from app.schemas.IVF.ivf_schema import (
     ActiveCanistersResponse,
     BranchListResponse,
     CanisterCheckResponse,
+    EmbryoTransferResponse,
     EmbryoTrackingResponse,
+    InTransitResponse,
     IVFControlTowerResponse,
 )
 from app.service.IVF.arc_ivf_service import ARCIVFService
@@ -627,4 +629,116 @@ def get_branches(
     except Exception as e:
         logger.error(f"Error getting branches: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting branches: {str(e)}")
+
+
+@router.get("/embryo-transfer", response_model=EmbryoTransferResponse)
+def get_embryo_transfer_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where embryo_transfer is True.
+    
+    Returns detailed information about all crylocks that have been moved to embryo transfer.
+    This endpoint is useful for tracking and reporting on embryo transfers.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_embryo_transfer_crylocks(branch_id=branch_id)
+        
+        return EmbryoTransferResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting embryo transfer crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting embryo transfer crylocks: {str(e)}")
+
+
+@router.get("/in-transit", response_model=InTransitResponse)
+def get_in_transit_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where in_transit is True.
+    
+    Returns detailed information about all crylocks that are currently in transit.
+    This endpoint is useful for tracking and reporting on shipments.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1,
+                "shipment_details": {
+                    "shipment_id": "SHIP-20240812-123",
+                    "iot_shipment_id": "tive-12345",
+                    "source_branch_id": 1,
+                    "destination_branch_id": 2,
+                    "source_location": "Egmore",
+                    "destination_location": "Tambaram",
+                    "description": "crylock is move from egmore to thambaram-deviceid -xxxxx",
+                    "device_id": "DEVICE-123",
+                    "shipment_status": "in_transit",
+                    "departure_time": "2024-08-12T10:00:00Z",
+                    "arrival_time": null,
+                    "scheduled_departure_time": "2024-08-12T09:00:00Z"
+                }
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_in_transit_crylocks(branch_id=branch_id)
+        
+        return InTransitResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")
 
