@@ -192,6 +192,44 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching active tanks: {str(e)}")
     
+    def get_branches_by_hospital(self, hospital_id: int) -> Dict[str, Any]:
+        """
+        Get list of branches for a specific hospital.
+        
+        Args:
+            hospital_id: Hospital ID to filter branches by
+            
+        Returns:
+            Dictionary containing:
+            - branches: List of branches with branch_id and branch_name
+            - total: Total number of branches
+        """
+        try:
+            # Query all branches for this hospital, ordered by branch name
+            branches = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.hospital_id == hospital_id)
+                .order_by(HospitalBranch.branch_name)
+                .all()
+            )
+            
+            # Build response list
+            branch_list = [
+                {
+                    "branch_id": branch.branch_id,
+                    "branch_name": branch.branch_name or f"Branch {branch.branch_id}"
+                }
+                for branch in branches
+            ]
+            
+            return {
+                "branches": branch_list,
+                "total": len(branch_list)
+            }
+        except Exception as e:
+            logger.error(f"Error fetching branches for hospital {hospital_id}: {str(e)}", exc_info=True)
+            raise Exception(f"Error fetching branches: {str(e)}")
+    
     def _calculate_branch_status(self, branch_id: int) -> str:
         """
         Calculate branch status based on tank statuses.

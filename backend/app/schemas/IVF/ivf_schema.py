@@ -463,6 +463,24 @@ class EmbryoTrackingItem(BaseModel):
         from_attributes = True
 
 
+class BranchListItem(BaseModel):
+    """Schema for branch list item (simplified for dropdowns)"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: str = Field(..., description="Branch name")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchListResponse(BaseModel):
+    """Response schema for branch list endpoint"""
+    branches: List[BranchListItem] = Field(..., description="List of branches")
+    total: int = Field(..., description="Total number of branches")
+    
+    class Config:
+        from_attributes = True
+
+
 class EmbryoTrackingResponse(BaseModel):
     """Schema for embryo tracking API response"""
     data: List[EmbryoTrackingItem] = Field(..., description="List of embryo tracking records")
