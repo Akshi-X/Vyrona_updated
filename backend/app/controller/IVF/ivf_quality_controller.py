@@ -132,46 +132,44 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                         # Try to parse as JSON
                         message = json.loads(data)
                         
-                        # Handle IVF canister subscription - ONLY accept canister_number
-                        if "canister_number" not in message or not message["canister_number"]:
+                        # Handle IVF tank subscription - accept tank_code (e.g., "T1", "T2")
+                        if "tank_code" not in message or not message["tank_code"]:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": "Subscription message must contain 'canister_number'"
+                                "message": "Subscription message must contain 'tank_code'"
                             })
                             continue
                         
-                        canister_number = message["canister_number"]
-                        logger.info(f"Received canister_number: {canister_number}")
+                        tank_code = message["tank_code"]
+                        logger.info(f"Received tank_code: {tank_code}")
                         
-                        # Convert canister_number to tank_id for internal operations
-                        # Note: Since canisters are removed, we find the tank through PatientCrylockInfo
+                        # Resolve tank_code to tank_id
                         try:
-                            # Convert canister_number to string (database column is VARCHAR/character varying)
-                            canister_number_str = str(canister_number)
+                            # Convert tank_code to string
+                            tank_code_str = str(tank_code).strip()
                             
-                            # Find a PatientCrylockInfo record with this canister_number to get the tank
-                            patient_crylock = db.query(PatientCrylockInfo).filter(
-                                PatientCrylockInfo.canister_number == canister_number_str
-                            ).first()
-                            
-                            if not patient_crylock:
-                                raise Exception(f"Canister number {canister_number} not found")
-                            
-                            tank_id = patient_crylock.tank_id
-                            
-                            # For non-admin users, validate that tank belongs to their branch
+                            # Find tank by tank_code and branch_id (for non-admin users)
                             if role_normalized != "Admin" and branch_id is not None:
-                                if patient_crylock.branch_id != branch_id:
-                                    raise Exception(f"Canister number {canister_number} does not belong to your branch")
+                                tank = db.query(Tank).filter(
+                                    Tank.tank_code == tank_code_str,
+                                    Tank.branch_id == branch_id
+                                ).first()
+                            else:
+                                # Admin users can access any tank
+                                tank = db.query(Tank).filter(
+                                    Tank.tank_code == tank_code_str
+                                ).first()
                             
-                            # Use tank_id as the identifier (canister_id is now tank_id)
-                            canister_id = tank_id  # Keep variable name for compatibility
+                            if not tank:
+                                raise Exception(f"Tank with code '{tank_code}' not found" + (f" in branch {branch_id}" if branch_id else ""))
                             
-                            logger.info(f"Converted canister_number {canister_number} to tank_id {tank_id}")
+                            tank_id = tank.tank_id
+                            
+                            logger.info(f"Resolved tank_code {tank_code} to tank_id {tank_id}")
                         except Exception as e:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": f"Invalid canister number: {str(e)}"
+                                "message": f"Invalid tank code: {str(e)}"
                             })
                             continue
                         
@@ -180,29 +178,27 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             # Admin users (branch_id is None) can access all tanks
                             # User/Manager users must match branch
                             if role_normalized != "Admin" and branch_id is not None:
-                                quality_service.validate_tank_belongs_to_branch(canister_id, branch_id)
+                                quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
                             
-                            # Client is subscribing to a canister (IVF) - track by canister_number only
-                            # Store canister_number as string (database stores as VARCHAR)
-                            canister_number_for_sub = str(canister_number)
+                            # Client is subscribing to a tank (IVF) - track by tank_code
+                            # Store tank_code as string
+                            tank_code_for_sub = str(tank_code)
                             
-                            # Store subscription using canister_number (primary identifier)
-                            # canister_id (now tank_id) is stored for internal operations but subscription is tracked by canister_number
-                            manager.set_canister_subscription(connection_id, canister_id, canister_number_for_sub)
+                            # Store subscription using tank_code (primary identifier)
+                            manager.set_tank_subscription(connection_id, tank_id, tank_code_for_sub)
                             
-                            # Get last 12 IVF quality logs from Redis for this tank (using tank_id as canister_id for Redis key compatibility)
-                            ivf_history = quality_service.get_canister_redis_history(canister_id, limit=12)
+                            # Get last 12 IVF quality logs from Redis for this tank
+                            ivf_history = quality_service.get_tank_redis_history(tank_id, limit=12)
                             
                             # Get IVF geolocation records from database (using tank_id)
-                            # Note: IVFGeolocation might still reference canister_id, but we'll use tank_id
-                            ivf_geolocation_history = quality_service.get_canister_geolocation_history(canister_id, limit=100)
+                            ivf_geolocation_history = quality_service.get_tank_geolocation_history(tank_id, limit=100)
                             
                             # Send IVF geolocation history as a single array message
                             if ivf_geolocation_history:
                                 await websocket.send_json({
                                     "type": "ivf_geolocation_history",
-                                    "canister_id": canister_id,
-                                    "canister_number": canister_number,  # Include canister_number in response
+                                    "tank_id": tank_id,
+                                    "tank_code": tank_code,  # Include tank_code in response
                                     "geolocations": ivf_geolocation_history,
                                     "count": len(ivf_geolocation_history)
                                 })
@@ -214,15 +210,15 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             # Send confirmation after history
                             await websocket.send_json({
                                 "type": "subscription_confirmed",
-                                "canister_id": canister_id,
-                                "canister_number": canister_number,  # Include canister_number in response
+                                "tank_id": tank_id,
+                                "tank_code": tank_code,  # Include tank_code in response
                                 "history_count": len(ivf_history),
                                 "geolocation_count": len(ivf_geolocation_history)
                             })
                         except Exception as e:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": f"Invalid canister: {str(e)}"
+                                "message": f"Invalid tank: {str(e)}"
                             })
                     except json.JSONDecodeError:
                         # Not JSON, ignore
