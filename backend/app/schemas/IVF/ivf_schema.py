@@ -416,6 +416,7 @@ class ActiveTankItem(BaseModel):
     """Schema for a single active tank in control tower"""
     tank_code: str = Field(..., description="Tank code (e.g., 'T1')")
     updated_at: Optional[datetime] = Field(None, description="Last updated date and time from tanks table")
+    status: CanisterStatus = Field(..., description="Tank status (safe, risk, critical)")
     
     class Config:
         from_attributes = True
