@@ -7,7 +7,7 @@ from ...config.database import Base
 
 class IVFGeolocation(Base):
     """
-    Model to store geolocation coordinates for IVF canister monitoring.
+    Model to store geolocation coordinates for IVF tank monitoring.
     Motion from Tive Solo 5G refers to location data (latitude/longitude).
     Supports tracking shipment routes and patient associations.
     """
@@ -17,12 +17,13 @@ class IVFGeolocation(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
     # Foreign Keys
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id", ondelete="CASCADE"), nullable=False, index=True, comment="Canister ID for IVF monitoring")
+    # Tank-level monitoring
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), nullable=False, index=True, comment="Tank ID for tank-level monitoring")
     ivf_telemetry_data_id = Column(Integer, ForeignKey("ivf_telemetry_data.id", ondelete="CASCADE"), nullable=False, index=True, comment="IVF telemetry data ID for IVF monitoring")
     
-    # Shipment and Patient References (optional - for IVF shipments)
-    shipment_id = Column(String, nullable=True, index=True, comment="Shipment ID if canister is part of a shipment")
-    patient_id = Column(Integer, ForeignKey("patients.patient_id", ondelete="CASCADE"), nullable=True, index=True, comment="IVF Patient ID if canister is associated with a patient")
+    # Shipment References (optional - for IVF shipments)
+    shipment_id = Column(String, nullable=True, index=True, comment="Shipment ID if tank is part of a shipment")
+    # Note: patient_id removed - patient data is now in PatientCrylockInfo table
     
     # Current Location Coordinates
     current_latitude = Column(Float, nullable=False, comment="Current latitude coordinate")
@@ -45,19 +46,17 @@ class IVFGeolocation(Base):
     
     # Relationships
     ivf_telemetry_data = relationship("IVFTelemetryData", backref="geolocations")
-    canister = relationship("Canister", backref="ivf_geolocations")
-    patient = relationship("IVFPatient", backref="ivf_geolocations")
-    
+    tank = relationship("Tank", backref="ivf_geolocations")
+
     # Composite indexes for common query patterns
     __table_args__ = (
-        # Index for filtering by canister and timestamp
-        Index('idx_ivf_geolocation_canister_timestamp', 'canister_id', 'reading_timestamp'),
+        # Index for filtering by tank and timestamp
+        Index('idx_ivf_geolocation_tank_timestamp', 'tank_id', 'reading_timestamp'),
         # Index for filtering by IVF telemetry_data and timestamp
         Index('idx_ivf_geolocation_telemetry_timestamp', 'ivf_telemetry_data_id', 'reading_timestamp'),
         # Index for filtering by shipment and timestamp
         Index('idx_ivf_geolocation_shipment_timestamp', 'shipment_id', 'reading_timestamp'),
-        # Index for filtering by patient and timestamp
-        Index('idx_ivf_geolocation_patient_timestamp', 'patient_id', 'reading_timestamp'),
+        # Note: patient_id index removed - patient data is now in PatientCrylockInfo table
         # Index for spatial queries (current location)
         Index('idx_ivf_geolocation_current_location', 'current_latitude', 'current_longitude'),
         # Index for filtering by shipment route
