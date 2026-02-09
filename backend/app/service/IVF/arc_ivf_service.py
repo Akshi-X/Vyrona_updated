@@ -500,6 +500,16 @@ class ARCIVFService:
                 logger.info(f"Created new patient_crylock_info: id={patient_crylock.id}, HIS={his_number}, crylock={crylock_number} (branch: {branch.branch_name})")
             else:
                 # Update existing record if needed
+                # IMPORTANT: Preserve user-managed fields (crylock_color, goblet_color, description, 
+                # embryo_transfer, in_transit) - these should NEVER be overwritten by ARC integration
+                
+                # Store existing user-managed values to ensure they are preserved
+                existing_crylock_color = patient_crylock.crylock_color
+                existing_goblet_color = patient_crylock.goblet_color
+                existing_description = patient_crylock.description
+                existing_embryo_transfer = patient_crylock.embryo_transfer
+                existing_in_transit = patient_crylock.in_transit
+                
                 updated = False
                 # Update branch_id if different (patient should belong to their branch)
                 if patient_crylock.branch_id != branch.branch_id:
@@ -533,6 +543,14 @@ class ARCIVFService:
                 if date_of_vitrification and patient_crylock.date_of_vitrification != date_of_vitrification:
                     patient_crylock.date_of_vitrification = date_of_vitrification
                     updated = True
+                
+                # Explicitly preserve user-managed fields - ensure they are never overwritten by ARC integration
+                # These fields should only be updated through user actions, not ARC integration
+                patient_crylock.crylock_color = existing_crylock_color
+                patient_crylock.goblet_color = existing_goblet_color
+                patient_crylock.description = existing_description
+                patient_crylock.embryo_transfer = existing_embryo_transfer
+                patient_crylock.in_transit = existing_in_transit
                 
                 if updated:
                     patient_crylock.updated_by = created_by

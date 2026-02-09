@@ -52,6 +52,16 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
         token = query_params.get("token")
         logger.info(f"Token from query params: {'present' if token else 'missing'}")
         
+        # Get branch_id_override from query parameters (optional, only for Managers)
+        branch_id_override = None
+        branch_id_override_str = query_params.get("branch_id_override")
+        if branch_id_override_str:
+            try:
+                branch_id_override = int(branch_id_override_str)
+                logger.info(f"branch_id_override provided: {branch_id_override}")
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid branch_id_override value: {branch_id_override_str}, ignoring")
+        
         if not token:
             logger.warning("IVF WebSocket connection rejected: No token provided")
             await websocket.close(code=1008, reason="Authentication required: No token provided")
@@ -87,12 +97,28 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
                 return
             
-            branch_id = user.branch_id
             role = user.role.value if hasattr(user.role, 'value') else str(user.role)
             role_normalized = role  # Already in correct format from enum
             department = user.department
             
-            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}")
+            # Determine branch_id based on role and override
+            # Managers can override, Users cannot override (always use their branch)
+            if role_normalized == "Manager":
+                if branch_id_override is not None:
+                    branch_id = branch_id_override
+                    logger.info(f"Manager using branch_id_override: {branch_id}")
+                else:
+                    branch_id = user.branch_id  # Manager without override uses their own branch_id
+                    logger.info(f"Manager using default branch_id: {branch_id}")
+            elif role_normalized == "Admin":
+                branch_id = None  # Admin sees all branches (ignore override)
+            else:
+                # User role: always use their branch (ignore override)
+                branch_id = user.branch_id
+                if branch_id_override is not None:
+                    logger.warning(f"User role cannot override branch_id, ignoring override: {branch_id_override}")
+            
+            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}, override={branch_id_override}")
         finally:
             db_temp.close()
         
