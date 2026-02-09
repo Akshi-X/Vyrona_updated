@@ -401,12 +401,12 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       }
       
       // Build request payload based on flow type
-      // For IVF: only include canister_number, omit patient_id completely
-      // For CGT: only include patient_id, omit canister_number completely
+      // For IVF: only include tank_code, omit patient_id completely
+      // For CGT: only include patient_id, omit tank_code completely
       const requestPayload: {
         message_content: string;
         patient_id?: string;
-        canister_number?: string;
+        tank_code?: string;
         tagged_user_ids: string[];
       } = {
         message_content: messageToSend,
@@ -414,11 +414,11 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       };
       
       if (isCGTFlow && patientId && patientId.trim()) {
-        // CGT flow: only set patient_id, don't include canister_number
+        // CGT flow: only set patient_id, don't include tank_code
         requestPayload.patient_id = patientId.trim();
       } else if (isIVFFlow && canisterNumber && canisterNumber.trim()) {
-        // IVF flow: only set canister_number, don't include patient_id
-        requestPayload.canister_number = canisterNumber.trim();
+        // IVF flow: only set tank_code, don't include patient_id
+        requestPayload.tank_code = canisterNumber.trim();
       }
       
       await chatService.sendMessage(requestPayload);
