@@ -17,15 +17,13 @@ class IVFShipment(Base):
     
     # Shipment Identifiers
     shipment_id = Column(String(255), unique=True, nullable=False, index=True, 
-                        comment="Auto-generated shipment ID (format: SHIP-YYYYMMDD-CANISTER_ID-CRYOLOCK_ID)")
+                        comment="Auto-generated shipment ID (format: SHIP-YYYYMMDD-PATIENT_CRYLOCK_INFO_ID)")
     iot_shipment_id = Column(String(255), nullable=True, index=True, 
                             comment="Shipment ID returned from IoT API (Tive)")
     
     # Foreign Keys
-    cryolock_id = Column(Integer, ForeignKey("cryolocks.cryolock_id", ondelete="CASCADE"), 
-                         nullable=False, index=True, comment="Cryolock being shipped")
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id", ondelete="CASCADE"), 
-                        nullable=False, index=True, comment="Canister containing the cryolock")
+    patient_crylock_info_id = Column(Integer, ForeignKey("patient_crylock_info.id", ondelete="CASCADE"), 
+                                     nullable=False, index=True, comment="Patient crylock info being shipped")
     source_branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id", ondelete="SET NULL"), 
                              nullable=False, index=True, comment="Source branch (current location)")
     destination_branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id", ondelete="SET NULL"), 
@@ -63,8 +61,7 @@ class IVFShipment(Base):
     updated_by = Column(String(255), nullable=True, comment="User who last updated the shipment")
     
     # Relationships
-    cryolock = relationship("Cryolock", backref="shipments")
-    canister = relationship("Canister", backref="ivf_shipments")
+    patient_crylock_info = relationship("PatientCrylockInfo", backref="shipments")
     source_branch = relationship("HospitalBranch", foreign_keys=[source_branch_id], backref="source_shipments")
     destination_branch = relationship("HospitalBranch", foreign_keys=[destination_branch_id], backref="destination_shipments")
     
@@ -74,10 +71,8 @@ class IVFShipment(Base):
         Index('idx_ivf_shipment_shipment_id', 'shipment_id'),
         # Index for querying by IoT shipment ID
         Index('idx_ivf_shipment_iot_id', 'iot_shipment_id'),
-        # Index for querying by cryolock
-        Index('idx_ivf_shipment_cryolock', 'cryolock_id'),
-        # Index for querying by canister
-        Index('idx_ivf_shipment_canister', 'canister_id'),
+        # Index for querying by patient crylock info
+        Index('idx_ivf_shipment_patient_crylock', 'patient_crylock_info_id'),
         # Index for querying by device
         Index('idx_ivf_shipment_device', 'device_id'),
         # Index for querying by status

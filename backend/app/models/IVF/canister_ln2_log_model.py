@@ -13,9 +13,9 @@ class CanisterLn2Log(Base):
     # Primary Key
     log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     
-    # Foreign Key - reference to canisters table (no schema prefix)
-    # Required: Every refill log must be associated with a canister
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=False, index=True)
+    # Foreign Key - reference to tanks table (no schema prefix)
+    # Required: Every refill log must be associated with a tank
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=False, index=True)
 
     # Branch ID for access control (hospital branches)
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=True, index=True)
@@ -44,7 +44,7 @@ class CanisterLn2Log(Base):
     ln2_received_date = Column(Date, nullable=True, comment="Date when LN2 was received")
     
     # Relationships
-    canister = relationship("Canister", back_populates="ln2_logs")
+    tank = relationship("Tank", back_populates="ln2_logs")
     
     # Audit Trail
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -54,8 +54,8 @@ class CanisterLn2Log(Base):
     
     # Composite indexes for common query patterns
     __table_args__ = (
-        # Index for filtering by canister and date
-        Index('idx_ln2_log_canister_date', 'canister_id', 'refill_date'),
+        # Index for filtering by tank and date
+        Index('idx_ln2_log_tank_date', 'tank_id', 'refill_date'),
         # Index for filtering by status
         Index('idx_ln2_log_status', 'status'),
         # Index for filtering by branch

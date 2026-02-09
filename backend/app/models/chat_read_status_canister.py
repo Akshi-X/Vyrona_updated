@@ -8,17 +8,17 @@ from ..config.database import Base
 
 class ChatReadStatusCanister(Base):
     """
-    Tracks the last read message for each user-canister combination (IVF flow).
+    Tracks the last read message for each user-tank combination (IVF flow).
     Uses a two-pointer approach: last_read_message_id points to the last message
-    the user has read for a specific canister.
+    the user has read for a specific tank.
     
-    NULL last_read_message_id means the user has never read any messages for this canister.
+    NULL last_read_message_id means the user has never read any messages for this tank.
     """
     __tablename__ = "chat_read_status_canister"
 
-    # Composite Primary Key: (user_id, canister_id)
+    # Composite Primary Key: (user_id, tank_id)
     user_id = Column(String, ForeignKey("users.user_id"), primary_key=True, nullable=False)
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), primary_key=True, nullable=False)
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), primary_key=True, nullable=False)
     
     # Last Read Message ID
     # NULL = user has never read any messages for this canister
@@ -30,6 +30,6 @@ class ChatReadStatusCanister(Base):
     
     # Relationships
     user = relationship("User", backref="chat_read_statuses_canister")
-    canister = relationship("Canister", backref="chat_read_statuses")
+    tank = relationship("Tank", backref="chat_read_statuses")
     # Optional: relationship to the last read message (may be None)
     last_read_message = relationship("ChatMessage", foreign_keys=[last_read_message_id])

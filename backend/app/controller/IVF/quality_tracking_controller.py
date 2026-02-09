@@ -36,18 +36,20 @@ router = APIRouter(
 )
 
 
-@router.post("/canisters/{canister_number}/refill-logs", response_model=RefillLogResponse, status_code=201)
+@router.post("/tanks/{tank_code}/refill-logs", response_model=RefillLogResponse, status_code=201)
 def create_refill_log(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, uses first canister in tank."),
     refill_log_data: RefillLogCreate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Create a new Liquid Nitrogen (LN2) refill log entry for a specific canister
+    Create a new Liquid Nitrogen (LN2) refill log entry for a canister in a specific tank.
     
-    Canister ID is automatically obtained from the URL path.
+    Tank ID is automatically obtained from the URL path.
+    If canister_number is not provided, uses the first canister in the tank.
     
     Request Body Fields:
     - Refill Date: Date when refill was performed
@@ -59,12 +61,13 @@ def create_refill_log(
     try:
         quality_tracking_service = QualityTrackingService(db)
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.create_refill_log(
-            canister_id=canister_id,
+        return quality_tracking_service.create_refill_log_for_tank(
+            tank_id=tank_id,
+            canister_number=canister_number,
             refill_log_data=refill_log_data,
             created_by=current_user.email if current_user else None,
             branch_id=branch_id
@@ -74,9 +77,10 @@ def create_refill_log(
         raise
 
 
-@router.get("/canisters/{canister_number}/refill-logs", response_model=RefillLogListResponse)
+@router.get("/tanks/{tank_code}/refill-logs", response_model=RefillLogListResponse)
 def get_refill_logs_by_container(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, returns logs for all canisters in tank."),
     status: Optional[str] = Query(None, description="Filter by status (Done, In progress, Not started)"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Limit number of results"),
     request: Request = None,
@@ -84,11 +88,13 @@ def get_refill_logs_by_container(
     db: Session = Depends(get_db)
 ):
     """
-    Fetch Liquid Nitrogen (LN2) refill logs for a specific canister
+    Fetch Liquid Nitrogen (LN2) refill logs for canisters in a specific tank.
     
-    Canister ID is automatically obtained from the URL path.
+    Tank ID is automatically obtained from the URL path.
+    If canister_number is not provided, returns logs for all canisters in the tank.
     
     Supports filtering by:
+    - Canister Number: Filter by specific canister (optional)
     - Status: Filter by status (Done, In progress, Not started)
     - Limit: Limit the number of results returned
     
@@ -107,12 +113,13 @@ def get_refill_logs_by_container(
         
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.get_refill_logs(
-            canister_id=canister_id,
+        return quality_tracking_service.get_refill_logs_for_tank(
+            tank_id=tank_id,
+            canister_number=canister_number,
             status=status,
             limit=limit,
             branch_id=branch_id
@@ -124,9 +131,9 @@ def get_refill_logs_by_container(
         raise
 
 
-@router.patch("/canisters/{canister_number}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
+@router.patch("/tanks/{tank_code}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
 def update_refill_log_status(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
     log_id: int = Path(..., description="Refill log ID"),
     status_update: RefillLogStatusUpdate = ...,
     request: Request = None,
@@ -134,17 +141,17 @@ def update_refill_log_status(
     db: Session = Depends(get_db)
 ):
     """
-    Update only the status of a refill log for a specific canister.
+    Update only the status of a refill log. The log_id uniquely identifies the log.
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.update_refill_log_status(
-            canister_id=canister_id,
+        return quality_tracking_service.update_refill_log_status_for_tank(
+            tank_id=tank_id,
             log_id=log_id,
             status_update=status_update,
             updated_by=current_user.email if current_user else None,
@@ -155,35 +162,35 @@ def update_refill_log_status(
         raise
 
 
-@router.get("/canisters/{canister_number}/tracking-details", response_model=IVFCanisterTrackingResponse)
+@router.get("/tanks/{tank_code}/tracking-details", response_model=IVFCanisterTrackingResponse)
 def get_canister_tracking_details(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T2') - represents Tank Number from ARC API format"),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Fetch tracking details for a specific canister.
+    Fetch tracking details for all canisters in a specific tank.
     
     Returns a table with the following columns:
     - HIS # (PK): Patient HIS Number
     - Cryolock #: Cryolock number
     - Canister #: Canister number
+    - Tank Code: Tank code (e.g., T1, T2) - represents Tank Number from ARC API format: Tank Number / Canister Number / Location / Cryolock Serial Number
     - Cane ID: Cane identifier (formatted)
     - Goblet Color: Goblet color
     - Cryolock Color: Cryolock color
     - Date of Vitrification: Date when vitrification was performed
     - Move to: Indicates if item can be moved (UI action button)
+    
+    Filters by the logged-in user's branch (e.g., Tambaram) for role-based access control.
+    Returns tracking details for all canisters within the specified tank.
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
-            branch_id=branch_id
-        )
-        return quality_tracking_service.get_canister_tracking_details(
-            canister_id=canister_id,
+        return quality_tracking_service.get_tank_tracking_details(
+            tank_code=tank_code,
             branch_id=branch_id
         )
     except Exception as e:
@@ -191,16 +198,16 @@ def get_canister_tracking_details(
         raise
 
 
-@router.patch("/canisters/{canister_number}/goblet-color", response_model=ColorUpdateResponse)
+@router.patch("/tanks/{tank_code}/goblet-color", response_model=ColorUpdateResponse)
 def update_goblet_color(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
     color_update: GobletColorUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update goblet color for a specific cryolock within a canister.
+    Update goblet color for a specific cryolock within a tank.
     
     Use this endpoint to update the goblet color from the tracking table.
     The goblet color is stored in the 'cryolocks' table.
@@ -222,41 +229,42 @@ def update_goblet_color(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.update_goblet_color(
-            canister_id=canister_id,
+        return quality_tracking_service.update_goblet_color_for_tank(
+            tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in update_goblet_color endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/canisters/{canister_number}/cryolock-color", response_model=ColorUpdateResponse)
+@router.patch("/tanks/{tank_code}/cryolock-color", response_model=ColorUpdateResponse)
 def update_cryolock_color(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
     color_update: CryolockColorUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update cryolock color for a specific cryolock within a canister.
+    Update cryolock color for a specific cryolock within a tank.
     
     Use this endpoint to update the cryolock color from the tracking table.
     The cryolock color is stored in the 'cryolocks' table.
     
     WHERE TO GET cryolock_number:
     - Use the "Cryolock Num" column value directly from the table row
-    - Example: "CL-01"
+    - Example: "CL-01", "T1/C1/A11/2"
     
     Request Body:
-    - cryolock_number: Cryolock number from the "Cryolock Num" column in the table (e.g., "CL-01")
+    - cryolock_number: Cryolock number from the tracking details (e.g., "CL-01", "T1/C1/A11/2")
     - cryolock_color: The cryolock color value to set (e.g., "Blue", "Green", "Red")
     
     Example Request:
@@ -268,24 +276,25 @@ def update_cryolock_color(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.update_cryolock_color(
-            canister_id=canister_id,
+        return quality_tracking_service.update_cryolock_color_for_tank(
+            tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in update_cryolock_color endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/canisters/{canister_number}/embryo-transfer", response_model=CryolockFlagUpdateResponse)
+@router.patch("/tanks/{tank_code}/embryo-transfer", response_model=CryolockFlagUpdateResponse)
 def mark_embryo_transfer(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
     flag_update: CryolockFlagUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -302,24 +311,25 @@ def mark_embryo_transfer(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.mark_embryo_transfer(
-            canister_id=canister_id,
+        return quality_tracking_service.mark_embryo_transfer_for_tank(
+            tank_id=tank_id,
             flag_update=flag_update,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in mark_embryo_transfer endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/canisters/{canister_number}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
+@router.patch("/tanks/{tank_code}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
 def mark_in_transit_with_shipment(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
     shipment_request: InTransitWithShipmentRequest = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -343,7 +353,7 @@ def mark_in_transit_with_shipment(
     Description Format:
     - "crylock is move from <source> to <destination>-deviceid -<device_id>"
     - Example: "crylock is move from egmore to thambaram-deviceid -xxxxx"
-    - Source location is auto-detected from canister's current branch
+    - Source location is auto-detected from tank's current branch
     - Destination location is extracted from description and matched to branch name
     - Device ID is extracted from description (optional)
     
@@ -356,112 +366,26 @@ def mark_in_transit_with_shipment(
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.mark_in_transit_with_shipment(
-            canister_id=canister_id,
+        return quality_tracking_service.mark_in_transit_with_shipment_for_tank(
+            tank_id=tank_id,
             request=shipment_request,
             updated_by=current_user.email if current_user else None,
-            branch_id=branch_id
+            branch_id=branch_id,
+            tank_code=tank_code
         )
     except Exception as e:
         logger.error(f"Error in mark_in_transit_with_shipment endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.get("/canisters/{canister_number}/refill-logs/export-excel")
-def export_monthly_refill_logs_excel(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
-    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
-    request: Request = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Export refill logs to Excel format.
-    
-    Returns an Excel file with:
-    - Metadata at the top: Container ID, Year/Month-Year, and Current Year Total
-    - Refill log data with all columns
-    
-    Query Parameters:
-    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
-    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
-    
-    Example:
-    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel (exports current year)
-    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024 (exports year 2024)
-    GET /api/quality-tracking/canisters/C1/refill-logs/export-excel?year=2024&month=3 (exports March 2024)
-    """
-    try:
-        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-        quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
-            branch_id=branch_id
-        )
-        return quality_tracking_service.export_monthly_refill_logs_excel(
-            canister_id=canister_id,
-            year=year,
-            month=month,
-            branch_id=branch_id
-        )
-    except Exception as e:
-        logger.error(f"Error in export_monthly_refill_logs_excel endpoint: {str(e)}", exc_info=True)
-        raise
-
-
-@router.get("/kpi-thresholds/export-excel")
-def export_kpi_threshold_monthly_excel(
-    canister_number: str = Query(..., description="Canister number to filter by (e.g., 'C1') - required"),
-    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
-    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, uses current month."),
-    request: Request = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Export KPI threshold deviation data as Excel format for a specific canister.
-    
-    Returns an Excel file with:
-    - Metadata at the top: Container ID, Year/Month-Year, and Total Deviations
-    - Date and Time of readings
-    - Canister information
-    - KPI values (Temperature, Humidity, Agitation, Light)
-    - Threshold targets and ranges
-    - Threshold violation status
-    - Quality loss percentage
-    
-    Query Parameters:
-    - canister_number: Canister number to filter by (e.g., 'C1') - required
-    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
-    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
-    
-    Example:
-    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1 (exports current year)
-    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1&year=2024 (exports year 2024)
-    GET /api/quality-tracking/kpi-thresholds/export-excel?canister_number=C1&year=2024&month=3 (exports March 2024)
-    """
-    try:
-        branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-        quality_tracking_service = QualityTrackingService(db)
-        return quality_tracking_service.export_kpi_threshold_monthly_excel(
-            canister_number=canister_number,
-            year=year,
-            month=month,
-            branch_id=branch_id
-        )
-    except Exception as e:
-        logger.error(f"Error in export_kpi_threshold_monthly_excel endpoint: {str(e)}", exc_info=True)
-        raise
-
-
-@router.get("/canisters/{canister_number}/combined-report/export-excel")
+@router.get("/tanks/{tank_code}/combined-report/export-excel")
 def export_combined_refill_logs_and_deviations_excel(
-    canister_number: str = Path(..., description="Canister number/code from URL (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, exports data for all canisters in tank."),
     year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
     month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
     request: Request = None,
@@ -472,27 +396,29 @@ def export_combined_refill_logs_and_deviations_excel(
     Export combined refill logs and KPI threshold deviations to Excel format with two sheets.
     
     Returns an Excel file with two sheets:
-    - Sheet 1: Refill Logs - Contains refill log data with metadata
-    - Sheet 2: KPI Threshold Deviations - Contains deviation data with metadata
+    - Sheet 1: Refill Logs - Contains refill log data with metadata for all canisters in tank (or specific canister if provided)
+    - Sheet 2: KPI Threshold Deviations - Contains deviation data with metadata for all canisters in tank (or specific canister if provided)
     
     Query Parameters:
+    - canister_number: Optional canister number to filter by (e.g., 'C1')
     - year: Year for the report (e.g., 2024). Optional - defaults to current year.
     - month: Month for the report (1-12). Optional - if not provided, exports entire year.
     
     Example:
-    GET /api/quality-tracking/canisters/C1/combined-report/export-excel (exports current year)
-    GET /api/quality-tracking/canisters/C1/combined-report/export-excel?year=2024 (exports year 2024)
-    GET /api/quality-tracking/canisters/C1/combined-report/export-excel?year=2024&month=3 (exports March 2024)
+    GET /api/quality-tracking/tanks/T1/combined-report/export-excel (exports current year for all canisters)
+    GET /api/quality-tracking/tanks/T1/combined-report/export-excel?canister_number=C1&year=2024 (exports year 2024 for C1)
+    GET /api/quality-tracking/tanks/T1/combined-report/export-excel?year=2024&month=3 (exports March 2024 for all canisters)
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        canister_id = quality_tracking_service.resolve_canister_id(
-            canister_number=canister_number,
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
             branch_id=branch_id
         )
-        return quality_tracking_service.export_combined_refill_logs_and_deviations_excel(
-            canister_id=canister_id,
+        return quality_tracking_service.export_combined_refill_logs_and_deviations_excel_for_tank(
+            tank_id=tank_id,
+            canister_number=canister_number,
             year=year,
             month=month,
             branch_id=branch_id
