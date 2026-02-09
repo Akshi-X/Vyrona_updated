@@ -490,12 +490,12 @@ class QualityService:
             logger.error(f"Error retrieving geolocation history for patient {patient_id}: {e}")
             return []
     
-    def get_canister_redis_history(self, canister_id: int, limit: int = 12) -> List[dict]:
+    def get_tank_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
         """
-        Get last N messages for an IVF canister from Redis
+        Get last N messages for an IVF tank from Redis
         
         Args:
-            canister_id: Canister ID to get history for
+            tank_id: Tank ID to get history for
             limit: Number of messages to retrieve (default: 12)
         
         Returns:
@@ -503,7 +503,7 @@ class QualityService:
         """
         try:
             redis_client = get_redis()
-            history_key = f"ivf_quality_history:{canister_id}"
+            history_key = f"ivf_quality_history:{tank_id}"
             
             # Get last N messages (0 to limit-1, since lrange is inclusive)
             # Redis lpush stores newest at index 0, so this gets newest first
@@ -519,7 +519,7 @@ class QualityService:
                     data = json.loads(raw_data)
                     history.append(data)
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse Redis message for canister {canister_id}: {e}")
+                    logger.warning(f"Failed to parse Redis message for tank {tank_id}: {e}")
                     continue
             
             # Reverse to get ascending order (oldest first)
@@ -527,24 +527,25 @@ class QualityService:
             
             return history
         except Exception as e:
-            logger.error(f"Error retrieving Redis history for canister {canister_id}: {e}")
+            logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
             return []
     
-    def get_canister_geolocation_history(self, canister_id: int, limit: int = 100) -> List[dict]:
+    def get_tank_geolocation_history(self, tank_id: int, limit: int = 100) -> List[dict]:
         """
-        Get geolocation records for an IVF canister from database
+        Get geolocation records for an IVF tank from database
         
         Args:
-            canister_id: Canister ID to get geolocation history for
+            tank_id: Tank ID to get geolocation history for
             limit: Maximum number of records to retrieve (default: 100)
         
         Returns:
             List of geolocation dictionaries, oldest first (ascending order)
         """
         try:
-            # Query geolocation records for the canister, ordered by id
+            # Query geolocation records for the tank, ordered by id
+            # Note: IVFGeolocation.canister_id is actually tank_id
             geolocation_records = self.db.query(IVFGeolocation).filter(
-                IVFGeolocation.canister_id == canister_id
+                IVFGeolocation.canister_id == tank_id
             ).order_by(
                 IVFGeolocation.id.asc()
             ).limit(limit).all()
@@ -555,7 +556,7 @@ class QualityService:
                 geolocation_data.append({
                     "type": "ivf_geolocation",
                     "id": record.id,
-                    "canister_id": record.canister_id,
+                    "tank_id": record.canister_id,  # canister_id is actually tank_id
                     "telemetry_data_id": record.ivf_telemetry_data_id,  # IVF model uses ivf_telemetry_data_id
                     "current_latitude": round(record.current_latitude, 2) if record.current_latitude is not None else None,
                     "current_longitude": round(record.current_longitude, 2) if record.current_longitude is not None else None,
@@ -565,8 +566,22 @@ class QualityService:
             
             return geolocation_data
         except Exception as e:
-            logger.error(f"Error retrieving geolocation history for canister {canister_id}: {e}")
+            logger.error(f"Error retrieving geolocation history for tank {tank_id}: {e}")
             return []
+    
+    def get_canister_redis_history(self, canister_id: int, limit: int = 12) -> List[dict]:
+        """
+        Deprecated: Use get_tank_redis_history instead. Kept for backward compatibility.
+        Get last N messages for an IVF canister from Redis (canister_id is actually tank_id)
+        """
+        return self.get_tank_redis_history(canister_id, limit)
+    
+    def get_canister_geolocation_history(self, canister_id: int, limit: int = 100) -> List[dict]:
+        """
+        Deprecated: Use get_tank_geolocation_history instead. Kept for backward compatibility.
+        Get geolocation records for an IVF canister from database (canister_id is actually tank_id)
+        """
+        return self.get_tank_geolocation_history(canister_id, limit)
     
     def validate_tank_belongs_to_branch(self, tank_id: int, branch_id: Optional[int]) -> bool:
         """
