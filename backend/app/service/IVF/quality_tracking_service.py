@@ -161,6 +161,7 @@ class QualityTrackingService:
             tank_id: Tank ID from URL path
             refill_log_data: Refill log data to create
             created_by: Username of the user creating the log
+            branch_id: Optional branch ID for authorization/filtering (not stored in DB - uses tank's branch_id instead)
             
         Returns:
             Created refill log response
@@ -169,6 +170,19 @@ class QualityTrackingService:
             AppException: If creation fails
         """
         try:
+            # Get tank to retrieve its actual branch_id (not the override)
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
+                raise AppException(
+                    message=f"Tank with ID {tank_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            # Use tank's actual branch_id for database storage (not the override)
+            # branch_id parameter is only used for authorization/filtering
+            tank_branch_id = tank.branch_id
+            
             # Calculate counts based on latest log for this tank
             last_log = self.db.query(CanisterLn2Log).filter(
                 CanisterLn2Log.tank_id == tank_id
@@ -180,6 +194,7 @@ class QualityTrackingService:
             last_opened_count = last_log.opened_count if last_log else 0
 
             # Create new refill log using CanisterLn2Log model
+            # Use tank's branch_id, not the override (override is only for filtering)
             refill_log = CanisterLn2Log(
                 tank_id=tank_id,
                 refill_date=refill_log_data.refill_date,
@@ -193,7 +208,7 @@ class QualityTrackingService:
                 ln2_ordered_date=refill_log_data.ln2_ordered_date,
                 ln2_received_date=refill_log_data.ln2_received_date,
                 created_by=created_by,
-                branch_id=branch_id,
+                branch_id=tank_branch_id,  # Use tank's actual branch_id, not override
                 refilled_count=last_refilled_count + 1,
                 opened_count=last_opened_count + 1
             )

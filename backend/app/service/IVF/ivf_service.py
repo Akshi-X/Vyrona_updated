@@ -1,16 +1,17 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, and_
-from typing import Dict, Any, Optional
 from collections import defaultdict
 from datetime import date
+from typing import Any, Dict, List, Optional
 import logging
 
-from ...models.IVF.hospital_model import Hospital
-from ...models.IVF.hospital_branch_model import HospitalBranch
-from ...models.IVF.tank_model import Tank
-from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from ...models.IVF.ivf_shipment_model import IVFShipment
+from sqlalchemy import and_, desc, func, or_
+from sqlalchemy.orm import Session
+
 from ...constants.enums import CanisterStatus
+from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.hospital_model import Hospital
+from ...models.IVF.ivf_shipment_model import IVFShipment
+from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from ...models.IVF.tank_model import Tank
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,265 @@ class IVFService:
             
         except Exception as e:
             raise Exception(f"Error fetching active tanks: {str(e)}")
+    
+    def get_embryo_transfer_crylocks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get all crylocks where embryo_transfer is True.
+        
+        Args:
+            branch_id: Optional branch ID to filter by. If provided, only returns crylocks for that branch.
+                      If None, returns crylocks for all branches (Manager/Admin roles).
+        
+        Returns:
+            Dictionary containing:
+            - data: List of crylock details with:
+                - his_number: Patient HIS Number
+                - cryolock_number: Cryolock number
+                - canister_number: Canister number
+                - tank_code: Tank code
+                - cane_code: Cane code
+                - goblet_color: Goblet color
+                - cryolock_color: Cryolock color
+                - date_of_vitrification: Date of vitrification
+                - branch_name: Branch name
+                - tank_id: Tank ID
+            - total: Total number of embryo transfer crylocks
+        """
+        try:
+            # Query patient crylocks where embryo_transfer is True
+            query = (
+                self.db.query(
+                    PatientCrylockInfo.his_number,
+                    PatientCrylockInfo.crylock_number,
+                    PatientCrylockInfo.canister_number,
+                    PatientCrylockInfo.tank_code,
+                    PatientCrylockInfo.cane_code,
+                    PatientCrylockInfo.goblet_color,
+                    PatientCrylockInfo.crylock_color,
+                    PatientCrylockInfo.date_of_vitrification,
+                    PatientCrylockInfo.tank_id,
+                    PatientCrylockInfo.branch_id,
+                    HospitalBranch.branch_name
+                )
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .filter(PatientCrylockInfo.embryo_transfer == True)
+            )
+            
+            # Apply branch filter if provided (User role only)
+            if branch_id is not None:
+                query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+            
+            # Order by branch name, then HIS number, then cryolock number
+            query = query.order_by(
+                HospitalBranch.branch_name,
+                PatientCrylockInfo.his_number,
+                PatientCrylockInfo.crylock_number
+            )
+            
+            results = query.all()
+            
+            # Build response list
+            crylock_list = []
+            for row in results:
+                crylock_data = {
+                    "his_number": row.his_number or "",
+                    "cryolock_number": row.crylock_number or "",
+                    "canister_number": row.canister_number or "",
+                    "tank_code": row.tank_code or "",
+                    "cane_code": row.cane_code or "",
+                    "goblet_color": row.goblet_color or "",
+                    "cryolock_color": row.crylock_color or "",
+                    "date_of_vitrification": row.date_of_vitrification,
+                    "branch_name": row.branch_name or "",
+                    "tank_id": row.tank_id
+                }
+                crylock_list.append(crylock_data)
+            
+            return {
+                "data": crylock_list,
+                "total": len(crylock_list)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching embryo transfer crylocks: {str(e)}", exc_info=True)
+            raise Exception(f"Error fetching embryo transfer crylocks: {str(e)}")
+    
+    def get_in_transit_crylocks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get all crylocks where in_transit is True.
+        
+        Args:
+            branch_id: Optional branch ID to filter by. If provided, only returns crylocks for that branch.
+                      If None, returns crylocks for all branches (Manager/Admin roles).
+        
+        Returns:
+            Dictionary containing:
+            - data: List of crylock details with:
+                - his_number: Patient HIS Number
+                - cryolock_number: Cryolock number
+                - canister_number: Canister number
+                - tank_code: Tank code
+                - cane_code: Cane code
+                - goblet_color: Goblet color
+                - cryolock_color: Cryolock color
+                - date_of_vitrification: Date of vitrification
+                - branch_name: Branch name
+                - tank_id: Tank ID
+                - shipment_details: Full shipment details object if available (from ivf_shipment table)
+            - total: Total number of in-transit crylocks
+        """
+        try:
+            # Query patient crylocks where in_transit is True
+            query = (
+                self.db.query(
+                    PatientCrylockInfo.his_number,
+                    PatientCrylockInfo.crylock_number,
+                    PatientCrylockInfo.canister_number,
+                    PatientCrylockInfo.tank_code,
+                    PatientCrylockInfo.cane_code,
+                    PatientCrylockInfo.goblet_color,
+                    PatientCrylockInfo.crylock_color,
+                    PatientCrylockInfo.date_of_vitrification,
+                    PatientCrylockInfo.tank_id,
+                    PatientCrylockInfo.branch_id,
+                    PatientCrylockInfo.id,
+                    HospitalBranch.branch_name
+                )
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .filter(PatientCrylockInfo.in_transit == True)
+            )
+            
+            # Apply branch filter if provided (User role only)
+            if branch_id is not None:
+                query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+            
+            # Order by branch name, then HIS number, then cryolock number
+            query = query.order_by(
+                HospitalBranch.branch_name,
+                PatientCrylockInfo.his_number,
+                PatientCrylockInfo.crylock_number
+            )
+            
+            results = query.all()
+            
+            # Get patient crylock info IDs to fetch shipment details
+            patient_crylock_info_ids = [row.id for row in results]
+            
+            # Fetch shipment details from ivf_shipment table for patient crylocks
+            # Get the most recent shipment for each patient crylock
+            shipment_details_map = {}
+            if patient_crylock_info_ids:
+                # Use a subquery to get the latest shipment per patient crylock
+                latest_shipments = (
+                    self.db.query(
+                        IVFShipment.patient_crylock_info_id,
+                        func.max(IVFShipment.id).label('latest_shipment_id')
+                    )
+                    .filter(
+                        IVFShipment.patient_crylock_info_id.in_(patient_crylock_info_ids)
+                    )
+                    .group_by(IVFShipment.patient_crylock_info_id)
+                    .subquery()
+                )
+                
+                # Fetch full shipment records
+                shipment_records = (
+                    self.db.query(IVFShipment)
+                    .join(
+                        latest_shipments,
+                        IVFShipment.id == latest_shipments.c.latest_shipment_id
+                    )
+                    .all()
+                )
+                
+                # Map shipment details by patient_crylock_info_id
+                for shipment in shipment_records:
+                    shipment_details_map[shipment.patient_crylock_info_id] = {
+                        "shipment_id": shipment.shipment_id,
+                        "iot_shipment_id": shipment.iot_shipment_id,
+                        "source_branch_id": shipment.source_branch_id,
+                        "destination_branch_id": shipment.destination_branch_id,
+                        "source_location": shipment.source_location,
+                        "destination_location": shipment.destination_location,
+                        "source_latitude": shipment.source_latitude,
+                        "source_longitude": shipment.source_longitude,
+                        "destination_latitude": shipment.destination_latitude,
+                        "destination_longitude": shipment.destination_longitude,
+                        "description": shipment.description,
+                        "device_id": shipment.device_id,
+                        "shipment_status": shipment.shipment_status,
+                        "departure_time": shipment.departure_time,
+                        "arrival_time": shipment.arrival_time,
+                        "scheduled_departure_time": shipment.scheduled_departure_time
+                    }
+            
+            # Build response list
+            crylock_list = []
+            for row in results:
+                # Get shipment details for this patient crylock if they exist
+                shipment_details = shipment_details_map.get(row.id)
+                
+                crylock_data = {
+                    "his_number": row.his_number or "",
+                    "cryolock_number": row.crylock_number or "",
+                    "canister_number": row.canister_number or "",
+                    "tank_code": row.tank_code or "",
+                    "cane_code": row.cane_code or "",
+                    "goblet_color": row.goblet_color or "",
+                    "cryolock_color": row.crylock_color or "",
+                    "date_of_vitrification": row.date_of_vitrification,
+                    "branch_name": row.branch_name or "",
+                    "tank_id": row.tank_id,
+                    "shipment_details": shipment_details
+                }
+                crylock_list.append(crylock_data)
+            
+            return {
+                "data": crylock_list,
+                "total": len(crylock_list)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching in-transit crylocks: {str(e)}", exc_info=True)
+            raise Exception(f"Error fetching in-transit crylocks: {str(e)}")
+    
+    def get_branches_by_hospital(self, hospital_id: int) -> Dict[str, Any]:
+        """
+        Get list of branches for a specific hospital.
+        
+        Args:
+            hospital_id: Hospital ID to filter branches by
+            
+        Returns:
+            Dictionary containing:
+            - branches: List of branches with branch_id and branch_name
+            - total: Total number of branches
+        """
+        try:
+            # Query all branches for this hospital, ordered by branch name
+            branches = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.hospital_id == hospital_id)
+                .order_by(HospitalBranch.branch_name)
+                .all()
+            )
+            
+            # Build response list
+            branch_list = [
+                {
+                    "branch_id": branch.branch_id,
+                    "branch_name": branch.branch_name or f"Branch {branch.branch_id}"
+                }
+                for branch in branches
+            ]
+            
+            return {
+                "branches": branch_list,
+                "total": len(branch_list)
+            }
+        except Exception as e:
+            logger.error(f"Error fetching branches for hospital {hospital_id}: {str(e)}", exc_info=True)
+            raise Exception(f"Error fetching branches: {str(e)}")
     
     def _calculate_branch_status(self, branch_id: int) -> str:
         """
