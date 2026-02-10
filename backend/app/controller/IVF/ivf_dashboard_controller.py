@@ -3,20 +3,21 @@ IVF Dashboard Controller
 Controller for IVF dashboard metrics endpoints with role-based access control.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
-from starlette.requests import Request
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from app.config.database import get_db
-from app.service.IVF.ivf_dashboard_service import IVFDashboardService
 from app.schemas.IVF.ivf_dashboard_schema import (
-    TotalEmbryosCryolocksResponse,
-    TotalContainersResponse,
-    QualityDeviationsFlaggedResponse,
-    TopDeviationDriverResponse,
-    OutboundShipmentsResponse,
     DeviationsGraphResponse,
-    TotalDeviationsResponse
+    OutboundShipmentsResponse,
+    QualityDeviationsFlaggedResponse,
+    TotalContainersResponse,
+    TotalDeviationsResponse,
+    TotalEmbryosCryolocksResponse,
+    TopDeviationDriverResponse,
 )
+from app.service.IVF.ivf_dashboard_service import IVFDashboardService
+from app.utils.ivf_helpers import get_branch_filter_info
 
 router = APIRouter(prefix="/ivf/dashboard", tags=["IVF Dashboard"])
 
@@ -31,6 +32,9 @@ def get_dashboard_branch_filter(request: Request) -> tuple:
     - Admin role: Show all sites (no branch filter)
     - Non-IVF users: No filtering (should not access IVF dashboard)
     
+    This is a wrapper around get_branch_filter_info with is_quality_tracking=False
+    to ensure Managers see all branches on dashboard.
+    
     Args:
         request: FastAPI Request object with current_user in request.state
         
@@ -39,39 +43,9 @@ def get_dashboard_branch_filter(request: Request) -> tuple:
         - branch_id: Branch ID to filter by, or None if no filtering
         - role: User's role, or None if not an IVF user
     """
-    # Get current user from request state (injected by middleware)
-    if not hasattr(request.state, "current_user"):
-        return None, None
-    
-    user = request.state.current_user
-    
-    # Check if user is from IVF department (IVF dashboard is only for IVF users)
-    if not user.department or user.department.upper() != "IVF":
-        # Not an IVF user - no access to IVF dashboard
-        return None, None
-    
-    # Get user's role
-    role = user.role.value if hasattr(user.role, 'value') else str(user.role)
-    role_normalized = role.title() if role else None
-    
-    # Admin role: no branch filtering (can see all branches)
-    if role_normalized == "Admin":
-        return None, role_normalized
-    
-    # Manager role: no branch filtering for dashboard (can see all sites)
-    if role_normalized == "Manager":
-        return None, role_normalized
-    
-    # User role: filter by their branch
-    if role_normalized == "User":
-        branch_id = user.branch_id
-        if branch_id is None:
-            # User without branch_id - shouldn't happen, but handle gracefully
-            return None, role_normalized
-        return branch_id, role_normalized
-    
-    # Unknown role - no filtering
-    return None, role_normalized
+    # Use the shared helper function with is_quality_tracking=False
+    # This ensures Managers see all branches (not filtered to their own branch)
+    return get_branch_filter_info(request, branch_id_override=None, is_quality_tracking=False)
 
 
 @router.get("/metrics/total-embryos-cryolocks", response_model=TotalEmbryosCryolocksResponse)
