@@ -8,10 +8,20 @@ from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.hospital_branch_model import HospitalBranch
-from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse, CanisterCheckResponse
+from app.schemas.IVF.ivf_schema import (
+    ActiveCanistersResponse,
+    BranchListResponse,
+    CanisterCheckResponse,
+    EmbryoTransferResponse,
+    EmbryoTrackingResponse,
+    InTransitResponse,
+    IVFControlTowerResponse,
+)
+from app.constants.enums import CanisterStatus
 from app.service.IVF.arc_ivf_service import ARCIVFService
 from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
+from app.utils.user_helpers import is_hospital_department
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +84,9 @@ def get_ivf_control_tower_map(
 @router.get("/control_tower/active_canisters", response_model=ActiveCanistersResponse)
 def get_active_canisters(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_name: Optional[str] = Query(None, description="Optional branch name filter"),
+    status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical)")
 ):
     """
     Get active tanks grouped by branch for the current logged-in user's branch.
@@ -84,12 +96,17 @@ def get_active_canisters(
     - Manager (IVF): See tanks from all branches
     - Admin: See tanks from all branches
     
+    Optional filters:
+    - branch_name: Filter by specific branch name
+    - status: Filter by tank status (safe, risk, critical)
+    
     This endpoint returns all active tanks (is_active = True) grouped by branch with:
     - branch_id: The ID of the branch
     - branch_name: The name of the branch
     - tanks: List of tanks for this branch with:
         - tank_code: The tank code (e.g., 'T1')
         - updated_at: Last updated date and time from tanks table updated_at
+        - status: Tank status (safe, risk, critical)
     
     Response format:
     {
@@ -100,11 +117,13 @@ def get_active_canisters(
                 "tanks": [
                     {
                         "tank_code": "T1",
-                        "updated_at": "2024-01-15T10:30:00Z"
+                        "updated_at": "2024-01-15T10:30:00Z",
+                        "status": "safe"
                     },
                     {
                         "tank_code": "T2",
-                        "updated_at": "2024-01-15T09:15:00Z"
+                        "updated_at": "2024-01-15T09:15:00Z",
+                        "status": "risk"
                     }
                 ]
             }
@@ -114,11 +133,38 @@ def get_active_canisters(
     """
     try:
         # Get branch filter info for IVF department users
-        branch_id, role = get_branch_filter_info(request)
+        user_branch_id, role = get_branch_filter_info(request)
+        
+        # Get user's branch name if User role
+        user_branch_name = None
+        if user_branch_id is not None:
+            user_branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user_branch_id).first()
+            if user_branch:
+                user_branch_name = user_branch.branch_name
+        
+        # Determine filter branch_name based on role and provided filter
+        filter_branch_name = None
+        if user_branch_id is not None and branch_name is None:
+            # User role - use their assigned branch
+            filter_branch_name = user_branch_name
+        elif branch_name is not None:
+            # Explicit filter provided
+            if role == "User" and user_branch_name:
+                # User role: verify the provided branch_name matches their branch
+                if branch_name != user_branch_name:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied: You can only view tanks from your assigned branch ({user_branch_name})"
+                    )
+            # Manager/Admin can filter by any branch, or User's branch matches
+            filter_branch_name = branch_name
+        # else: No filter - return all branches (Manager/Admin only)
         
         service = IVFService(db)
-        tanks_data = service.get_active_tanks(branch_id=branch_id)
+        tanks_data = service.get_active_tanks(branch_name=filter_branch_name, status=status)
         return ActiveCanistersResponse(**tanks_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
 
@@ -543,4 +589,193 @@ def get_ivf_storage(
             error_code=500,
             error_message=f"Internal server error: {str(e)}"
         )
+
+
+@router.get("/branches", response_model=BranchListResponse)
+def get_branches(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of branches for the logged-in IVF user's hospital.
+    
+    Returns branch_id and branch_name for all branches belonging to the user's hospital.
+    This endpoint is useful for dropdowns/selectors in the frontend.
+    
+    Role-based access:
+    - All IVF users (User, Manager, Admin): Can see all branches in their hospital
+    - Non-IVF users: Cannot access this endpoint
+    
+    Response format:
+    {
+        "branches": [
+            {
+                "branch_id": 1,
+                "branch_name": "Egmore"
+            },
+            {
+                "branch_id": 2,
+                "branch_name": "Tambaram"
+            }
+        ],
+        "total": 2
+    }
+    """
+    try:
+        # Get current user from request state (injected by middleware)
+        if not hasattr(request.state, "current_user"):
+            raise HTTPException(status_code=401, detail="User not authenticated")
+        
+        user = request.state.current_user
+        
+        # Verify user is from IVF department
+        if not user.department or not is_hospital_department(user.department):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: This endpoint is for IVF users only"
+            )
+        
+        # Get hospital_id from user or request state
+        hospital_id = None
+        if hasattr(request.state, "hospital_id") and request.state.hospital_id:
+            hospital_id = request.state.hospital_id
+        elif user.hospital_id:
+            hospital_id = user.hospital_id
+        else:
+            # Fallback: get hospital_id from user's branch
+            if user.branch_id:
+                branch = db.query(HospitalBranch).filter(
+                    HospitalBranch.branch_id == user.branch_id
+                ).first()
+                if branch:
+                    hospital_id = branch.hospital_id
+        
+        if not hospital_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to determine hospital. User must be associated with a hospital."
+            )
+        
+        # Use service to get branches
+        service = IVFService(db)
+        branches_data = service.get_branches_by_hospital(hospital_id)
+        
+        return BranchListResponse(**branches_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting branches: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting branches: {str(e)}")
+
+
+@router.get("/embryo-transfer", response_model=EmbryoTransferResponse)
+def get_embryo_transfer_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where embryo_transfer is True.
+    
+    Returns detailed information about all crylocks that have been moved to embryo transfer.
+    This endpoint is useful for tracking and reporting on embryo transfers.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_embryo_transfer_crylocks(branch_id=branch_id)
+        
+        return EmbryoTransferResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting embryo transfer crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting embryo transfer crylocks: {str(e)}")
+
+
+@router.get("/in-transit", response_model=InTransitResponse)
+def get_in_transit_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where in_transit is True.
+    
+    Returns detailed information about all crylocks that are currently in transit.
+    This endpoint is useful for tracking and reporting on shipments.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1,
+                "shipment_details": {
+                    "shipment_id": "SHIP-20240812-123",
+                    "iot_shipment_id": "tive-12345",
+                    "source_branch_id": 1,
+                    "destination_branch_id": 2,
+                    "source_location": "Egmore",
+                    "destination_location": "Tambaram",
+                    "description": "crylock is move from egmore to thambaram-deviceid -xxxxx",
+                    "device_id": "DEVICE-123",
+                    "shipment_status": "in_transit",
+                    "departure_time": "2024-08-12T10:00:00Z",
+                    "arrival_time": null,
+                    "scheduled_departure_time": "2024-08-12T09:00:00Z"
+                }
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_in_transit_crylocks(branch_id=branch_id)
+        
+        return InTransitResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")
 

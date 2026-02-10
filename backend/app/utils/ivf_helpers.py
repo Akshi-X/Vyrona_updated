@@ -1,23 +1,23 @@
 """
 Helper functions for IVF control tower role-based access control and data access
 """
-from typing import Tuple, Optional
-from fastapi import Request
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from typing import Optional, Tuple
 
+from fastapi import Request
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from ..models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from ..models.IVF.tank_model import Tank
 from ..models.user_model import User
 from ..utils.user_helpers import is_hospital_department
-from ..models.IVF.tank_model import Tank
-from ..models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from ..models.IVF.hospital_branch_model import HospitalBranch
 
 
 # Roles that should be filtered by branch (only User)
 ROLES_WITH_BRANCH_FILTER = ["User"]
 
 
-def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[str]]:
+def get_branch_filter_info(request: Request, branch_id_override: Optional[int] = None, is_quality_tracking: bool = False) -> Tuple[Optional[int], Optional[str]]:
     """
     Get branch filter information for IVF department users.
     
@@ -25,13 +25,18 @@ def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[st
     to determine if data should be filtered by branch.
     
     Rules:
-    - User: Filter by their branch_id (return branch_id)
-    - Manager: No filtering (return None for branch_id) - can see all branches
-    - Admin: No filtering (return None for branch_id) - can see all branches
+    - User: Always filter by their branch_id (branch_id_override is ignored)
+    - Manager: 
+        * If is_quality_tracking=True and branch_id_override is provided: filter by that branch
+        * If is_quality_tracking=True and branch_id_override is NOT provided: filter by their own branch_id
+        * If is_quality_tracking=False (control tower, dashboard, etc.): no filtering - can see all branches
+    - Admin: No filtering (return None for branch_id) - can see all branches (branch_id_override is ignored)
     - Non-IVF users: No filtering (return None for branch_id)
     
     Args:
         request: FastAPI Request object with current_user in request.state
+        branch_id_override: Optional branch ID override (only applies to Manager role on quality tracking page)
+        is_quality_tracking: True if called from quality tracking endpoints, False for control tower/dashboard
         
     Returns:
         Tuple of (branch_id, role):
@@ -53,19 +58,28 @@ def get_branch_filter_info(request: Request) -> Tuple[Optional[int], Optional[st
     role = user.role.value if hasattr(user.role, 'value') else str(user.role)
     role_normalized = role  # Already in correct format from enum
     
-    # Admin and Manager roles: no branch filtering (can see all branches)
-    if role_normalized in ["Admin", "Manager"]:
+    # Admin role: no branch filtering (can see all branches, ignore override)
+    if role_normalized == "Admin":
         return None, role_normalized
     
-    # User role: filter by their branch
+    # Manager role: behavior depends on whether this is quality tracking page
+    if role_normalized == "Manager":
+        if is_quality_tracking:
+            # Quality tracking page: use override if provided, otherwise use Manager's own branch_id
+            if branch_id_override is not None:
+                return branch_id_override, role_normalized
+            # Manager without override - filter by their own branch_id
+            branch_id = user.branch_id
+            return (branch_id, role_normalized) if branch_id else (None, role_normalized)
+        # Control tower, dashboard, etc.: Managers see all branches
+        return None, role_normalized
+    
+    # User role: always filter by their branch (ignore override)
     if role_normalized in ROLES_WITH_BRANCH_FILTER:
         branch_id = user.branch_id
-        if branch_id is None:
-            # User without branch_id - shouldn't happen, but handle gracefully
-            return None, role_normalized
-        return branch_id, role_normalized
+        return (branch_id, role_normalized) if branch_id else (None, role_normalized)
     
-    # Unknown role or no branch_id - no filtering
+    # Unknown role - no filtering
     return None, role_normalized
 
 
