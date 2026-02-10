@@ -120,13 +120,14 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching IVF control tower map locations: {str(e)}")
     
-    def get_active_tanks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_active_tanks(self, branch_name: Optional[str] = None, status: Optional[CanisterStatus] = None) -> Dict[str, Any]:
         """
         Get active tanks grouped by branch for the current logged-in user's branch.
         
         Args:
-            branch_id: Optional branch ID to filter by. If provided, only returns tanks for that branch (User role).
-                      If None, returns tanks for all branches (Manager/Admin roles).
+            branch_name: Optional branch name to filter by. If provided, only returns tanks for that branch.
+                        If None, returns tanks for all branches (Manager/Admin roles).
+            status: Optional tank status to filter by (safe, risk, critical). If provided, only returns tanks with that status.
         
         Returns:
             Dictionary containing:
@@ -136,9 +137,11 @@ class IVFService:
                 - tanks: List of active tanks with:
                     - tank_code: Tank code (e.g., 'T1')
                     - updated_at: Last updated date and time from tanks table updated_at
+                    - status: Tank status (safe, risk, critical)
             - total: Total number of active tanks across all branches
         """
         try:
+            
             # Query active tanks with branch information
             query = (
                 self.db.query(
@@ -150,9 +153,13 @@ class IVFService:
                 .filter(Tank.is_active == True)
             )
             
-            # Apply branch filter if provided (User role only)
-            if branch_id is not None:
-                query = query.filter(HospitalBranch.branch_id == branch_id)
+            # Apply branch name filter if provided
+            if branch_name is not None:
+                query = query.filter(HospitalBranch.branch_name == branch_name)
+            
+            # Apply status filter if provided
+            if status is not None:
+                query = query.filter(Tank.status == status)
             
             results = query.all()
             
@@ -165,15 +172,16 @@ class IVFService:
             
             total_tanks = 0
             
-            for tank, branch_id_val, branch_name in results:
+            for tank, branch_id_val, branch_name_val in results:
                 # Initialize branch if not already in dict
                 if branches_dict[branch_id_val]["branch_id"] is None:
                     branches_dict[branch_id_val]["branch_id"] = branch_id_val
-                    branches_dict[branch_id_val]["branch_name"] = branch_name or "Unknown"
+                    branches_dict[branch_id_val]["branch_name"] = branch_name_val or "Unknown"
                 
                 tank_data = {
                     "tank_code": tank.tank_code or "",
-                    "updated_at": tank.updated_at or tank.created_at
+                    "updated_at": tank.updated_at or tank.created_at,
+                    "status": tank.status
                 }
                 
                 branches_dict[branch_id_val]["tanks"].append(tank_data)
