@@ -161,7 +161,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         description: newTask.description.trim(),
         assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
         patient_id: isIvfVariant ? undefined : (newTask.patientId.trim() || undefined),
-        canister_number: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
+        tank_code: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
         due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : undefined,
         priority: newTask.priority,
         status: newTask.status as 'Not started' | 'In progress' | 'Done'

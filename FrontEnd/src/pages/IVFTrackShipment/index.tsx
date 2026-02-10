@@ -421,7 +421,7 @@ export default function IVFTrackShipmentPage() {
                             description?: string;
                             assignee_id?: string;
                             patient_id?: string;
-                            canister_number?: string;
+                            tank_code?: string;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
                             status?: 'Not started' | 'In progress' | 'Done';
@@ -440,9 +440,9 @@ export default function IVFTrackShipmentPage() {
                                 updateData.assignee_id = String(assigneeId);
                             }
 
-                            // IVF tasks are canister-scoped; CGT tasks are patient-scoped
+                            // IVF tasks are tank-scoped; CGT tasks are patient-scoped
                             if (task.canisterNumber && task.canisterNumber !== 'N/A') {
-                                updateData.canister_number = String(task.canisterNumber);
+                                updateData.tank_code = String(task.canisterNumber);
                                 updateData.patient_id = undefined;
                             } else {
                                 updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;
