@@ -33,7 +33,12 @@ from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
-from ...utils.ivf_helpers import find_tank_by_code, find_crylock_by_tank_code
+from ...utils.ivf_helpers import (
+    decrypt_sensitive_ivf_value,
+    encrypt_sensitive_ivf_value,
+    find_tank_by_code,
+    find_crylock_by_tank_code,
+)
 from ...schemas.IVF.quality_tracking_schema import (
     ColorUpdateResponse,
     CryolockColorUpdate,
@@ -603,8 +608,8 @@ class QualityTrackingService:
                 
                 tracking_rows.append(
                     IVFCanisterTrackingItem(
-                        his_number=row.his_number or "",
-                        cryolock_number=row.crylock_number or "",
+                        his_number=decrypt_sensitive_ivf_value(row.his_number) or "",
+                        cryolock_number=decrypt_sensitive_ivf_value(row.crylock_number) or "",
                         canister_number=row.canister_number,
                         tank_code=row.tank_code or "",
                         cane_code=row.cane_code or "",
@@ -795,11 +800,15 @@ class QualityTrackingService:
                 )
             
             # Find PatientCrylockInfo by tank_id and crylock_number
+            encrypted_cryolock_number = encrypt_sensitive_ivf_value(request.cryolock_number)
             query = (
                 self.db.query(PatientCrylockInfo)
                 .filter(
                     PatientCrylockInfo.tank_id == tank.tank_id,
-                    PatientCrylockInfo.crylock_number == request.cryolock_number
+                    PatientCrylockInfo.crylock_number.in_([
+                        encrypted_cryolock_number,
+                        request.cryolock_number
+                    ])
                 )
             )
 
@@ -1030,7 +1039,7 @@ class QualityTrackingService:
             return InTransitWithShipmentResponse(
                 success=True,
                 message="Cryolock marked as in transit and shipment created successfully",
-                cryolock_number=cryolock.crylock_number or request.cryolock_number,
+                cryolock_number=decrypt_sensitive_ivf_value(cryolock.crylock_number) or request.cryolock_number,
                 in_transit=True,
                 shipment=shipment_response
             )
@@ -1115,6 +1124,7 @@ class QualityTrackingService:
             # Direct query using tank_code and crylock_number - no fallback needed
             # Find tank by tank_code and branch_id
             tank = find_tank_by_code(self.db, tank_code, branch_id) if tank_code else None
+            encrypted_cryolock_number = encrypt_sensitive_ivf_value(cryolock_number)
             
             if not tank:
                 raise AppException(
@@ -1128,7 +1138,10 @@ class QualityTrackingService:
                 self.db.query(PatientCrylockInfo)
                 .filter(
                     PatientCrylockInfo.tank_id == tank.tank_id,
-                    PatientCrylockInfo.crylock_number == cryolock_number
+                    PatientCrylockInfo.crylock_number.in_([
+                        encrypted_cryolock_number,
+                        cryolock_number
+                    ])
                 )
             )
 
@@ -1159,7 +1172,7 @@ class QualityTrackingService:
             return CryolockFlagUpdateResponse(
                 success=True,
                 message=f"Updated {flag_field} successfully",
-                cryolock_number=cryolock.crylock_number or cryolock_number,
+                cryolock_number=decrypt_sensitive_ivf_value(cryolock.crylock_number) or cryolock_number,
                 embryo_transfer=bool(getattr(cryolock, "embryo_transfer", False)),
                 in_transit=bool(getattr(cryolock, "in_transit", False))
             )
@@ -1209,10 +1222,14 @@ class QualityTrackingService:
             # Fallback: Find by canister_number (canister_id is now tank_id)
             if not cryolock:
                 # Find PatientCrylockInfo by crylock_number
+                encrypted_cryolock_number = encrypt_sensitive_ivf_value(color_update.cryolock_number)
                 query = (
                     self.db.query(PatientCrylockInfo)
                     .filter(
-                        PatientCrylockInfo.crylock_number == color_update.cryolock_number
+                        PatientCrylockInfo.crylock_number.in_([
+                            encrypted_cryolock_number,
+                            color_update.cryolock_number
+                        ])
                     )
                 )
                 
@@ -1250,7 +1267,7 @@ class QualityTrackingService:
             return ColorUpdateResponse(
                 success=True,
                 message=f"Goblet color updated successfully to '{color_update.goblet_color}'",
-                cryolock_number=color_update.cryolock_number,
+                cryolock_number=decrypt_sensitive_ivf_value(cryolock.crylock_number) or color_update.cryolock_number,
                 updated_color=color_update.goblet_color
             )
             
@@ -1317,10 +1334,14 @@ class QualityTrackingService:
             # Fallback: Find by canister_number (canister_id is now tank_id)
             if not cryolock:
                 # Find PatientCrylockInfo by crylock_number
+                encrypted_cryolock_number = encrypt_sensitive_ivf_value(color_update.cryolock_number)
                 query = (
                     self.db.query(PatientCrylockInfo)
                     .filter(
-                        PatientCrylockInfo.crylock_number == color_update.cryolock_number
+                        PatientCrylockInfo.crylock_number.in_([
+                            encrypted_cryolock_number,
+                            color_update.cryolock_number
+                        ])
                     )
                 )
                 
@@ -1358,7 +1379,7 @@ class QualityTrackingService:
             return ColorUpdateResponse(
                 success=True,
                 message=f"Cryolock color updated successfully to '{color_update.cryolock_color}'",
-                cryolock_number=color_update.cryolock_number,
+                cryolock_number=decrypt_sensitive_ivf_value(cryolock.crylock_number) or color_update.cryolock_number,
                 updated_color=color_update.cryolock_color
             )
             
