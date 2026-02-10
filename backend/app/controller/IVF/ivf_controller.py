@@ -17,6 +17,7 @@ from app.schemas.IVF.ivf_schema import (
     InTransitResponse,
     IVFControlTowerResponse,
 )
+from app.constants.enums import CanisterStatus
 from app.service.IVF.arc_ivf_service import ARCIVFService
 from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
@@ -83,7 +84,9 @@ def get_ivf_control_tower_map(
 @router.get("/control_tower/active_canisters", response_model=ActiveCanistersResponse)
 def get_active_canisters(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_name: Optional[str] = Query(None, description="Optional branch name filter"),
+    status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical)")
 ):
     """
     Get active tanks grouped by branch for the current logged-in user's branch.
@@ -93,12 +96,17 @@ def get_active_canisters(
     - Manager (IVF): See tanks from all branches
     - Admin: See tanks from all branches
     
+    Optional filters:
+    - branch_name: Filter by specific branch name
+    - status: Filter by tank status (safe, risk, critical)
+    
     This endpoint returns all active tanks (is_active = True) grouped by branch with:
     - branch_id: The ID of the branch
     - branch_name: The name of the branch
     - tanks: List of tanks for this branch with:
         - tank_code: The tank code (e.g., 'T1')
         - updated_at: Last updated date and time from tanks table updated_at
+        - status: Tank status (safe, risk, critical)
     
     Response format:
     {
@@ -109,11 +117,13 @@ def get_active_canisters(
                 "tanks": [
                     {
                         "tank_code": "T1",
-                        "updated_at": "2024-01-15T10:30:00Z"
+                        "updated_at": "2024-01-15T10:30:00Z",
+                        "status": "safe"
                     },
                     {
                         "tank_code": "T2",
-                        "updated_at": "2024-01-15T09:15:00Z"
+                        "updated_at": "2024-01-15T09:15:00Z",
+                        "status": "risk"
                     }
                 ]
             }
@@ -123,11 +133,38 @@ def get_active_canisters(
     """
     try:
         # Get branch filter info for IVF department users
-        branch_id, role = get_branch_filter_info(request)
+        user_branch_id, role = get_branch_filter_info(request)
+        
+        # Get user's branch name if User role
+        user_branch_name = None
+        if user_branch_id is not None:
+            user_branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user_branch_id).first()
+            if user_branch:
+                user_branch_name = user_branch.branch_name
+        
+        # Determine filter branch_name based on role and provided filter
+        filter_branch_name = None
+        if user_branch_id is not None and branch_name is None:
+            # User role - use their assigned branch
+            filter_branch_name = user_branch_name
+        elif branch_name is not None:
+            # Explicit filter provided
+            if role == "User" and user_branch_name:
+                # User role: verify the provided branch_name matches their branch
+                if branch_name != user_branch_name:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied: You can only view tanks from your assigned branch ({user_branch_name})"
+                    )
+            # Manager/Admin can filter by any branch, or User's branch matches
+            filter_branch_name = branch_name
+        # else: No filter - return all branches (Manager/Admin only)
         
         service = IVFService(db)
-        tanks_data = service.get_active_tanks(branch_id=branch_id)
+        tanks_data = service.get_active_tanks(branch_name=filter_branch_name, status=status)
         return ActiveCanistersResponse(**tanks_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
 
