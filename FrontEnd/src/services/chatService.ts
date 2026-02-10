@@ -89,10 +89,10 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Get all messages for a specific canister (IVF flow)
+   * Get all messages for a specific tank (IVF flow)
    */
-  async getCanisterMessages(canisterNumber: string): Promise<PatientMessagesResponse> {
-    return await this.request<PatientMessagesResponse>(`/api/chat/canisters/${canisterNumber}/messages`, {
+  async getCanisterMessages(tank_code: string): Promise<PatientMessagesResponse> {
+    return await this.request<PatientMessagesResponse>(`/api/chat/canisters/${tank_code}/messages`, {
       method: 'GET',
     });
   }
@@ -123,16 +123,16 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Mark canister messages as read (IVF flow)
+   * Mark tank messages as read (IVF flow)
    */
-  async markCanisterAsRead(canisterNumber: string): Promise<{
+  async markCanisterAsRead(tank_code: string): Promise<{
     success: boolean;
     message: string;
     canister_number: string;
     last_read_message_id: number;
     unread_count: number;
   }> {
-    return await this.request(`/api/chat/canisters/${canisterNumber}/mark-read`, {
+    return await this.request(`/api/chat/canisters/${tank_code}/mark-read`, {
       method: 'POST',
     });
   }
