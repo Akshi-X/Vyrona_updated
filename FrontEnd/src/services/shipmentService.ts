@@ -309,7 +309,10 @@ class ShipmentService extends BaseApiService {
    * Get Active Canisters (flat format)
    * GET /api/ivf/control_tower/active_canisters
    */
-  async getActiveCanisters(): Promise<{
+  async getActiveCanisters(filters?: {
+    branch_name?: string;
+    status?: string;
+  }): Promise<{
     canisters: Array<{
       canister_id: number;
       canister_status: string;
@@ -317,7 +320,18 @@ class ShipmentService extends BaseApiService {
     }>;
     total: number;
   }> {
-    return this.get('/api/ivf/control_tower/active_canisters');
+    const params = new URLSearchParams();
+    if (filters?.branch_name) {
+      params.append('branch_name', filters.branch_name);
+    }
+    if (filters?.status) {
+      params.append('status', filters.status);
+    }
+    const queryString = params.toString();
+    const url = queryString
+      ? `/api/ivf/control_tower/active_canisters?${queryString}`
+      : '/api/ivf/control_tower/active_canisters';
+    return this.get(url);
   }
 
   /**
