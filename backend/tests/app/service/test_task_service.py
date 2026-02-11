@@ -19,10 +19,15 @@ from app.exceptions import (
 from app.models.task_model import Tasks
 from app.models.user_model import User
 from app.models.patient_model import Patient
+from app.models.IVF.tank_model import Tank
 from app.schemas.task_schema import (
     CreateTaskRequest,
     UpdateTaskRequest,
-    UpdateTaskStatusRequest
+    UpdateTaskStatusRequest,
+    TaskResponse,
+    TaskAssigneeInfo,
+    TaskCreatorInfo,
+    TaskPermissions
 )
 from app.constants.enums import TaskStatus, TaskPriority
 
@@ -45,6 +50,9 @@ def mock_user():
     user.email = "john.doe@example.com"
     user.approved_status = "approved"
     user.status = True
+    user.department = None  # None means pharma user (CGT), not hospital user (IVF)
+    user.hospital_id = None
+    user.branch_id = None
     return user
 
 
@@ -60,6 +68,9 @@ def mock_assignee():
     assignee.email = "jane.smith@example.com"
     assignee.approved_status = "approved"
     assignee.status = True
+    assignee.department = None  # None means pharma user (CGT)
+    assignee.hospital_id = None
+    assignee.branch_id = None
     return assignee
 
 
@@ -76,6 +87,8 @@ def mock_task(mock_user, mock_assignee):
     task.created_by = mock_user
     task.updated_by_id = mock_user.user_id
     task.patient_id = None
+    task.tank_id = None  # Explicitly set to None
+    task.canister_id = None  # Explicitly set to None
     task.due_date = None
     task.priority = TaskPriority.MEDIUM
     task.status = TaskStatus.NOT_STARTED
@@ -108,24 +121,58 @@ def _setup_patient_task_queries(db_session, mock_patient, task_list, total_count
     tasks_query.count.return_value = total_count if total_count is not None else len(task_list)
     tasks_query.all.return_value = task_list
 
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None  # Default: no tank found
+
     def query_side_effect(model):
         if model == Patient:
             return patient_query
         if model == Tasks:
             return tasks_query
+        if model == Tank:
+            return tank_query
         return MagicMock()
 
     db_session.query.side_effect = query_side_effect
     return patient_query, tasks_query
 
 
+def _setup_tank_query(db_session):
+    """Helper to mock Tank query for _build_task_response"""
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None  # Default: no tank found
+    
+    # Get existing side_effect if it exists
+    original_side_effect = db_session.query.side_effect if hasattr(db_session.query, 'side_effect') else None
+    
+    def query_side_effect(model):
+        if model == Tank:
+            return tank_query
+        if original_side_effect:
+            return original_side_effect(model)
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
+    return tank_query
+
+
 # ==========================================
 # Tests for _build_task_response
 # ==========================================
 
-def test_build_task_response_success(mock_user, mock_assignee, mock_task):
+def test_build_task_response_success(mock_user, mock_assignee, mock_task, db_session):
     """Test building task response successfully"""
-    result = task_service._build_task_response(mock_task, mock_user)
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
+    
+    result = task_service._build_task_response(mock_task, mock_user, db_session)
     
     assert result.id == mock_task.id
     assert result.task_name == mock_task.task_name
@@ -136,14 +183,24 @@ def test_build_task_response_success(mock_user, mock_assignee, mock_task):
     assert result.permissions.can_edit_status_only is False  # User is not assignee
 
 
-def test_build_task_response_assignee_permissions(mock_user, mock_assignee, mock_task):
+def test_build_task_response_assignee_permissions(mock_user, mock_assignee, mock_task, db_session):
     """Test building task response when user is assignee"""
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
+    
     # Make user the assignee
     mock_task.assignee_id = mock_user.user_id
     mock_task.assignee = mock_user
     mock_task.created_by_id = "OTHER-USER"
     
-    result = task_service._build_task_response(mock_task, mock_user)
+    result = task_service._build_task_response(mock_task, mock_user, db_session)
     
     assert result.permissions.can_edit_all is False  # User is not creator
     assert result.permissions.can_edit_status_only is True  # User is assignee
@@ -154,8 +211,9 @@ def test_build_task_response_assignee_permissions(mock_user, mock_assignee, mock
 # ==========================================
 
 @patch('app.service.task_service.get_user_by_id')
+@patch('app.service.task_service._build_task_response')
 @patch('app.service.task_service.Tasks')
-def test_create_task_success(mock_tasks_class, mock_get_user, db_session, mock_user, mock_assignee, mock_patient):
+def test_create_task_success(mock_tasks_class, mock_build_response, mock_get_user, db_session, mock_user, mock_assignee, mock_patient):
     """Test creating a task successfully"""
     # Setup mocks
     mock_get_user.return_value = mock_assignee
@@ -185,16 +243,14 @@ def test_create_task_success(mock_tasks_class, mock_get_user, db_session, mock_u
     new_task.created_by = mock_user
     new_task.updated_by_id = mock_user.user_id
     new_task.patient_id = request.patient_id
+    new_task.canister_id = None
     new_task.due_date = request.due_date
     new_task.priority = request.priority
     new_task.status = request.status
     new_task.created_at = datetime.now(timezone.utc)
     new_task.updated_at = datetime.now(timezone.utc)
     
-    # Make Tasks() constructor return our mock
-    mock_tasks_class.return_value = new_task
-    
-    # Mock db.query to return patient_query for Patient, and handle Tasks if needed
+    # Mock db.query to return patient_query for Patient
     def query_side_effect(model):
         if model.__name__ == 'Patient':
             return patient_query
@@ -202,10 +258,43 @@ def test_create_task_success(mock_tasks_class, mock_get_user, db_session, mock_u
     
     db_session.query.side_effect = query_side_effect
     
+    # Mock Tasks constructor to return our mock task
+    mock_tasks_class.return_value = new_task
+    
     # Mock db.add, commit, refresh
     db_session.add = MagicMock()
     db_session.commit = MagicMock()
-    db_session.refresh = MagicMock()
+    db_session.refresh = MagicMock(side_effect=lambda obj: None)  # refresh updates the object in place
+    
+    # Mock _build_task_response to return a proper response
+    mock_response = TaskResponse(
+        id=new_task.id,
+        task_name=new_task.task_name,
+        description=new_task.description,
+        assignee=TaskAssigneeInfo(
+            user_id=mock_assignee.user_id,
+            first_name=mock_assignee.first_name,
+            last_name=mock_assignee.last_name,
+            email=mock_assignee.email,
+            role="Manager"
+        ),
+        created_by=TaskCreatorInfo(
+            user_id=mock_user.user_id,
+            first_name=mock_user.first_name,
+            last_name=mock_user.last_name,
+            email=mock_user.email,
+            role="Manager"
+        ),
+        patient_id=new_task.patient_id,
+        tank_code=None,
+        due_date=new_task.due_date,
+        priority=new_task.priority,
+        status=new_task.status,
+        created_at=new_task.created_at,
+        updated_at=new_task.updated_at,
+        permissions=TaskPermissions(can_edit_all=True, can_edit_status_only=False)
+    )
+    mock_build_response.return_value = mock_response
     
     result = task_service.create_task(request, mock_user, db_session)
     
@@ -322,18 +411,27 @@ def test_create_task_invalid_patient(mock_get_user, db_session, mock_user, mock_
 
 
 @patch('app.service.task_service.get_user_by_id')
-def test_create_task_integrity_error(mock_get_user, db_session, mock_user, mock_assignee):
+def test_create_task_integrity_error(mock_get_user, db_session, mock_user, mock_assignee, mock_patient):
     """Test creating task when database integrity error occurs"""
     mock_get_user.return_value = mock_assignee
     
     request = CreateTaskRequest(
         task_name="New Task",
         assignee_id=mock_assignee.user_id,
+        patient_id=mock_patient.id,  # Required for CGT users
         priority=TaskPriority.MEDIUM
     )
     
-    # Mock patient query (no patient_id provided, so this won't be called)
-    db_session.query.return_value.filter.return_value.first.return_value = None
+    # Mock patient query
+    patient_query = MagicMock()
+    patient_query.filter.return_value.first.return_value = mock_patient
+    
+    def query_side_effect(model):
+        if model.__name__ == 'Patient':
+            return patient_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     # Mock db.commit to raise IntegrityError
     db_session.commit.side_effect = IntegrityError("statement", "params", "orig")
@@ -345,20 +443,27 @@ def test_create_task_integrity_error(mock_get_user, db_session, mock_user, mock_
 
 
 @patch('app.service.task_service.get_user_by_id')
-def test_create_task_general_exception(mock_get_user, db_session, mock_user, mock_assignee):
+def test_create_task_general_exception(mock_get_user, db_session, mock_user, mock_assignee, mock_patient):
     """Test creating task when general exception occurs"""
     mock_get_user.return_value = mock_assignee
     
     request = CreateTaskRequest(
         task_name="New Task",
         assignee_id=mock_assignee.user_id,
+        patient_id=mock_patient.id,  # Required for CGT users
         priority=TaskPriority.MEDIUM
     )
     
     # Mock patient query
     patient_query = MagicMock()
-    patient_query.filter.return_value.first.return_value = None
-    db_session.query.return_value = patient_query
+    patient_query.filter.return_value.first.return_value = mock_patient
+    
+    def query_side_effect(model):
+        if model.__name__ == 'Patient':
+            return patient_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     # Mock db.add to raise exception
     db_session.add.side_effect = Exception("Database error")
@@ -370,44 +475,26 @@ def test_create_task_general_exception(mock_get_user, db_session, mock_user, moc
 
 
 @patch('app.service.task_service.get_user_by_id')
-@patch('app.service.task_service.Tasks')
-def test_create_task_without_patient(mock_tasks_class, mock_get_user, db_session, mock_user, mock_assignee):
-    """Test creating task without patient_id"""
+def test_create_task_without_patient(mock_get_user, db_session, mock_user, mock_assignee):
+    """Test creating task without patient_id or tank_code - should raise exception"""
     mock_get_user.return_value = mock_assignee
     
     request = CreateTaskRequest(
         task_name="New Task",
         assignee_id=mock_assignee.user_id,
         priority=TaskPriority.MEDIUM
+        # No patient_id or tank_code - should fail
     )
     
-    # Mock task creation
-    new_task = Mock(spec=Tasks)
-    new_task.id = 1
-    new_task.task_name = request.task_name
-    new_task.description = request.description
-    new_task.assignee_id = request.assignee_id
-    new_task.assignee = mock_assignee
-    new_task.created_by_id = mock_user.user_id
-    new_task.created_by = mock_user
-    new_task.updated_by_id = mock_user.user_id
-    new_task.patient_id = None
-    new_task.due_date = None
-    new_task.priority = request.priority
-    new_task.status = TaskStatus.NOT_STARTED
-    new_task.created_at = datetime.now(timezone.utc)
-    new_task.updated_at = datetime.now(timezone.utc)
+    with pytest.raises(TaskInvalidPatientException) as exc_info:
+        task_service.create_task(request, mock_user, db_session)
     
-    # Make Tasks() constructor return our mock
-    mock_tasks_class.return_value = new_task
-    
-    db_session.add = MagicMock()
-    db_session.commit = MagicMock()
-    db_session.refresh = MagicMock()
-    
-    result = task_service.create_task(request, mock_user, db_session)
-    
-    assert result.task.patient_id is None
+    # Check that the exception was raised (the message is "Invalid patient ID for task")
+    # The custom message is stored in details['patient_id']
+    assert exc_info.value.details.get('patient_id') is not None
+    # Verify the exception message contains "patient"
+    error_message = str(exc_info.value).lower()
+    assert "patient" in error_message
 
 
 # ==========================================
@@ -432,6 +519,8 @@ def test_get_all_tasks_success(db_session, mock_user, mock_assignee, mock_task):
     assigned_task.created_by.role = "manager"
     assigned_task.updated_by_id = None
     assigned_task.patient_id = None
+    assigned_task.tank_id = None  # Explicitly set to None
+    assigned_task.canister_id = None  # Explicitly set to None
     assigned_task.due_date = None
     assigned_task.priority = TaskPriority.LOW
     assigned_task.status = TaskStatus.IN_PROGRESS
@@ -447,6 +536,9 @@ def test_get_all_tasks_success(db_session, mock_user, mock_assignee, mock_task):
     assigned_query.filter.return_value.order_by.return_value.all.return_value = [assigned_task]
     
     # Setup query chain
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
     def query_side_effect(model):
         if model == Tasks:
             # First call for created tasks
@@ -457,6 +549,8 @@ def test_get_all_tasks_success(db_session, mock_user, mock_assignee, mock_task):
                 return created_query
             else:
                 return assigned_query
+        elif model == Tank:
+            return tank_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
@@ -653,7 +747,20 @@ def test_get_tasks_by_patient_database_exception(db_session, mock_user, mock_pat
 
 def test_get_task_by_id_success(db_session, mock_user, mock_task):
     """Test getting task by ID successfully"""
-    db_session.query.return_value.filter.return_value.first.return_value = mock_task
+    tasks_query = MagicMock()
+    tasks_query.filter.return_value.first.return_value = mock_task
+    
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tasks:
+            return tasks_query
+        elif model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     result = task_service.get_task_by_id(1, mock_user, db_session)
     
@@ -692,7 +799,20 @@ def test_get_task_by_id_as_assignee(db_session, mock_user, mock_task):
     mock_task.assignee = mock_user
     mock_task.created_by_id = "OTHER-USER"
     
-    db_session.query.return_value.filter.return_value.first.return_value = mock_task
+    tasks_query = MagicMock()
+    tasks_query.filter.return_value.first.return_value = mock_task
+    
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tasks:
+            return tasks_query
+        elif model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     result = task_service.get_task_by_id(1, mock_user, db_session)
     
@@ -766,8 +886,23 @@ def test_update_task_unauthorized(mock_get_user, db_session, mock_user, mock_tas
 @patch('app.service.task_service.get_user_by_id')
 def test_update_task_with_new_assignee(mock_get_user, db_session, mock_user, mock_task, mock_assignee):
     """Test updating task with new assignee"""
-    db_session.query.return_value.filter.return_value.first.return_value = mock_task
     mock_get_user.return_value = mock_assignee
+    
+    # Setup query side_effect to handle both Tasks and Tank queries
+    tasks_query = MagicMock()
+    tasks_query.filter.return_value.first.return_value = mock_task
+    
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tasks:
+            return tasks_query
+        elif model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     request = UpdateTaskRequest(assignee_id=mock_assignee.user_id)
     
@@ -800,11 +935,16 @@ def test_update_task_with_new_patient(mock_get_user, db_session, mock_user, mock
     patient_query = MagicMock()
     patient_query.filter.return_value.first.return_value = mock_patient
     
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
     def query_side_effect(model):
         if model == Tasks:
             return db_session.query.return_value
         elif model == Patient:
             return patient_query
+        elif model == Tank:
+            return tank_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
@@ -846,7 +986,21 @@ def test_update_task_invalid_patient(mock_get_user, db_session, mock_user, mock_
 @patch('app.service.task_service.get_user_by_id')
 def test_update_task_partial_update(mock_get_user, db_session, mock_user, mock_task):
     """Test updating task with only some fields"""
-    db_session.query.return_value.filter.return_value.first.return_value = mock_task
+    # Setup query side_effect to handle both Tasks and Tank queries
+    tasks_query = MagicMock()
+    tasks_query.filter.return_value.first.return_value = mock_task
+    
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tasks:
+            return tasks_query
+        elif model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     request = UpdateTaskRequest(
         task_name="Updated Name",
@@ -885,7 +1039,21 @@ def test_update_task_status_success(db_session, mock_user, mock_task):
     mock_task.assignee_id = mock_user.user_id
     mock_task.assignee = mock_user
     
-    db_session.query.return_value.filter.return_value.first.return_value = mock_task
+    # Setup query side_effect to handle both Tasks and Tank queries
+    tasks_query = MagicMock()
+    tasks_query.filter.return_value.first.return_value = mock_task
+    
+    tank_query = MagicMock()
+    tank_query.filter.return_value.first.return_value = None
+    
+    def query_side_effect(model):
+        if model == Tasks:
+            return tasks_query
+        elif model == Tank:
+            return tank_query
+        return MagicMock()
+    
+    db_session.query.side_effect = query_side_effect
     
     request = UpdateTaskStatusRequest(status=TaskStatus.DONE)
     
