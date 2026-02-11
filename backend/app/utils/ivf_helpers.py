@@ -1,10 +1,12 @@
 """
 Helper functions for IVF control tower role-based access control and data access
 """
-from typing import Optional, Tuple
+from functools import lru_cache
+from typing import List, Optional, Tuple
 import base64
 import hashlib
 import hmac
+import logging
 
 from fastapi import Request
 from cryptography.hazmat.primitives import padding  # pyright: ignore[reportMissingImports]
@@ -22,6 +24,7 @@ from ..utils.user_helpers import is_hospital_department
 # Roles that should be filtered by branch (only User)
 ROLES_WITH_BRANCH_FILTER = ["User"]
 ENCRYPTED_VALUE_PREFIX = "encv1:"
+logger = logging.getLogger(__name__)
 
 
 def _get_ivf_encryption_key() -> bytes:
@@ -71,26 +74,29 @@ def decrypt_sensitive_ivf_value(value: Optional[str]) -> Optional[str]:
     value_str = str(value)
     if not value_str:
         return value_str
-    if not value_str.startswith(ENCRYPTED_VALUE_PREFIX):
-        return value_str
 
-    try:
-        token = value_str[len(ENCRYPTED_VALUE_PREFIX):]
-        encrypted_bytes = base64.urlsafe_b64decode(token.encode("utf-8"))
-        iv = encrypted_bytes[:16]
-        ciphertext = encrypted_bytes[16:]
+    # Current deterministic encryption format.
+    if value_str.startswith(ENCRYPTED_VALUE_PREFIX):
+        try:
+            token = value_str[len(ENCRYPTED_VALUE_PREFIX):]
+            encrypted_bytes = base64.urlsafe_b64decode(token.encode("utf-8"))
+            iv = encrypted_bytes[:16]
+            ciphertext = encrypted_bytes[16:]
 
-        key = _get_ivf_encryption_key()
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+            key = _get_ivf_encryption_key()
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+            decryptor = cipher.decryptor()
+            padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
 
-        unpadder = padding.PKCS7(128).unpadder()
-        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
-        return plaintext.decode("utf-8")
-    except Exception:
-        # Fail-safe fallback so bad/legacy values do not break API responses.
-        return value_str
+            unpadder = padding.PKCS7(128).unpadder()
+            plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+            return plaintext.decode("utf-8")
+        except Exception:
+            logger.warning("Failed to decrypt encv1 IVF value; returning original value.")
+            return value_str
+
+    # Legacy plaintext rows remain readable.
+    return value_str
 
 
 def get_branch_filter_info(request: Request, branch_id_override: Optional[int] = None, is_quality_tracking: bool = False) -> Tuple[Optional[int], Optional[str]]:
