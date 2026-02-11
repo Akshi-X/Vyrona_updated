@@ -27,6 +27,7 @@ from app.models.chat_model import ChatMessage
 from app.models.chat_read_status import ChatReadStatus
 from app.models.user_model import User
 from app.models.patient_model import Patient
+from app.models.IVF.tank_model import Tank
 from app.schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, ChatMessageResponse,
     PatientMessagesResponse, UnreadMessageResponse, UnreadMessagesResponse
@@ -82,6 +83,8 @@ def mock_chat_message():
     message.patient_id = "PAT-123"
     message.sender_id = "USER-123"
     message.tagged_user_ids = None
+    message.canister_id = None  # Explicitly set to None to prevent canister query
+    message.tank_id = None  # Explicitly set to None to prevent tank query
     message.created_at = datetime.now(timezone.utc)
     return message
 
@@ -111,7 +114,8 @@ async def test_broadcast_unread_messages_update_success(db_session, connection_m
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -145,7 +149,8 @@ async def test_broadcast_unread_messages_update_disconnected_websocket(db_sessio
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -176,7 +181,8 @@ async def test_broadcast_unread_messages_update_user_id_mismatch(db_session, con
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -208,7 +214,8 @@ async def test_broadcast_unread_messages_update_send_exception(db_session, conne
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -263,7 +270,8 @@ async def test_broadcast_new_message_success(db_session, connection_manager):
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -338,7 +346,8 @@ async def test_broadcast_new_message_tagged_users_branch(db_session, connection_
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         db_session.expire_all = MagicMock()
@@ -498,7 +507,8 @@ async def test_broadcast_new_message_send_json_exception(db_session, connection_
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         db_session.expire_all = MagicMock()
@@ -632,6 +642,7 @@ def test_create_chat_message_tagged_user_ids_none_explicit(db_session, mock_pati
             request,
             "USER-123",
             42,
+            None,  # sender_hospital_id
             "John Doe",
             None,
             db_session
@@ -738,7 +749,8 @@ async def test_handle_websocket_connection_success_without_patient_id():
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -1115,6 +1127,7 @@ def test_create_chat_message_patient_not_found_exception(db_session):
             request,
             "USER-123",
             42,
+            None,  # sender_hospital_id
             "John Doe",
             None,
             db_session
@@ -1141,6 +1154,7 @@ def test_create_chat_message_tag_self_validation(db_session, mock_patient):
             request,
             "USER-123",  # Same as tagged_user_ids
             42,
+            None,  # sender_hospital_id
             "John Doe",
             None,
             db_session
@@ -1187,6 +1201,7 @@ def test_create_chat_message_tagged_user_not_found(db_session, mock_patient):
             request,
             "USER-123",
             42,
+            None,  # sender_hospital_id
             "John Doe",
             None,
             db_session
@@ -1227,6 +1242,7 @@ def test_create_chat_message_tagged_user_pharma_mismatch(db_session, mock_patien
             request,
             "USER-123",
             42,  # Different pharma
+            None,  # sender_hospital_id
             "John Doe",
             None,
             db_session
@@ -1291,6 +1307,7 @@ def test_create_chat_message_with_tagged_users_creates_read_status(db_session, m
                 request,
                 "USER-123",
                 42,
+                None,  # sender_hospital_id
                 "John Doe",
                 None,
                 db_session
@@ -1349,6 +1366,7 @@ def test_create_chat_message_gets_tagged_user_names(db_session, mock_patient):
                 request,
                 "USER-123",
                 42,
+                None,  # sender_hospital_id
                 "John Doe",
                 None,
                 db_session
@@ -1373,6 +1391,7 @@ def test_create_chat_message_general_exception(db_session, mock_patient):
                 request,
                 "USER-123",
                 42,
+                None,  # sender_hospital_id
                 "John Doe",
                 None,
                 db_session
@@ -1410,7 +1429,8 @@ async def test_handle_get_unread_messages_ws_success(connection_manager, mock_us
         mock_unread_response = UnreadMessagesResponse(
             unread_messages=[],
             total_unread=0,
-            unread_by_patient={}
+            unread_by_patient={},
+            unread_by_tank={}
         )
         mock_get_unread.return_value = mock_unread_response
         
@@ -1557,6 +1577,23 @@ async def test_get_patient_messages_mark_as_read_true(db_session, mock_patient, 
         query_call_count[0] += 1
         call_num = query_call_count[0]
         
+        # Handle Canister queries (for canister_number lookup) - return None
+        # Handle Tank queries (for tank_code lookup) - return None
+        if hasattr(model, '__name__'):
+            if model.__name__ == 'Canister':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            elif model.__name__ == 'Tank':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            # Handle ChatMessageTag queries - return empty list
+            elif model.__name__ == 'ChatMessageTag':
+                query = MagicMock()
+                query.filter.return_value.all.return_value = []
+                return query
+        
         if call_num == 1:
             # Patient query
             query = MagicMock()
@@ -1598,6 +1635,7 @@ async def test_get_patient_messages_mark_as_read_true(db_session, mock_patient, 
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.add = MagicMock()
     db_session.commit = MagicMock()
+    db_session.refresh = MagicMock()
     
     with patch('app.service.chat_service.broadcast_unread_messages_update', new_callable=AsyncMock) as mock_broadcast:
         result = await chat_service.get_patient_messages(
@@ -1630,6 +1668,23 @@ async def test_get_patient_messages_with_existing_read_status_mark_read(db_sessi
     def query_side_effect(model):
         query_call_count[0] += 1
         call_num = query_call_count[0]
+        
+        # Handle Canister queries (for canister_number lookup) - return None
+        # Handle Tank queries (for tank_code lookup) - return None
+        if hasattr(model, '__name__'):
+            if model.__name__ == 'Canister':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            elif model.__name__ == 'Tank':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            # Handle ChatMessageTag queries - return empty list
+            elif model.__name__ == 'ChatMessageTag':
+                query = MagicMock()
+                query.filter.return_value.all.return_value = []
+                return query
         
         if call_num == 1:
             query = MagicMock()
@@ -1700,6 +1755,23 @@ async def test_get_patient_messages_with_tagged_user_ids_json(db_session, mock_p
         query_call_count[0] += 1
         call_num = query_call_count[0]
         
+        # Handle Canister queries (for canister_number lookup) - return None
+        # Handle Tank queries (for tank_code lookup) - return None
+        if hasattr(model, '__name__'):
+            if model.__name__ == 'Canister':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            elif model.__name__ == 'Tank':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            # Handle ChatMessageTag queries - return empty list
+            elif model.__name__ == 'ChatMessageTag':
+                query = MagicMock()
+                query.filter.return_value.all.return_value = []
+                return query
+        
         if call_num == 1:
             query = MagicMock()
             query.filter.return_value.first.return_value = mock_patient
@@ -1750,6 +1822,23 @@ async def test_get_patient_messages_broadcast_exception(db_session, mock_patient
         query_call_count[0] += 1
         call_num = query_call_count[0]
         
+        # Handle Canister queries (for canister_number lookup) - return None
+        # Handle Tank queries (for tank_code lookup) - return None
+        if hasattr(model, '__name__'):
+            if model.__name__ == 'Canister':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            elif model.__name__ == 'Tank':
+                query = MagicMock()
+                query.filter.return_value.first.return_value = None
+                return query
+            # Handle ChatMessageTag queries - return empty list
+            elif model.__name__ == 'ChatMessageTag':
+                query = MagicMock()
+                query.filter.return_value.all.return_value = []
+                return query
+        
         if call_num == 1:
             query = MagicMock()
             query.filter.return_value.first.return_value = mock_patient
@@ -1784,6 +1873,7 @@ async def test_get_patient_messages_broadcast_exception(db_session, mock_patient
     db_session.query = Mock(side_effect=query_side_effect)
     db_session.add = MagicMock()
     db_session.commit = MagicMock()
+    db_session.refresh = MagicMock()
     
     with patch('app.service.chat_service.broadcast_unread_messages_update', new_callable=AsyncMock) as mock_broadcast:
         mock_broadcast.side_effect = Exception("Broadcast error")
