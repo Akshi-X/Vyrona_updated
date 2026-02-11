@@ -7,12 +7,13 @@ import os
 from typing import Dict, Optional, Any
 from datetime import datetime, date, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.config.config import settings
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from ...utils.ivf_helpers import encrypt_sensitive_ivf_value
 
 logger = logging.getLogger(__name__)
 
@@ -346,6 +347,9 @@ class ARCIVFService:
             
             if not crylock_number:
                 raise Exception("Missing required field: cryolockNumber")
+
+            encrypted_his_number = encrypt_sensitive_ivf_value(his_number)
+            encrypted_crylock_number = encrypt_sensitive_ivf_value(crylock_number)
             
             # Extract components from cryolockNumber format: "T10/C5/E1/3"
             # Format breakdown: Tank Code / Canister Number / Cane Code / Position Number
@@ -467,8 +471,14 @@ class ARCIVFService:
             # Find or create PatientCrylockInfo record
             # Unique constraint on (his_number, crylock_number) ensures one record per patient per crylock
             patient_crylock = db.query(PatientCrylockInfo).filter(
-                PatientCrylockInfo.his_number == his_number,
-                PatientCrylockInfo.crylock_number == crylock_number
+                or_(
+                    PatientCrylockInfo.his_number == encrypted_his_number,
+                    PatientCrylockInfo.his_number == his_number
+                ),
+                or_(
+                    PatientCrylockInfo.crylock_number == encrypted_crylock_number,
+                    PatientCrylockInfo.crylock_number == crylock_number
+                )
             ).first()
             
             if not patient_crylock:
@@ -476,8 +486,8 @@ class ARCIVFService:
                 patient_crylock = PatientCrylockInfo(
                     branch_id=branch.branch_id,  # Branch based on siteName
                     tank_id=tank.tank_id,  # Reference to tank
-                    his_number=his_number,  # Patient HIS number
-                    crylock_number=crylock_number,  # Full crylock number (e.g., "T10/C5/E1/3")
+                    his_number=encrypted_his_number,  # Encrypted Patient HIS number
+                    crylock_number=encrypted_crylock_number,  # Encrypted full crylock number
                     # Extracted components
                     tank_code=tank_code_to_use,  # Extracted from crylockNumber (e.g., "T10")
                     canister_number=canister_number_to_use,  # Extracted from crylockNumber (e.g., "C5")
@@ -511,6 +521,13 @@ class ARCIVFService:
                 existing_in_transit = patient_crylock.in_transit
                 
                 updated = False
+                # Encrypt legacy plaintext values on first sync/update.
+                if patient_crylock.his_number != encrypted_his_number:
+                    patient_crylock.his_number = encrypted_his_number
+                    updated = True
+                if patient_crylock.crylock_number != encrypted_crylock_number:
+                    patient_crylock.crylock_number = encrypted_crylock_number
+                    updated = True
                 # Update branch_id if different (patient should belong to their branch)
                 if patient_crylock.branch_id != branch.branch_id:
                     patient_crylock.branch_id = branch.branch_id

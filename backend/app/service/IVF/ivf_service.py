@@ -12,6 +12,7 @@ from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
+from ...utils.ivf_helpers import decrypt_sensitive_ivf_value
 
 logger = logging.getLogger(__name__)
 
@@ -261,8 +262,8 @@ class IVFService:
             crylock_list = []
             for row in results:
                 crylock_data = {
-                    "his_number": row.his_number or "",
-                    "cryolock_number": row.crylock_number or "",
+                    "his_number": decrypt_sensitive_ivf_value(row.his_number) or "",
+                    "cryolock_number": decrypt_sensitive_ivf_value(row.crylock_number) or "",
                     "canister_number": row.canister_number or "",
                     "tank_code": row.tank_code or "",
                     "cane_code": row.cane_code or "",
@@ -399,8 +400,8 @@ class IVFService:
                 shipment_details = shipment_details_map.get(row.id)
                 
                 crylock_data = {
-                    "his_number": row.his_number or "",
-                    "cryolock_number": row.crylock_number or "",
+                    "his_number": decrypt_sensitive_ivf_value(row.his_number) or "",
+                    "cryolock_number": decrypt_sensitive_ivf_value(row.crylock_number) or "",
                     "canister_number": row.canister_number or "",
                     "tank_code": row.tank_code or "",
                     "cane_code": row.cane_code or "",
@@ -598,8 +599,8 @@ class IVFService:
                 description = row.shipment_description if hasattr(row, 'shipment_description') else None
                 
                 tracking_data = {
-                    "his_number": row.his_number or "",
-                    "cryolock_number": row.crylock_number or "",
+                    "his_number": decrypt_sensitive_ivf_value(row.his_number) or "",
+                    "cryolock_number": decrypt_sensitive_ivf_value(row.crylock_number) or "",
                     "canister_number": str(row.canister_number) if row.canister_number else None,
                     "tank_code": row.tank_code or "",
                     "cane_code": row.cane_code or "",
