@@ -12,7 +12,7 @@ from typing import List, Optional
 # Third-party imports
 import pandas as pd
 from fastapi import Response
-from sqlalchemy import desc, func, or_
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from ...constants.messages import ErrorMessages
 from ...exceptions.custom_exceptions import AppException
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.ivf_geolocation_model import IVFGeolocation
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
@@ -539,8 +540,58 @@ class QualityTrackingService:
             moved_count = moved_count_query.scalar() or 0
             available_slots = moved_count
 
-            # Data rows - return ALL patient crylocks in the specified tank for the user's branch
-            # Exclude only embryo_transfer=True crylocks (include in_transit to show descriptions)
+            # Data rows - return patient crylocks in the specified tank for the user's branch.
+            # Exclude embryo_transfer=True always.
+            # Exclude in_transit=True only when the latest shipment's current coordinates
+            # match the destination coordinates (shipment reached destination).
+            latest_shipments_subquery = (
+                self.db.query(
+                    IVFShipment.patient_crylock_info_id.label("patient_crylock_info_id"),
+                    func.max(IVFShipment.id).label("latest_shipment_id")
+                )
+                .group_by(IVFShipment.patient_crylock_info_id)
+                .subquery()
+            )
+
+            latest_geolocation_subquery = (
+                self.db.query(
+                    IVFGeolocation.shipment_id.label("shipment_id"),
+                    func.max(IVFGeolocation.reading_timestamp).label("latest_reading_timestamp")
+                )
+                .filter(IVFGeolocation.shipment_id.isnot(None))
+                .group_by(IVFGeolocation.shipment_id)
+                .subquery()
+            )
+
+            # Small tolerance to avoid float precision issues in GPS comparisons.
+            coordinate_match_tolerance = 0.0001
+            arrived_cryolock_ids_query = (
+                self.db.query(IVFShipment.patient_crylock_info_id)
+                .join(
+                    latest_shipments_subquery,
+                    IVFShipment.id == latest_shipments_subquery.c.latest_shipment_id
+                )
+                .join(
+                    latest_geolocation_subquery,
+                    IVFShipment.shipment_id == latest_geolocation_subquery.c.shipment_id
+                )
+                .join(
+                    IVFGeolocation,
+                    and_(
+                        IVFGeolocation.shipment_id == latest_geolocation_subquery.c.shipment_id,
+                        IVFGeolocation.reading_timestamp == latest_geolocation_subquery.c.latest_reading_timestamp
+                    )
+                )
+                .filter(
+                    IVFGeolocation.current_latitude.isnot(None),
+                    IVFGeolocation.current_longitude.isnot(None),
+                    IVFGeolocation.shipment_to_latitude.isnot(None),
+                    IVFGeolocation.shipment_to_longitude.isnot(None),
+                    func.abs(IVFGeolocation.current_latitude - IVFGeolocation.shipment_to_latitude) <= coordinate_match_tolerance,
+                    func.abs(IVFGeolocation.current_longitude - IVFGeolocation.shipment_to_longitude) <= coordinate_match_tolerance
+                )
+            )
+
             query = (
                 self.db.query(
                     PatientCrylockInfo.his_number,
@@ -558,8 +609,13 @@ class QualityTrackingService:
                 .filter(
                     PatientCrylockInfo.tank_id == tank.tank_id,
                     PatientCrylockInfo.branch_id == filter_branch_id,  # Filter by user's branch
-                    # Exclude only embryo_transfer crylocks (include in_transit to show descriptions)
-                    PatientCrylockInfo.embryo_transfer != True
+                    # Exclude embryo_transfer crylocks
+                    PatientCrylockInfo.embryo_transfer != True,
+                    # Keep in_transit rows unless their latest shipment has reached destination.
+                    or_(
+                        PatientCrylockInfo.in_transit != True,
+                        ~PatientCrylockInfo.id.in_(arrived_cryolock_ids_query)
+                    )
                 )
             )
 
