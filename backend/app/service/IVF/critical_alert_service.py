@@ -717,14 +717,19 @@ class CriticalAlertService:
         tank_ids = [alert.tank_id for alert in alerts]
         tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
         tank_code_map = {t.tank_id: t.tank_code for t in tanks}
+        branch_ids = list({alert.branch_id for alert in alerts})
+        branches = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id.in_(branch_ids)).all()
+        branch_name_map = {b.branch_id: b.branch_name for b in branches}
         
         # Build alert responses with tank_code
         alert_responses = []
         for alert in alerts:
             tank_code = tank_code_map.get(alert.tank_id) or f"Tank-{alert.tank_id}"
+            branch_name = branch_name_map.get(alert.branch_id) or "N/A"
             alert_dict = {
                 **alert.__dict__,
-                'tank_code': tank_code
+                'tank_code': tank_code,
+                'branch_name': branch_name
             }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
         
