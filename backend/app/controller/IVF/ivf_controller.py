@@ -1,10 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Path, Query
 from sqlalchemy.orm import Session
+from typing import Optional
+import logging
 
 from app.config.database import get_db
+from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
-from app.schemas.IVF.ivf_schema import IVFControlTowerResponse, ActiveCanistersResponse, EmbryoTrackingResponse
+from app.models.IVF.tank_model import Tank
+from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.schemas.IVF.ivf_schema import (
+    ActiveCanistersResponse,
+    BranchListResponse,
+    CanisterCheckResponse,
+    EmbryoTransferResponse,
+    EmbryoTrackingResponse,
+    InTransitResponse,
+    IVFControlTowerResponse,
+)
+from app.constants.enums import CanisterStatus
+from app.service.IVF.arc_ivf_service import ARCIVFService
+from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
+from app.utils.user_helpers import is_hospital_department
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
 
@@ -65,23 +84,29 @@ def get_ivf_control_tower_map(
 @router.get("/control_tower/active_canisters", response_model=ActiveCanistersResponse)
 def get_active_canisters(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    branch_name: Optional[str] = Query(None, description="Optional branch name filter"),
+    status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical)")
 ):
     """
-    Get active canisters grouped by branch with their status and last updated time.
+    Get active tanks grouped by branch for the current logged-in user's branch.
     
     Role-based access:
-    - User/Manager: Only see canisters from their assigned branch
-    - Admin: See canisters from all branches
+    - User (IVF): Only see tanks from their assigned branch
+    - Manager (IVF): See tanks from all branches
+    - Admin: See tanks from all branches
     
-    This endpoint returns all active canisters (is_active = True) grouped by branch with:
+    Optional filters:
+    - branch_name: Filter by specific branch name
+    - status: Filter by tank status (safe, risk, critical)
+    
+    This endpoint returns all active tanks (is_active = True) grouped by branch with:
     - branch_id: The ID of the branch
     - branch_name: The name of the branch
-    - canisters: List of canisters for this branch with:
-        - canister_number: The canister number/code (e.g., 'C1')
-        - canister_status: Status (safe, risk, or critical)
-        - updated_at: Last updated date and time from the most recent canister log refill_date+refill_time (if available),
-                      otherwise from canisters table created_at
+    - tanks: List of tanks for this branch with:
+        - tank_code: The tank code (e.g., 'T1')
+        - updated_at: Last updated date and time from tanks table updated_at
+        - status: Tank status (safe, risk, critical)
     
     Response format:
     {
@@ -89,43 +114,59 @@ def get_active_canisters(
             {
                 "branch_id": 1,
                 "branch_name": "Egmore",
-                "canisters": [
+                "tanks": [
                     {
-                        "canister_number": "C1",
-                        "canister_status": "safe",
-                        "updated_at": "2024-01-15T10:30:00Z"
+                        "tank_code": "T1",
+                        "updated_at": "2024-01-15T10:30:00Z",
+                        "status": "safe"
                     },
                     {
-                        "canister_number": "C2",
-                        "canister_status": "risk",
-                        "updated_at": "2024-01-15T09:15:00Z"
-                    }
-                ]
-            },
-            {
-                "branch_id": 2,
-                "branch_name": "Anna Nagar",
-                "canisters": [
-                    {
-                        "canister_number": "C1",
-                        "canister_status": "safe",
-                        "updated_at": "2024-01-15T11:00:00Z"
+                        "tank_code": "T2",
+                        "updated_at": "2024-01-15T09:15:00Z",
+                        "status": "risk"
                     }
                 ]
             }
         ],
-        "total": 3
+        "total": 2
     }
     """
     try:
         # Get branch filter info for IVF department users
-        branch_id, role = get_branch_filter_info(request)
+        user_branch_id, role = get_branch_filter_info(request)
+        
+        # Get user's branch name if User role
+        user_branch_name = None
+        if user_branch_id is not None:
+            user_branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user_branch_id).first()
+            if user_branch:
+                user_branch_name = user_branch.branch_name
+        
+        # Determine filter branch_name based on role and provided filter
+        filter_branch_name = None
+        if user_branch_id is not None and branch_name is None:
+            # User role - use their assigned branch
+            filter_branch_name = user_branch_name
+        elif branch_name is not None:
+            # Explicit filter provided
+            if role == "User" and user_branch_name:
+                # User role: verify the provided branch_name matches their branch
+                if branch_name != user_branch_name:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied: You can only view tanks from your assigned branch ({user_branch_name})"
+                    )
+            # Manager/Admin can filter by any branch, or User's branch matches
+            filter_branch_name = branch_name
+        # else: No filter - return all branches (Manager/Admin only)
         
         service = IVFService(db)
-        canisters_data = service.get_active_canisters(branch_id=branch_id)
-        return ActiveCanistersResponse(**canisters_data)
+        tanks_data = service.get_active_tanks(branch_name=filter_branch_name, status=status)
+        return ActiveCanistersResponse(**tanks_data)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting active canisters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
 
 
 @router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
@@ -138,7 +179,7 @@ def get_embryo_tracking(
     
     Role-based access and field visibility:
     - User: Only see data from their assigned branch. Includes embryo_grading, excludes site_name and status.
-    - Manager: Only see data from their assigned branch. Includes site_name and status, excludes embryo_grading.
+    - Manager: See data from all branches. Includes site_name and status, excludes embryo_grading.
     - Admin: See data from all branches. Includes site_name and status, excludes embryo_grading.
     
     This endpoint returns embryo tracking information in a table format showing:
@@ -202,4 +243,539 @@ def get_embryo_tracking(
         return EmbryoTrackingResponse(**tracking_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting embryo tracking data: {str(e)}")
+
+
+@router.get("/canisters/{tank_code}/check", response_model=CanisterCheckResponse)
+def check_tank_exists(
+    tank_code: str = Path(..., description="Tank code to check (e.g., 'T1')"),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Check if a tank exists in the system by tank code for the current logged-in user's branch.
+    
+    This endpoint allows users to verify if a tank code exists before performing operations.
+    Role-based access:
+    - User (IVF): Only see tanks from their assigned branch
+    - Manager (IVF): See tanks from all branches
+    - Admin: See tanks from all branches
+    
+    Path Parameters:
+    - tank_code: Tank code to check (e.g., 'T1')
+    
+    Response:
+    - exists: Boolean indicating if the tank exists
+    - canister_number: The tank code that was checked (kept as canister_number for backward compatibility)
+    - canister_id: Tank ID if exists (null if not found) - kept as canister_id for backward compatibility
+    - is_active: Whether the tank is active (null if not found)
+    - canister_status: Always null for tanks (kept for backward compatibility)
+    - message: Descriptive message about the result
+    
+    Example Response (exists):
+    {
+        "exists": true,
+        "canister_number": "T1",
+        "canister_id": 1,
+        "is_active": true,
+        "canister_status": null,
+        "message": "Tank T1 exists and is active"
+    }
+    
+    Example Response (not exists):
+    {
+        "exists": false,
+        "canister_number": "T999",
+        "canister_id": null,
+        "is_active": null,
+        "canister_status": null,
+        "message": "Tank T999 does not exist"
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request) if request else (None, None)
+        
+        # Query tank by tank_code
+        query = db.query(Tank).filter(Tank.tank_code == tank_code)
+        
+        # Apply branch filter if provided (User role only)
+        if branch_id is not None:
+            query = query.filter(Tank.branch_id == branch_id)
+        
+        tank = query.first()
+        
+        if tank:
+            return CanisterCheckResponse(
+                exists=True,
+                canister_number=tank_code,  # Tank code stored in canister_number field for backward compatibility
+                canister_id=tank.tank_id,  # Tank ID stored in canister_id field for backward compatibility
+                is_active=tank.is_active,
+                canister_status=tank.status.value if tank.status else None,  # Tank status
+                message=f"Tank {tank_code} exists and is {'active' if tank.is_active else 'inactive'}"
+            )
+        else:
+            return CanisterCheckResponse(
+                exists=False,
+                canister_number=tank_code,
+                canister_id=None,
+                is_active=None,
+                canister_status=None,
+                message=f"Tank {tank_code} does not exist" + (f" in your branch" if branch_id is not None else "")
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
+@router.get("/storage", response_model=ARCIVFStorageResponse)
+def get_ivf_storage(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch IVF storage information from ARC IVF external API.
+    
+    This endpoint calls the ARC IVF Storage API to retrieve all storage information
+    using a TokenId for authentication. The TokenId is automatically read from the 
+    ARC_API_TOKEN (or ARC_IVF_TOKEN_ID) environment variable in your .env file.
+    
+    **No Input Parameters Required:**
+    The TokenId is automatically retrieved from the ARC_API_TOKEN environment variable.
+    
+    **Response Fields:**
+    - storageList: List of storage items, each containing:
+        - hisNumber: Patient Hospital ID
+        - cryolockNumber: Format T10/C2/B14/1 (Tank/Canister/Location/Cryolock Serial)
+        - canisterNumber: Canister Number
+        - tankID: Tank Unique ID
+        - caneID: Cane Unique ID
+        - dateofVitrification: Date of OCR
+        - siteName: Branch Name
+        - totalNumberofEmbryos: Total Embryos for the branch
+        - totalNumberofContainers: Total Cryolocks for the branch
+    - status: API call status (SUCCESS/FAILURE)
+    - errorCode: API call status code
+    
+    **Example Request:**
+    ```
+    GET /api/ivf/storage
+    ```
+    
+    **Note:** Make sure ARC_API_TOKEN (or ARC_IVF_TOKEN_ID) is set in your .env file.
+    
+    **Example Success Response:**
+    ```json
+    {
+        "storageList": [
+            {
+                "hisNumber": "3222044212F",
+                "cryolockNumber": "T1/C1/A11/2",
+                "canisterNumber": "C1",
+                "tankID": "6216",
+                "caneID": "6216",
+                "dateofVitrification": "2023-03-11",
+                "siteName": "Tambaram",
+                "totalNumberofEmbryos": "640",
+                "totalNumberofContainers": "384"
+            }
+        ],
+        "status": "SUCCESS",
+        "errorCode": 200
+    }
+    ```
+    
+    **Example Failure Response:**
+    ```json
+    {
+        "storageList": [],
+        "status": "FAILURE",
+        "errorCode": 412
+    }
+    ```
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        # Get branch name if branch filtering is needed
+        branch_name = None
+        if branch_id is not None:
+            branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == branch_id).first()
+            if branch:
+                branch_name = branch.branch_name
+        
+        service = ARCIVFService()
+        # Fetch data from ARC IVF API (TokenId is automatically read from .env)
+        result = service.get_ivf_storage()
+        
+        # Save data to database if API call was successful
+        if result.get("status") == "SUCCESS":
+            storage_list = result.get("storageList", [])
+            
+            # IMPORTANT: Save ALL data from ARC API to database (for all branches)
+            # Don't filter before saving - we want to persist all branch data
+            logger.info(f"Fetched {len(storage_list)} items from ARC API - saving ALL to database for all branches")
+            
+            # Count unique patients, tanks, canisters, canes, and cryolocks
+            unique_patients = set()
+            unique_tanks = set()
+            unique_canisters = set()
+            unique_canes = set()
+            unique_cryolocks = set()
+            
+            # Save ALL items to database (for all branches)
+            for storage_item in storage_list:
+                if storage_item.get("hisNumber"):
+                    unique_patients.add(storage_item.get("hisNumber"))
+                if storage_item.get("tankID"):
+                    unique_tanks.add(storage_item.get("tankID"))
+                if storage_item.get("canisterNumber"):
+                    unique_canisters.add(storage_item.get("canisterNumber"))
+                if storage_item.get("caneID"):
+                    unique_canes.add(storage_item.get("caneID"))
+                if storage_item.get("cryolockNumber"):
+                    unique_cryolocks.add(storage_item.get("cryolockNumber"))
+            
+            logger.info(
+                f"Storage data statistics: "
+                f"Total items: {len(storage_list)}, "
+                f"Unique patients: {len(unique_patients)}, "
+                f"Unique tanks: {len(unique_tanks)}, "
+                f"Unique canisters: {len(unique_canisters)}, "
+                f"Unique canes: {len(unique_canes)}, "
+                f"Unique cryolocks: {len(unique_cryolocks)}"
+            )
+            
+            saved_count = 0
+            failed_count = 0
+            skipped_count = 0
+            failed_items = []  # Track failed items with details
+            BATCH_SIZE = 100  # Commit every 100 items for better performance
+            
+            # Save each storage item to database
+            for idx, storage_item in enumerate(storage_list, 1):
+                try:
+                    # Save to database (created_by will be None for now, can be enhanced later with auth)
+                    save_result = service.save_ivf_storage_to_db(
+                        db=db,
+                        api_data=storage_item,
+                        created_by=None
+                    )
+                    
+                    # Check if record was skipped (e.g., invalid cryolock position)
+                    if save_result.get("status") == "SKIPPED":
+                        skipped_count += 1
+                        # Log skipped records at debug level (not error)
+                        logger.debug(
+                            f"Skipped ARC IVF data item {idx}/{len(storage_list)} "
+                            f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                            f"Cryolock={storage_item.get('cryolockNumber')}): {save_result.get('message')}"
+                        )
+                    else:
+                        saved_count += 1
+                    
+                    # Log progress every 100 items or at milestones
+                    if idx % 100 == 0 or idx == len(storage_list):
+                        logger.info(f"Progress: {idx}/{len(storage_list)} items processed ({saved_count} saved, {skipped_count} skipped, {failed_count} failed)")
+                    elif idx % 10 == 0:
+                        # Less verbose logging every 10 items
+                        logger.debug(f"Processing item {idx}/{len(storage_list)}")
+                        
+                except Exception as save_error:
+                    failed_count += 1
+                    error_type = type(save_error).__name__
+                    error_message = str(save_error)
+                    
+                    # Track failed item details
+                    failed_item = {
+                        "index": idx,
+                        "hisNumber": storage_item.get('hisNumber'),
+                        "siteName": storage_item.get('siteName'),
+                        "cryolockNumber": storage_item.get('cryolockNumber'),
+                        "canisterNumber": storage_item.get('canisterNumber'),
+                        "tankID": storage_item.get('tankID'),
+                        "caneID": storage_item.get('caneID'),
+                        "error_type": error_type,
+                        "error_message": error_message
+                    }
+                    failed_items.append(failed_item)
+                    
+                    # Log the error but don't fail the API response
+                    logger.error(
+                        f"Failed to save ARC IVF data item {idx}/{len(storage_list)} "
+                        f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                        f"Cryolock={storage_item.get('cryolockNumber')}): "
+                        f"[{error_type}] {error_message}",
+                        exc_info=True
+                    )
+                
+                # Batch commit every BATCH_SIZE items for better performance
+                if idx % BATCH_SIZE == 0:
+                    try:
+                        db.commit()
+                        logger.debug(f"Committed batch at item {idx}")
+                    except Exception as commit_error:
+                        db.rollback()
+                        logger.error(f"Error committing batch at item {idx}: {str(commit_error)}")
+            
+            # Final commit for remaining items
+            try:
+                db.commit()
+                logger.info(f"Final commit completed")
+            except Exception as commit_error:
+                db.rollback()
+                logger.error(f"Error in final commit: {str(commit_error)}")
+            
+            logger.info(f"Database save summary: {saved_count} saved, {skipped_count} skipped, {failed_count} failed out of {len(storage_list)} total items")
+            
+            # Log failure analysis if there are failures
+            if failed_count > 0:
+                # Group failures by error type
+                error_types = {}
+                for item in failed_items:
+                    error_type = item['error_type']
+                    if error_type not in error_types:
+                        error_types[error_type] = []
+                    error_types[error_type].append(item)
+                
+                logger.warning(f"Failure Analysis:")
+                logger.warning(f"  Total failures: {failed_count}")
+                for error_type, items in error_types.items():
+                    logger.warning(f"  {error_type}: {len(items)} failures")
+                    # Log first 5 examples of each error type
+                    for item in items[:5]:
+                        logger.warning(
+                            f"    - Item {item['index']}: HIS={item['hisNumber']}, "
+                            f"Site={item['siteName']}, Cryolock={item['cryolockNumber']}, "
+                            f"Error: {item['error_message'][:100]}"
+                        )
+                    if len(items) > 5:
+                        logger.warning(f"    ... and {len(items) - 5} more {error_type} errors")
+                
+                # Check for common failure patterns
+                missing_position = [item for item in failed_items if 'position' in item['error_message'].lower() or 'extract' in item['error_message'].lower()]
+                missing_fields = [item for item in failed_items if 'missing' in item['error_message'].lower() or 'required' in item['error_message'].lower()]
+                constraint_violations = [item for item in failed_items if 'unique' in item['error_message'].lower() or 'constraint' in item['error_message'].lower()]
+                
+                if missing_position:
+                    logger.warning(f"  Pattern: {len(missing_position)} failures due to position extraction issues")
+                if missing_fields:
+                    logger.warning(f"  Pattern: {len(missing_fields)} failures due to missing required fields")
+                if constraint_violations:
+                    logger.warning(f"  Pattern: {len(constraint_violations)} failures due to database constraint violations")
+            
+            # Calculate statistics about saved data
+            branches_from_arc = set()
+            for item in result.get("storageList", []):
+                site_name = item.get("siteName")
+                if site_name:
+                    branches_from_arc.add(site_name.strip())
+            
+            logger.info(
+                f"ARC Data Summary: "
+                f"Total records from ARC: {len(result.get('storageList', []))}, "
+                f"Total branches from ARC: {len(branches_from_arc)}, "
+                f"Branches: {', '.join(sorted(branches_from_arc))}, "
+                f"Saved to DB: {saved_count}, "
+                f"Skipped: {skipped_count}, "
+                f"Failed: {failed_count}"
+            )
+        
+        # Return all ARC data in response (no filtering)
+        return ARCIVFStorageResponse(**result)
+    except Exception as e:
+        logger.error(f"Error in get_ivf_storage: {str(e)}", exc_info=True)
+        # Return failure response format on exception
+        return ARCIVFStorageResponse(
+            storage_list=[],
+            status="FAILURE",
+            error_code=500,
+            error_message=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get("/branches", response_model=BranchListResponse)
+def get_branches(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of branches for the logged-in IVF user's hospital.
+    
+    Returns branch_id and branch_name for all branches belonging to the user's hospital.
+    This endpoint is useful for dropdowns/selectors in the frontend.
+    
+    Role-based access:
+    - All IVF users (User, Manager, Admin): Can see all branches in their hospital
+    - Non-IVF users: Cannot access this endpoint
+    
+    Response format:
+    {
+        "branches": [
+            {
+                "branch_id": 1,
+                "branch_name": "Egmore"
+            },
+            {
+                "branch_id": 2,
+                "branch_name": "Tambaram"
+            }
+        ],
+        "total": 2
+    }
+    """
+    try:
+        # Get current user from request state (injected by middleware)
+        if not hasattr(request.state, "current_user"):
+            raise HTTPException(status_code=401, detail="User not authenticated")
+        
+        user = request.state.current_user
+        
+        # Verify user is from IVF department
+        if not user.department or not is_hospital_department(user.department):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: This endpoint is for IVF users only"
+            )
+        
+        # Get hospital_id from user or request state
+        hospital_id = None
+        if hasattr(request.state, "hospital_id") and request.state.hospital_id:
+            hospital_id = request.state.hospital_id
+        elif user.hospital_id:
+            hospital_id = user.hospital_id
+        else:
+            # Fallback: get hospital_id from user's branch
+            if user.branch_id:
+                branch = db.query(HospitalBranch).filter(
+                    HospitalBranch.branch_id == user.branch_id
+                ).first()
+                if branch:
+                    hospital_id = branch.hospital_id
+        
+        if not hospital_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to determine hospital. User must be associated with a hospital."
+            )
+        
+        # Use service to get branches
+        service = IVFService(db)
+        branches_data = service.get_branches_by_hospital(hospital_id)
+        
+        return BranchListResponse(**branches_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting branches: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting branches: {str(e)}")
+
+
+@router.get("/embryo-transfer", response_model=EmbryoTransferResponse)
+def get_embryo_transfer_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where embryo_transfer is True.
+    
+    Returns detailed information about all crylocks that have been moved to embryo transfer.
+    This endpoint is useful for tracking and reporting on embryo transfers.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_embryo_transfer_crylocks(branch_id=branch_id)
+        
+        return EmbryoTransferResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting embryo transfer crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting embryo transfer crylocks: {str(e)}")
+
+
+@router.get("/in-transit", response_model=InTransitResponse)
+def get_in_transit_crylocks(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all crylocks where in_transit is True.
+    
+    Returns detailed information about all crylocks that are currently in transit.
+    This endpoint is useful for tracking and reporting on shipments.
+    
+    Role-based access:
+    - User (IVF): Only see crylocks from their assigned branch
+    - Manager (IVF): See crylocks from all branches in their hospital
+    - Admin: See crylocks from all branches
+    
+    Response format:
+    {
+        "data": [
+            {
+                "his_number": "HIS-10234",
+                "cryolock_number": "T1/C1/A11/2",
+                "canister_number": "C1",
+                "tank_code": "T1",
+                "cane_code": "A11",
+                "goblet_color": "Yellow",
+                "cryolock_color": "Blue",
+                "date_of_vitrification": "2024-08-12",
+                "branch_name": "Egmore",
+                "tank_id": 1,
+                "shipment_details": {
+                    "shipment_id": "SHIP-20240812-123",
+                    "iot_shipment_id": "tive-12345",
+                    "source_branch_id": 1,
+                    "destination_branch_id": 2,
+                    "source_location": "Egmore",
+                    "destination_location": "Tambaram",
+                    "description": "crylock is move from egmore to thambaram-deviceid -xxxxx",
+                    "device_id": "DEVICE-123",
+                    "shipment_status": "in_transit",
+                    "departure_time": "2024-08-12T10:00:00Z",
+                    "arrival_time": null,
+                    "scheduled_departure_time": "2024-08-12T09:00:00Z"
+                }
+            },
+            ...
+        ],
+        "total": 10
+    }
+    """
+    try:
+        # Get branch filter info for IVF department users
+        branch_id, role = get_branch_filter_info(request)
+        
+        service = IVFService(db)
+        crylocks_data = service.get_in_transit_crylocks(branch_id=branch_id)
+        
+        return InTransitResponse(**crylocks_data)
+    except Exception as e:
+        logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")
 

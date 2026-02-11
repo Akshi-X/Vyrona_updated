@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     IOT_CLIENT_ID: str
     IOT_CLIENT_SECRET: str
     IOT_ACCOUNT_ID: str
+    # ARC IVF API Configuration (Optional - set in .env)
+    ARC_API_TOKEN: Optional[str] = None  # Token ID for ARC IVF Storage API authentication
+    ARC_IVF_TOKEN_ID: Optional[str] = None  # Alias for ARC_API_TOKEN (for backward compatibility)
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================

@@ -113,6 +113,9 @@ class ErrorMessages:
     QUALITY_SERVICE_ERROR = "Quality monitoring service error"
     QUALITY_CSV_EXPORT_FAILED = "Failed to generate quality data export"
     
+    # IVF / Quality Tracking
+    CRYOLOCK_ACTIVE_SHIPMENT_EXISTS = "The cryolock '{cryolock_number}' already has an active shipment"
+    
     # General
     INTERNAL_ERROR = "An internal server error occurred"
     NOT_FOUND = "Resource not found"

@@ -17,8 +17,8 @@ from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
 from app.config.database import get_db, SessionLocal
 from app.models.user_model import User
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.utils.user_helpers import is_hospital_department
 from app.exceptions import InvalidTokenException
 
@@ -51,6 +51,16 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
         query_params = dict(websocket.query_params)
         token = query_params.get("token")
         logger.info(f"Token from query params: {'present' if token else 'missing'}")
+        
+        # Get branch_id_override from query parameters (optional, only for Managers)
+        branch_id_override = None
+        branch_id_override_str = query_params.get("branch_id_override")
+        if branch_id_override_str:
+            try:
+                branch_id_override = int(branch_id_override_str)
+                logger.info(f"branch_id_override provided: {branch_id_override}")
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid branch_id_override value: {branch_id_override_str}, ignoring")
         
         if not token:
             logger.warning("IVF WebSocket connection rejected: No token provided")
@@ -87,12 +97,28 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
                 return
             
-            branch_id = user.branch_id
             role = user.role.value if hasattr(user.role, 'value') else str(user.role)
             role_normalized = role  # Already in correct format from enum
             department = user.department
             
-            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}")
+            # Determine branch_id based on role and override
+            # Managers can override, Users cannot override (always use their branch)
+            if role_normalized == "Manager":
+                if branch_id_override is not None:
+                    branch_id = branch_id_override
+                    logger.info(f"Manager using branch_id_override: {branch_id}")
+                else:
+                    branch_id = user.branch_id  # Manager without override uses their own branch_id
+                    logger.info(f"Manager using default branch_id: {branch_id}")
+            elif role_normalized == "Admin":
+                branch_id = None  # Admin sees all branches (ignore override)
+            else:
+                # User role: always use their branch (ignore override)
+                branch_id = user.branch_id
+                if branch_id_override is not None:
+                    logger.warning(f"User role cannot override branch_id, ignoring override: {branch_id_override}")
+            
+            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}, override={branch_id_override}")
         finally:
             db_temp.close()
         
@@ -132,76 +158,73 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                         # Try to parse as JSON
                         message = json.loads(data)
                         
-                        # Handle IVF canister subscription - ONLY accept canister_number
-                        if "canister_number" not in message or not message["canister_number"]:
+                        # Handle IVF tank subscription - accept tank_code (e.g., "T1", "T2")
+                        if "tank_code" not in message or not message["tank_code"]:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": "Subscription message must contain 'canister_number'"
+                                "message": "Subscription message must contain 'tank_code'"
                             })
                             continue
                         
-                        canister_number = message["canister_number"]
-                        logger.info(f"Received canister_number: {canister_number}")
+                        tank_code = message["tank_code"]
+                        logger.info(f"Received tank_code: {tank_code}")
                         
-                        # Convert canister_number to canister_id for internal operations
+                        # Resolve tank_code to tank_id
                         try:
-                            # Convert canister_number to string (database column is VARCHAR/character varying)
-                            canister_number_str = str(canister_number)
+                            # Convert tank_code to string
+                            tank_code_str = str(tank_code).strip()
                             
-                            # First, look up canister_id from canister_number (without branch filter)
-                            # This allows us to check if canister exists first, then validate branch access
-                            canister = db.query(Canister).filter(Canister.canister_number == canister_number_str).first()
-                            
-                            if not canister:
-                                raise Exception(f"Canister number {canister_number} not found")
-                            
-                            canister_id = canister.canister_id
-                            
-                            # For non-admin users, validate that canister belongs to their branch
+                            # Find tank by tank_code and branch_id (for non-admin users)
                             if role_normalized != "Admin" and branch_id is not None:
-                                # Get canister's branch through tank
-                                tank = db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
-                                if not tank:
-                                    raise Exception(f"Tank for canister {canister_number} not found")
-                                
-                                if tank.branch_id != branch_id:
-                                    raise Exception(f"Canister number {canister_number} does not belong to your branch")
+                                tank = db.query(Tank).filter(
+                                    Tank.tank_code == tank_code_str,
+                                    Tank.branch_id == branch_id
+                                ).first()
+                            else:
+                                # Admin users can access any tank
+                                tank = db.query(Tank).filter(
+                                    Tank.tank_code == tank_code_str
+                                ).first()
                             
-                            logger.info(f"Converted canister_number {canister_number} to canister_id {canister_id}")
+                            if not tank:
+                                raise Exception(f"Tank with code '{tank_code}' not found" + (f" in branch {branch_id}" if branch_id else ""))
+                            
+                            tank_id = tank.tank_id
+                            
+                            logger.info(f"Resolved tank_code {tank_code} to tank_id {tank_id}")
                         except Exception as e:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": f"Invalid canister number: {str(e)}"
+                                "message": f"Invalid tank code: {str(e)}"
                             })
                             continue
                         
-                        # Validate canister belongs to user's branch (if user is not admin)
+                        # Validate tank belongs to user's branch (if user is not admin)
                         try:
-                            # Admin users (branch_id is None) can access all canisters
+                            # Admin users (branch_id is None) can access all tanks
                             # User/Manager users must match branch
                             if role_normalized != "Admin" and branch_id is not None:
-                                quality_service.validate_canister_belongs_to_branch(canister_id, branch_id)
+                                quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
                             
-                            # Client is subscribing to a canister (IVF) - track by canister_number only
-                            # Store canister_number as string (database stores as VARCHAR)
-                            canister_number_for_sub = str(canister_number)
+                            # Client is subscribing to a tank (IVF) - track by tank_code
+                            # Store tank_code as string
+                            tank_code_for_sub = str(tank_code)
                             
-                            # Store subscription using canister_number (primary identifier)
-                            # canister_id is stored for internal operations but subscription is tracked by canister_number
-                            manager.set_canister_subscription(connection_id, canister_id, canister_number_for_sub)
+                            # Store subscription using tank_code (primary identifier)
+                            manager.set_tank_subscription(connection_id, tank_id, tank_code_for_sub)
                             
-                            # Get last 12 IVF quality logs from Redis for this canister
-                            ivf_history = quality_service.get_canister_redis_history(canister_id, limit=12)
+                            # Get last 12 IVF quality logs from Redis for this tank
+                            ivf_history = quality_service.get_tank_redis_history(tank_id, limit=12)
                             
-                            # Get IVF geolocation records from database
-                            ivf_geolocation_history = quality_service.get_canister_geolocation_history(canister_id, limit=100)
+                            # Get IVF geolocation records from database (using tank_id)
+                            ivf_geolocation_history = quality_service.get_tank_geolocation_history(tank_id, limit=100)
                             
                             # Send IVF geolocation history as a single array message
                             if ivf_geolocation_history:
                                 await websocket.send_json({
                                     "type": "ivf_geolocation_history",
-                                    "canister_id": canister_id,
-                                    "canister_number": canister_number,  # Include canister_number in response
+                                    "tank_id": tank_id,
+                                    "tank_code": tank_code,  # Include tank_code in response
                                     "geolocations": ivf_geolocation_history,
                                     "count": len(ivf_geolocation_history)
                                 })
@@ -213,15 +236,15 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             # Send confirmation after history
                             await websocket.send_json({
                                 "type": "subscription_confirmed",
-                                "canister_id": canister_id,
-                                "canister_number": canister_number,  # Include canister_number in response
+                                "tank_id": tank_id,
+                                "tank_code": tank_code,  # Include tank_code in response
                                 "history_count": len(ivf_history),
                                 "geolocation_count": len(ivf_geolocation_history)
                             })
                         except Exception as e:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": f"Invalid canister: {str(e)}"
+                                "message": f"Invalid tank: {str(e)}"
                             })
                     except json.JSONDecodeError:
                         # Not JSON, ignore

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { userService } from "../services/userService";
 import MyGrapeLogo from "../assets/mGScale.svg";
 import IsolationModeBanner from "../assets/Isolation_Mode.svg";
 
@@ -20,6 +22,17 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
   const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  
+  // User department (CGT or IVF) - initialize from localStorage
+  const [userDepartment, setUserDepartment] = useState<string | null>(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      return dept ? dept.toUpperCase() : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const handleResize = () => setSidebarHeight(window.innerHeight);
@@ -27,11 +40,54 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const navigationItems = [
+  // Fetch user profile to get department
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await userService.getProfile();
+        
+        // Get department (CGT or IVF) - check localStorage first, then API
+        let department: string | null = null;
+        const storedDept = localStorage.getItem('department');
+        if (storedDept) {
+          department = storedDept.toUpperCase();
+        }
+        
+        // Fall back to API if not in localStorage
+        if (!department) {
+          department = profile.department?.toUpperCase() || null;
+        }
+        
+        setUserDepartment(department);
+      } catch {
+        // Try to get department from localStorage even if API fails
+        const storedDept = localStorage.getItem('department');
+        if (storedDept) {
+          const department = storedDept.toUpperCase();
+          setUserDepartment(department);
+        }
+      }
+    };
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
+  }, [isAuthenticated]);
+
+  // Base navigation items
+  const allNavigationItems = [
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
     { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" }
   ];
+
+  // Filter out Database if user is IVF
+  const navigationItems = allNavigationItems.filter(item => {
+    const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
+    if (isIVF && item.label === "Database") {
+      return false;
+    }
+    return true;
+  });
 
   const handleNavigation = (path: string) => {
     navigate(path);

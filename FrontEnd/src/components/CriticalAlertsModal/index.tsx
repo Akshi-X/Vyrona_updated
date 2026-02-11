@@ -17,14 +17,17 @@ interface CriticalAlertsModalProps {
   onClose: () => void;
   alerts: CriticalAlert[];
   loading?: boolean;
+  onAcknowledge?: (alertId: string) => Promise<void>;
 }
 
 const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
   isOpen,
   onClose,
   alerts,
-  loading = false
+  loading = false,
+  onAcknowledge
 }) => {
+  const [acknowledgingIds, setAcknowledgingIds] = useState<Set<string>>(new Set());
   // Filter states
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -82,6 +85,24 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
   // Get unique values for filters
   const priorities: ('Low' | 'Medium' | 'High' | 'Critical')[] = ['Low', 'Medium', 'High', 'Critical'];
   const statuses: ('Active' | 'Acknowledged' | 'Resolved' | 'Escalated')[] = ['Active', 'Acknowledged', 'Resolved', 'Escalated'];
+
+  const handleAcknowledge = async (alertId: string) => {
+    if (!onAcknowledge) return;
+    
+    setAcknowledgingIds(prev => new Set(prev).add(alertId));
+    try {
+      await onAcknowledge(alertId);
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+      // You could show a toast notification here
+    } finally {
+      setAcknowledgingIds(prev => {
+        const next = new Set(prev);
+        next.delete(alertId);
+        return next;
+      });
+    }
+  };
 
   return (
     <AlertCard
@@ -208,12 +229,15 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 </div>
               </div>
             </th>
+            {onAcknowledge && (
+              <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Action</th>
+            )}
           </tr>
         </thead>
         <tbody>
           {visibleAlerts.length === 0 && (
             <tr>
-              <td colSpan={6} className="bg-white p-[15px] text-center text-gray-500 text-sm">
+              <td colSpan={onAcknowledge ? 7 : 6} className="bg-white p-[15px] text-center text-gray-500 text-sm">
                 No alerts match the current filters
               </td>
             </tr>
@@ -252,6 +276,25 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                   {alert.status}
                 </span>
               </td>
+              {onAcknowledge && (
+                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                  {alert.status === 'Active' ? (
+                    <button
+                      onClick={() => handleAcknowledge(alert.id)}
+                      disabled={acknowledgingIds.has(alert.id)}
+                      className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                        acknowledgingIds.has(alert.id)
+                          ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                          : 'bg-[#6b1176] text-white hover:bg-[#5a0f66]'
+                      }`}
+                    >
+                      {acknowledgingIds.has(alert.id) ? 'Acknowledging...' : 'Acknowledge'}
+                    </button>
+                  ) : (
+                    <span className="text-gray-400 text-xs">-</span>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

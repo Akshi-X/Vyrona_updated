@@ -7,9 +7,10 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from psycopg2.errors import UniqueViolation
 
 from ...models.IVF.critical_alert_model import CriticalAlert, AlertType, AlertSeverity, AlertStatus
-from ...models.IVF.canister_model import Canister
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
@@ -21,7 +22,7 @@ from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertResponse,
     CriticalAlertListResponse,
     AcknowledgeAlertResponse,
-    CanisterAlertsResponse,
+    TankAlertsResponse,
     HospitalAlertsResponse
 )
 from ...service.email_service import send_email
@@ -31,13 +32,9 @@ from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
 
-# KPI Thresholds
-KPI_THRESHOLDS = {
-    "temperature": {"min": 0.0, "max": 10.0, "yellow_min": 1.0, "yellow_max": 9.0},
-    "humidity": {"min": 45.0, "max": 55.0, "yellow_min": 47.0, "yellow_max": 53.0},
-    "agitation": {"min": 0.0, "max": 5.0, "yellow_min": 1.0, "yellow_max": 4.0},
-    "light": {"min": 0.0, "max": 5.0, "yellow_min": 1.0, "yellow_max": 4.0}
-}
+# Note: IVF thresholds are checked in publisher.py using check_ivf_threshold_magnitude()
+# The quality_log already has violation flags set (is_temp_loss, is_humidity_loss, etc.)
+# We use those flags instead of re-checking thresholds here
 
 # Quality Loss Thresholds
 QUALITY_LOSS_HIGH = 15.0  # Red alert
@@ -56,98 +53,92 @@ class CriticalAlertService:
     def __init__(self, db: Session):
         self.db = db
     
-    def resolve_canister_id(self, canister_number: str, branch_id: Optional[int] = None) -> int:
+    def resolve_tank_id(self, tank_code: str, branch_id: Optional[int] = None) -> int:
         """
-        Resolve a canister_number (external identifier) to the internal canister_id.
+        Resolve a tank_code (external identifier) to the internal tank_id.
         
         Args:
-            canister_number: Canister number/code (e.g., "C1")
+            tank_code: Tank code (e.g., "T1")
             branch_id: Optional branch filter for authorization (when present)
         
         Returns:
-            canister_id (int)
+            tank_id (int)
         
         Raises:
-            ValueError: If the canister_number is not found (or not accessible under branch filter)
+            ValueError: If the tank_code is not found (or not accessible under branch filter)
         """
         try:
-            query = (
-                self.db.query(Canister)
-                .join(Tank, Canister.tank_id == Tank.tank_id)
-                .filter(Canister.canister_number == canister_number)
-            )
+            query = self.db.query(Tank).filter(Tank.tank_code == tank_code)
             
             if branch_id is not None:
                 query = query.filter(Tank.branch_id == branch_id)
             
-            canister = query.first()
-            if not canister:
-                raise ValueError(f"Canister with number '{canister_number}' not found")
+            tank = query.first()
+            if not tank:
+                raise ValueError(f"Tank with code '{tank_code}' not found")
             
-            return canister.canister_id
+            return tank.tank_id
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"Error resolving canister_id for canister_number={canister_number}: {str(e)}", exc_info=True)
-            raise ValueError(f"Failed to resolve canister: {str(e)}")
+            logger.error(f"Error resolving tank_id for tank_code={tank_code}: {str(e)}", exc_info=True)
+            raise ValueError(f"Failed to resolve tank: {str(e)}")
     
     def _check_kpi_deviation(self, quality_log: IVFQualityLog) -> Optional[Dict[str, Any]]:
         """
-        Check if quality log has KPI deviations.
+        Check if quality log has KPI deviations using violation flags.
+        The quality_log already has violation flags set by publisher using IVF-specific thresholds.
         Returns dict with alert info if deviation found, None otherwise.
         """
         violations = []
         severity = None
         
-        # Check temperature
-        if quality_log.temperature is not None:
-            if quality_log.temperature < KPI_THRESHOLDS["temperature"]["min"] or \
-               quality_log.temperature > KPI_THRESHOLDS["temperature"]["max"]:
-                violations.append(f"Temperature: {quality_log.temperature}°C (Range: {KPI_THRESHOLDS['temperature']['min']}-{KPI_THRESHOLDS['temperature']['max']}°C)")
-                severity = AlertSeverity.HIGH
-            elif quality_log.temperature < KPI_THRESHOLDS["temperature"]["yellow_min"] or \
-                 quality_log.temperature > KPI_THRESHOLDS["temperature"]["yellow_max"]:
-                violations.append(f"Temperature: {quality_log.temperature}°C (Approaching limits)")
-                if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.MEDIUM
+        # Use violation flags from quality_log (already set by publisher using IVF thresholds)
+        # IVF KPIs: temp_internal, temp_external, humidity, shock (stored as agitation)
         
-        # Check humidity
-        if quality_log.humidity is not None:
-            if quality_log.humidity < KPI_THRESHOLDS["humidity"]["min"] or \
-               quality_log.humidity > KPI_THRESHOLDS["humidity"]["max"]:
-                violations.append(f"Humidity: {quality_log.humidity}% (Range: {KPI_THRESHOLDS['humidity']['min']}-{KPI_THRESHOLDS['humidity']['max']}%)")
+        # Check temperature violations (covers both temp_internal and temp_external)
+        if quality_log.is_temp_loss:
+            temp_value = quality_log.temperature
+            if temp_value is not None:
+                # Determine if it's internal or external temp violation
+                # For IVF: temp_internal > 60°C or temp_external > 30°C triggers is_temp_loss
+                if temp_value > 60.0:
+                    violations.append(f"Temperature Internal: {temp_value}°C (exceeds 60°C limit)")
+                elif temp_value > 30.0:
+                    violations.append(f"Temperature External: {temp_value}°C (exceeds 30°C limit)")
+                else:
+                    violations.append(f"Temperature: {temp_value}°C (violation detected)")
                 severity = AlertSeverity.HIGH
-            elif quality_log.humidity < KPI_THRESHOLDS["humidity"]["yellow_min"] or \
-                 quality_log.humidity > KPI_THRESHOLDS["humidity"]["yellow_max"]:
-                violations.append(f"Humidity: {quality_log.humidity}% (Approaching limits)")
-                if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.MEDIUM
         
-        # Check agitation
-        if quality_log.agitation is not None:
-            if quality_log.agitation < KPI_THRESHOLDS["agitation"]["min"] or \
-               quality_log.agitation > KPI_THRESHOLDS["agitation"]["max"]:
-                violations.append(f"Agitation: {quality_log.agitation}G (Range: {KPI_THRESHOLDS['agitation']['min']}-{KPI_THRESHOLDS['agitation']['max']}G)")
-                severity = AlertSeverity.HIGH
-            elif quality_log.agitation > KPI_THRESHOLDS["agitation"]["yellow_max"]:
-                violations.append(f"Agitation: {quality_log.agitation}G (Approaching limits)")
+        # Check humidity violations
+        if quality_log.is_humidity_loss:
+            humidity_value = quality_log.humidity
+            if humidity_value is not None:
+                # IVF: humidity target 50%, acceptable 45-55%, violation if outside ±5 band
+                violations.append(f"Humidity: {humidity_value}% (outside acceptable range 45-55%)")
                 if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.MEDIUM
+                    severity = AlertSeverity.HIGH
         
-        # Check light
-        if quality_log.light is not None:
-            if quality_log.light < KPI_THRESHOLDS["light"]["min"] or \
-               quality_log.light > KPI_THRESHOLDS["light"]["max"]:
-                violations.append(f"Light: {quality_log.light}lux (Range: {KPI_THRESHOLDS['light']['min']}-{KPI_THRESHOLDS['light']['max']}lux)")
-                severity = AlertSeverity.HIGH
-            elif quality_log.light > KPI_THRESHOLDS["light"]["yellow_max"]:
-                violations.append(f"Light: {quality_log.light}lux (Approaching limits)")
+        # Check agitation/shock violations (shock stored in agitation column)
+        if quality_log.is_agitation_loss:
+            agitation_value = quality_log.agitation
+            if agitation_value is not None:
+                # IVF: shock target 0G, acceptable 0-5G, violation if > 5G
+                violations.append(f"Shock/Agitation: {agitation_value}G (exceeds 5G limit)")
                 if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.MEDIUM
+                    severity = AlertSeverity.HIGH
+        
+        # Check light violations (if applicable)
+        if quality_log.is_light_loss:
+            light_value = quality_log.light
+            if light_value is not None:
+                violations.append(f"Light: {light_value}lux (violation detected)")
+                if severity != AlertSeverity.HIGH:
+                    severity = AlertSeverity.HIGH
         
         if violations:
             return {
-                "severity": severity or AlertSeverity.MEDIUM,
+                "severity": severity or AlertSeverity.HIGH,
                 "message": f"KPI Deviation detected: {', '.join(violations)}"
             }
         
@@ -174,15 +165,15 @@ class CriticalAlertService:
         
         return None
     
-    def _check_refill_log(self, canister_id: int) -> Optional[Dict[str, Any]]:
+    def _check_refill_log(self, tank_id: int) -> Optional[Dict[str, Any]]:
         """
         Check if refill log is missing (not created within last 3 days).
         Returns dict with alert info if refill log missing, None otherwise.
         """
-        # Get the most recent refill log for this canister
+        # Get the most recent refill log for this tank
         latest_refill = (
             self.db.query(CanisterLn2Log)
-            .filter(CanisterLn2Log.canister_id == canister_id)
+            .filter(CanisterLn2Log.tank_id == tank_id)
             .order_by(desc(CanisterLn2Log.refill_date), desc(CanisterLn2Log.created_at))
             .first()
         )
@@ -211,37 +202,33 @@ class CriticalAlertService:
         
         return None
     
-    def _get_canister_hospital_branch(self, canister_id: int) -> tuple:
-        """Get hospital_id and branch_id for a canister"""
-        canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
-        if not canister:
-            raise ValueError(f"Canister {canister_id} not found")
-        
-        tank = self.db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
+    def _get_tank_hospital_branch(self, tank_id: int) -> tuple:
+        """Get hospital_id and branch_id for a tank"""
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
-            raise ValueError(f"Tank for canister {canister_id} not found")
+            raise ValueError(f"Tank {tank_id} not found")
         
         branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
         if not branch:
-            raise ValueError(f"Branch for canister {canister_id} not found")
+            raise ValueError(f"Branch for tank {tank_id} not found")
         
         return branch.hospital_id, branch.branch_id
     
     def _generate_dedup_key(
         self,
-        canister_id: int,
+        tank_id: int,
         source: AlertSource,
         alert_type: AlertType,
         occurred_at: datetime
     ) -> str:
         """Generate deduplication key to prevent alert spam"""
-        # Use date (YYYY-MM-DD) to allow one alert per day per canister+source+type
+        # Use date (YYYY-MM-DD) to allow one alert per day per tank+source+type
         date_str = occurred_at.strftime('%Y-%m-%d')
-        return f"{canister_id}:{source.value}:{alert_type.value}:{date_str}"
+        return f"{tank_id}:{source.value}:{alert_type.value}:{date_str}"
     
     def _create_alert(
         self,
-        canister_id: int,
+        tank_id: int,
         alert_type: AlertType,
         source: AlertSource,
         severity: AlertSeverity,
@@ -251,10 +238,10 @@ class CriticalAlertService:
     ) -> CriticalAlert:
         """Create a new alert if it doesn't already exist (using dedup_key)"""
         # Get hospital and branch info
-        hospital_id, branch_id = self._get_canister_hospital_branch(canister_id)
+        hospital_id, branch_id = self._get_tank_hospital_branch(tank_id)
         
         # Generate deduplication key
-        dedup_key = self._generate_dedup_key(canister_id, source, alert_type, occurred_at)
+        dedup_key = self._generate_dedup_key(tank_id, source, alert_type, occurred_at)
         
         # Check if similar active alert already exists using dedup_key
         existing_alert = (
@@ -274,97 +261,157 @@ class CriticalAlertService:
             return existing_alert
         
         # Create new alert with UUID
-        alert = CriticalAlert(
-            alert_id=str(uuid.uuid4()),
-            canister_id=canister_id,
-            hospital_id=hospital_id,
-            branch_id=branch_id,
-            alert_type=alert_type.value,
-            source=source.value,
-            severity=severity.value,
-            message=message,
-            status=AlertStatus.ACTIVE.value,
-            triggered_by=triggered_by.value,
-            occurred_at=occurred_at,
-            dedup_key=dedup_key,
-            created_at=datetime.now(timezone.utc)
-        )
-        
-        self.db.add(alert)
-        self.db.flush()
-        return alert
+        try:
+            alert = CriticalAlert(
+                alert_id=str(uuid.uuid4()),
+                tank_id=tank_id,
+                hospital_id=hospital_id,
+                branch_id=branch_id,
+                alert_type=alert_type.value,
+                source=source.value,
+                severity=severity.value,
+                message=message,
+                status=AlertStatus.ACTIVE.value,
+                triggered_by=triggered_by.value,
+                occurred_at=occurred_at,
+                dedup_key=dedup_key,
+                created_at=datetime.now(timezone.utc)
+            )
+            
+            self.db.add(alert)
+            self.db.flush()
+            return alert
+        except IntegrityError as e:
+            # Handle race condition: if another process created the alert between our check and insert
+            if isinstance(e.orig, UniqueViolation) and 'dedup_key' in str(e.orig):
+                logger.info(f"Alert with dedup_key={dedup_key} already exists (race condition), fetching existing alert")
+                self.db.rollback()
+                
+                # Fetch the existing alert
+                existing_alert = (
+                    self.db.query(CriticalAlert)
+                    .filter(
+                        CriticalAlert.dedup_key == dedup_key,
+                        CriticalAlert.status == AlertStatus.ACTIVE.value
+                    )
+                    .first()
+                )
+                
+                if existing_alert:
+                    # Update occurred_at to latest and refresh updated_at
+                    existing_alert.occurred_at = occurred_at
+                    existing_alert.updated_at = datetime.now(timezone.utc)
+                    self.db.flush()
+                    return existing_alert
+                else:
+                    # Alert exists but was acknowledged/resolved, create new one with different dedup_key
+                    logger.warning(f"Alert with dedup_key={dedup_key} exists but is not active, creating new alert")
+                    # Create new alert with timestamp in dedup_key to make it unique
+                    new_dedup_key = f"{dedup_key}:{datetime.now(timezone.utc).strftime('%H%M%S')}"
+                    alert = CriticalAlert(
+                        alert_id=str(uuid.uuid4()),
+                        tank_id=tank_id,
+                        hospital_id=hospital_id,
+                        branch_id=branch_id,
+                        alert_type=alert_type.value,
+                        source=source.value,
+                        severity=severity.value,
+                        message=message,
+                        status=AlertStatus.ACTIVE.value,
+                        triggered_by=triggered_by.value,
+                        occurred_at=occurred_at,
+                        dedup_key=new_dedup_key,
+                        created_at=datetime.now(timezone.utc)
+                    )
+                    self.db.add(alert)
+                    self.db.flush()
+                    return alert
+            else:
+                # Re-raise if it's a different integrity error
+                raise
     
-    def check_and_create_alerts(self, canister_number: Optional[str] = None, branch_id: Optional[int] = None) -> List[CriticalAlert]:
+    def check_and_create_alerts(self, tank_id: Optional[int] = None, branch_id: Optional[int] = None) -> List[CriticalAlert]:
         """
-        Check for alerts and create them if needed.
-        If canister_number is provided, only check that canister.
-        Otherwise, check all active canisters.
+        Check for alerts and create them if needed (tank-level monitoring).
+        If tank_id is provided, only check that tank.
+        Otherwise, check all active tanks.
         
         Args:
-            canister_number: Optional canister number to check (e.g., "C1")
+            tank_id: Optional tank ID to check
             branch_id: Optional branch filter for authorization
         """
         alerts_created = []
+        # Track dedup_keys we've already sent emails for to prevent duplicate emails
+        # This ensures we only send one email per alert type per tank per day
+        sent_email_dedup_keys = set()
         
-        # Get canisters to check
-        if canister_number:
-            canister_id = self.resolve_canister_id(canister_number, branch_id)
-            canisters = self.db.query(Canister).filter(
-                Canister.canister_id == canister_id,
-                Canister.is_active == True
+        # Get tanks to check
+        if tank_id:
+            tanks = self.db.query(Tank).filter(
+                Tank.tank_id == tank_id,
+                Tank.is_active == True
             ).all()
         else:
-            # Check all active canisters, optionally filtered by branch
-            query = self.db.query(Canister).filter(Canister.is_active == True)
+            # Check all active tanks, optionally filtered by branch
+            query = self.db.query(Tank).filter(Tank.is_active == True)
             if branch_id is not None:
-                query = query.join(Tank, Canister.tank_id == Tank.tank_id).filter(Tank.branch_id == branch_id)
-            canisters = query.all()
+                query = query.filter(Tank.branch_id == branch_id)
+            tanks = query.all()
         
         current_time = datetime.now(timezone.utc)
         
-        for canister in canisters:
-            logger.info(f"Checking alerts for canister_id={canister.canister_id} (canister_number={canister.canister_number})")
+        for tank in tanks:
+            logger.info(f"Checking alerts for tank_id={tank.tank_id} (tank_code={tank.tank_code})")
             
             # Check for KPI deviations from recent quality logs (last 24 hours)
             time_threshold = current_time - timedelta(days=1)
             recent_quality_logs = (
                 self.db.query(IVFQualityLog)
                 .filter(
-                    IVFQualityLog.canister_id == canister.canister_id,
+                    IVFQualityLog.tank_id == tank.tank_id,
                     IVFQualityLog.reading_timestamp >= time_threshold
                 )
                 .order_by(desc(IVFQualityLog.reading_timestamp))
                 .all()
             )
             
-            logger.info(f"Found {len(recent_quality_logs)} quality logs from last 24 hours for canister_id={canister.canister_id}")
+            logger.info(f"Found {len(recent_quality_logs)} quality logs from last 24 hours for tank_id={tank.tank_id}")
             
             if not recent_quality_logs:
                 # Check if there are any quality logs at all (for debugging)
                 all_logs_count = self.db.query(IVFQualityLog).filter(
-                    IVFQualityLog.canister_id == canister.canister_id
+                    IVFQualityLog.tank_id == tank.tank_id
                 ).count()
                 if all_logs_count > 0:
                     latest_log = self.db.query(IVFQualityLog).filter(
-                        IVFQualityLog.canister_id == canister.canister_id
+                        IVFQualityLog.tank_id == tank.tank_id
                     ).order_by(desc(IVFQualityLog.reading_timestamp)).first()
                     if latest_log:
                         hours_ago = (current_time - latest_log.reading_timestamp).total_seconds() / 3600
-                        logger.warning(f"No recent quality logs for canister_id={canister.canister_id}. "
+                        logger.warning(f"No recent quality logs for tank_id={tank.tank_id}. "
                                      f"Latest log is {hours_ago:.1f} hours old (timestamp: {latest_log.reading_timestamp})")
             
             for quality_log in recent_quality_logs:
-                logger.debug(f"Checking quality_log id={quality_log.id}, timestamp={quality_log.reading_timestamp}, "
-                            f"temp={quality_log.temperature}, humidity={quality_log.humidity}, "
-                            f"agitation={quality_log.agitation}, light={quality_log.light}, "
-                            f"quality_loss={quality_log.quality_loss}")
+                logger.info(f"Checking quality_log id={quality_log.id}, timestamp={quality_log.reading_timestamp}, "
+                            f"temp={quality_log.temperature}°C, humidity={quality_log.humidity}%, "
+                            f"agitation={quality_log.agitation}G, quality_loss={quality_log.quality_loss}%, "
+                            f"violations: temp={quality_log.is_temp_loss}, humidity={quality_log.is_humidity_loss}, "
+                            f"agitation={quality_log.is_agitation_loss}")
                 
-                # Check KPI deviation
+                # Check KPI deviation (uses violation flags from quality_log)
                 kpi_alert = self._check_kpi_deviation(quality_log)
                 if kpi_alert:
-                    logger.info(f"KPI deviation detected for canister_id={canister.canister_id}: {kpi_alert['message']}")
+                    logger.info(f"✓ KPI deviation detected for tank_id={tank.tank_id}: {kpi_alert['message']}")
+                    # Generate dedup_key to check if we've already sent email for this alert
+                    dedup_key = self._generate_dedup_key(
+                        tank.tank_id, 
+                        AlertSource.KPI, 
+                        AlertType.DEVIATION_ALERT, 
+                        quality_log.reading_timestamp
+                    )
+                    
                     alert = self._create_alert(
-                        canister_id=canister.canister_id,
+                        tank_id=tank.tank_id,
                         alert_type=AlertType.DEVIATION_ALERT,
                         source=AlertSource.KPI,
                         severity=kpi_alert["severity"],
@@ -374,16 +421,29 @@ class CriticalAlertService:
                     )
                     if alert:
                         alerts_created.append(alert)
-                        logger.info(f"Created KPI deviation alert: alert_id={alert.alert_id}")
+                        # Only send email if we haven't sent one for this dedup_key yet
+                        if dedup_key not in sent_email_dedup_keys:
+                            sent_email_dedup_keys.add(dedup_key)
+                            logger.info(f"✓ Created/updated KPI deviation alert: alert_id={alert.alert_id}, tank_id={tank.tank_id}, will send email")
+                        else:
+                            logger.debug(f"Skipping duplicate email for KPI deviation alert (dedup_key={dedup_key} already processed)")
                 else:
-                    logger.debug(f"No KPI deviation found in quality_log id={quality_log.id}")
+                    logger.debug(f"No KPI deviation found in quality_log id={quality_log.id} (violation flags all False)")
                 
                 # Check quality loss
                 quality_alert = self._check_quality_loss(quality_log)
                 if quality_alert:
-                    logger.info(f"Quality loss detected for canister_id={canister.canister_id}: {quality_alert['message']}")
+                    logger.info(f"✓ Quality loss detected for tank_id={tank.tank_id}: {quality_alert['message']}")
+                    # Generate dedup_key to check if we've already sent email for this alert
+                    dedup_key = self._generate_dedup_key(
+                        tank.tank_id, 
+                        AlertSource.QUALITY, 
+                        AlertType.QUALITY_ALERT, 
+                        quality_log.reading_timestamp
+                    )
+                    
                     alert = self._create_alert(
-                        canister_id=canister.canister_id,
+                        tank_id=tank.tank_id,
                         alert_type=AlertType.QUALITY_ALERT,
                         source=AlertSource.QUALITY,
                         severity=quality_alert["severity"],
@@ -393,15 +453,27 @@ class CriticalAlertService:
                     )
                     if alert:
                         alerts_created.append(alert)
-                        logger.info(f"Created quality loss alert: alert_id={alert.alert_id}")
+                        # Only send email if we haven't sent one for this dedup_key yet
+                        if dedup_key not in sent_email_dedup_keys:
+                            sent_email_dedup_keys.add(dedup_key)
+                            logger.info(f"✓ Created/updated quality loss alert: alert_id={alert.alert_id}, tank_id={tank.tank_id}, will send email")
+                        else:
+                            logger.debug(f"Skipping duplicate email for quality loss alert (dedup_key={dedup_key} already processed)")
                 else:
-                    logger.debug(f"No quality loss found in quality_log id={quality_log.id}")
+                    logger.debug(f"No quality loss found in quality_log id={quality_log.id} (quality_loss={quality_log.quality_loss})")
             
-            # Check refill log
-            refill_alert = self._check_refill_log(canister.canister_id)
+            # Check refill log (for the tank)
+            # Refill logs are tank-based
+            refill_alert = self._check_refill_log(tank.tank_id)
             if refill_alert:
+                dedup_key = self._generate_dedup_key(
+                    tank.tank_id, 
+                    AlertSource.REFILL, 
+                    AlertType.REFILL_LOG_ALERT, 
+                    current_time
+                )
                 alert = self._create_alert(
-                    canister_id=canister.canister_id,
+                    tank_id=tank.tank_id,
                     alert_type=AlertType.REFILL_LOG_ALERT,
                     source=AlertSource.REFILL,
                     severity=refill_alert["severity"],
@@ -409,12 +481,18 @@ class CriticalAlertService:
                     occurred_at=current_time,
                     triggered_by=AlertTriggeredBy.SYSTEM
                 )
-                alerts_created.append(alert)
+                if alert:
+                    alerts_created.append(alert)
+                    if dedup_key not in sent_email_dedup_keys:
+                        sent_email_dedup_keys.add(dedup_key)
         
         self.db.commit()
         
-        # Send emails for newly created alerts
-        for alert in alerts_created:
+        # Send emails ONLY for alerts with dedup_keys we haven't sent emails for yet
+        alerts_to_email = [alert for alert in alerts_created if alert.dedup_key in sent_email_dedup_keys]
+        logger.info(f"Sending emails for {len(alerts_to_email)} new alert(s) out of {len(alerts_created)} total alert(s) processed")
+        
+        for alert in alerts_to_email:
             try:
                 self._send_alert_email(alert)
             except Exception as e:
@@ -423,15 +501,13 @@ class CriticalAlertService:
         return alerts_created
     
     def _send_alert_email(self, alert: CriticalAlert):
-        """Send email notification for alert with acknowledge button"""
-        canister = self.db.query(Canister).filter(Canister.canister_id == alert.canister_id).first()
-        if not canister:
+        """Send email notification for alert with acknowledge button (tank-level monitoring)"""
+        # Get tank directly (tank-level monitoring)
+        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+        if not tank:
             return
         
         # Get branch and hospital info
-        tank = self.db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
-        if not tank:
-            return
         
         branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
         if not branch:
@@ -480,8 +556,8 @@ class CriticalAlertService:
         all_users = {user.user_id: user for user in users_to_notify + branch_users}.values()
         
         # Send email to each user
-        # Navigate to alerts page where user can manually acknowledge
-        alerts_url = f"{settings.FRONTEND_URL}/ivf/alerts?alert_id={alert.alert_id}"
+        # Navigate to dashboard with alert_id query param - Dashboard will open alerts modal automatically
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
         
         # Load email template
         template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
@@ -500,21 +576,21 @@ class CriticalAlertService:
         elif alert.severity == "Low":
             severity_class = "low-severity"
         
-        # Get canister number for email
-        canister = self.db.query(Canister).filter(Canister.canister_id == alert.canister_id).first()
-        canister_number = canister.canister_number if canister else str(alert.canister_id)
+        # Get tank code for email (tank-level monitoring)
+        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
+        
         
         for user in all_users:
             try:
-                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity"
+                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
                 
                 if template:
                     html_body = template.render(
                         subject=subject,
                         alert_type=alert.alert_type,
                         severity=alert.severity,
-                        canister_id=alert.canister_id,
-                        canister_number=canister_number,
+                        tank_id=alert.tank_id,
+                        tank_code=tank_code,
                         branch_name=branch.branch_name or "N/A",
                         message=alert.message,
                         occurred_at=alert.occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -529,7 +605,7 @@ class CriticalAlertService:
                         <h2>Critical Alert Notification</h2>
                         <p><strong>Alert Type:</strong> {alert.alert_type}</p>
                         <p><strong>Severity:</strong> {alert.severity}</p>
-                        <p><strong>Canister Number:</strong> {canister_number}</p>
+                        <p><strong>Tank:</strong> {tank_code}</p>
                         <p><strong>Branch:</strong> {branch.branch_name or 'N/A'}</p>
                         <p><strong>Message:</strong> {alert.message}</p>
                         <p><strong>Occurred At:</strong> {alert.occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
@@ -546,79 +622,61 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
     
-    def get_canister_alerts(self, canister_id: int) -> CanisterAlertsResponse:
-        """Get all alerts for a specific canister by canister_id"""
+    def get_tank_alerts(self, tank_id: int) -> TankAlertsResponse:
+        """Get all alerts for a specific tank by tank_id (tank-level monitoring)"""
+        # Get tank
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise ValueError(f"Tank {tank_id} not found")
+        
+        # Get alerts for the tank
         alerts = (
             self.db.query(CriticalAlert)
-            .filter(CriticalAlert.canister_id == canister_id)
+            .filter(CriticalAlert.tank_id == tank_id)
             .order_by(desc(CriticalAlert.occurred_at))
             .all()
         )
         
-        # Get canister number for response
-        canister = self.db.query(Canister).filter(Canister.canister_id == canister_id).first()
-        canister_number = canister.canister_number if canister else None
+        tank_code = tank.tank_code or f"Tank-{tank_id}"
         
-        # Build alert responses with canister_number
+        # Build alert responses with tank_code
         alert_responses = []
         for alert in alerts:
             alert_dict = {
                 **alert.__dict__,
-                'canister_number': canister_number
+                'tank_code': tank_code
             }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
         
-        return CanisterAlertsResponse(
-            canister_id=canister_id,
-            canister_number=canister_number,
+        return TankAlertsResponse(
+            tank_id=tank_id,
+            tank_code=tank_code,
             alerts=alert_responses,
             total_count=len(alert_responses)
         )
     
-    def get_canister_alerts_by_number(
+    def get_tank_alerts_by_code(
         self, 
-        canister_number: str, 
+        tank_code: str, 
         branch_id: Optional[int] = None
-    ) -> CanisterAlertsResponse:
+    ) -> TankAlertsResponse:
         """
-        Get all alerts for a specific canister by canister_number.
+        Get all alerts for a specific tank by tank_code (tank-level monitoring).
         
         Args:
-            canister_number: Canister number/code (e.g., "C1")
+            tank_code: Tank code (e.g., "T1")
             branch_id: Optional branch filter for authorization
         
         Returns:
-            CanisterAlertsResponse with all alerts for the canister
+            TankAlertsResponse with all alerts for the tank
         """
-        # Resolve canister_number to canister_id
+        # Resolve tank_code to tank_id
         try:
-            canister_id = self.resolve_canister_id(canister_number, branch_id)
+            tank_id = self.resolve_tank_id(tank_code, branch_id)
         except ValueError as e:
-            raise ValueError(f"Canister '{canister_number}' not found: {str(e)}")
+            raise ValueError(f"Tank '{tank_code}' not found: {str(e)}")
         
-        # Get all alerts for this canister
-        alerts = (
-            self.db.query(CriticalAlert)
-            .filter(CriticalAlert.canister_id == canister_id)
-            .order_by(desc(CriticalAlert.occurred_at))
-            .all()
-        )
-        
-        # Build alert responses with canister_number
-        alert_responses = []
-        for alert in alerts:
-            alert_dict = {
-                **alert.__dict__,
-                'canister_number': canister_number
-            }
-            alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
-        
-        return CanisterAlertsResponse(
-            canister_id=canister_id,
-            canister_number=canister_number,
-            alerts=alert_responses,
-            total_count=len(alert_responses)
-        )
+        return self.get_tank_alerts(tank_id)
     
     def get_hospital_alerts(
         self,
@@ -634,8 +692,7 @@ class CriticalAlertService:
         # Build query
         query = (
             self.db.query(CriticalAlert)
-            .join(Canister, CriticalAlert.canister_id == Canister.canister_id)
-            .join(Tank, Canister.tank_id == Tank.tank_id)
+            .join(Tank, CriticalAlert.tank_id == Tank.tank_id)
             .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
         )
         
@@ -656,17 +713,18 @@ class CriticalAlertService:
         
         alerts = query.order_by(desc(CriticalAlert.occurred_at)).all()
         
-        # Get canister numbers for all alerts
-        canister_ids = [alert.canister_id for alert in alerts]
-        canisters = self.db.query(Canister).filter(Canister.canister_id.in_(canister_ids)).all()
-        canister_number_map = {c.canister_id: c.canister_number for c in canisters}
+        # Get tank codes and canister numbers for all alerts (tank-level monitoring)
+        tank_ids = [alert.tank_id for alert in alerts]
+        tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
+        tank_code_map = {t.tank_id: t.tank_code for t in tanks}
         
-        # Build alert responses with canister_number
+        # Build alert responses with tank_code
         alert_responses = []
         for alert in alerts:
+            tank_code = tank_code_map.get(alert.tank_id) or f"Tank-{alert.tank_id}"
             alert_dict = {
                 **alert.__dict__,
-                'canister_number': canister_number_map.get(alert.canister_id)
+                'tank_code': tank_code
             }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
         
@@ -811,10 +869,10 @@ class CriticalAlertService:
         if not alerts:
             return
         
-        # Get canister numbers for all alerts
-        canister_ids = [alert.canister_id for alert in alerts]
-        canisters = self.db.query(Canister).filter(Canister.canister_id.in_(canister_ids)).all()
-        canister_number_map = {c.canister_id: c.canister_number for c in canisters}
+        # Get tank codes for all alerts (tank-level monitoring)
+        tank_ids = [alert.tank_id for alert in alerts]
+        tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
+        tank_code_map = {t.tank_id: t.tank_code for t in tanks}
         
         # Get branch names
         branch_ids = list(set([alert.branch_id for alert in alerts]))
@@ -831,17 +889,22 @@ class CriticalAlertService:
             logger.error(f"Failed to load reminder email template: {str(e)}")
             template = None
         
+        # Get tank codes for alerts (tank-level monitoring)
+        tank_ids = [alert.tank_id for alert in alerts]
+        tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
+        tank_code_map = {t.tank_id: t.tank_code for t in tanks}
+        
         # Prepare alert data for email
         alert_data = []
         for alert in alerts:
-            canister_number = canister_number_map.get(alert.canister_id) or str(alert.canister_id)
+            tank_code = tank_code_map.get(alert.tank_id) or f"Tank-{alert.tank_id}"
             branch_name = branch_name_map.get(alert.branch_id) or "N/A"
             
             alert_data.append({
                 "alert_id": alert.alert_id,
                 "alert_type": alert.alert_type,
                 "severity": alert.severity,
-                "canister_number": canister_number,
+                "tank_code": tank_code,
                 "branch_name": branch_name,
                 "message": alert.message,
                 "occurred_at": alert.occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -849,8 +912,8 @@ class CriticalAlertService:
             })
         
         subject = f"Reminder: {len(alerts)} Unacknowledged Critical Alert(s)"
-        # Navigate to alerts page where user can manually acknowledge
-        alerts_url = f"{settings.FRONTEND_URL}/ivf/alerts"
+        # Navigate to dashboard - Dashboard will show alerts modal
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard"
         
         try:
             if template:
