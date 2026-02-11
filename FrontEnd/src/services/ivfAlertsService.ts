@@ -58,11 +58,11 @@ export interface CheckAlertsResponse {
 
 export class IvfAlertsService extends BaseApiService {
   /**
-   * Get alerts for a specific canister
+   * Get alerts for a specific tank
    */
-  async getCanisterAlerts(canisterNumber: string): Promise<CanisterAlertsResponse> {
+  async getCanisterAlerts(tank_code: string): Promise<CanisterAlertsResponse> {
     return await this.request<CanisterAlertsResponse>(
-      `/api/ivf/alerts/canister/${encodeURIComponent(canisterNumber)}`,
+      `/api/ivf/alerts/tank/${encodeURIComponent(tank_code)}`,
       { method: 'GET' }
     );
   }
@@ -89,10 +89,10 @@ export class IvfAlertsService extends BaseApiService {
   }
 
   /**
-   * Check and create alerts for a canister or all canisters
+   * Check and create alerts for a tank or all tanks
    */
-  async checkAndCreateAlerts(canisterNumber?: string): Promise<CheckAlertsResponse> {
-    const queryParam = canisterNumber ? `?canister_number=${encodeURIComponent(canisterNumber)}` : '';
+  async checkAndCreateAlerts(tank_code?: string): Promise<CheckAlertsResponse> {
+    const queryParam = tank_code ? `?tank_code=${encodeURIComponent(tank_code)}` : '';
     return await this.request<CheckAlertsResponse>(
       `/api/ivf/alerts/check${queryParam}`,
       { method: 'GET' }
