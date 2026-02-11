@@ -514,9 +514,9 @@ class QualityTrackingService:
                     status_code=HTTPStatus.FORBIDDEN
                 )
             
-            # total_slots = distinct patient crylocks in this tank for the user's branch
+            # total_slots = all patient crylock records in this tank for the user's branch
             total_slots_query = (
-                self.db.query(func.count(func.distinct(PatientCrylockInfo.id)))
+                self.db.query(func.count(PatientCrylockInfo.id))
                 .filter(
                     PatientCrylockInfo.tank_id == tank.tank_id,
                     PatientCrylockInfo.branch_id == filter_branch_id
@@ -524,9 +524,9 @@ class QualityTrackingService:
             )
             total_slots = total_slots_query.scalar() or 0
 
-            # moved_count = distinct crylocks where embryo_transfer OR in_transit (for user's branch)
+            # available_slots = count of records where embryo_transfer OR in_transit is True
             moved_count_query = (
-                self.db.query(func.count(func.distinct(PatientCrylockInfo.id)))
+                self.db.query(func.count(PatientCrylockInfo.id))
                 .filter(
                     PatientCrylockInfo.tank_id == tank.tank_id,
                     PatientCrylockInfo.branch_id == filter_branch_id,
@@ -537,7 +537,7 @@ class QualityTrackingService:
                 )
             )
             moved_count = moved_count_query.scalar() or 0
-            available_slots = max(total_slots - moved_count, 0)
+            available_slots = moved_count
 
             # Data rows - return ALL patient crylocks in the specified tank for the user's branch
             # Exclude only embryo_transfer=True crylocks (include in_transit to show descriptions)
