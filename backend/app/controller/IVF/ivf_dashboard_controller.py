@@ -145,9 +145,9 @@ def get_top_deviation_driver(
     
     Returns the KPI (Key Performance Indicator) with the highest deviation count.
     KPIs tracked:
-    - Temperature deviations
-    - Humidity deviations
-    - Agitation deviations
+    - Internal temperature deviations
+    - External temperature deviations
+    - Shock deviations
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -208,7 +208,7 @@ def get_deviations_graph(
     - Y-axis: Tanks (User view) or Sites (Manager/Admin view)
     - X-axis: Deviation values (0-100)
     - For each tank/site: Two horizontal bars
-      1. Stacked bar: Internal Temperature, External Temperature, Humidity, Shock
+      1. Stacked bar: Internal Temperature, External Temperature, Shock
       2. Solid bar: Top risk driver (blue) - maximum deviation value
     
     Role-based access:
@@ -235,10 +235,9 @@ def get_total_deviations(
     Get total count of deviations from IVF quality logs.
     
     Counts all records in IVFQualityLog where any deviation flag is True:
-    - Temperature deviations (is_temp_loss)
-    - Humidity deviations (is_humidity_loss)
-    - Agitation/Vibration deviations (is_agitation_loss)
-    - Light deviations (is_light_loss)
+    - Internal temperature deviations (is_temp_internal_loss)
+    - External temperature deviations (is_temp_external_loss)
+    - Shock deviations (is_shock_loss)
     
     Role-based access:
     - Manager (IVF): Count deviations across all branches

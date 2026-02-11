@@ -1620,7 +1620,6 @@ class QualityTrackingService:
             # KPI Threshold Targets
             kpi_targets = {
                 "temperature": {"target": 5.0, "min": 0.0, "max": 10.0, "unit": "°C"},
-                "humidity": {"target": 50.0, "min": 45.0, "max": 55.0, "unit": "%"},
                 "agitation": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "G"},
                 "light": {"target": 0.0, "min": 0.0, "max": 5.0, "unit": "lux"}
             }
@@ -1656,8 +1655,6 @@ class QualityTrackingService:
                 violations = []
                 if quality_log.is_temp_internal_loss or quality_log.is_temp_external_loss:
                     violations.append("Temperature")
-                if quality_log.is_humidity_loss:
-                    violations.append("Humidity")
                 if quality_log.is_shock_loss:
                     violations.append("Shock")
                 
@@ -1676,11 +1673,6 @@ class QualityTrackingService:
                     "Temperature Min (°C)": f"{kpi_targets['temperature']['min']:.1f}",
                     "Temperature Max (°C)": f"{kpi_targets['temperature']['max']:.1f}",
                     "Temperature Violation": "Yes" if temp_violation else "No",
-                    "Humidity (%)": f"{quality_log.humidity:.2f}" if quality_log.humidity is not None else "",
-                    "Humidity Target (%)": f"{kpi_targets['humidity']['target']:.1f}",
-                    "Humidity Min (%)": f"{kpi_targets['humidity']['min']:.1f}",
-                    "Humidity Max (%)": f"{kpi_targets['humidity']['max']:.1f}",
-                    "Humidity Violation": "Yes" if quality_log.is_humidity_loss else "No",
                     "Shock (G)": f"{quality_log.shock:.2f}" if quality_log.shock is not None else "",
                     "Shock Target (G)": f"{kpi_targets['agitation']['target']:.1f}",
                     "Shock Min (G)": f"{kpi_targets['agitation']['min']:.1f}",
@@ -1710,7 +1702,6 @@ class QualityTrackingService:
                 deviations_df = pd.DataFrame(columns=[
                     "Date", "Time", "Tank Code", "Branch Name", "Device ID",
                     "Temperature Internal (°C)", "Temperature External (°C)", "Temperature Target (°C)", "Temperature Min (°C)", "Temperature Max (°C)", "Temperature Violation",
-                    "Humidity (%)", "Humidity Target (%)", "Humidity Min (%)", "Humidity Max (%)", "Humidity Violation",
                     "Shock (G)", "Shock Target (G)", "Shock Min (G)", "Shock Max (G)", "Shock Violation",
                     "Quality Loss (%)", "Violated Parameters"
                 ])

@@ -174,9 +174,9 @@ class IVFDashboardService:
         
         Quality deviations are telemetry-driven and based on `ivf_quality_log`:
         - Any entry with `quality_loss > 0`, or any KPI loss flag set:
-          `is_temp_internal_loss`, `is_temp_external_loss`, `is_humidity_loss`, `is_shock_loss`
+          `is_temp_internal_loss`, `is_temp_external_loss`, `is_shock_loss`
         
-        KPIs monitored: Internal Temperature, External Temperature, Humidity, Shock
+        KPIs monitored: Internal Temperature, External Temperature, Shock
         
         Args:
             branch_id: Optional branch ID to filter by
@@ -194,7 +194,6 @@ class IVFDashboardService:
             and_(IVFQualityLog.quality_loss.isnot(None), IVFQualityLog.quality_loss > 0),
             IVFQualityLog.is_temp_internal_loss == True,
             IVFQualityLog.is_temp_external_loss == True,
-            IVFQualityLog.is_humidity_loss == True,
             IVFQualityLog.is_shock_loss == True,
         )
         
@@ -229,7 +228,6 @@ class IVFDashboardService:
         KPIs tracked (tank-level monitoring):
         - Internal Temperature deviations (is_temp_internal_loss)
         - External Temperature deviations (is_temp_external_loss)
-        - Humidity deviations (is_humidity_loss)
         - Shock deviations (is_shock_loss)
         
         Role-based access:
@@ -272,9 +270,6 @@ class IVFDashboardService:
         # Count external temperature deviations
         temp_external_count = build_query(IVFQualityLog.is_temp_external_loss == True).scalar() or 0
         
-        # Count humidity deviations
-        humidity_count = build_query(IVFQualityLog.is_humidity_loss == True).scalar() or 0
-        
         # Count shock deviations
         shock_count = build_query(IVFQualityLog.is_shock_loss == True).scalar() or 0
         
@@ -282,7 +277,6 @@ class IVFDashboardService:
         drivers = {
             "Internal Temperature": temp_internal_count,
             "External Temperature": temp_external_count,
-            "Humidity": humidity_count,
             "Shock": shock_count
         }
         
@@ -310,7 +304,6 @@ class IVFDashboardService:
         Counts distinct records in IVFQualityLog where any deviation flag is True:
         - is_temp_internal_loss (Internal Temperature)
         - is_temp_external_loss (External Temperature)
-        - is_humidity_loss (Humidity)
         - is_shock_loss (Shock)
         
         Uses distinct count to avoid double-counting records with multiple violations.
@@ -335,7 +328,6 @@ class IVFDashboardService:
         total_filter = or_(
             IVFQualityLog.is_temp_internal_loss == True,
             IVFQualityLog.is_temp_external_loss == True,
-            IVFQualityLog.is_humidity_loss == True,
             IVFQualityLog.is_shock_loss == True
         )
         total_query = (
@@ -380,9 +372,6 @@ class IVFDashboardService:
         # Count external temperature deviations
         temp_external_count = build_count_query(IVFQualityLog.is_temp_external_loss == True).scalar() or 0
         
-        # Count humidity deviations
-        humidity_count = build_count_query(IVFQualityLog.is_humidity_loss == True).scalar() or 0
-        
         # Count shock deviations
         shock_count = build_count_query(IVFQualityLog.is_shock_loss == True).scalar() or 0
         
@@ -390,7 +379,6 @@ class IVFDashboardService:
             "total_deviations": total_count,
             "temp_internal_deviations": temp_internal_count,
             "temp_external_deviations": temp_external_count,
-            "humidity_deviations": humidity_count,
             "shock_deviations": shock_count
         }
     
@@ -454,20 +442,19 @@ class IVFDashboardService:
         Get deviations graph data for IVF dashboard.
         
         Returns data for a horizontal bar chart showing:
-        - Stacked bar: Internal Temperature, External Temperature, Humidity, Shock deviations
+        - Stacked bar: Internal Temperature, External Temperature, Shock deviations
         - Top risk driver bar: Maximum deviation value for each tank/site
         
         Chart structure (Quality deviation):
         - Y-axis: Tanks (User view) or Sites (Manager/Admin view)
         - X-axis: Deviation values (0-100)
         - For each tank/site: Two horizontal bars
-          1. Stacked bar: Internal Temperature, External Temperature, Humidity, Shock
+          1. Stacked bar: Internal Temperature, External Temperature, Shock
           2. Solid bar: Top risk driver (blue) - maximum deviation value
         
         Deviation types are mapped from IVF quality logs (tank-level monitoring):
         - temp_internal: is_temp_internal_loss
         - temp_external: is_temp_external_loss
-        - humidity: is_humidity_loss
         - shock: is_shock_loss
         """
         filter_branch_id = self._get_branch_filter(branch_id, role)
@@ -475,7 +462,6 @@ class IVFDashboardService:
         # Case statements for new KPI flags
         temp_internal_case = case((IVFQualityLog.is_temp_internal_loss.is_(True), 1), else_=0)
         temp_external_case = case((IVFQualityLog.is_temp_external_loss.is_(True), 1), else_=0)
-        humidity_case = case((IVFQualityLog.is_humidity_loss.is_(True), 1), else_=0)
         shock_case = case((IVFQualityLog.is_shock_loss.is_(True), 1), else_=0)
         
         # Join through: IVFQualityLog -> Tank -> Branch (tank-level monitoring)
@@ -496,7 +482,6 @@ class IVFDashboardService:
                     Tank.tank_code.label("tank_code"),
                     func.coalesce(func.sum(temp_internal_case), 0).label("temp_internal_deviations"),
                     func.coalesce(func.sum(temp_external_case), 0).label("temp_external_deviations"),
-                    func.coalesce(func.sum(humidity_case), 0).label("humidity_deviations"),
                     func.coalesce(func.sum(shock_case), 0).label("shock_deviations")
                 )
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
@@ -517,14 +502,12 @@ class IVFDashboardService:
             for row in results:
                 temp_internal_val = int(row.temp_internal_deviations)
                 temp_external_val = int(row.temp_external_deviations)
-                humidity_val = int(row.humidity_deviations)
                 shock_val = int(row.shock_deviations)
                 
                 # Determine the highest top risk driver name and count for this tank
                 tank_drivers = {
                     "temp_internal": temp_internal_val,
                     "temp_external": temp_external_val,
-                    "humidity": humidity_val,
                     "shock": shock_val
                 }
                 top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(tank_drivers)
@@ -534,7 +517,6 @@ class IVFDashboardService:
                     "temperature": temp_internal_val + temp_external_val,  # Combined internal + external temp for backward compatibility
                     "temp_internal": temp_internal_val,  # Internal temperature deviations
                     "temp_external": temp_external_val,  # External temperature deviations
-                    "humidity": humidity_val,  # Humidity deviations
                     "agitation_vibration": shock_val,  # Shock deviations (kept as agitation_vibration for backward compatibility)
                     "shock": shock_val,  # Shock deviations
                     "top_risk_driver_name": top_risk_driver_name,  # Highest top risk driver name
@@ -548,7 +530,7 @@ class IVFDashboardService:
             }
         
         # Manager/Admin view: site-wise cumulative deviations
-        # Manager sees: site name with cumulative counts of temp_internal, temp_external, humidity, shock for all tanks in that site
+        # Manager sees: site name with cumulative counts of temp_internal, temp_external, shock for all tanks in that site
         # and top risk driver name with cumulative count per site
         query = (
             self.db.query(
@@ -556,7 +538,6 @@ class IVFDashboardService:
                 HospitalBranch.branch_name.label("site_name"),
                 func.coalesce(func.sum(temp_internal_case), 0).label("temp_internal_deviations"),
                 func.coalesce(func.sum(temp_external_case), 0).label("temp_external_deviations"),
-                func.coalesce(func.sum(humidity_case), 0).label("humidity_deviations"),
                 func.coalesce(func.sum(shock_case), 0).label("shock_deviations")
             )
             .join(Tank, Tank.branch_id == HospitalBranch.branch_id)
@@ -575,14 +556,12 @@ class IVFDashboardService:
         for row in results:
             temp_internal_val = int(row.temp_internal_deviations)
             temp_external_val = int(row.temp_external_deviations)
-            humidity_val = int(row.humidity_deviations)
             shock_val = int(row.shock_deviations)
             
             # Determine top risk driver name and count for this site
             site_drivers = {
                 "temp_internal": temp_internal_val,
                 "temp_external": temp_external_val,
-                "humidity": humidity_val,
                 "shock": shock_val
             }
             top_risk_driver_name, top_risk_driver_count = self._get_top_risk_driver_with_count(site_drivers)
@@ -593,7 +572,6 @@ class IVFDashboardService:
                 "temperature": temp_internal_val + temp_external_val,  # Combined internal + external temp for backward compatibility
                 "temp_internal": temp_internal_val,  # Cumulative internal temperature deviations for all tanks in this site
                 "temp_external": temp_external_val,  # Cumulative external temperature deviations for all tanks in this site
-                "humidity": humidity_val,  # Cumulative humidity deviations for all tanks in this site
                 "agitation_vibration": shock_val,  # Cumulative shock deviations for all tanks in this site (kept for backward compatibility)
                 "shock": shock_val,  # Cumulative shock deviations for all tanks in this site
                 "top_risk_driver_name": top_risk_driver_name,  # Top risk driver name for this site
@@ -620,7 +598,7 @@ class IVFDashboardService:
         
         Args:
             drivers: Dictionary with driver names as keys and counts as values
-                    e.g., {"temp_internal": 10, "temp_external": 5, "humidity": 8, "shock": 15}
+                    e.g., {"temp_internal": 10, "temp_external": 5, "shock": 15}
         
         Returns:
             Tuple of (driver_name, count)
@@ -632,7 +610,6 @@ class IVFDashboardService:
         name_mapping = {
             "temp_internal": "Internal Temperature",
             "temp_external": "External Temperature",
-            "humidity": "Humidity",
             "shock": "Shock"
         }
         
