@@ -117,7 +117,7 @@ def check_and_create_alerts(
     Check for alerts and create them if needed (tank-level monitoring).
     
     This endpoint:
-    1. Checks for KPI deviations (temperature, humidity, agitation, light)
+    1. Checks for KPI deviations (internal/external temperature and shock)
     2. Checks for quality loss events
     3. Checks for missing refill logs (not created within 3 days)
     4. Creates alerts if conditions are met

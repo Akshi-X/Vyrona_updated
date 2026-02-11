@@ -65,7 +65,6 @@ class TotalDeviationsResponse(BaseModel):
     total_deviations: int = Field(..., description="Total number of deviations (any KPI violation)")
     temp_internal_deviations: int = Field(..., description="Count of internal temperature deviations")
     temp_external_deviations: int = Field(..., description="Count of external temperature deviations")
-    humidity_deviations: int = Field(..., description="Count of humidity deviations")
     shock_deviations: int = Field(..., description="Count of shock deviations")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")

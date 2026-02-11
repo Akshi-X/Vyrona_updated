@@ -33,7 +33,7 @@ from jinja2 import Environment, FileSystemLoader
 logger = logging.getLogger(__name__)
 
 # Note: IVF thresholds are checked in publisher.py using check_ivf_threshold_magnitude()
-# The quality_log already has violation flags set (is_temp_loss, is_humidity_loss, etc.)
+# The quality_log already has violation flags set by publisher logic.
 # We use those flags instead of re-checking thresholds here
 
 # Quality Loss Thresholds
@@ -94,7 +94,7 @@ class CriticalAlertService:
         severity = None
         
         # Use violation flags from quality_log (already set by publisher using IVF thresholds)
-        # IVF KPIs: temp_internal, temp_external, humidity, shock (stored as agitation)
+        # IVF KPIs: temp_internal, temp_external, shock (stored as agitation)
         
         # Check temperature violations (covers both temp_internal and temp_external)
         if quality_log.is_temp_loss:
@@ -109,15 +109,6 @@ class CriticalAlertService:
                 else:
                     violations.append(f"Temperature: {temp_value}°C (violation detected)")
                 severity = AlertSeverity.HIGH
-        
-        # Check humidity violations
-        if quality_log.is_humidity_loss:
-            humidity_value = quality_log.humidity
-            if humidity_value is not None:
-                # IVF: humidity target 50%, acceptable 45-55%, violation if outside ±5 band
-                violations.append(f"Humidity: {humidity_value}% (outside acceptable range 45-55%)")
-                if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.HIGH
         
         # Check agitation/shock violations (shock stored in agitation column)
         if quality_log.is_agitation_loss:
@@ -393,9 +384,9 @@ class CriticalAlertService:
             
             for quality_log in recent_quality_logs:
                 logger.info(f"Checking quality_log id={quality_log.id}, timestamp={quality_log.reading_timestamp}, "
-                            f"temp={quality_log.temperature}°C, humidity={quality_log.humidity}%, "
+                            f"temp={quality_log.temperature}°C, "
                             f"agitation={quality_log.agitation}G, quality_loss={quality_log.quality_loss}%, "
-                            f"violations: temp={quality_log.is_temp_loss}, humidity={quality_log.is_humidity_loss}, "
+                            f"violations: temp={quality_log.is_temp_loss}, "
                             f"agitation={quality_log.is_agitation_loss}")
                 
                 # Check KPI deviation (uses violation flags from quality_log)
