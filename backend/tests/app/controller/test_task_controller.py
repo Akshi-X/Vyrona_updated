@@ -42,6 +42,8 @@ from app.middleware.patient_validation_middleware import PatientValidationMiddle
 from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.exception_handler import exception_handler_middleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from app.config import database
+from app.dependencies import auth_dependencies
 
 
 def _create_test_client(monkeypatch):
@@ -119,8 +121,6 @@ def _create_test_client(monkeypatch):
     def override_get_db():
         yield db_mock
 
-    from app.config import database
-    from app.dependencies import auth_dependencies
     app.dependency_overrides[database.get_db] = override_get_db
     app.dependency_overrides[auth_dependencies.get_current_user] = lambda: mock_user
 
@@ -172,7 +172,7 @@ def test_create_task_success(client):
                 role="manager"
             ),
             patient_id=None,
-            canister_number=None,
+            tank_code=None,
             due_date=None,
             priority=TaskPriority.MEDIUM,
             status=TaskStatus.NOT_STARTED,
@@ -310,7 +310,7 @@ def test_get_all_tasks_success(client):
                     role="manager"
                 ),
                 patient_id=None,
-                canister_number=None,
+                tank_code=None,
                 due_date=None,
                 priority=TaskPriority.HIGH,
                 status=TaskStatus.NOT_STARTED,
@@ -342,7 +342,7 @@ def test_get_all_tasks_success(client):
                     role="manager"
                 ),
                 patient_id=None,
-                canister_number=None,
+                tank_code=None,
                 due_date=None,
                 priority=TaskPriority.MEDIUM,
                 status=TaskStatus.IN_PROGRESS,
@@ -433,7 +433,7 @@ def test_get_task_by_id_success(client):
             role="manager"
         ),
         patient_id=None,
-        canister_number=None,
+        tank_code=None,
         due_date=None,
         priority=TaskPriority.MEDIUM,
         status=TaskStatus.NOT_STARTED,
@@ -521,7 +521,7 @@ def test_get_patient_tasks_success(client):
                     role="manager"
                 ),
                 patient_id="PT-123",
-                canister_number=None,
+                tank_code=None,
                 due_date=None,
                 priority=TaskPriority.MEDIUM,
                 status=TaskStatus.IN_PROGRESS,
@@ -610,7 +610,7 @@ def test_update_task_success(client):
                 role="manager"
             ),
             patient_id=None,
-            canister_number=None,
+            tank_code=None,
             due_date=None,
             priority=TaskPriority.HIGH,
             status=TaskStatus.IN_PROGRESS,
@@ -754,7 +754,7 @@ def test_update_task_status_success(client):
                 role="manager"
             ),
             patient_id=None,
-            canister_number=None,
+            tank_code=None,
             due_date=None,
             priority=TaskPriority.MEDIUM,
             status=TaskStatus.DONE,
@@ -944,8 +944,6 @@ def test_rbac_middleware_unauthorized_access(client):
 def test_exception_handler_middleware_app_exception_format(client):
     """Test exception handler middleware formats AppException correctly"""
     test_client, service_mock = client
-    
-    from app.exceptions.custom_exceptions import AppException
     
     service_mock.get_task_by_id.side_effect = AppException(
         message="Test error",

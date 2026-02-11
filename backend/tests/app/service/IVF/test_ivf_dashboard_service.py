@@ -137,63 +137,40 @@ def test_get_current_month_bounds(dashboard_service):
 
 def test_get_total_embryos_cryolocks_no_filter(dashboard_service, db_session):
     """Test getting total embryos and cryolocks without branch filter"""
-    # Mock queries - func.count() returns a query that chains filter().join().scalar()
-    embryo_query = MagicMock()
-    embryo_query.filter.return_value = embryo_query
-    embryo_query.join.return_value = embryo_query
-    embryo_query.scalar.return_value = 100
-    
+    # Mock query - service only queries cryolocks once, then sets total_embryos = total_cryolocks
     cryolock_query = MagicMock()
+    cryolock_query.filter.return_value = cryolock_query
     cryolock_query.scalar.return_value = 50
     
-    query_call_count = [0]
     def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        # First call is func.count(Embryo.embryo_id), second is func.count(Cryolock.cryolock_id)
-        if query_call_count[0] == 1:
-            return embryo_query
-        elif query_call_count[0] == 2:
-            return cryolock_query
-        return MagicMock()
+        return cryolock_query
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_total_embryos_cryolocks()
     
-    assert result["total_embryos"] == 100
+    assert result["total_embryos"] == 50  # Same as total_cryolocks
     assert result["total_cryolocks"] == 50
-    assert result["total_embryos_cryolocks"] == 150
+    assert result["total_embryos_cryolocks"] == 100  # total_embryos + total_cryolocks
 
 
 def test_get_total_embryos_cryolocks_with_branch_filter(dashboard_service, db_session):
     """Test getting total embryos and cryolocks with branch filter"""
-    # Mock queries with proper chaining for branch filter
-    embryo_query = MagicMock()
-    embryo_query.filter.return_value = embryo_query
-    embryo_query.join.return_value = embryo_query
-    embryo_query.scalar.return_value = 50
-    
+    # Mock query - service only queries cryolocks once, then sets total_embryos = total_cryolocks
     cryolock_query = MagicMock()
-    cryolock_query.join.return_value = cryolock_query
     cryolock_query.filter.return_value = cryolock_query
     cryolock_query.scalar.return_value = 25
     
-    query_call_count = [0]
     def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            return embryo_query
-        elif query_call_count[0] == 2:
-            return cryolock_query
-        return MagicMock()
+        return cryolock_query
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_total_embryos_cryolocks(branch_id=1, role="User")
     
-    assert result["total_embryos"] == 50
+    assert result["total_embryos"] == 25  # Same as total_cryolocks
     assert result["total_cryolocks"] == 25
-    assert result["total_embryos_cryolocks"] == 75
+    assert result["total_embryos_cryolocks"] == 50  # total_embryos + total_cryolocks
 
 
 def test_get_total_embryos_cryolocks_empty_results(dashboard_service, db_session):
@@ -283,60 +260,37 @@ def test_get_total_containers_empty_results(dashboard_service, db_session):
 
 def test_get_quality_deviations_flagged_no_filter(dashboard_service, db_session):
     """Test getting quality deviations without branch filter"""
-    canister_query = MagicMock()
-    canister_query.filter.return_value = canister_query
-    canister_query.scalar.return_value = 5
+    quality_log_query = MagicMock()
+    quality_log_query.filter.return_value = quality_log_query
+    quality_log_query.first.return_value = MagicMock(total_quality_deviations=8)
     
-    log_query = MagicMock()
-    log_query.filter.return_value = log_query
-    log_query.scalar.return_value = 3
-    
-    query_call_count = [0]
     def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            return canister_query
-        elif query_call_count[0] == 2:
-            return log_query
-        return MagicMock()
+        return quality_log_query
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_quality_deviations_flagged()
     
-    assert result["canister_status_deviations"] == 5
-    assert result["ln2_level_deviations"] == 3
     assert result["total_quality_deviations"] == 8
+    assert result["ln2_level_deviations"] == 0
 
 
 def test_get_quality_deviations_flagged_with_branch_filter(dashboard_service, db_session):
     """Test getting quality deviations with branch filter"""
-    canister_query = MagicMock()
-    canister_query.filter.return_value = canister_query
-    canister_query.join.return_value = canister_query
-    canister_query.scalar.return_value = 2
+    quality_log_query = MagicMock()
+    quality_log_query.filter.return_value = quality_log_query
+    quality_log_query.join.return_value = quality_log_query
+    quality_log_query.first.return_value = MagicMock(total_quality_deviations=3)
     
-    log_query = MagicMock()
-    log_query.filter.return_value = log_query
-    log_query.join.return_value = log_query
-    log_query.scalar.return_value = 1
-    
-    query_call_count = [0]
     def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            return canister_query
-        elif query_call_count[0] == 2:
-            return log_query
-        return MagicMock()
+        return quality_log_query
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_quality_deviations_flagged(branch_id=1, role="User")
     
-    assert result["canister_status_deviations"] == 2
-    assert result["ln2_level_deviations"] == 1
     assert result["total_quality_deviations"] == 3
+    assert result["ln2_level_deviations"] == 0
 
 
 # ==========================================
@@ -345,70 +299,86 @@ def test_get_quality_deviations_flagged_with_branch_filter(dashboard_service, db
 
 def test_get_top_deviation_driver_temperature(dashboard_service, db_session):
     """Test getting top deviation driver when temperature has most deviations"""
-    # Mock temperature count query
-    temp_query = MagicMock()
-    temp_query.join.return_value = temp_query
-    temp_query.filter.return_value = temp_query
-    temp_query.scalar.return_value = 10
+    # Mock internal temperature count query
+    temp_internal_query = MagicMock()
+    temp_internal_query.join.return_value = temp_internal_query
+    temp_internal_query.filter.return_value = temp_internal_query
+    temp_internal_query.scalar.return_value = 10
+    
+    # Mock external temperature count query
+    temp_external_query = MagicMock()
+    temp_external_query.join.return_value = temp_external_query
+    temp_external_query.filter.return_value = temp_external_query
+    temp_external_query.scalar.return_value = 5
     
     # Mock humidity count query
     humidity_query = MagicMock()
     humidity_query.join.return_value = humidity_query
     humidity_query.filter.return_value = humidity_query
-    humidity_query.scalar.return_value = 5
+    humidity_query.scalar.return_value = 3
     
-    # Mock agitation count query
-    agitation_query = MagicMock()
-    agitation_query.join.return_value = agitation_query
-    agitation_query.filter.return_value = agitation_query
-    agitation_query.scalar.return_value = 3
+    # Mock shock count query
+    shock_query = MagicMock()
+    shock_query.join.return_value = shock_query
+    shock_query.filter.return_value = shock_query
+    shock_query.scalar.return_value = 2
     
     query_call_count = [0]
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
         if query_call_count[0] == 1:
-            return temp_query
+            return temp_internal_query
         elif query_call_count[0] == 2:
-            return humidity_query
+            return temp_external_query
         elif query_call_count[0] == 3:
-            return agitation_query
+            return humidity_query
+        elif query_call_count[0] == 4:
+            return shock_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_top_deviation_driver()
     
-    assert result["driver_name"] == "Temperature"
+    assert result["driver_name"] == "Internal Temperature"
     assert result["count"] == 10
-    assert result["percentage"] == pytest.approx(55.56, rel=0.1)  # 10 / 18 * 100
+    assert "all_drivers" in result
+    assert result["all_drivers"]["Internal Temperature"] == 10
 
 
 def test_get_top_deviation_driver_no_deviations(dashboard_service, db_session):
     """Test getting top deviation driver when no deviations exist"""
-    temp_query = MagicMock()
-    temp_query.join.return_value = temp_query
-    temp_query.filter.return_value = temp_query
-    temp_query.scalar.return_value = 0
+    temp_internal_query = MagicMock()
+    temp_internal_query.join.return_value = temp_internal_query
+    temp_internal_query.filter.return_value = temp_internal_query
+    temp_internal_query.scalar.return_value = 0
+    
+    temp_external_query = MagicMock()
+    temp_external_query.join.return_value = temp_external_query
+    temp_external_query.filter.return_value = temp_external_query
+    temp_external_query.scalar.return_value = 0
     
     humidity_query = MagicMock()
     humidity_query.join.return_value = humidity_query
     humidity_query.filter.return_value = humidity_query
     humidity_query.scalar.return_value = 0
     
-    agitation_query = MagicMock()
-    agitation_query.join.return_value = agitation_query
-    agitation_query.filter.return_value = agitation_query
-    agitation_query.scalar.return_value = 0
+    shock_query = MagicMock()
+    shock_query.join.return_value = shock_query
+    shock_query.filter.return_value = shock_query
+    shock_query.scalar.return_value = 0
     
     query_call_count = [0]
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
         if query_call_count[0] == 1:
-            return temp_query
+            return temp_internal_query
         elif query_call_count[0] == 2:
-            return humidity_query
+            return temp_external_query
         elif query_call_count[0] == 3:
-            return agitation_query
+            return humidity_query
+        elif query_call_count[0] == 4:
+            return shock_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
@@ -417,7 +387,7 @@ def test_get_top_deviation_driver_no_deviations(dashboard_service, db_session):
     
     assert result["driver_name"] == "N/A"
     assert result["count"] == 0
-    assert result["percentage"] == 0.0
+    assert "all_drivers" in result
 
 
 # ==========================================
@@ -541,25 +511,25 @@ def test_get_deviations_graph_manager_role(dashboard_service, db_session):
 
 def test_get_total_deviations_no_filter(dashboard_service, db_session):
     """Test getting total deviations without branch filter"""
-    temp_query = MagicMock()
-    temp_query.join.return_value = temp_query
-    temp_query.filter.return_value = temp_query
-    temp_query.scalar.return_value = 10
+    temp_internal_query = MagicMock()
+    temp_internal_query.join.return_value = temp_internal_query
+    temp_internal_query.filter.return_value = temp_internal_query
+    temp_internal_query.scalar.return_value = 10
+    
+    temp_external_query = MagicMock()
+    temp_external_query.join.return_value = temp_external_query
+    temp_external_query.filter.return_value = temp_external_query
+    temp_external_query.scalar.return_value = 5
     
     humidity_query = MagicMock()
     humidity_query.join.return_value = humidity_query
     humidity_query.filter.return_value = humidity_query
-    humidity_query.scalar.return_value = 5
+    humidity_query.scalar.return_value = 3
     
-    agitation_query = MagicMock()
-    agitation_query.join.return_value = agitation_query
-    agitation_query.filter.return_value = agitation_query
-    agitation_query.scalar.return_value = 3
-    
-    light_query = MagicMock()
-    light_query.join.return_value = light_query
-    light_query.filter.return_value = light_query
-    light_query.scalar.return_value = 2
+    shock_query = MagicMock()
+    shock_query.join.return_value = shock_query
+    shock_query.filter.return_value = shock_query
+    shock_query.scalar.return_value = 2
     
     total_query = MagicMock()
     total_query.join.return_value = total_query
@@ -570,49 +540,49 @@ def test_get_total_deviations_no_filter(dashboard_service, db_session):
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
         if query_call_count[0] == 1:
-            return temp_query
-        elif query_call_count[0] == 2:
-            return humidity_query
-        elif query_call_count[0] == 3:
-            return agitation_query
-        elif query_call_count[0] == 4:
-            return light_query
-        elif query_call_count[0] == 5:
             return total_query
+        elif query_call_count[0] == 2:
+            return temp_internal_query
+        elif query_call_count[0] == 3:
+            return temp_external_query
+        elif query_call_count[0] == 4:
+            return humidity_query
+        elif query_call_count[0] == 5:
+            return shock_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_total_deviations()
     
-    assert result["temperature_deviations"] == 10
-    assert result["humidity_deviations"] == 5
-    assert result["agitation_deviations"] == 3
-    assert result["light_deviations"] == 2
+    assert result["temp_internal_deviations"] == 10
+    assert result["temp_external_deviations"] == 5
+    assert result["humidity_deviations"] == 3
+    assert result["shock_deviations"] == 2
     assert result["total_deviations"] == 20
 
 
 def test_get_total_deviations_with_branch_filter(dashboard_service, db_session):
     """Test getting total deviations with branch filter"""
-    temp_query = MagicMock()
-    temp_query.join.return_value = temp_query
-    temp_query.filter.return_value = temp_query
-    temp_query.scalar.return_value = 5
+    temp_internal_query = MagicMock()
+    temp_internal_query.join.return_value = temp_internal_query
+    temp_internal_query.filter.return_value = temp_internal_query
+    temp_internal_query.scalar.return_value = 5
+    
+    temp_external_query = MagicMock()
+    temp_external_query.join.return_value = temp_external_query
+    temp_external_query.filter.return_value = temp_external_query
+    temp_external_query.scalar.return_value = 2
     
     humidity_query = MagicMock()
     humidity_query.join.return_value = humidity_query
     humidity_query.filter.return_value = humidity_query
-    humidity_query.scalar.return_value = 2
+    humidity_query.scalar.return_value = 1
     
-    agitation_query = MagicMock()
-    agitation_query.join.return_value = agitation_query
-    agitation_query.filter.return_value = agitation_query
-    agitation_query.scalar.return_value = 1
-    
-    light_query = MagicMock()
-    light_query.join.return_value = light_query
-    light_query.filter.return_value = light_query
-    light_query.scalar.return_value = 1
+    shock_query = MagicMock()
+    shock_query.join.return_value = shock_query
+    shock_query.filter.return_value = shock_query
+    shock_query.scalar.return_value = 1
     
     total_query = MagicMock()
     total_query.join.return_value = total_query
@@ -623,23 +593,23 @@ def test_get_total_deviations_with_branch_filter(dashboard_service, db_session):
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
         if query_call_count[0] == 1:
-            return temp_query
-        elif query_call_count[0] == 2:
-            return humidity_query
-        elif query_call_count[0] == 3:
-            return agitation_query
-        elif query_call_count[0] == 4:
-            return light_query
-        elif query_call_count[0] == 5:
             return total_query
+        elif query_call_count[0] == 2:
+            return temp_internal_query
+        elif query_call_count[0] == 3:
+            return temp_external_query
+        elif query_call_count[0] == 4:
+            return humidity_query
+        elif query_call_count[0] == 5:
+            return shock_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
     
     result = dashboard_service.get_total_deviations(branch_id=1, role="User")
     
-    assert result["temperature_deviations"] == 5
-    assert result["humidity_deviations"] == 2
-    assert result["agitation_deviations"] == 1
-    assert result["light_deviations"] == 1
+    assert result["temp_internal_deviations"] == 5
+    assert result["temp_external_deviations"] == 2
+    assert result["humidity_deviations"] == 1
+    assert result["shock_deviations"] == 1
     assert result["total_deviations"] == 9

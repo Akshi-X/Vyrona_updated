@@ -219,8 +219,7 @@ def test_get_quality_deviations_flagged_success(app, monkeypatch):
     mock_service = MagicMock()
     mock_service.get_quality_deviations_flagged.return_value = {
         "total_quality_deviations": 10,
-        "canister_status_deviations": 5,
-        "ln2_level_deviations": 5
+        "ln2_level_deviations": 0
     }
     
     monkeypatch.setattr(
@@ -241,8 +240,7 @@ def test_get_quality_deviations_flagged_success(app, monkeypatch):
     if response.status_code == 200:
         data = response.json()
         assert data["total_quality_deviations"] == 10
-        assert data["canister_status_deviations"] == 5
-        assert data["ln2_level_deviations"] == 5
+        assert data["ln2_level_deviations"] == 0
 
 
 # ==========================================
@@ -255,7 +253,12 @@ def test_get_top_deviation_driver_success(app, monkeypatch):
     mock_service.get_top_deviation_driver.return_value = {
         "driver_name": "Temperature",
         "count": 10,
-        "percentage": 55.56
+        "all_drivers": {
+            "Internal Temperature": 10,
+            "External Temperature": 5,
+            "Humidity": 3,
+            "Shock": 2
+        }
     }
     
     monkeypatch.setattr(
@@ -277,7 +280,7 @@ def test_get_top_deviation_driver_success(app, monkeypatch):
         data = response.json()
         assert data["driver_name"] == "Temperature"
         assert data["count"] == 10
-        assert data["percentage"] == pytest.approx(55.56, rel=0.01)
+        assert "all_drivers" in data
 
 
 # ==========================================

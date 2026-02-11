@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 from datetime import datetime, timezone, date, timedelta
 import uuid
 
-from app.service.IVF.critical_alert_service import CriticalAlertService, KPI_THRESHOLDS, QUALITY_LOSS_HIGH, QUALITY_LOSS_MEDIUM, REFILL_LOG_DAYS
+from app.service.IVF.critical_alert_service import CriticalAlertService, QUALITY_LOSS_HIGH, QUALITY_LOSS_MEDIUM, REFILL_LOG_DAYS
 from app.models.IVF.critical_alert_model import AlertSeverity, AlertStatus, AlertType
 from app.constants.enums import CanisterStatus
 
@@ -72,48 +72,45 @@ def mock_ln2_log():
 
 
 # ==========================================
-# Tests for resolve_canister_id
+# Tests for resolve_tank_id
 # ==========================================
 
-def test_resolve_canister_id_success(alert_service, db_session, mock_canister):
-    """Test resolving canister number to ID successfully"""
+def test_resolve_tank_id_success(alert_service, db_session, mock_tank):
+    """Test resolving tank code to ID successfully"""
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.first.return_value = mock_canister
+    query.first.return_value = mock_tank
     
     db_session.query.return_value = query
     
-    result = alert_service.resolve_canister_id("C1")
+    result = alert_service.resolve_tank_id("T1")
     
     assert result == 1
 
 
-def test_resolve_canister_id_with_branch_filter(alert_service, db_session, mock_canister):
-    """Test resolving canister number to ID with branch filter"""
+def test_resolve_tank_id_with_branch_filter(alert_service, db_session, mock_tank):
+    """Test resolving tank code to ID with branch filter"""
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.first.return_value = mock_canister
+    query.first.return_value = mock_tank
     
     db_session.query.return_value = query
     
-    result = alert_service.resolve_canister_id("C1", branch_id=1)
+    result = alert_service.resolve_tank_id("T1", branch_id=1)
     
     assert result == 1
 
 
-def test_resolve_canister_id_not_found(alert_service, db_session):
-    """Test resolving canister number when canister not found"""
+def test_resolve_tank_id_not_found(alert_service, db_session):
+    """Test resolving tank code when tank not found"""
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
     query.first.return_value = None
     
     db_session.query.return_value = query
     
     with pytest.raises(ValueError) as exc_info:
-        alert_service.resolve_canister_id("INVALID")
+        alert_service.resolve_tank_id("INVALID")
     
     assert "not found" in str(exc_info.value).lower()
 
@@ -292,41 +289,50 @@ def test_check_refill_log_old(alert_service, db_session, mock_ln2_log):
 
 
 # ==========================================
-# Tests for get_canister_alerts_by_number
+# Tests for get_tank_alerts_by_code
 # ==========================================
 
-def test_get_canister_alerts_by_number_success(alert_service, db_session, mock_canister):
-    """Test getting canister alerts by number successfully"""
-    # Mock resolve_canister_id
-    with patch.object(alert_service, 'resolve_canister_id', return_value=1):
+def test_get_tank_alerts_by_code_success(alert_service, db_session, mock_tank):
+    """Test getting tank alerts by code successfully"""
+    # Mock resolve_tank_id
+    with patch.object(alert_service, 'resolve_tank_id', return_value=1):
         # Mock alert query
         alert_query = MagicMock()
         alert_query.filter.return_value = alert_query
         alert_query.order_by.return_value = alert_query
         alert_query.all.return_value = []
         
+        # Mock tank query
+        mock_tank_obj = Mock()
+        mock_tank_obj.tank_id = 1
+        mock_tank_obj.tank_code = "T1"
+        tank_query = MagicMock()
+        tank_query.filter.return_value.first.return_value = mock_tank_obj
+        
         query_call_count = [0]
         def query_side_effect(model):
             query_call_count[0] += 1
+            if hasattr(model, '__name__') and model.__name__ == 'Tank':
+                return tank_query
             if query_call_count[0] == 1:
                 return alert_query
             return MagicMock()
         
         db_session.query.side_effect = query_side_effect
         
-        result = alert_service.get_canister_alerts_by_number("C1")
+        result = alert_service.get_tank_alerts_by_code("T1")
         
-        assert result.canister_number == "C1"
-        assert result.canister_id == 1
+        assert result.tank_code == "T1"
+        assert result.tank_id == 1
         assert isinstance(result.alerts, list)
         assert result.total_count == 0
 
 
-def test_get_canister_alerts_by_number_not_found(alert_service, db_session):
-    """Test getting canister alerts when canister not found"""
-    with patch.object(alert_service, 'resolve_canister_id', side_effect=ValueError("Not found")):
+def test_get_tank_alerts_by_code_not_found(alert_service, db_session):
+    """Test getting tank alerts when tank not found"""
+    with patch.object(alert_service, 'resolve_tank_id', side_effect=ValueError("Not found")):
         with pytest.raises(ValueError):
-            alert_service.get_canister_alerts_by_number("INVALID")
+            alert_service.get_tank_alerts_by_code("INVALID")
 
 
 # ==========================================
