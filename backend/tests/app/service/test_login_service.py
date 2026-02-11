@@ -63,7 +63,7 @@ def test_handle_login_success(mock_validate, mock_send_otp, db_session, mock_use
     # Verify results
     assert result["user_id"] == "USER-123"
     assert result["email"] == "user@example.com"
-    assert result["otp_expiry"] == mock_otp.expires_at
+    assert result["otp_expiry"] is None  # Frontend uses fixed 10-minute countdown
     
     # Verify function calls
     mock_validate.assert_called_once_with("user@example.com", "password123", db_session)
@@ -89,7 +89,7 @@ def test_handle_login_success_with_remember_me(mock_validate, mock_send_otp, db_
     # Verify results
     assert result["user_id"] == "USER-123"
     assert result["email"] == "user@example.com"
-    assert result["otp_expiry"] == mock_otp.expires_at
+    assert result["otp_expiry"] is None  # Frontend uses fixed 10-minute countdown
     
     # Verify remember_me was passed correctly
     mock_send_otp.assert_called_once_with(db_session, "USER-123", "user@example.com", True)

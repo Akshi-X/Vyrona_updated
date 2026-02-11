@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, ANY, patch
 from datetime import datetime, timezone
 
 from app.controller import user_controller
+from app.auth import auth as auth_module
 from app.exceptions import (
     EmailAlreadyExistsException,
     DatabaseQueryException,
@@ -54,6 +55,131 @@ from app.middleware.exception_handler import exception_handler_middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+
+from app.config import database
+from app.dependencies import auth_dependencies
+from app.utils.utils import create_error_response
+import json
+from app.constants.error_codes import get_error_code
+from app.models.user_model import User
+from app.dependencies.auth_dependencies import validate_login_request
+from app.dependencies.auth_dependencies import validate_get_user_request
+from app.dependencies.auth_dependencies import validate_approve_user_request
+from app.exceptions import UserApproveNotFoundException
+from app.dependencies.auth_dependencies import validate_reject_user_request
+from app.exceptions import UserRejectNotFoundException
+from app.middleware.authentication_middleware import validate_user_for_login
+from app.exceptions import UserNotFoundException
+from app.exceptions import AccountInactiveException
+from app.exceptions import UserNotApprovedException
+from app.exceptions import InvalidCredentialsException
+from app.middleware.authentication_middleware import LoginValidationMiddleware
+from unittest.mock import MagicMock, patch, AsyncMock
+from fastapi import Request
+from unittest.mock import MagicMock, AsyncMock
+from app.exceptions import UserNotFoundException, AccountInactiveException, UserNotApprovedException, InvalidCredentialsException
+from app.middleware.exception_handler import setup_exception_handlers
+from app.exceptions.patient_exceptions import PatientNotFoundException
+from fastapi import FastAPI
+from pydantic import ValidationError
+from pydantic import BaseModel
+from pydantic import ValidationError, BaseModel
+from fastapi import FastAPI, HTTPException
+from unittest.mock import MagicMock, patch
+from fastapi import status
+from app.constants.error_codes import ERROR_CODES
+from app.constants.messages import ErrorMessages
+from datetime import datetime
+from app.middleware.exception_handler import COMMON_API_HEADERS
+from fastapi.exceptions import RequestValidationError
+from app.constants.roles import (
+ROLE_ADMIN, ROLE_PHARMA_ADMIN, ROLE_MYGRAPE_ADMIN,
+ROLE_MANAGER, ROLE_USER,
+ALL_ROLES, MANAGEMENT_ROLES, APPROVAL_ROLES, FEEDBACK_ROLES
+)
+from app.auth.auth import verify_password, get_password_hash
+from app.auth.auth import get_password_hash
+from app.auth.auth import create_access_token
+from datetime import timedelta
+from app.auth.auth import verify_token, create_access_token
+from app.exceptions import TokenExpiredException
+import time
+from app.auth.auth import verify_token
+from app.exceptions import InvalidTokenException
+from app.auth.auth import verify_websocket_token, create_access_token
+from app.auth.auth import verify_websocket_token
+from app.auth.auth import get_current_user_from_request
+from unittest.mock import MagicMock
+from app.exceptions import AuthenticationRequiredException
+from app.auth.auth import get_current_user, create_access_token
+from fastapi.security import HTTPAuthorizationCredentials
+from app.exceptions import UserFromTokenNotFoundException
+from app.constants.http_status import HTTPStatus
+from app.exceptions.custom_exceptions import InvalidOTPException
+from app.exceptions.custom_exceptions import OTPExpiredException
+from app.exceptions.custom_exceptions import OTPUserNotFoundException
+from app.exceptions.custom_exceptions import ResendOTPInvalidUserException
+from app.exceptions.custom_exceptions import ResendOTPUserNotApprovedException
+from app.exceptions.custom_exceptions import PasswordMismatchException
+from app.exceptions.custom_exceptions import DatabaseException
+from app.exceptions.custom_exceptions import PasswordResetRateLimitException
+from app.exceptions.custom_exceptions import IntegrityConstraintException
+from app.exceptions.custom_exceptions import AdminRoleRequiredException
+from app.exceptions.custom_exceptions import ManagerRoleRequiredException
+from app.exceptions.custom_exceptions import UserRoleRequiredException
+from app.exceptions.custom_exceptions import InsufficientPermissionsException
+from app.exceptions.custom_exceptions import ManagerApprovalOnlyException
+from app.exceptions.custom_exceptions import ManagerShipmentManagementOnlyException
+from app.exceptions.custom_exceptions import FeedbackInvalidDataException
+from app.exceptions.custom_exceptions import FeedbackTicketIdGenerationFailedException
+from app.exceptions.custom_exceptions import FeedbackNotFoundException
+from app.exceptions.custom_exceptions import FeedbackAccessDeniedException
+from app.exceptions.custom_exceptions import FeedbackFilterInvalidException
+from app.exceptions.custom_exceptions import FeedbackCommentNotFoundException
+from app.exceptions.custom_exceptions import FeedbackCommentInvalidException
+from app.exceptions.custom_exceptions import FeedbackCommentAccessDeniedException
+from app.exceptions.custom_exceptions import FeedbackStatusInvalidException
+from app.exceptions.custom_exceptions import FeedbackStatusAccessDeniedException
+from app.exceptions.custom_exceptions import FeedbackStatusAlreadySetException
+from app.exceptions.custom_exceptions import FeedbackEmailSendFailedException
+from app.exceptions.custom_exceptions import FeedbackEmailTemplateErrorException
+from app.exceptions.custom_exceptions import FeedbackEmailRecipientInvalidException
+from app.exceptions.custom_exceptions import ChatWebSocketInvalidMessageException
+from app.exceptions.custom_exceptions import ChatWebSocketInvalidTypeException
+from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
+from app.dependencies.rbac_dependencies import require_admin
+from unittest.mock import patch
+from app.dependencies.rbac_dependencies import require_manager
+from app.dependencies.rbac_dependencies import require_user
+from app.dependencies.rbac_dependencies import require_roles
+from app.dependencies.rbac_dependencies import check_same_company
+from app.models.pharma_model import Pharma
+from app.exceptions.custom_exceptions import CompanyAccessForbiddenException
+from app.dependencies.rbac_dependencies import can_approve_users
+from app.dependencies.rbac_dependencies import can_manage_shipments
+from app.dependencies.rbac_dependencies import is_admin
+from app.dependencies.rbac_dependencies import is_manager
+from app.dependencies.rbac_dependencies import is_user
+from app.dependencies.rbac_dependencies import get_user_permissions
+from app.dependencies.auth_dependencies import get_current_user
+from app.exceptions.custom_exceptions import InvalidCredentialsException
+from app.dependencies.auth_dependencies import get_current_user_pharma_id
+from app.dependencies.auth_dependencies import get_pharma_id_from_request
+from app.dependencies.auth_dependencies import validate_registration_request
+from app.exceptions import PasswordMismatchException
+from app.schemas.user_schema import UserRegister
+from app.exceptions import EmailAlreadyExistsException
+from app.dependencies.auth_dependencies import validate_otp_verification
+from app.exceptions import InvalidOTPException
+from app.service.otp_service import validate_otp_verification
+from app.exceptions import OTPUserNotFoundException, InvalidOTPException
+from app.service.otp_service import get_validated_user
+from app.exceptions import ResendOTPInvalidUserException
+from app.exceptions import ResendOTPUserNotApprovedException
+from app.exceptions import UserGetNotFoundException
+from app.dependencies.auth_dependencies import authenticate_websocket
+from fastapi import WebSocket
+from app.config.database import SessionLocal
 def _create_test_client(monkeypatch):
     app = FastAPI()
     app.include_router(user_controller.router)
@@ -84,6 +210,13 @@ def _create_test_client(monkeypatch):
             self.role = "pharma_admin"  # Role that can access user endpoints
             self.email = "test@example.com"
             self.is_approved = True
+            self.department = None  # For pharma users, department is None
+            self.branch_id = None  # For pharma users, branch_id is None
+            self.hospital_id = None  # For pharma users, hospital_id is None
+            self.status = True  # Account is active
+            self.approved_status = "approved"
+            self.first_name = "Test"
+            self.last_name = "User"
 
     mock_user = MockUser()
 
@@ -109,8 +242,6 @@ def _create_test_client(monkeypatch):
     def override_get_db():
         yield db_mock
 
-    from app.config import database
-    from app.dependencies import auth_dependencies
     app.dependency_overrides[database.get_db] = override_get_db
     app.dependency_overrides[auth_dependencies.get_current_user] = lambda: mock_user
 
@@ -1124,7 +1255,6 @@ def test_request_validation_middleware_feedback_string_lengths(client):
 
 def test_create_error_response_basic(client):
     """Test create_error_response with basic parameters (lines 52-68)"""
-    from app.utils.utils import create_error_response
     
     response = create_error_response(
         status_code=400,
@@ -1134,7 +1264,6 @@ def test_create_error_response_basic(client):
     
     assert response.status_code == 400
     content = response.body.decode('utf-8')
-    import json
     data = json.loads(content)
     assert data["error_code"] == "ERR_400"
     assert data["message"] == "Test error message"
@@ -1145,7 +1274,6 @@ def test_create_error_response_basic(client):
 
 def test_create_error_response_with_details(client):
     """Test create_error_response with details parameter (lines 60-61)"""
-    from app.utils.utils import create_error_response
     
     response = create_error_response(
         status_code=400,
@@ -1156,14 +1284,12 @@ def test_create_error_response_with_details(client):
     
     assert response.status_code == 400
     content = response.body.decode('utf-8')
-    import json
     data = json.loads(content)
     assert data["remaining_attempts"] == 2
 
 
 def test_create_error_response_with_headers(client):
     """Test create_error_response with custom headers (lines 64-66)"""
-    from app.utils.utils import create_error_response
     
     response = create_error_response(
         status_code=400,
@@ -1179,7 +1305,6 @@ def test_create_error_response_with_headers(client):
 
 def test_get_error_code_valid_key(client):
     """Test get_error_code with valid key (line 278)"""
-    from app.constants.error_codes import get_error_code
     
     # Test with various valid keys
     assert get_error_code("INVALID_PASSWORD") == "ERR_1003"
@@ -1191,7 +1316,6 @@ def test_get_error_code_valid_key(client):
 
 def test_get_error_code_invalid_key(client):
     """Test get_error_code with invalid key returns default (line 278)"""
-    from app.constants.error_codes import get_error_code
     
     # Test with invalid key - should return ERR_9001 (SERVER_ERROR)
     assert get_error_code("NON_EXISTENT_KEY") == "ERR_9001"
@@ -1207,8 +1331,6 @@ def test_request_validation_middleware_login_validation_success(client):
     """Test request validation middleware login validation success path (lines 96-118)"""
     test_client, service_mocks = client
     
-    from app.models.user_model import User
-    from app.dependencies.auth_dependencies import validate_login_request
     
     mock_user = MagicMock(spec=User)
     mock_user.user_id = "USER-123"
@@ -1310,7 +1432,6 @@ def test_request_validation_middleware_otp_validation_app_exception(client):
     """Test request validation middleware OTP validation AppException handling (lines 199-205)"""
     test_client, service_mocks = client
     
-    from app.exceptions.custom_exceptions import AppException
     
     # This test covers the exception handling path in _validate_otp
     # The middleware should handle AppException
@@ -1382,8 +1503,6 @@ def test_request_validation_middleware_get_user_validation_success(client):
     """Test request validation middleware get user validation success (lines 248-253)"""
     test_client, service_mocks = client
     
-    from app.models.user_model import User
-    from app.dependencies.auth_dependencies import validate_get_user_request
     
     mock_user = MagicMock(spec=User)
     mock_user.user_id = "USER-123"
@@ -1441,8 +1560,6 @@ def test_request_validation_middleware_approve_user_validation_success(client):
     """Test request validation middleware approve user validation success (lines 294-299)"""
     test_client, service_mocks = client
     
-    from app.models.user_model import User
-    from app.dependencies.auth_dependencies import validate_approve_user_request
     
     mock_user = MagicMock(spec=User)
     mock_user.user_id = "USER-123"
@@ -1462,7 +1579,6 @@ def test_request_validation_middleware_approve_user_validation_app_exception(cli
     """Test request validation middleware approve user validation AppException handling (lines 300-306)"""
     test_client, service_mocks = client
     
-    from app.exceptions import UserApproveNotFoundException
     
     with patch('app.middleware.request_validation_middleware.validate_approve_user_request') as mock_validate:
         mock_validate.side_effect = UserApproveNotFoundException(registration_id="REG-123")
@@ -1502,8 +1618,6 @@ def test_request_validation_middleware_reject_user_validation_success(client):
     """Test request validation middleware reject user validation success (lines 339-344)"""
     test_client, service_mocks = client
     
-    from app.models.user_model import User
-    from app.dependencies.auth_dependencies import validate_reject_user_request
     
     mock_user = MagicMock(spec=User)
     mock_user.user_id = "USER-123"
@@ -1523,7 +1637,6 @@ def test_request_validation_middleware_reject_user_validation_app_exception(clie
     """Test request validation middleware reject user validation AppException handling (lines 345-351)"""
     test_client, service_mocks = client
     
-    from app.exceptions import UserRejectNotFoundException
     
     with patch('app.middleware.request_validation_middleware.validate_reject_user_request') as mock_validate:
         mock_validate.side_effect = UserRejectNotFoundException(registration_id="REG-123")
@@ -1768,8 +1881,6 @@ def test_request_validation_middleware_get_user_path_parsing(client):
     """Test request validation middleware GET user path parsing (lines 82-87)"""
     test_client, service_mocks = client
     
-    from app.models.user_model import User
-    from app.dependencies.auth_dependencies import validate_get_user_request
     
     mock_user = MagicMock(spec=User)
     mock_user.user_id = "USER-123"
@@ -1877,8 +1988,6 @@ def test_authentication_middleware_user_not_found(client):
     test_client, service_mocks = client
     
     # Test the validate_user_for_login function directly to cover middleware logic
-    from app.middleware.authentication_middleware import validate_user_for_login
-    from app.exceptions import UserNotFoundException
     
     db = MagicMock()
     
@@ -1892,9 +2001,6 @@ def test_authentication_middleware_account_inactive(client):
     test_client, service_mocks = client
     
     # Test the validate_user_for_login function directly to cover middleware logic
-    from app.middleware.authentication_middleware import validate_user_for_login
-    from app.models.user_model import User
-    from app.exceptions import AccountInactiveException
     
     db = MagicMock()
     mock_user = MagicMock(spec=User)
@@ -1913,9 +2019,6 @@ def test_authentication_middleware_user_not_approved(client):
     test_client, service_mocks = client
     
     # Test the validate_user_for_login function directly to cover middleware logic
-    from app.middleware.authentication_middleware import validate_user_for_login
-    from app.models.user_model import User
-    from app.exceptions import UserNotApprovedException
     
     db = MagicMock()
     mock_user = MagicMock(spec=User)
@@ -1934,9 +2037,6 @@ def test_authentication_middleware_invalid_password(client):
     test_client, service_mocks = client
     
     # Test the validate_user_for_login function directly to cover middleware logic
-    from app.middleware.authentication_middleware import validate_user_for_login
-    from app.models.user_model import User
-    from app.exceptions import InvalidCredentialsException
     
     db = MagicMock()
     mock_user = MagicMock(spec=User)
@@ -1957,10 +2057,6 @@ def test_authentication_middleware_invalid_password(client):
 @pytest.mark.asyncio
 async def test_authentication_middleware_dispatch_login_endpoint(client):
     """Test LoginValidationMiddleware dispatch method for login endpoint (lines 37-88)"""
-    from app.middleware.authentication_middleware import LoginValidationMiddleware
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     middleware = LoginValidationMiddleware(None)
     
@@ -2003,9 +2099,6 @@ async def test_authentication_middleware_dispatch_login_endpoint(client):
 @pytest.mark.asyncio
 async def test_authentication_middleware_dispatch_non_login_endpoint(client):
     """Test LoginValidationMiddleware dispatch for non-login endpoint (lines 37, 86-88)"""
-    from app.middleware.authentication_middleware import LoginValidationMiddleware
-    from unittest.mock import MagicMock, AsyncMock
-    from fastapi import Request
     
     middleware = LoginValidationMiddleware(None)
     
@@ -2028,10 +2121,6 @@ async def test_authentication_middleware_dispatch_non_login_endpoint(client):
 @pytest.mark.asyncio
 async def test_authentication_middleware_dispatch_user_not_found(client):
     """Test LoginValidationMiddleware dispatch with user not found (lines 37-51)"""
-    from app.middleware.authentication_middleware import LoginValidationMiddleware
-    from app.exceptions import UserNotFoundException
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     middleware = LoginValidationMiddleware(None)
     
@@ -2057,11 +2146,6 @@ async def test_authentication_middleware_dispatch_user_not_found(client):
 @pytest.mark.asyncio
 async def test_authentication_middleware_dispatch_invalid_password(client):
     """Test LoginValidationMiddleware dispatch with invalid password (lines 37-73)"""
-    from app.middleware.authentication_middleware import LoginValidationMiddleware
-    from app.exceptions import InvalidCredentialsException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     middleware = LoginValidationMiddleware(None)
     
@@ -2096,9 +2180,6 @@ async def test_authentication_middleware_dispatch_invalid_password(client):
 
 def test_authentication_middleware_validate_user_for_login_function(client):
     """Test validate_user_for_login standalone function (lines 103-130)"""
-    from app.middleware.authentication_middleware import validate_user_for_login
-    from app.models.user_model import User
-    from app.exceptions import UserNotFoundException, AccountInactiveException, UserNotApprovedException, InvalidCredentialsException
     
     db = MagicMock()
     
@@ -2156,7 +2237,6 @@ def test_exception_handler_middleware_app_exception_logging(client):
     """Test exception handler middleware logs AppException (lines 41-50)"""
     test_client, service_mocks = client
     
-    from app.exceptions.custom_exceptions import AppException
     
     service_mocks['login_service'].side_effect = AppException(
         error_code="TEST_ERROR",
@@ -2177,9 +2257,6 @@ def test_exception_handler_middleware_app_exception_logging(client):
 def test_exception_handler_middleware_patient_exception_logging(client):
     """Test exception handler middleware logs PatientException (lines 59-68)"""
     # Test the exception handler setup function directly
-    from app.middleware.exception_handler import setup_exception_handlers
-    from app.exceptions.patient_exceptions import PatientNotFoundException
-    from fastapi import FastAPI
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2200,7 +2277,6 @@ def test_exception_handler_middleware_validation_error_otp_path(client):
     """Test exception handler middleware handles ValidationError on OTP path (lines 82-101)"""
     test_client, service_mocks = client
     
-    from pydantic import ValidationError
     
     with patch('app.middleware.exception_handler.logger') as mock_logger:
         # This is already tested in test_exception_handler_middleware_validation_error_otp_path
@@ -2250,7 +2326,6 @@ def test_exception_handler_middleware_validation_error_in_general_handler(client
     """Test exception handler middleware handles ValidationError in general handler (lines 132-143)"""
     test_client, service_mocks = client
     
-    from pydantic import ValidationError
     
     # This path is hard to trigger directly, but we can test it exists
     # by ensuring the middleware handles it
@@ -2265,9 +2340,6 @@ def test_exception_handler_middleware_validation_error_in_general_handler(client
 
 def test_exception_handler_setup_app_exception_handler(client):
     """Test setup_exception_handlers AppException handler (lines 163-178)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from app.exceptions.custom_exceptions import AppException
-    from fastapi import FastAPI, Request
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2289,9 +2361,6 @@ def test_exception_handler_setup_app_exception_handler(client):
 
 def test_exception_handler_setup_patient_exception_handler(client):
     """Test setup_exception_handlers PatientException handler (lines 180-201)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from app.exceptions.patient_exceptions import PatientNotFoundException
-    from fastapi import FastAPI
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2309,9 +2378,6 @@ def test_exception_handler_setup_patient_exception_handler(client):
 
 def test_exception_handler_setup_request_validation_handler(client):
     """Test setup_exception_handlers RequestValidationError handler (lines 203-242)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI
-    from pydantic import BaseModel
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2333,9 +2399,6 @@ def test_exception_handler_setup_request_validation_handler(client):
 
 def test_exception_handler_setup_pydantic_validation_handler(client):
     """Test setup_exception_handlers Pydantic ValidationError handler (lines 244-279)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI
-    from pydantic import ValidationError, BaseModel
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2358,8 +2421,6 @@ def test_exception_handler_setup_pydantic_validation_handler(client):
 
 def test_exception_handler_setup_http_exception_handler(client):
     """Test setup_exception_handlers HTTPException handler (lines 281-297)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI, HTTPException
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2377,8 +2438,6 @@ def test_exception_handler_setup_http_exception_handler(client):
 
 def test_exception_handler_setup_general_exception_handler(client):
     """Test setup_exception_handlers general Exception handler (lines 299-324)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2404,10 +2463,6 @@ def test_exception_handler_setup_general_exception_handler(client):
 @pytest.mark.asyncio
 async def test_exception_handler_middleware_app_exception_logging_detailed(client):
     """Test exception handler middleware AppException logging with extra details (lines 41-51)"""
-    from app.middleware.exception_handler import exception_handler_middleware
-    from app.exceptions.custom_exceptions import AppException
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     mock_request = MagicMock(spec=Request)
     mock_request.url.path = "/api/test"
@@ -2438,10 +2493,6 @@ async def test_exception_handler_middleware_app_exception_logging_detailed(clien
 @pytest.mark.asyncio
 async def test_exception_handler_middleware_patient_exception_logging_detailed(client):
     """Test exception handler middleware PatientException logging with extra details (lines 59-69)"""
-    from app.middleware.exception_handler import exception_handler_middleware
-    from app.exceptions.patient_exceptions import PatientNotFoundException
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     mock_request = MagicMock(spec=Request)
     mock_request.url.path = "/api/patients/PT-123"
@@ -2465,10 +2516,6 @@ async def test_exception_handler_middleware_patient_exception_logging_detailed(c
 @pytest.mark.asyncio
 async def test_exception_handler_middleware_validation_error_otp_logging(client):
     """Test exception handler middleware ValidationError OTP path logging (lines 91-92)"""
-    from app.middleware.exception_handler import exception_handler_middleware
-    from pydantic import ValidationError
-    from unittest.mock import MagicMock, patch, AsyncMock
-    from fastapi import Request
     
     mock_request = MagicMock(spec=Request)
     mock_request.url.path = "/api/verify-otp"
@@ -2494,10 +2541,6 @@ async def test_exception_handler_middleware_validation_error_otp_logging(client)
 @pytest.mark.asyncio
 async def test_exception_handler_middleware_validation_error_in_general_handler(client):
     """Test exception handler middleware ValidationError caught in general handler (lines 133-134)"""
-    from app.middleware.exception_handler import exception_handler_middleware
-    from pydantic import ValidationError
-    from unittest.mock import MagicMock, patch
-    from fastapi import Request
     
     mock_request = MagicMock(spec=Request)
     mock_request.url.path = "/api/test"
@@ -2534,13 +2577,6 @@ async def test_exception_handler_middleware_validation_error_in_general_handler(
                 if isinstance(exc, ValidationError):
                     # This covers line 133
                     mock_logger.warning("ValidationError caught in general exception handler - this should not happen")
-                    from fastapi import status
-                    from fastapi.responses import JSONResponse
-                    from app.constants.error_codes import ERROR_CODES
-                    from app.constants.status_constants import STATUS_FAILED
-                    from app.constants.messages import ErrorMessages
-                    from datetime import datetime
-                    from app.middleware.exception_handler import COMMON_API_HEADERS
                     return JSONResponse(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         content={
@@ -2567,10 +2603,6 @@ async def test_exception_handler_middleware_validation_error_in_general_handler(
 
 def test_exception_handler_setup_request_validation_field_errors(client):
     """Test setup_exception_handlers RequestValidationError handler field-specific errors (lines 216, 218, 220, 222, 224, 226)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI, Request
-    from fastapi.exceptions import RequestValidationError
-    from pydantic import BaseModel
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2631,9 +2663,6 @@ def test_exception_handler_setup_request_validation_field_errors(client):
 
 def test_exception_handler_setup_pydantic_validation_otp_path(client):
     """Test setup_exception_handlers Pydantic ValidationError handler OTP path (lines 247-267)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI
-    from pydantic import ValidationError, BaseModel
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2657,9 +2686,6 @@ def test_exception_handler_setup_pydantic_validation_otp_path(client):
 
 def test_exception_handler_setup_pydantic_validation_generic_path(client):
     """Test setup_exception_handlers Pydantic ValidationError handler generic path (lines 268-279)"""
-    from app.middleware.exception_handler import setup_exception_handlers
-    from fastapi import FastAPI
-    from pydantic import BaseModel
     
     app = FastAPI()
     setup_exception_handlers(app)
@@ -2686,11 +2712,6 @@ def test_exception_handler_setup_pydantic_validation_generic_path(client):
 
 def test_roles_constants_values():
     """Test role constants values"""
-    from app.constants.roles import (
-        ROLE_ADMIN, ROLE_PHARMA_ADMIN, ROLE_MYGRAPE_ADMIN,
-        ROLE_MANAGER, ROLE_USER,
-        ALL_ROLES, MANAGEMENT_ROLES, APPROVAL_ROLES, FEEDBACK_ROLES
-    )
     
     assert ROLE_ADMIN == "Admin"
     assert ROLE_PHARMA_ADMIN == "Pharma_admin"
@@ -2734,7 +2755,6 @@ def test_roles_constants_values():
 
 def test_verify_password_success():
     """Test verify_password with valid password (line 26)"""
-    from app.auth.auth import verify_password, get_password_hash
     
     password = "test_password_123"
     hashed = get_password_hash(password)
@@ -2745,7 +2765,6 @@ def test_verify_password_success():
 
 def test_verify_password_invalid():
     """Test verify_password with invalid password (line 26)"""
-    from app.auth.auth import verify_password, get_password_hash
     
     password = "test_password_123"
     hashed = get_password_hash(password)
@@ -2756,7 +2775,6 @@ def test_verify_password_invalid():
 
 def test_get_password_hash():
     """Test get_password_hash (line 31)"""
-    from app.auth.auth import get_password_hash
     
     password = "test_password_123"
     hashed = get_password_hash(password)
@@ -2768,8 +2786,6 @@ def test_get_password_hash():
 
 def test_create_access_token_with_dict():
     """Test create_access_token with valid dict (lines 37-48)"""
-    from app.auth.auth import create_access_token
-    from datetime import timedelta
     
     data = {"sub": "USER-123", "pharma_id": 42}
     token = create_access_token(data)
@@ -2780,8 +2796,6 @@ def test_create_access_token_with_dict():
 
 def test_create_access_token_with_expires_delta():
     """Test create_access_token with custom expires_delta (lines 41-42)"""
-    from app.auth.auth import create_access_token
-    from datetime import timedelta
     
     data = {"sub": "USER-123", "pharma_id": 42}
     expires_delta = timedelta(hours=2)
@@ -2793,7 +2807,6 @@ def test_create_access_token_with_expires_delta():
 
 def test_create_access_token_without_expires_delta():
     """Test create_access_token without expires_delta (lines 43-44)"""
-    from app.auth.auth import create_access_token
     
     data = {"sub": "USER-123", "pharma_id": 42}
     token = create_access_token(data)
@@ -2804,7 +2817,6 @@ def test_create_access_token_without_expires_delta():
 
 def test_create_access_token_invalid_data():
     """Test create_access_token with invalid data type (lines 37-38)"""
-    from app.auth.auth import create_access_token
     
     with pytest.raises(ValueError, match="data must be a dict"):
         create_access_token("not a dict")
@@ -2812,7 +2824,6 @@ def test_create_access_token_invalid_data():
 
 def test_verify_token_success():
     """Test verify_token with valid token (lines 53-55)"""
-    from app.auth.auth import verify_token, create_access_token
     
     data = {"sub": "USER-123", "pharma_id": 42}
     token = create_access_token(data)
@@ -2825,9 +2836,6 @@ def test_verify_token_success():
 
 def test_verify_token_expired():
     """Test verify_token with expired token (lines 56-57)"""
-    from app.auth.auth import verify_token, create_access_token
-    from app.exceptions import TokenExpiredException
-    from datetime import timedelta
     
     # Create token with negative expiration (already expired)
     data = {"sub": "USER-123", "pharma_id": 42}
@@ -2835,7 +2843,6 @@ def test_verify_token_expired():
     token = create_access_token(data, expires_delta=expires_delta)
     
     # Wait a bit to ensure expiration
-    import time
     time.sleep(1)
     
     with pytest.raises(TokenExpiredException):
@@ -2844,8 +2851,6 @@ def test_verify_token_expired():
 
 def test_verify_token_invalid():
     """Test verify_token with invalid token (lines 58-59)"""
-    from app.auth.auth import verify_token
-    from app.exceptions import InvalidTokenException
     
     with pytest.raises(InvalidTokenException):
         verify_token("invalid_token_string")
@@ -2853,7 +2858,6 @@ def test_verify_token_invalid():
 
 def test_verify_websocket_token_success():
     """Test verify_websocket_token with valid token (lines 80-94)"""
-    from app.auth.auth import verify_websocket_token, create_access_token
     
     data = {"sub": "USER-123", "pharma_id": 42}
     token = create_access_token(data)
@@ -2867,8 +2871,6 @@ def test_verify_websocket_token_success():
 
 def test_verify_websocket_token_empty():
     """Test verify_websocket_token with empty token (lines 80-81)"""
-    from app.auth.auth import verify_websocket_token
-    from app.exceptions import InvalidTokenException
     
     with pytest.raises(InvalidTokenException):
         verify_websocket_token("")
@@ -2876,8 +2878,6 @@ def test_verify_websocket_token_empty():
 
 def test_verify_websocket_token_none():
     """Test verify_websocket_token with None token (lines 80-81)"""
-    from app.auth.auth import verify_websocket_token
-    from app.exceptions import InvalidTokenException
     
     with pytest.raises(InvalidTokenException):
         verify_websocket_token(None)
@@ -2885,39 +2885,31 @@ def test_verify_websocket_token_none():
 
 def test_verify_websocket_token_missing_user_id():
     """Test verify_websocket_token with missing user_id (lines 87-88)"""
-    from app.auth.auth import verify_websocket_token, create_access_token
-    from app.exceptions import InvalidTokenException
     
     # Create token without 'sub' field
     data = {"pharma_id": 42}
     token = create_access_token(data)
     
-    # Note: Line 88 tries to pass a message to InvalidTokenException() which doesn't accept parameters
-    # This will raise TypeError, but the test covers the line execution
-    with pytest.raises(TypeError):
+    # Missing user_id raises InvalidTokenException
+    with pytest.raises(InvalidTokenException):
         verify_websocket_token(token)
 
 
 def test_verify_websocket_token_missing_pharma_id():
     """Test verify_websocket_token with missing pharma_id (lines 87-88)"""
-    from app.auth.auth import verify_websocket_token, create_access_token
-    from app.exceptions import InvalidTokenException
     
     # Create token without 'pharma_id' field
     data = {"sub": "USER-123"}
     token = create_access_token(data)
     
-    # Note: Line 88 tries to pass a message to InvalidTokenException() which doesn't accept parameters
-    # This will raise TypeError, but the test covers the line execution
-    with pytest.raises(TypeError):
-        verify_websocket_token(token)
+    # For IVF/hospital users, pharma_id can be None, so this should succeed
+    result = verify_websocket_token(token)
+    assert result["user_id"] == "USER-123"
+    assert result["pharma_id"] is None
 
 
 def test_get_current_user_from_request_success(client):
     """Test get_current_user_from_request with valid request (lines 107-109)"""
-    from app.auth.auth import get_current_user_from_request
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     # Create a mock request with current_user in state
     mock_user = MagicMock()
@@ -2932,10 +2924,6 @@ def test_get_current_user_from_request_success(client):
 
 def test_get_current_user_from_request_missing_user(client):
     """Test get_current_user_from_request without current_user (lines 107-108)"""
-    from app.auth.auth import get_current_user_from_request
-    from app.exceptions import AuthenticationRequiredException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     # Create a mock request without current_user in state
     # Use a simple object that doesn't have current_user attribute
@@ -2953,10 +2941,6 @@ def test_get_current_user_from_request_missing_user(client):
 
 def test_get_current_user_success(client):
     """Test get_current_user with valid token (lines 117-128)"""
-    from app.auth.auth import get_current_user, create_access_token
-    from app.models.user_model import User
-    from fastapi.security import HTTPAuthorizationCredentials
-    from unittest.mock import MagicMock, patch
     
     # Create a valid token
     data = {"sub": "USER-123", "pharma_id": 42}
@@ -2977,17 +2961,13 @@ def test_get_current_user_success(client):
     mock_query.filter.return_value = mock_filter
     mock_db.query.return_value = mock_query
     
-    result = get_current_user(credentials=credentials, db=mock_db)
+    result = auth_module.get_current_user(credentials=credentials, db=mock_db)
     assert result == mock_user
     mock_db.query.assert_called_once_with(User)
 
 
 def test_get_current_user_missing_user_id(client):
     """Test get_current_user with token missing user_id (lines 120-122)"""
-    from app.auth.auth import get_current_user, create_access_token
-    from app.exceptions import InvalidTokenException
-    from fastapi.security import HTTPAuthorizationCredentials
-    from unittest.mock import MagicMock
     
     # Create token without 'sub' field
     data = {"pharma_id": 42}
@@ -2999,16 +2979,11 @@ def test_get_current_user_missing_user_id(client):
     mock_db = MagicMock()
     
     with pytest.raises(InvalidTokenException):
-        get_current_user(credentials=credentials, db=mock_db)
+        auth_module.get_current_user(credentials=credentials, db=mock_db)
 
 
 def test_get_current_user_not_found(client):
     """Test get_current_user when user not found in database (lines 124-126)"""
-    from app.auth.auth import get_current_user, create_access_token
-    from app.models.user_model import User
-    from app.exceptions import UserFromTokenNotFoundException
-    from fastapi.security import HTTPAuthorizationCredentials
-    from unittest.mock import MagicMock
     
     # Create a valid token
     data = {"sub": "USER-123", "pharma_id": 42}
@@ -3026,7 +3001,7 @@ def test_get_current_user_not_found(client):
     mock_db.query.return_value = mock_query
     
     with pytest.raises(UserFromTokenNotFoundException) as exc_info:
-        get_current_user(credentials=credentials, db=mock_db)
+        auth_module.get_current_user(credentials=credentials, db=mock_db)
     
     assert exc_info.value.details.get('user_id') == "USER-123"
 
@@ -3037,7 +3012,6 @@ def test_get_current_user_not_found(client):
 
 def test_http_status_constants():
     """Test HTTPStatus constants"""
-    from app.constants.http_status import HTTPStatus
     
     # 2xx Success
     assert HTTPStatus.OK == 200
@@ -3074,7 +3048,6 @@ def test_http_status_constants():
 
 def test_invalid_otp_exception():
     """Test InvalidOTPException initialization (line 144)"""
-    from app.exceptions.custom_exceptions import InvalidOTPException
     
     exc = InvalidOTPException(user_id="USER-123")
     assert exc.status_code == 400
@@ -3083,7 +3056,6 @@ def test_invalid_otp_exception():
 
 def test_otp_expired_exception():
     """Test OTPExpiredException initialization (line 156)"""
-    from app.exceptions.custom_exceptions import OTPExpiredException
     
     exc = OTPExpiredException(user_id="USER-123")
     assert exc.status_code == 400
@@ -3092,7 +3064,6 @@ def test_otp_expired_exception():
 
 def test_otp_user_not_found_exception():
     """Test OTPUserNotFoundException initialization (line 181)"""
-    from app.exceptions.custom_exceptions import OTPUserNotFoundException
     
     exc = OTPUserNotFoundException(user_id="USER-123")
     assert exc.status_code == 404
@@ -3101,7 +3072,6 @@ def test_otp_user_not_found_exception():
 
 def test_resend_otp_invalid_user_exception():
     """Test ResendOTPInvalidUserException initialization (line 197)"""
-    from app.exceptions.custom_exceptions import ResendOTPInvalidUserException
     
     exc = ResendOTPInvalidUserException(user_id="USER-123", email="user@example.com")
     assert exc.status_code == 400
@@ -3111,7 +3081,6 @@ def test_resend_otp_invalid_user_exception():
 
 def test_resend_otp_user_not_approved_exception():
     """Test ResendOTPUserNotApprovedException initialization (line 210)"""
-    from app.exceptions.custom_exceptions import ResendOTPUserNotApprovedException
     
     exc = ResendOTPUserNotApprovedException(user_id="USER-123")
     assert exc.status_code == 403
@@ -3120,7 +3089,6 @@ def test_resend_otp_user_not_approved_exception():
 
 def test_password_mismatch_exception():
     """Test PasswordMismatchException initialization (line 329)"""
-    from app.exceptions.custom_exceptions import PasswordMismatchException
     
     exc = PasswordMismatchException()
     assert exc.status_code == 400
@@ -3128,7 +3096,6 @@ def test_password_mismatch_exception():
 
 def test_database_exception():
     """Test DatabaseException initialization (line 357)"""
-    from app.exceptions.custom_exceptions import DatabaseException
     
     exc = DatabaseException(
         message="Database error",
@@ -3142,7 +3109,6 @@ def test_database_exception():
 
 def test_password_reset_rate_limit_exception():
     """Test PasswordResetRateLimitException initialization (line 506)"""
-    from app.exceptions.custom_exceptions import PasswordResetRateLimitException
     
     exc = PasswordResetRateLimitException(email="user@example.com", retry_after_minutes=5)
     assert exc.status_code == 429
@@ -3152,7 +3118,6 @@ def test_password_reset_rate_limit_exception():
 
 def test_integrity_constraint_exception():
     """Test IntegrityConstraintException initialization (line 570)"""
-    from app.exceptions.custom_exceptions import IntegrityConstraintException
     
     exc = IntegrityConstraintException(constraint="unique_email", details="Email already exists")
     assert exc.status_code == 409
@@ -3162,7 +3127,6 @@ def test_integrity_constraint_exception():
 
 def test_admin_role_required_exception():
     """Test AdminRoleRequiredException initialization (line 617)"""
-    from app.exceptions.custom_exceptions import AdminRoleRequiredException
     
     exc = AdminRoleRequiredException(user_role="user")
     assert exc.status_code == 403
@@ -3172,7 +3136,6 @@ def test_admin_role_required_exception():
 
 def test_manager_role_required_exception():
     """Test ManagerRoleRequiredException initialization (line 629)"""
-    from app.exceptions.custom_exceptions import ManagerRoleRequiredException
     
     exc = ManagerRoleRequiredException(user_role="user")
     assert exc.status_code == 403
@@ -3182,7 +3145,6 @@ def test_manager_role_required_exception():
 
 def test_user_role_required_exception():
     """Test UserRoleRequiredException initialization (line 641)"""
-    from app.exceptions.custom_exceptions import UserRoleRequiredException
     
     exc = UserRoleRequiredException(user_role="admin")
     assert exc.status_code == 403
@@ -3192,7 +3154,6 @@ def test_user_role_required_exception():
 
 def test_insufficient_permissions_exception():
     """Test InsufficientPermissionsException initialization (line 653)"""
-    from app.exceptions.custom_exceptions import InsufficientPermissionsException
     
     exc = InsufficientPermissionsException(user_role="user", required_roles=["admin", "manager"])
     assert exc.status_code == 403
@@ -3202,7 +3163,6 @@ def test_insufficient_permissions_exception():
 
 def test_manager_approve_only_exception():
     """Test ManagerApprovalOnlyException initialization (line 677)"""
-    from app.exceptions.custom_exceptions import ManagerApprovalOnlyException
     
     exc = ManagerApprovalOnlyException(user_role="user")
     assert exc.status_code == 403
@@ -3211,7 +3171,6 @@ def test_manager_approve_only_exception():
 
 def test_manager_shipment_management_only_exception():
     """Test ManagerShipmentManagementOnlyException initialization (line 688)"""
-    from app.exceptions.custom_exceptions import ManagerShipmentManagementOnlyException
     
     exc = ManagerShipmentManagementOnlyException(user_role="user")
     assert exc.status_code == 403
@@ -3220,7 +3179,6 @@ def test_manager_shipment_management_only_exception():
 
 def test_feedback_invalid_data_exception():
     """Test FeedbackInvalidDataException initialization (lines 728-734)"""
-    from app.exceptions.custom_exceptions import FeedbackInvalidDataException
     
     # Test with field only
     exc1 = FeedbackInvalidDataException(field="subject")
@@ -3241,7 +3199,6 @@ def test_feedback_invalid_data_exception():
 
 def test_feedback_ticket_id_generation_failed_exception():
     """Test FeedbackTicketIdGenerationFailedException initialization (line 794)"""
-    from app.exceptions.custom_exceptions import FeedbackTicketIdGenerationFailedException
     
     exc = FeedbackTicketIdGenerationFailedException(reason="Database error")
     assert exc.status_code == 500
@@ -3250,7 +3207,6 @@ def test_feedback_ticket_id_generation_failed_exception():
 
 def test_feedback_not_found_exception():
     """Test FeedbackNotFoundException initialization (line 815)"""
-    from app.exceptions.custom_exceptions import FeedbackNotFoundException
     
     # Test with feedback_id
     exc1 = FeedbackNotFoundException(feedback_id=123)
@@ -3271,7 +3227,6 @@ def test_feedback_not_found_exception():
 
 def test_feedback_access_denied_exception():
     """Test FeedbackAccessDeniedException initialization (line 830)"""
-    from app.exceptions.custom_exceptions import FeedbackAccessDeniedException
     
     exc = FeedbackAccessDeniedException(feedback_id=123, user_id="USER-123", reason="Not owner")
     assert exc.status_code == 403
@@ -3282,7 +3237,6 @@ def test_feedback_access_denied_exception():
 
 def test_feedback_filter_invalid_exception():
     """Test FeedbackFilterInvalidException initialization (lines 845-849)"""
-    from app.exceptions.custom_exceptions import FeedbackFilterInvalidException
     
     # Test without reason
     exc1 = FeedbackFilterInvalidException(invalid_filters=["status", "priority"])
@@ -3298,7 +3252,6 @@ def test_feedback_filter_invalid_exception():
 
 def test_feedback_comment_not_found_exception():
     """Test FeedbackCommentNotFoundException initialization (line 894)"""
-    from app.exceptions.custom_exceptions import FeedbackCommentNotFoundException
     
     exc = FeedbackCommentNotFoundException(comment_id=456)
     assert exc.status_code == 404
@@ -3307,7 +3260,6 @@ def test_feedback_comment_not_found_exception():
 
 def test_feedback_comment_invalid_exception():
     """Test FeedbackCommentInvalidException initialization (lines 907-913)"""
-    from app.exceptions.custom_exceptions import FeedbackCommentInvalidException
     
     # Test with field only
     exc1 = FeedbackCommentInvalidException(field="content")
@@ -3328,7 +3280,6 @@ def test_feedback_comment_invalid_exception():
 
 def test_feedback_comment_access_denied_exception():
     """Test FeedbackCommentAccessDeniedException initialization (line 927)"""
-    from app.exceptions.custom_exceptions import FeedbackCommentAccessDeniedException
     
     exc = FeedbackCommentAccessDeniedException(comment_id=456, user_id="USER-123")
     assert exc.status_code == 403
@@ -3338,7 +3289,6 @@ def test_feedback_comment_access_denied_exception():
 
 def test_feedback_status_invalid_exception():
     """Test FeedbackStatusInvalidException initialization (line 959)"""
-    from app.exceptions.custom_exceptions import FeedbackStatusInvalidException
     
     exc = FeedbackStatusInvalidException(status="invalid", valid_statuses=["open", "closed"])
     assert exc.status_code == 400
@@ -3348,7 +3298,6 @@ def test_feedback_status_invalid_exception():
 
 def test_feedback_status_access_denied_exception():
     """Test FeedbackStatusAccessDeniedException initialization (line 973)"""
-    from app.exceptions.custom_exceptions import FeedbackStatusAccessDeniedException
     
     exc = FeedbackStatusAccessDeniedException(feedback_id=123, user_id="USER-123", current_status="open")
     assert exc.status_code == 403
@@ -3359,7 +3308,6 @@ def test_feedback_status_access_denied_exception():
 
 def test_feedback_status_already_set_exception():
     """Test FeedbackStatusAlreadySetException initialization (line 988)"""
-    from app.exceptions.custom_exceptions import FeedbackStatusAlreadySetException
     
     exc = FeedbackStatusAlreadySetException(feedback_id=123, status="closed")
     assert exc.status_code == 400
@@ -3369,7 +3317,6 @@ def test_feedback_status_already_set_exception():
 
 def test_feedback_email_send_failed_exception():
     """Test FeedbackEmailSendFailedException initialization (line 1006)"""
-    from app.exceptions.custom_exceptions import FeedbackEmailSendFailedException
     
     exc = FeedbackEmailSendFailedException(email_type="notification", recipient="user@example.com", reason="SendGrid error")
     assert exc.status_code == 500
@@ -3380,7 +3327,6 @@ def test_feedback_email_send_failed_exception():
 
 def test_feedback_email_template_error_exception():
     """Test FeedbackEmailTemplateErrorException initialization (line 1021)"""
-    from app.exceptions.custom_exceptions import FeedbackEmailTemplateErrorException
     
     exc = FeedbackEmailTemplateErrorException(template_name="feedback_notification", reason="Template not found")
     assert exc.status_code == 500
@@ -3390,7 +3336,6 @@ def test_feedback_email_template_error_exception():
 
 def test_feedback_email_recipient_invalid_exception():
     """Test FeedbackEmailRecipientInvalidException initialization (line 1035)"""
-    from app.exceptions.custom_exceptions import FeedbackEmailRecipientInvalidException
     
     exc = FeedbackEmailRecipientInvalidException(recipient="invalid-email", reason="Invalid email format")
     assert exc.status_code == 400
@@ -3400,7 +3345,6 @@ def test_feedback_email_recipient_invalid_exception():
 
 def test_chat_websocket_invalid_message_exception():
     """Test ChatWebSocketInvalidMessageException initialization (line 1255)"""
-    from app.exceptions.custom_exceptions import ChatWebSocketInvalidMessageException
     
     exc = ChatWebSocketInvalidMessageException(reason="Missing required field")
     assert exc.status_code == 400
@@ -3409,7 +3353,6 @@ def test_chat_websocket_invalid_message_exception():
 
 def test_chat_websocket_invalid_type_exception():
     """Test ChatWebSocketInvalidTypeException initialization (line 1279)"""
-    from app.exceptions.custom_exceptions import ChatWebSocketInvalidTypeException
     
     exc = ChatWebSocketInvalidTypeException(message_type="invalid_type")
     assert exc.status_code == 400
@@ -3418,7 +3361,6 @@ def test_chat_websocket_invalid_type_exception():
 
 def test_chat_websocket_auth_failed_exception():
     """Test ChatWebSocketAuthFailedException initialization (line 1279)"""
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
     
     exc = ChatWebSocketAuthFailedException(reason="Token expired")
     assert exc.status_code == 401
@@ -3431,9 +3373,6 @@ def test_chat_websocket_auth_failed_exception():
 
 def test_require_admin_success():
     """Test require_admin with admin role (lines 32-44)"""
-    from app.dependencies.rbac_dependencies import require_admin
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     admin_user = User()
     admin_user.role = "Admin"  # RoleType stores as title case
@@ -3447,9 +3386,6 @@ def test_require_admin_success():
 
 def test_require_admin_failure():
     """Test require_admin with non-admin role (lines 42-43)"""
-    from app.dependencies.rbac_dependencies import require_admin
-    from app.exceptions.custom_exceptions import AdminRoleRequiredException
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3462,9 +3398,6 @@ def test_require_admin_failure():
 
 def test_require_manager_success():
     """Test require_manager with manager role (lines 47-59)"""
-    from app.dependencies.rbac_dependencies import require_manager
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     manager_user = User()
     manager_user.role = "Manager"  # RoleType stores as title case
@@ -3478,9 +3411,6 @@ def test_require_manager_success():
 
 def test_require_manager_with_admin():
     """Test require_manager with admin role (admin can access manager functions) (line 57)"""
-    from app.dependencies.rbac_dependencies import require_manager
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     admin_user = User()
     admin_user.role = "Admin"  # RoleType stores as title case
@@ -3493,9 +3423,6 @@ def test_require_manager_with_admin():
 
 def test_require_manager_failure():
     """Test require_manager with user role (lines 57-58)"""
-    from app.dependencies.rbac_dependencies import require_manager
-    from app.exceptions.custom_exceptions import ManagerRoleRequiredException
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3508,9 +3435,6 @@ def test_require_manager_failure():
 
 def test_require_user_success():
     """Test require_user with user role (lines 62-74)"""
-    from app.dependencies.rbac_dependencies import require_user
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     user = User()
     user.role = "User"  # RoleType stores as title case
@@ -3523,9 +3447,6 @@ def test_require_user_success():
 
 def test_require_user_failure():
     """Test require_user with non-user role (lines 72-73)"""
-    from app.dependencies.rbac_dependencies import require_user
-    from app.exceptions.custom_exceptions import UserRoleRequiredException
-    from app.models.user_model import User
     
     admin_user = User()
     admin_user.role = "Admin"
@@ -3538,8 +3459,6 @@ def test_require_user_failure():
 
 def test_require_roles_success():
     """Test require_roles with allowed role (lines 77-98)"""
-    from app.dependencies.rbac_dependencies import require_roles
-    from app.models.user_model import User
     
     user = User()
     user.role = "manager"
@@ -3551,9 +3470,6 @@ def test_require_roles_success():
 
 def test_require_roles_failure():
     """Test require_roles with disallowed role (lines 91-95)"""
-    from app.dependencies.rbac_dependencies import require_roles
-    from app.exceptions.custom_exceptions import InsufficientPermissionsException
-    from app.models.user_model import User
     
     user = User()
     user.role = "user"
@@ -3568,10 +3484,6 @@ def test_require_roles_failure():
 
 def test_check_same_company_success():
     """Test check_same_company with same company (lines 101-131)"""
-    from app.dependencies.rbac_dependencies import check_same_company
-    from app.models.user_model import User
-    from app.models.pharma_model import Pharma
-    from unittest.mock import MagicMock
     
     user = User()
     user.pharma_id = 42
@@ -3589,10 +3501,6 @@ def test_check_same_company_success():
 
 def test_check_same_company_pharma_not_found():
     """Test check_same_company when pharma not found (lines 119-124)"""
-    from app.dependencies.rbac_dependencies import check_same_company
-    from app.exceptions.custom_exceptions import CompanyAccessForbiddenException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock
     
     user = User()
     user.pharma_id = 42
@@ -3608,11 +3516,6 @@ def test_check_same_company_pharma_not_found():
 
 def test_check_same_company_different_pharma():
     """Test check_same_company with different company (lines 126-130)"""
-    from app.dependencies.rbac_dependencies import check_same_company
-    from app.exceptions.custom_exceptions import CompanyAccessForbiddenException
-    from app.models.user_model import User
-    from app.models.pharma_model import Pharma
-    from unittest.mock import MagicMock
     
     user = User()
     user.pharma_id = 42
@@ -3632,9 +3535,6 @@ def test_check_same_company_different_pharma():
 
 def test_can_approve_users_success():
     """Test can_approve_users with manager role (lines 134-146)"""
-    from app.dependencies.rbac_dependencies import can_approve_users
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     manager_user = User()
     manager_user.role = "Manager"  # RoleType stores as title case
@@ -3647,9 +3547,6 @@ def test_can_approve_users_success():
 
 def test_can_approve_users_with_admin():
     """Test can_approve_users with admin role (line 144)"""
-    from app.dependencies.rbac_dependencies import can_approve_users
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     admin_user = User()
     admin_user.role = "Admin"  # RoleType stores as title case
@@ -3662,9 +3559,6 @@ def test_can_approve_users_with_admin():
 
 def test_can_approve_users_failure():
     """Test can_approve_users with user role (lines 144-145)"""
-    from app.dependencies.rbac_dependencies import can_approve_users
-    from app.exceptions.custom_exceptions import ManagerApprovalOnlyException
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3677,9 +3571,6 @@ def test_can_approve_users_failure():
 
 def test_can_manage_shipments_success():
     """Test can_manage_shipments with manager role (lines 149-161)"""
-    from app.dependencies.rbac_dependencies import can_manage_shipments
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     manager_user = User()
     manager_user.role = "Manager"  # RoleType stores as title case
@@ -3692,9 +3583,6 @@ def test_can_manage_shipments_success():
 
 def test_can_manage_shipments_with_admin():
     """Test can_manage_shipments with admin role (line 159)"""
-    from app.dependencies.rbac_dependencies import can_manage_shipments
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     admin_user = User()
     admin_user.role = "Admin"  # RoleType stores as title case
@@ -3707,9 +3595,6 @@ def test_can_manage_shipments_with_admin():
 
 def test_can_manage_shipments_failure():
     """Test can_manage_shipments with user role (lines 159-160)"""
-    from app.dependencies.rbac_dependencies import can_manage_shipments
-    from app.exceptions.custom_exceptions import ManagerShipmentManagementOnlyException
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3722,9 +3607,6 @@ def test_can_manage_shipments_failure():
 
 def test_is_admin_true():
     """Test is_admin with admin role (lines 164-174)"""
-    from app.dependencies.rbac_dependencies import is_admin
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     admin_user = User()
     admin_user.role = "Admin"  # RoleType stores as title case
@@ -3737,8 +3619,6 @@ def test_is_admin_true():
 
 def test_is_admin_false():
     """Test is_admin with non-admin role (line 174)"""
-    from app.dependencies.rbac_dependencies import is_admin
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3749,9 +3629,6 @@ def test_is_admin_false():
 
 def test_is_manager_true():
     """Test is_manager with manager role (lines 177-187)"""
-    from app.dependencies.rbac_dependencies import is_manager
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     manager_user = User()
     manager_user.role = "Manager"  # RoleType stores as title case
@@ -3764,8 +3641,6 @@ def test_is_manager_true():
 
 def test_is_manager_false():
     """Test is_manager with non-manager role (line 187)"""
-    from app.dependencies.rbac_dependencies import is_manager
-    from app.models.user_model import User
     
     user = User()
     user.role = "User"
@@ -3776,9 +3651,6 @@ def test_is_manager_false():
 
 def test_is_user_true():
     """Test is_user with user role (lines 190-200)"""
-    from app.dependencies.rbac_dependencies import is_user
-    from app.models.user_model import User
-    from unittest.mock import patch
     
     user = User()
     user.role = "User"  # RoleType stores as title case
@@ -3791,8 +3663,6 @@ def test_is_user_true():
 
 def test_is_user_false():
     """Test is_user with non-user role (line 200)"""
-    from app.dependencies.rbac_dependencies import is_user
-    from app.models.user_model import User
     
     admin_user = User()
     admin_user.role = "Admin"
@@ -3803,8 +3673,6 @@ def test_is_user_false():
 
 def test_get_user_permissions():
     """Test get_user_permissions (lines 203-213)"""
-    from app.dependencies.rbac_dependencies import get_user_permissions
-    from app.models.user_model import User
     
     user = User()
     user.role = "Admin"
@@ -3821,10 +3689,6 @@ def test_get_user_permissions():
 
 def test_get_current_user_missing():
     """Test get_current_user when current_user is not in request.state (lines 65-68)"""
-    from app.dependencies.auth_dependencies import get_current_user
-    from app.exceptions.custom_exceptions import InvalidCredentialsException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     mock_request = MagicMock(spec=Request)
     # Create a state object without current_user attribute
@@ -3839,9 +3703,6 @@ def test_get_current_user_missing():
 
 def test_get_current_user_pharma_id_from_state():
     """Test get_current_user_pharma_id from request.state (lines 84-89)"""
-    from app.dependencies.auth_dependencies import get_current_user_pharma_id
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     mock_request = MagicMock(spec=Request)
     mock_request.state.pharma_id = 42
@@ -3852,10 +3713,6 @@ def test_get_current_user_pharma_id_from_state():
 
 def test_get_current_user_pharma_id_from_token():
     """Test get_current_user_pharma_id from Authorization header (lines 84-114)"""
-    from app.dependencies.auth_dependencies import get_current_user_pharma_id
-    from app.auth.auth import create_access_token
-    from fastapi import Request
-    from unittest.mock import MagicMock, patch
     
     # Create a token with pharma_id
     token_data = {"sub": "USER-123", "pharma_id": 42}
@@ -3874,10 +3731,6 @@ def test_get_current_user_pharma_id_from_token():
 
 def test_get_current_user_pharma_id_no_header():
     """Test get_current_user_pharma_id with no Authorization header (lines 92-94)"""
-    from app.dependencies.auth_dependencies import get_current_user_pharma_id
-    from app.exceptions import InvalidTokenException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     mock_request = MagicMock(spec=Request)
     mock_request.state.pharma_id = None
@@ -3889,10 +3742,6 @@ def test_get_current_user_pharma_id_no_header():
 
 def test_get_current_user_pharma_id_invalid_header_format():
     """Test get_current_user_pharma_id with invalid header format (lines 97-99)"""
-    from app.dependencies.auth_dependencies import get_current_user_pharma_id
-    from app.exceptions import InvalidTokenException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     mock_request = MagicMock(spec=Request)
     mock_request.state.pharma_id = None
@@ -3904,11 +3753,6 @@ def test_get_current_user_pharma_id_invalid_header_format():
 
 def test_get_current_user_pharma_id_missing_pharma_id():
     """Test get_current_user_pharma_id when token has no pharma_id (lines 109-112)"""
-    from app.dependencies.auth_dependencies import get_current_user_pharma_id
-    from app.auth.auth import create_access_token
-    from app.exceptions import UserNotFoundException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     # Create a token without pharma_id
     token_data = {"sub": "USER-123"}
@@ -3924,10 +3768,6 @@ def test_get_current_user_pharma_id_missing_pharma_id():
 
 def test_get_pharma_id_from_request_missing():
     """Test get_pharma_id_from_request when pharma_id is not in request.state (lines 130-135)"""
-    from app.dependencies.auth_dependencies import get_pharma_id_from_request
-    from app.exceptions import UserNotFoundException
-    from fastapi import Request
-    from unittest.mock import MagicMock
     
     mock_request = MagicMock(spec=Request)
     mock_request.state.pharma_id = None
@@ -3938,9 +3778,6 @@ def test_get_pharma_id_from_request_missing():
 
 def test_validate_login_request_user_not_found():
     """Test validate_login_request when user not found (lines 151-153)"""
-    from app.dependencies.auth_dependencies import validate_login_request
-    from app.exceptions import UserNotFoundException
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
@@ -3951,10 +3788,6 @@ def test_validate_login_request_user_not_found():
 
 def test_validate_login_request_account_inactive():
     """Test validate_login_request when account is inactive (lines 158-160)"""
-    from app.dependencies.auth_dependencies import validate_login_request
-    from app.exceptions import AccountInactiveException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     user = User()
@@ -3971,10 +3804,6 @@ def test_validate_login_request_account_inactive():
 
 def test_validate_login_request_user_not_approved():
     """Test validate_login_request when user is not approved (lines 162-164)"""
-    from app.dependencies.auth_dependencies import validate_login_request
-    from app.exceptions import UserNotApprovedException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     user = User()
@@ -3991,10 +3820,6 @@ def test_validate_login_request_user_not_approved():
 
 def test_validate_login_request_invalid_password():
     """Test validate_login_request with invalid password (lines 167-175)"""
-    from app.dependencies.auth_dependencies import validate_login_request
-    from app.exceptions import InvalidCredentialsException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     user = User()
@@ -4016,9 +3841,6 @@ def test_validate_login_request_invalid_password():
 
 def test_validate_login_request_success():
     """Test validate_login_request with valid credentials (lines 177-180)"""
-    from app.dependencies.auth_dependencies import validate_login_request
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     user = User()
@@ -4038,10 +3860,6 @@ def test_validate_login_request_success():
 
 def test_validate_registration_request_password_mismatch():
     """Test validate_registration_request with password mismatch (lines 193-194)"""
-    from app.dependencies.auth_dependencies import validate_registration_request
-    from app.exceptions import PasswordMismatchException
-    from app.schemas.user_schema import UserRegister
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     request = UserRegister(
@@ -4060,11 +3878,6 @@ def test_validate_registration_request_password_mismatch():
 
 def test_validate_registration_request_email_exists():
     """Test validate_registration_request when email already exists (lines 197-199)"""
-    from app.dependencies.auth_dependencies import validate_registration_request
-    from app.exceptions import EmailAlreadyExistsException
-    from app.schemas.user_schema import UserRegister
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     request = UserRegister(
@@ -4087,9 +3900,6 @@ def test_validate_registration_request_email_exists():
 
 def test_validate_otp_verification_invalid_otp():
     """Test validate_otp_verification with invalid OTP (lines 212-214)"""
-    from app.dependencies.auth_dependencies import validate_otp_verification
-    from app.exceptions import InvalidOTPException
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
@@ -4100,50 +3910,40 @@ def test_validate_otp_verification_invalid_otp():
 
 def test_validate_otp_verification_user_not_found():
     """Test validate_otp_verification when user not found (lines 217-219)"""
-    from app.dependencies.auth_dependencies import validate_otp_verification
-    from app.exceptions import OTPUserNotFoundException
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
-    with patch('app.dependencies.auth_dependencies.verify_otp_service', return_value=True):
-        with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=None):
+    # First verify_otp must return True (OTP is valid), then get_user_by_id returns None
+    with patch('app.service.otp_service.verify_otp', return_value=True):
+        with patch('app.service.otp_service.get_user_by_id', return_value=None):
             with pytest.raises(OTPUserNotFoundException):
                 validate_otp_verification("USER-123", "valid_otp", db_mock)
 
 
 def test_get_validated_user_invalid():
     """Test get_validated_user with invalid user or email mismatch (lines 232-236)"""
-    from app.dependencies.auth_dependencies import get_validated_user
-    from app.exceptions import ResendOTPInvalidUserException
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     
     # Test user not found
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=None):
+    with patch('app.service.otp_service.get_user_by_id', return_value=None):
         with pytest.raises(ResendOTPInvalidUserException):
             get_validated_user("user@example.com", "USER-123", db_mock)
     
     # Test email mismatch
-    from app.models.user_model import User
     user = User()
     user.user_id = "USER-123"
     user.email = "different@example.com"
     user.status = True
     user.approved_status = "approved"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPInvalidUserException):
             get_validated_user("user@example.com", "USER-123", db_mock)
 
 
 def test_get_validated_user_not_approved():
     """Test get_validated_user when user is not approved or inactive (lines 239-240)"""
-    from app.dependencies.auth_dependencies import get_validated_user
-    from app.exceptions import ResendOTPUserNotApprovedException
-    from app.models.user_model import User
-    from unittest.mock import MagicMock, patch
     
     db_mock = MagicMock()
     user = User()
@@ -4152,7 +3952,8 @@ def test_get_validated_user_not_approved():
     user.status = False  # Inactive
     user.approved_status = "approved"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    # User exists and email matches, but status is False
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPUserNotApprovedException):
             get_validated_user("user@example.com", "USER-123", db_mock)
     
@@ -4160,16 +3961,13 @@ def test_get_validated_user_not_approved():
     user.status = True
     user.approved_status = "pending"
     
-    with patch('app.dependencies.auth_dependencies.get_user_by_id', return_value=user):
+    with patch('app.service.otp_service.get_user_by_id', return_value=user):
         with pytest.raises(ResendOTPUserNotApprovedException):
             get_validated_user("user@example.com", "USER-123", db_mock)
 
 
 def test_validate_get_user_request_not_found():
     """Test validate_get_user_request when user not found (lines 252-254)"""
-    from app.dependencies.auth_dependencies import validate_get_user_request
-    from app.exceptions import UserGetNotFoundException
-    from unittest.mock import MagicMock
     
     db_mock = MagicMock()
     db_mock.query.return_value.filter.return_value.first.return_value = None
@@ -4180,9 +3978,6 @@ def test_validate_get_user_request_not_found():
 
 def test_validate_approve_user_request_not_found():
     """Test validate_approve_user_request when user not found (lines 266-268)"""
-    from app.dependencies.auth_dependencies import validate_approve_user_request
-    from app.exceptions import UserApproveNotFoundException
-    from unittest.mock import MagicMock
     
     db_mock = MagicMock()
     db_mock.query.return_value.filter.return_value.first.return_value = None
@@ -4193,9 +3988,6 @@ def test_validate_approve_user_request_not_found():
 
 def test_validate_reject_user_request_not_found():
     """Test validate_reject_user_request when user not found (lines 280-282)"""
-    from app.dependencies.auth_dependencies import validate_reject_user_request
-    from app.exceptions import UserRejectNotFoundException
-    from unittest.mock import MagicMock
     
     db_mock = MagicMock()
     db_mock.query.return_value.filter.return_value.first.return_value = None
@@ -4207,10 +3999,6 @@ def test_validate_reject_user_request_not_found():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_token_verification_fails():
     """Test authenticate_websocket when token verification fails (lines 304-309)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     mock_websocket.query_params = {"token": "invalid_token"}
@@ -4225,10 +4013,6 @@ async def test_authenticate_websocket_token_verification_fails():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_missing_user_id():
     """Test authenticate_websocket when token has no user_id or sub (lines 311-313)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     
@@ -4242,11 +4026,6 @@ async def test_authenticate_websocket_missing_user_id():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_user_not_found():
     """Test authenticate_websocket when user not found (lines 316-319)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     
@@ -4266,12 +4045,6 @@ async def test_authenticate_websocket_user_not_found():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_account_inactive():
     """Test authenticate_websocket when account is inactive (lines 321-322)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from app.models.user_model import User
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     user = User()
@@ -4296,12 +4069,6 @@ async def test_authenticate_websocket_account_inactive():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_not_approved():
     """Test authenticate_websocket when account is not approved (lines 324-325)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from app.models.user_model import User
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     user = User()
@@ -4326,12 +4093,6 @@ async def test_authenticate_websocket_not_approved():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_missing_pharma_id():
     """Test authenticate_websocket when pharma_id is missing (lines 327-332)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from app.models.user_model import User
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     user = User()
@@ -4356,11 +4117,6 @@ async def test_authenticate_websocket_missing_pharma_id():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_success():
     """Test authenticate_websocket with valid credentials (lines 304-337)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.models.user_model import User
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     user = User()
@@ -4385,11 +4141,6 @@ async def test_authenticate_websocket_success():
 @pytest.mark.asyncio
 async def test_authenticate_websocket_general_exception():
     """Test authenticate_websocket with general exception (lines 341-343)"""
-    from app.dependencies.auth_dependencies import authenticate_websocket
-    from app.exceptions.custom_exceptions import ChatWebSocketAuthFailedException
-    from app.config.database import SessionLocal
-    from fastapi import WebSocket
-    from unittest.mock import MagicMock, patch
     
     mock_websocket = MagicMock(spec=WebSocket)
     
