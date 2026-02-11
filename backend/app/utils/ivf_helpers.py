@@ -1,12 +1,20 @@
 """
 Helper functions for IVF control tower role-based access control and data access
 """
-from typing import Optional, Tuple
+from functools import lru_cache
+from typing import List, Optional, Tuple
+import base64
+import hashlib
+import hmac
+import logging
 
 from fastapi import Request
+from cryptography.hazmat.primitives import padding  # pyright: ignore[reportMissingImports]
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes  # pyright: ignore[reportMissingImports]
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..config.config import settings
 from ..models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ..models.IVF.tank_model import Tank
 from ..models.user_model import User
@@ -15,6 +23,80 @@ from ..utils.user_helpers import is_hospital_department
 
 # Roles that should be filtered by branch (only User)
 ROLES_WITH_BRANCH_FILTER = ["User"]
+ENCRYPTED_VALUE_PREFIX = "encv1:"
+logger = logging.getLogger(__name__)
+
+
+def _get_ivf_encryption_key() -> bytes:
+    """
+    Derive a stable 32-byte encryption key from SECRET_KEY.
+    """
+    return hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+
+
+def encrypt_sensitive_ivf_value(value: Optional[str]) -> Optional[str]:
+    """
+    Deterministically encrypt IVF-sensitive values for DB storage.
+    Returns plaintext unchanged only when value is empty/None.
+    """
+    if value is None:
+        return None
+    value_str = str(value)
+    if not value_str:
+        return value_str
+    if value_str.startswith(ENCRYPTED_VALUE_PREFIX):
+        return value_str
+
+    key = _get_ivf_encryption_key()
+    value_bytes = value_str.encode("utf-8")
+
+    # Deterministic IV keeps equality queries working on encrypted columns.
+    iv = hmac.new(key, value_bytes, hashlib.sha256).digest()[:16]
+
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(value_bytes) + padder.finalize()
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+
+    encoded = base64.urlsafe_b64encode(iv + ciphertext).decode("utf-8")
+    return f"{ENCRYPTED_VALUE_PREFIX}{encoded}"
+
+
+def decrypt_sensitive_ivf_value(value: Optional[str]) -> Optional[str]:
+    """
+    Decrypt IVF-sensitive values when reading from DB.
+    Plaintext values (legacy rows) are returned as-is.
+    """
+    if value is None:
+        return None
+    value_str = str(value)
+    if not value_str:
+        return value_str
+
+    # Current deterministic encryption format.
+    if value_str.startswith(ENCRYPTED_VALUE_PREFIX):
+        try:
+            token = value_str[len(ENCRYPTED_VALUE_PREFIX):]
+            encrypted_bytes = base64.urlsafe_b64decode(token.encode("utf-8"))
+            iv = encrypted_bytes[:16]
+            ciphertext = encrypted_bytes[16:]
+
+            key = _get_ivf_encryption_key()
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+            decryptor = cipher.decryptor()
+            padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+
+            unpadder = padding.PKCS7(128).unpadder()
+            plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+            return plaintext.decode("utf-8")
+        except Exception:
+            logger.warning("Failed to decrypt encv1 IVF value; returning original value.")
+            return value_str
+
+    # Legacy plaintext rows remain readable.
+    return value_str
 
 
 def get_branch_filter_info(request: Request, branch_id_override: Optional[int] = None, is_quality_tracking: bool = False) -> Tuple[Optional[int], Optional[str]]:
@@ -139,6 +221,7 @@ def find_crylock_by_tank_code(
         PatientCrylockInfo object or None if not found
     """
     crylock_number_trimmed = crylock_number.strip() if crylock_number else None
+    encrypted_crylock_number = encrypt_sensitive_ivf_value(crylock_number_trimmed)
     
     if not tank_code or not crylock_number_trimmed:
         return None
@@ -151,7 +234,10 @@ def find_crylock_by_tank_code(
     # Step 2: Try direct query using patient_crylock_info.tank_id (optimized path)
     query = db.query(PatientCrylockInfo).filter(
         PatientCrylockInfo.tank_id == tank.tank_id,
-        PatientCrylockInfo.crylock_number == crylock_number_trimmed
+        PatientCrylockInfo.crylock_number.in_([
+            encrypted_crylock_number,
+            crylock_number_trimmed
+        ])
     )
     
     # Apply branch filter using direct branch_id reference
@@ -165,7 +251,7 @@ def find_crylock_by_tank_code(
     if crylock:
         return crylock
     
-    # Step 3: Fallback to case-insensitive match with direct references
+    # Step 3: Fallback to case-insensitive match for legacy plaintext rows
     query = db.query(PatientCrylockInfo).filter(
         PatientCrylockInfo.tank_id == tank.tank_id,
         func.lower(func.trim(PatientCrylockInfo.crylock_number)) == func.lower(crylock_number_trimmed)
