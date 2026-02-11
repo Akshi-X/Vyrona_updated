@@ -9,6 +9,7 @@ from typing import Optional
 from app.config.database import get_db
 from app.models.IVF.tank_model import Tank
 from app.service.IVF.critical_alert_service import CriticalAlertService
+from app.exceptions.custom_exceptions import AppException
 from app.schemas.IVF.critical_alert_schema import (
     CriticalAlertResponse,
     CriticalAlertListResponse,
@@ -107,7 +108,6 @@ def acknowledge_alert(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Check if it's an AppException
-        from app.exceptions.custom_exceptions import AppException
         if isinstance(e, AppException):
             raise HTTPException(status_code=e.status_code, detail=e.message)
         raise HTTPException(status_code=500, detail=f"Error acknowledging alert: {str(e)}")
