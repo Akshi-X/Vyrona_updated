@@ -627,6 +627,9 @@ class QualityTrackingService:
                 total=total_slots,
                 available_slots=available_slots
             )
+        except AppException:
+            # Re-raise AppException as-is to preserve status code
+            raise
         except Exception as e:
             logger.error(f"Error fetching canister tracking details: {str(e)}", exc_info=True)
             raise AppException(

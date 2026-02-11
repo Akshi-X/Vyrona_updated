@@ -17,11 +17,24 @@ def db_session():
 @pytest.fixture
 def mock_user():
     """Create a mock user"""
-    user = Mock(spec=User)
+    user = Mock()
     user.user_id = "USER-123"
     user.email = "user@example.com"
     user.role = "manager"
     user.pharma_id = 42
+    user.department = None  # For pharma users, department can be None
+    user.branch_id = None
+    user.hospital_id = None
+    # Configure Mock to return actual values instead of MagicMock
+    user.configure_mock(**{
+        'user_id': "USER-123",
+        'email': "user@example.com",
+        'role': "manager",
+        'pharma_id': 42,
+        'department': None,
+        'branch_id': None,
+        'hospital_id': None
+    })
     return user
 
 
@@ -277,13 +290,13 @@ def test_verify_otp_exception(db_session):
 # ==========================================
 
 @patch('app.service.otp_service.create_access_token')
-@patch('app.dependencies.auth_dependencies.validate_otp_verification')
+@patch('app.service.otp_service.validate_otp_verification')
 def test_verify_otp_and_create_token_success(mock_validate, mock_create_token, db_session, mock_user, mock_otp):
     """Test successfully verifying OTP and creating token"""
     # Setup mocks
     mock_validate.return_value = mock_user
     
-    # Mock OTP query
+    # Mock OTP query for remember_me check
     mock_query = MagicMock()
     mock_query.filter.return_value.order_by.return_value.first.return_value = mock_otp
     db_session.query.return_value = mock_query
@@ -306,7 +319,7 @@ def test_verify_otp_and_create_token_success(mock_validate, mock_create_token, d
     mock_create_token.assert_called_once()
 
 
-@patch('app.dependencies.auth_dependencies.validate_otp_verification')
+@patch('app.service.otp_service.validate_otp_verification')
 def test_verify_otp_and_create_token_with_remember_me(mock_validate, db_session, mock_user, mock_otp):
     """Test verify_otp_and_create_token with remember_me=True"""
     mock_validate.return_value = mock_user
@@ -333,33 +346,32 @@ def test_verify_otp_and_create_token_with_remember_me(mock_validate, db_session,
         assert data.get('remember_me') is True
 
 
-@patch('app.dependencies.auth_dependencies.validate_otp_verification')
-def test_verify_otp_and_create_token_no_otp_record(mock_validate, db_session, mock_user):
+@patch('app.service.otp_service.create_access_token')
+@patch('app.service.otp_service.validate_otp_verification')
+def test_verify_otp_and_create_token_no_otp_record(mock_validate, mock_create_token, db_session, mock_user):
     """Test verify_otp_and_create_token when no OTP record found"""
     mock_validate.return_value = mock_user
+    mock_create_token.return_value = "jwt_token_123"
     
-    # Mock OTP query to return None
+    # Mock OTP query to return None (no remember_me preference)
     mock_query = MagicMock()
     mock_query.filter.return_value.order_by.return_value.first.return_value = None
     db_session.query.return_value = mock_query
     
-    with patch('app.service.otp_service.create_access_token') as mock_create_token:
-        mock_create_token.return_value = "jwt_token_123"
-        
-        result = otp_service.verify_otp_and_create_token(
-            user_id="USER-123",
-            otp="123456",
-            db=db_session
-        )
-        
-        # Should use default session duration (no remember_me)
-        # create_access_token is called with data={...} and expires_delta=...
-        call_kwargs = mock_create_token.call_args[1]  # Get keyword arguments
-        data = call_kwargs.get('data', {})
-        assert data.get('remember_me') is False
+    result = otp_service.verify_otp_and_create_token(
+        user_id="USER-123",
+        otp="123456",
+        db=db_session
+    )
+    
+    # Should use default session duration (no remember_me)
+    # create_access_token is called with data={...} and expires_delta=...
+    call_kwargs = mock_create_token.call_args[1]  # Get keyword arguments
+    data = call_kwargs.get('data', {})
+    assert data.get('remember_me') is False
 
 
-@patch('app.dependencies.auth_dependencies.validate_otp_verification')
+@patch('app.service.otp_service.validate_otp_verification')
 def test_verify_otp_and_create_token_exception(mock_validate, db_session):
     """Test verify_otp_and_create_token when exception occurs"""
     mock_validate.side_effect = Exception("Validation failed")
@@ -380,7 +392,7 @@ def test_verify_otp_and_create_token_exception(mock_validate, db_session):
 # ==========================================
 
 @patch('app.service.otp_service.send_otp_to_user')
-@patch('app.dependencies.auth_dependencies.get_validated_user')
+@patch('app.service.otp_service.get_validated_user')
 def test_resend_otp_to_user_success(mock_get_user, mock_send_otp, db_session, mock_user, mock_otp):
     """Test successfully resending OTP"""
     mock_get_user.return_value = mock_user
@@ -394,13 +406,13 @@ def test_resend_otp_to_user_success(mock_get_user, mock_send_otp, db_session, mo
     
     assert result["user_id"] == "USER-123"
     assert result["email"] == "user@example.com"
-    assert result["otp_expiry"] == mock_otp.expires_at
+    assert result["otp_expiry"] is None  # Frontend uses fixed 10-minute countdown
     mock_get_user.assert_called_once_with("user@example.com", "USER-123", db_session)
     mock_send_otp.assert_called_once_with(db_session, "USER-123", "user@example.com")
 
 
 @patch('app.service.otp_service.send_otp_to_user')
-@patch('app.dependencies.auth_dependencies.get_validated_user')
+@patch('app.service.otp_service.get_validated_user')
 def test_resend_otp_to_user_failed(mock_get_user, mock_send_otp, db_session, mock_user):
     """Test resending OTP when it fails"""
     mock_get_user.return_value = mock_user

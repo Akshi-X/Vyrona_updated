@@ -288,7 +288,7 @@ async def broadcast_new_message(
             id=result.message_id,
             message_content=result.message_content,
             patient_id=result.patient_id,
-            canister_number=result.canister_number,
+            tank_code=result.tank_code,
             sender_id=result.sender_id,
             sender_name=result.sender_name,
             sender_role=result.sender_role,
@@ -313,10 +313,10 @@ async def broadcast_new_message(
                 sender_pharma_id,
                 db
             )
-        elif result.canister_number:
-            # IVF flow: broadcast to canister subscribers (handled via websocket manager)
-            # The websocket manager already supports canister_number broadcasting
-            pass  # Will be handled by existing canister subscription logic
+        elif result.tank_code:
+            # IVF flow: broadcast to tank subscribers (handled via websocket manager)
+            # The websocket manager already supports tank_code broadcasting
+            pass  # Will be handled by existing tank subscription logic
         
         # Send to tagged users (even if not subscribed to patient)
         if result.tagged_user_ids:
