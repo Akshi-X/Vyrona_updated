@@ -9,6 +9,7 @@ from typing import Optional
 
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user
+from app.exceptions.custom_exceptions import AppException
 from app.models.user_model import User
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.schemas.IVF.quality_tracking_schema import (
@@ -200,7 +201,6 @@ def get_canister_tracking_details(
     except HTTPException:
         raise
     except Exception as e:
-        from app.exceptions.custom_exceptions import AppException
         if isinstance(e, AppException):
             raise HTTPException(status_code=e.status_code, detail=e.message)
         logger.error(f"Error in get_canister_tracking_details endpoint: {str(e)}", exc_info=True)

@@ -3,12 +3,19 @@ Unit tests for Critical Alert Controller
 """
 import pytest
 from unittest.mock import MagicMock, Mock, patch
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import uuid
 
 from app.controller.IVF import critical_alert_controller
 from app.constants.enums import AlertStatus
+from app.exceptions.custom_exceptions import AppException
+from app.schemas.IVF.critical_alert_schema import (
+    AcknowledgeAlertResponse,
+    HospitalAlertsResponse,
+    TankAlertsResponse,
+)
 
 
 @pytest.fixture
@@ -45,8 +52,6 @@ def override_get_db():
 
 def test_get_tank_alerts_success(app, monkeypatch):
     """Test getting tank alerts successfully"""
-    from app.schemas.IVF.critical_alert_schema import TankAlertsResponse
-    
     mock_response = TankAlertsResponse(
         tank_id=1,
         tank_code="T1",
@@ -138,8 +143,6 @@ def test_get_tank_alerts_error(app, monkeypatch):
 
 def test_get_hospital_alerts_success(app, monkeypatch):
     """Test getting hospital alerts successfully"""
-    from app.schemas.IVF.critical_alert_schema import HospitalAlertsResponse
-    
     mock_response = HospitalAlertsResponse(
         alerts=[],
         total_count=0,
@@ -175,8 +178,6 @@ def test_get_hospital_alerts_success(app, monkeypatch):
 
 def test_get_hospital_alerts_with_status_filter(app, monkeypatch):
     """Test getting hospital alerts with status filter"""
-    from app.schemas.IVF.critical_alert_schema import HospitalAlertsResponse
-    
     mock_response = HospitalAlertsResponse(
         alerts=[],
         total_count=0,
@@ -215,11 +216,6 @@ def test_get_hospital_alerts_with_status_filter(app, monkeypatch):
 
 def test_acknowledge_alert_success(app, monkeypatch, mock_request):
     """Test acknowledging an alert successfully"""
-    from app.schemas.IVF.critical_alert_schema import AcknowledgeAlertResponse
-    from app.constants.enums import AlertStatus
-    from datetime import datetime, timezone
-    from starlette.middleware.base import BaseHTTPMiddleware
-    
     alert_id = str(uuid.uuid4())
     
     mock_response = AcknowledgeAlertResponse(
@@ -282,9 +278,6 @@ def test_acknowledge_alert_not_authenticated(app, monkeypatch):
 
 def test_acknowledge_alert_not_found(app, monkeypatch, mock_request):
     """Test acknowledging an alert when alert not found"""
-    from starlette.middleware.base import BaseHTTPMiddleware
-    from app.exceptions.custom_exceptions import AppException
-    
     alert_id = str(uuid.uuid4())
     
     mock_service = MagicMock()
