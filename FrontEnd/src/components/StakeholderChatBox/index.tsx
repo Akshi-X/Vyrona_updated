@@ -3,7 +3,7 @@ import { chatService } from '../../services/chatService';
 import { userService, type UserListItem } from '../../services/userService';
 import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import { usePatientChatWebSocket } from '../../hooks/useChatWebSocket';
+import { usePatientChatWebSocket, useCanisterChatWebSocket } from '../../hooks/useChatWebSocket';
 
 // Utility function to format date in UTC consistently across all browsers
 const formatUTCTimestamp = (dateString: string): string => {
@@ -46,7 +46,8 @@ type ChatMessage = {
 interface StakeholderChatBoxProps {
   isOpen: boolean;
   onClose: () => void;
-  patientId: string | undefined;
+  patientId?: string | undefined; // For CGT flow
+  canisterNumber?: string | undefined; // For IVF flow
   onMessagesUpdated?: () => void; // Callback to refresh unread messages in parent
 }
 
@@ -54,6 +55,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   isOpen,
   onClose,
   patientId,
+  canisterNumber,
   onMessagesUpdated
 }) => {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -77,8 +79,18 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
   const [mentionIndex, setMentionIndex] = useState(-1);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
-  // WebSocket for patient messages
-  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = usePatientChatWebSocket(patientId);
+  // Determine if this is CGT (patient) or IVF (canister) flow
+  // Treat empty strings as falsy to avoid sending empty patient_id
+  const isCGTFlow = !!(patientId && patientId.trim());
+  const isIVFFlow = !!(canisterNumber && canisterNumber.trim());
+  const chatIdentifier = (patientId && patientId.trim()) || (canisterNumber && canisterNumber.trim()) || undefined;
+
+  // WebSocket for patient messages (CGT) or canister messages (IVF)
+  const patientWs = usePatientChatWebSocket(isCGTFlow ? patientId : undefined);
+  const canisterWs = useCanisterChatWebSocket(isIVFFlow ? canisterNumber : undefined);
+  
+  // Use the appropriate WebSocket hook based on flow
+  const { messages: wsMessages, unreadCount, markAsRead, refreshMessages } = isCGTFlow ? patientWs : canisterWs;
 
   // Fetch current user
   const fetchCurrentUser = async (): Promise<void> => {
@@ -131,7 +143,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       
       return {
         id: msg.id.toString(),
-        chatId: patientId || '',
+        chatId: chatIdentifier || '',
         sender: isFromMe ? 'me' : 'them',
         text: msg.message_content,
         at: formatUTCTimestamp(msg.created_at),
@@ -154,7 +166,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     setMessages(transformedMessages);
     
    
-  }, [wsMessages, currentUserId, patientId, isOpen]);
+  }, [wsMessages, currentUserId, chatIdentifier, isOpen]);
 
   // Note: Mark as read functionality:
   // 1. When user closes chat dialog (handleClose function)
@@ -212,7 +224,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   // Initialize when chat opens
   useEffect(() => {
-    if (isOpen && patientId) {
+    if (isOpen && chatIdentifier) {
       const initializeChat = async () => {
         setLoadingMessages(true);
         await fetchCurrentUser();
@@ -227,7 +239,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
       hasMarkedAsReadRef.current = false;
       previousUnreadCountRef.current = 0;
     }
-  }, [isOpen, patientId, unreadCount, currentUserId]);
+  }, [isOpen, chatIdentifier, unreadCount, currentUserId]);
 
   // Scroll to bottom when loading completes and messages are available
   useEffect(() => {
@@ -368,7 +380,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   const handleSendDraft = async () => {
     const text = draftMessage.trim();
-    if (!patientId || !text) return;
+    if (!chatIdentifier || !text) return;
     
     // Clear input immediately for better UX
     const messageToSend = text;
@@ -388,11 +400,26 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         taggedUserIds = [];
       }
       
-      const requestPayload = {
+      // Build request payload based on flow type
+      // For IVF: only include tank_code, omit patient_id completely
+      // For CGT: only include patient_id, omit tank_code completely
+      const requestPayload: {
+        message_content: string;
+        patient_id?: string;
+        tank_code?: string;
+        tagged_user_ids: string[];
+      } = {
         message_content: messageToSend,
-        patient_id: patientId,
         tagged_user_ids: taggedUserIds
       };
+      
+      if (isCGTFlow && patientId && patientId.trim()) {
+        // CGT flow: only set patient_id, don't include tank_code
+        requestPayload.patient_id = patientId.trim();
+      } else if (isIVFFlow && canisterNumber && canisterNumber.trim()) {
+        // IVF flow: only set tank_code, don't include patient_id
+        requestPayload.tank_code = canisterNumber.trim();
+      }
       
       await chatService.sendMessage(requestPayload);
       
@@ -401,9 +428,15 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         markAsRead();
       } catch {
         // Fallback to HTTP API if WebSocket fails
-        chatService.markPatientAsRead(patientId).catch(() => {
-          // Silently handle errors
-        });
+        if (isCGTFlow && patientId) {
+          chatService.markPatientAsRead(patientId).catch(() => {
+            // Silently handle errors
+          });
+        } else if (isIVFFlow && canisterNumber) {
+          chatService.markCanisterAsRead(canisterNumber).catch(() => {
+            // Silently handle errors
+          });
+        }
       }
       hasMarkedAsReadRef.current = true;
       
@@ -453,7 +486,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   // Handle close - mark as read
   const handleClose = () => {
-    if (patientId && !hasMarkedAsReadRef.current) {
+    if (chatIdentifier && !hasMarkedAsReadRef.current) {
       // Mark as read when closing chat
       // Try WebSocket first, fallback to HTTP API
       try {
@@ -464,9 +497,15 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         }, 200);
       } catch {
         // Fallback to HTTP API if WebSocket fails
-        chatService.markPatientAsRead(patientId).catch(() => {
-          // Silently handle errors
-        });
+        if (isCGTFlow && patientId) {
+          chatService.markPatientAsRead(patientId).catch(() => {
+            // Silently handle errors
+          });
+        } else if (isIVFFlow && canisterNumber) {
+          chatService.markCanisterAsRead(canisterNumber).catch(() => {
+            // Silently handle errors
+          });
+        }
       }
       hasMarkedAsReadRef.current = true;
     }
@@ -706,7 +745,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
               })()
             ) : (
               <div className="text-center text-xs text-gray-500 mt-10">
-                {patientId ? 'No messages yet. Start the conversation!' : 'No messages to display'}
+                {chatIdentifier ? 'No messages yet. Start the conversation!' : 'No messages to display'}
               </div>
             )}
           </div>
@@ -718,11 +757,11 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={patientId ? 'Type a message… (use @ to mention)' : 'Type a message…'}
+                  placeholder={chatIdentifier ? 'Type a message… (use @ to mention)' : 'Type a message…'}
                   value={draftMessage}
                   onChange={(e) => handleMessageChange(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  disabled={!patientId}
+                  disabled={!chatIdentifier}
                   className="w-full min-h-[44px] max-h-32 py-2.5 px-4 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white shadow-sm"
                 />
                 {/* Mention dropdown */}
@@ -762,10 +801,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 )}
               </div>
               <button 
-                disabled={!patientId || !draftMessage.trim()} 
+                disabled={!chatIdentifier || !draftMessage.trim()} 
                 onClick={handleSendDraft} 
                 className={`min-w-[44px] h-[44px] rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
-                  (!patientId || !draftMessage.trim()) 
+                  (!chatIdentifier || !draftMessage.trim()) 
                     ? 'bg-gray-300 cursor-not-allowed' 
                     : 'bg-[#8d2b8f] hover:bg-[#7a2473] active:bg-[#6a1f64] cursor-pointer'
                 }`}

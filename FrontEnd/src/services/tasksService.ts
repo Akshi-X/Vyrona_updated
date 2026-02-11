@@ -24,6 +24,7 @@ export interface Task {
     role: string;
   };
   patient_id?: string;
+  canister_number?: string | null;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
   status: 'Not started' | 'In progress' | 'Done';
@@ -42,6 +43,22 @@ export interface TaskListResponse {
   total_assigned: number;
 }
 
+export interface ScopedTaskListResponse {
+  tasks: Task[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  message: string;
+  patient_id?: string | null;
+  canister_number?: string | null;
+}
+
+export interface TaskMutationResponse {
+  message: string;
+  task: Task;
+}
+
 export class TasksService extends BaseApiService {
   /**
    * Get all tasks for current user
@@ -56,8 +73,18 @@ export class TasksService extends BaseApiService {
    * Get tasks for a specific patient
    * Returns PatientTaskListResponse with tasks array inside
    */
-  async getPatientTasks(patientId: string): Promise<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }> {
-    return await this.request<{ tasks: Task[]; total: number; page: number; page_size: number; has_next: boolean; message: string; patient_id: string }>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
+  async getPatientTasks(patientId: string): Promise<ScopedTaskListResponse> {
+    return await this.request<ScopedTaskListResponse>(`/api/patients/${encodeURIComponent(patientId)}/tasks`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get tasks for a specific tank (IVF flow)
+   * Returns PatientTaskListResponse with tasks array inside
+   */
+  async getCanisterTasks(tank_code: string): Promise<ScopedTaskListResponse> {
+    return await this.request<ScopedTaskListResponse>(`/api/canisters/${encodeURIComponent(tank_code)}/tasks`, {
       method: 'GET',
     });
   }
@@ -79,11 +106,12 @@ export class TasksService extends BaseApiService {
     description?: string;
     assignee_id: string;
     patient_id?: string;
+    tank_code?: string;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';
     status?: 'Not started' | 'In progress' | 'Done';
-  }): Promise<{ message: string; task_id: number }> {
-    return await this.request<{ message: string; task_id: number }>('/api/tasks', {
+  }): Promise<TaskMutationResponse> {
+    return await this.request<TaskMutationResponse>('/api/tasks', {
       method: 'POST',
       body: JSON.stringify(taskData),
     });
@@ -97,11 +125,12 @@ export class TasksService extends BaseApiService {
     description?: string;
     assignee_id?: string;
     patient_id?: string;
+    tank_code?: string;
     due_date?: string;
     priority?: 'Low' | 'Medium' | 'High';
     status?: 'Not started' | 'In progress' | 'Done';
-  }): Promise<{ message: string; task_id: number }> {
-    return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}`, {
+  }): Promise<TaskMutationResponse> {
+    return await this.request<TaskMutationResponse>(`/api/tasks/${taskId}`, {
       method: 'PUT',
       body: JSON.stringify(taskData),
     });
@@ -110,8 +139,8 @@ export class TasksService extends BaseApiService {
   /**
    * Update task status
    */
-  async updateTaskStatus(taskId: number, status: 'Not started' | 'In progress' | 'Done'): Promise<{ message: string; task_id: number }> {
-    return await this.request<{ message: string; task_id: number }>(`/api/tasks/${taskId}/status`, {
+  async updateTaskStatus(taskId: number, status: 'Not started' | 'In progress' | 'Done'): Promise<TaskMutationResponse> {
+    return await this.request<TaskMutationResponse>(`/api/tasks/${taskId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });

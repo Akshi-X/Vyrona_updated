@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import { authUtils } from '../../../utils/auth';
 import ExtractIcon from '../../../assets/TrackAndTraceIcons/Extract.svg';
 import LightExtractIcon from '../../../assets/TrackAndTraceIcons/LightExtract.svg';
 import QualityLossModal from '../../../components/QualityLossModal';
@@ -10,49 +12,140 @@ interface Threshold {
 }
 
 interface QualityPayload {
-  temperature: number;
+  temp_internal: number;
+  temp_external: number | null;
   humidity: number;
-  agitation: number;
+  shock: number;
   thresholds: {
-    temperature: Threshold;
+    temp_internal: Threshold;
+    temp_external: Threshold;
     humidity: Threshold;
-    agitation: Threshold;
+    shock: Threshold;
   };
   threshold_violations: {
-    temperature: boolean;
+    temp_internal: boolean;
+    temp_external: boolean;
     humidity: boolean;
-    agitation: boolean;
+    shock: boolean;
   };
   quality_loss?: number;
   quality_status?: string;
   quality_percentage?: number;
 }
 
-const mockQualityPayload: QualityPayload = {
-  // Temperature is intentionally outside range -> anomaly
-  temperature: 11.8,
-  // Humidity and agitation are within their ranges -> normal
-  humidity: 55,
-  agitation: 6,
-  thresholds: {
-    temperature: { min: 2, max: 8, unit: '°C' },
-    humidity: { min: 40, max: 60, unit: '%' },
-    agitation: { min: 0, max: 10, unit: '%' },
-  },
-  threshold_violations: {
-    temperature: true,
-    humidity: false,
-    agitation: false,
-  },
-  quality_loss: 11.5,
-  quality_status: 'Warning',
-  quality_percentage: 88.5,
-};
+interface IVFQualityParametersTableProps {
+  canisterNumber?: string;
+}
 
-export function IVFQualityParametersTable() {
+export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
+  const { token } = useAuth();
+  const wsRef = useRef<WebSocket | null>(null);
+  const isMountedRef = useRef(true);
+  
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [showQualityLossModal, setShowQualityLossModal] = useState(false);
-  const [latest] = useState<QualityPayload | null>(mockQualityPayload);
+  const [latest, setLatest] = useState<QualityPayload | null>(null);
+
+  const getWebSocketUrl = () => {
+    const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
+    const wsUrl = baseUrl.replace(/^http/, 'ws');
+    return `${wsUrl}/api/ivf/quality/ws`;
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    if (!canisterNumber) return;
+    const authToken = token || authUtils.getToken();
+    if (!authToken) return;
+
+    try {
+      const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
+
+      ws.onopen = () => {
+        if (canisterNumber) ws.send(JSON.stringify({ canister_number: canisterNumber }));
+      };
+
+      ws.onmessage = (event) => {
+        if (!isMountedRef.current) return;
+        try {
+          const data: any = JSON.parse(event.data);
+          
+          if (data.type === 'subscription_confirmed') {
+            return;
+          }
+          
+          if (data.type === 'error') {
+            return;
+          }
+          
+          // Check if this is quality data (has canister_number or canister_id and timestamp)
+          // IVF data uses temp_internal (not temperature) and shock (not agitation)
+          const hasCanisterId = data.canister_number || data.canister_id;
+          const hasTimestamp = data.timestamp;
+          const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
+          
+          if (hasCanisterId && hasTimestamp && hasTemperature) {
+            // Extract IVF field names
+            const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
+            const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
+            const humidity = data.humidity;
+            const shock = data.shock !== undefined ? data.shock : data.agitation;
+            
+            // Only process if we have valid numeric values for required fields
+            if (temp_internal !== undefined && temp_internal !== null && 
+                humidity !== undefined && humidity !== null && 
+                shock !== undefined && shock !== null) {
+              // Map the data to QualityPayload format
+              const qualityPayload: QualityPayload = {
+                temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
+                temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
+                humidity: typeof humidity === 'number' ? humidity : parseFloat(humidity),
+                shock: typeof shock === 'number' ? shock : parseFloat(shock),
+                thresholds: {
+                  temp_internal: data.thresholds?.temperature || data.thresholds?.temp_internal || { min: null, max: null, unit: '°C' },
+                  temp_external: data.thresholds?.temp_external || { min: null, max: null, unit: '°C' },
+                  humidity: data.thresholds?.humidity || { min: null, max: null, unit: '%' },
+                  shock: data.thresholds?.agitation || data.thresholds?.shock || { min: null, max: null, unit: 'G' },
+                },
+                threshold_violations: {
+                  temp_internal: data.threshold_violations?.temperature || data.threshold_violations?.temp_internal || false,
+                  temp_external: data.threshold_violations?.temp_external || false,
+                  humidity: data.threshold_violations?.humidity || false,
+                  shock: data.threshold_violations?.agitation || data.threshold_violations?.shock || false,
+                },
+                quality_loss: data.quality_loss,
+                quality_status: data.quality_status,
+                quality_percentage: data.quality_percentage,
+              };
+              
+              setLatest(qualityPayload);
+            }
+          }
+        } catch (e) {
+          // Error parsing WebSocket message
+        }
+      };
+
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+
+      wsRef.current = ws;
+    } catch (e) {
+      // ignore connection errors here
+    }
+
+    return () => {
+      isMountedRef.current = false;
+      if (wsRef.current) {
+        try {
+          wsRef.current.close(1000, 'component unmount');
+        } catch {}
+        wsRef.current = null;
+      }
+    };
+  }, [canisterNumber, token]);
 
   type Row = {
     key: keyof QualityPayload['thresholds'];
@@ -65,28 +158,32 @@ export function IVFQualityParametersTable() {
   const rows: Row[] = useMemo(() => {
     if (!latest) return [];
 
-    const mapping: Array<{ key: Row['key']; label: string; value: number }> = [
-      { key: 'temperature', label: 'Temperature (°C)', value: latest.temperature },
+    const mapping: Array<{ key: Row['key']; label: string; value: number | null }> = [
+      { key: 'temp_internal', label: 'Temperature Internal (°C)', value: latest.temp_internal },
+      { key: 'temp_external', label: 'Temperature External (°C)', value: latest.temp_external },
       { key: 'humidity', label: 'Humidity (%)', value: latest.humidity },
-      { key: 'agitation', label: 'Agitation / Vibration', value: latest.agitation },
+      { key: 'shock', label: 'Shock (G)', value: latest.shock },
     ];
 
-    const isViolated = (value: number, t: Threshold) => {
+    const isViolated = (value: number | null, t: Threshold) => {
+      if (value === null || value === undefined) return false;
       const belowMin = t.min !== null && t.min !== undefined && value < t.min;
       const aboveMax = t.max !== null && t.max !== undefined && value > t.max;
       return belowMin || aboveMax;
     };
 
-    return mapping.map((m) => {
-      const threshold = latest.thresholds[m.key];
-      return {
-        key: m.key,
-        label: m.label,
-        value: m.value,
-        threshold,
-        violated: isViolated(m.value, threshold),
-      };
-    });
+    return mapping
+      .filter((m) => m.value !== null && m.value !== undefined) // Filter out null values
+      .map((m) => {
+        const threshold = latest.thresholds[m.key];
+        return {
+          key: m.key,
+          label: m.label,
+          value: m.value as number,
+          threshold,
+          violated: isViolated(m.value, threshold),
+        };
+      });
   }, [latest]);
 
   const filteredRows = useMemo(() => {
@@ -109,7 +206,7 @@ export function IVFQualityParametersTable() {
     if (t.unit) return `${value}${t.unit ? ` ${t.unit}` : ''}`;
     if (label.includes('Temperature')) return `${value} °C`;
     if (label.includes('Humidity')) return `${value} %`;
-    if (label.includes('Agitation') || label.includes('Vibration')) return `${value} %`;
+    if (label.includes('Shock')) return `${value} G`;
     return `${value}`;
   };
 
@@ -142,9 +239,9 @@ export function IVFQualityParametersTable() {
                 type="button"
                 onClick={() => setShowQualityLossModal(true)}
                 className={`rounded-[6px] px-3 py-2 text-xs font-semibold h-[30px] text-white ${
-                  latest.quality_status === 'Critical'
+                  latest.quality_loss >= 30
                     ? 'bg-red-600'
-                    : latest.quality_status === 'Warning'
+                    : latest.quality_loss >= 15
                     ? 'bg-[#EAB308]'
                     : 'bg-green-600'
                 }`}
@@ -193,7 +290,7 @@ export function IVFQualityParametersTable() {
               <tr>
                 <td className="px-3 py-4 text-gray-600 text-center" colSpan={4}>
                   <div className="flex items-center justify-center">
-                    {latest ? 'No anomalies' : 'Waiting for data...'}
+                    {latest ? 'No anomalies' : 'Waiting for live data...'}
                   </div>
                 </td>
               </tr>

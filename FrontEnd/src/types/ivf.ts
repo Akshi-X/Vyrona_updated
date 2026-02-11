@@ -2,8 +2,8 @@ export interface IVFTreatment {
   hisNumber: string;
   cryolockNum: string;
   canisterNum: number;
-  tankId: string;
-  caneId: string;
+  tankCode: string;
+  caneCode: string;
   gobletColor: string;
   cryolockColor: string;
   dateOfVitrification: string;
@@ -11,6 +11,7 @@ export interface IVFTreatment {
   status: string;
   // Available from API, not currently displayed in the table UI
   embryoGrading?: string;
+  description?: string | null;
 }
 
 export interface EmbryoTrackingApiResponse {

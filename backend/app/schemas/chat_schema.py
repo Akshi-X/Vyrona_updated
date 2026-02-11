@@ -10,7 +10,7 @@ from datetime import datetime
 class ChatMessageCreateRequest(BaseModel):
     """Schema for creating a new chat message"""
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     message_content: str
     tagged_user_ids: Optional[List[str]] = []
     
@@ -24,23 +24,23 @@ class ChatMessageCreateRequest(BaseModel):
         return v.strip()
     
     @model_validator(mode='after')
-    def validate_patient_or_canister(self):
-        """Validate that either patient_id or canister_number is provided"""
+    def validate_patient_or_tank(self):
+        """Validate that either patient_id or tank_code is provided"""
         # Treat empty strings as None
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
-        canister_number = self.canister_number.strip() if self.canister_number and isinstance(self.canister_number, str) else self.canister_number
+        tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
         
         # If both are None/empty, raise error
-        if not patient_id and not canister_number:
-            raise ValueError("Either patient_id (for CGT) or canister_number (for IVF) must be provided")
+        if not patient_id and not tank_code:
+            raise ValueError("Either patient_id (for CGT) or tank_code (for IVF) must be provided")
         
         # If both are provided, raise error
-        if patient_id and canister_number:
-            raise ValueError("Cannot provide both patient_id and canister_number. Use patient_id for CGT or canister_number for IVF")
+        if patient_id and tank_code:
+            raise ValueError("Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
         
         # Update the model with cleaned values
         self.patient_id = patient_id if patient_id else None
-        self.canister_number = canister_number if canister_number else None
+        self.tank_code = tank_code if tank_code else None
         return self
     
     @field_validator('tagged_user_ids')
@@ -73,7 +73,7 @@ class ChatMessageResponse(BaseModel):
     id: int
     message_content: str
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     sender_id: str
     sender_name: str
     sender_role: Optional[str] = None
@@ -92,7 +92,7 @@ class ChatMessageCreateResponse(BaseModel):
     """Schema for chat message creation response"""
     message_id: int
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     message_content: str
     sender_id: str
     sender_name: str
@@ -110,9 +110,9 @@ class ChatMessageCreateResponse(BaseModel):
 
 
 class PatientMessagesResponse(BaseModel):
-    """Schema for patient/canister messages response"""
+    """Schema for patient/tank messages response"""
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     patient_name: Optional[str] = None  # Patient name for CGT
     messages: List[ChatMessageResponse]
     total_messages: int
@@ -127,7 +127,7 @@ class UnreadMessageResponse(BaseModel):
     message_id: int
     message_content: str
     patient_id: Optional[str] = None  # For CGT flow
-    canister_number: Optional[str] = None  # For IVF flow (e.g., "C1")
+    tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
     patient_name: Optional[str] = None  # Patient name for CGT
     sender_id: str
     sender_name: str
@@ -142,7 +142,7 @@ class UnreadMessagesResponse(BaseModel):
     unread_messages: List[UnreadMessageResponse]
     total_unread: int
     unread_by_patient: dict  # {patient_id: count} for CGT
-    unread_by_canister: dict  # {canister_number: count} for IVF
+    unread_by_tank: dict  # {tank_code: count} for IVF
     
     class Config:
         from_attributes = True

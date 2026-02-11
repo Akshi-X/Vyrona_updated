@@ -7,7 +7,8 @@ import { BaseApiService } from './baseApiService';
 export interface ChatMessageResponse {
   id: number;
   message_content: string;
-  patient_id: string;
+  patient_id?: string | null; // For CGT flow
+  canister_number?: string | null; // For IVF flow
   sender_id: string;
   sender_name: string;
   sender_role?: string;
@@ -20,8 +21,9 @@ export interface ChatMessageResponse {
 export interface UnreadMessageResponse {
   message_id: number;
   message_content: string;
-  patient_id: string;
-  patient_name: string;
+  patient_id?: string | null; // For CGT flow
+  canister_number?: string | null; // For IVF flow
+  patient_name?: string | null; // Patient name for CGT
   sender_id: string;
   sender_name: string;
   created_at: string;
@@ -30,12 +32,14 @@ export interface UnreadMessageResponse {
 export interface UnreadMessagesResponse {
   unread_messages: UnreadMessageResponse[];
   total_unread: number;
-  unread_by_patient: Record<string, number>;
+  unread_by_patient: Record<string, number>; // For CGT flow
+  unread_by_canister: Record<string, number>; // For IVF flow
 }
 
 export interface PatientMessagesResponse {
-  patient_id: string;
-  patient_name: string;
+  patient_id?: string | null; // For CGT flow
+  canister_number?: string | null; // For IVF flow
+  patient_name?: string | null; // Patient name for CGT
   messages: ChatMessageResponse[];
   total_messages: number;
   unread_count: number;
@@ -43,17 +47,22 @@ export interface PatientMessagesResponse {
 
 export interface ChatMessageCreateRequest {
   message_content: string;
-  patient_id: string;
+  patient_id?: string; // For CGT flow
+  canister_number?: string; // For IVF flow
   tagged_user_ids?: string[];
 }
 
 export interface ChatMessageCreateResponse {
   message_id: number;
   message_content: string;
-  patient_id: string;
+  patient_id?: string | null; // For CGT flow
+  canister_number?: string | null; // For IVF flow
   sender_id: string;
-  created_at: string;
+  sender_name: string;
+  sender_role?: string | null;
   tagged_user_ids: string[];
+  tagged_user_names?: string[] | null;
+  created_at: string;
 }
 
 // ============================================
@@ -71,7 +80,7 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Get all messages for a specific patient
+   * Get all messages for a specific patient (CGT flow)
    */
   async getPatientMessages(patientId: string): Promise<PatientMessagesResponse> {
     return await this.request<PatientMessagesResponse>(`/api/chat/patients/${patientId}/messages`, {
@@ -80,7 +89,16 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Send a chat message
+   * Get all messages for a specific tank (IVF flow)
+   */
+  async getCanisterMessages(tank_code: string): Promise<PatientMessagesResponse> {
+    return await this.request<PatientMessagesResponse>(`/api/chat/canisters/${tank_code}/messages`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Send a chat message (supports both CGT and IVF flows)
    */
   async sendMessage(data: ChatMessageCreateRequest): Promise<ChatMessageCreateResponse> {
     return await this.request<ChatMessageCreateResponse>('/api/chat/messages', {
@@ -90,7 +108,7 @@ export class ChatService extends BaseApiService {
   }
 
   /**
-   * Mark patient messages as read
+   * Mark patient messages as read (CGT flow)
    */
   async markPatientAsRead(patientId: string): Promise<{
     success: boolean;
@@ -100,6 +118,21 @@ export class ChatService extends BaseApiService {
     unread_count: number;
   }> {
     return await this.request(`/api/chat/patients/${patientId}/mark-read`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Mark tank messages as read (IVF flow)
+   */
+  async markCanisterAsRead(tank_code: string): Promise<{
+    success: boolean;
+    message: string;
+    canister_number: string;
+    last_read_message_id: number;
+    unread_count: number;
+  }> {
+    return await this.request(`/api/chat/canisters/${tank_code}/mark-read`, {
       method: 'POST',
     });
   }

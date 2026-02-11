@@ -221,6 +221,7 @@ ERROR_CODES = {
     "QUALITY_DATA_NOT_FOUND": "ERR_11002",
     "QUALITY_SERVICE_ERROR": "ERR_11003",
     "QUALITY_CSV_EXPORT_FAILED": "ERR_11004",
+    "CRYOLOCK_ACTIVE_SHIPMENT_EXISTS": "ERR_11011",
 
     # ============================================
     # CHAT SYSTEM (11xxx)

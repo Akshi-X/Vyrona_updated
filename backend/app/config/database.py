@@ -77,12 +77,8 @@ def init_db():
         hospital_model,
         hospital_branch_model,
         tank_model,
-        canister_model,
         canister_ln2_log_model,
-        cane_model,
-        cryolock_model,
-        patient_model as ivf_patient_model,
-        embryo_model,
+        patient_crylock_info_model,
         critical_alert_model
     )
     

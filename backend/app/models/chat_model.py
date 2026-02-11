@@ -18,8 +18,8 @@ class ChatMessage(Base):
     # Patient Reference (for CGT flow)
     patient_id = Column(String, ForeignKey("patient.id"), nullable=True, index=True)
     
-    # Canister Reference (for IVF flow)
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=True, index=True)
+    # Tank Reference (for IVF flow)
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=True, index=True)
     
     # Sender Information
     sender_id = Column(String, ForeignKey("users.user_id"), nullable=False, index=True)
@@ -36,7 +36,7 @@ class ChatMessage(Base):
     
     # Relationships
     patient = relationship("Patient", backref="chat_messages")
-    canister = relationship("Canister", backref="chat_messages")
+    tank = relationship("Tank", backref="chat_messages")
     sender = relationship("User", foreign_keys=[sender_id], backref="sent_messages")
     # Note: read_statuses relationship removed - ChatReadStatus now uses composite PK (user_id, patient_id)
     # and tracks last_read_message_id instead of per-message read status
@@ -44,5 +44,5 @@ class ChatMessage(Base):
     # Composite indexes for common query patterns
     __table_args__ = (
         Index('idx_chat_messages_patient_created', 'patient_id', 'created_at'),
-        Index('idx_chat_messages_canister_created', 'canister_id', 'created_at'),
+        Index('idx_chat_messages_tank_created', 'tank_id', 'created_at'),
     )

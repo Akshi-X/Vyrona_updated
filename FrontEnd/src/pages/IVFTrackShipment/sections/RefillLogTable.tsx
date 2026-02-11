@@ -36,6 +36,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
     refilled_by: '',
     description: '',
     status: 'Not started',
+    cryoshipper: '',
+    disinfected_shipper_infected_tank_description: '',
+    reservoir: '',
+    ln2_ordered_date: '',
+    ln2_received_date: '',
   });
   const [isAddStatusDropdownOpen, setIsAddStatusDropdownOpen] = useState(false);
   const [editingStatusDropdownIndex, setEditingStatusDropdownIndex] = useState<number | null>(null);
@@ -182,6 +187,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
       refilled_by: '',
       description: '',
       status: 'Not started',
+      cryoshipper: '',
+      disinfected_shipper_infected_tank_description: '',
+      reservoir: '',
+      ln2_ordered_date: '',
+      ln2_received_date: '',
     });
   }, []);
 
@@ -194,6 +204,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
       refilled_by: '',
       description: '',
       status: 'Not started',
+      cryoshipper: '',
+      disinfected_shipper_infected_tank_description: '',
+      reservoir: '',
+      ln2_ordered_date: '',
+      ln2_received_date: '',
     });
   }, []);
 
@@ -236,6 +251,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
         refilled_by: newRefillLog.refilled_by.trim(),
         description: newRefillLog.description.trim(),
         status: newRefillLog.status,
+        cryoshipper: newRefillLog.cryoshipper.trim() || null,
+        disinfected_shipper_infected_tank_description: newRefillLog.disinfected_shipper_infected_tank_description.trim() || null,
+        reservoir: newRefillLog.reservoir.trim() || null,
+        ln2_ordered_date: newRefillLog.ln2_ordered_date || null,
+        ln2_received_date: newRefillLog.ln2_received_date || null,
       });
 
       // Refresh the data from server to get all fields correctly
@@ -249,6 +269,11 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
         refilled_by: '',
         description: '',
         status: 'Not started',
+        cryoshipper: '',
+        disinfected_shipper_infected_tank_description: '',
+        reservoir: '',
+        ln2_ordered_date: '',
+        ln2_received_date: '',
       });
     } catch (e: any) {
       setAddError(e?.message || 'Failed to add refill log');
@@ -294,8 +319,12 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled Date</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refill Time</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled By</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Canister ID</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Description</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Cryoshipper</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Infected Shipper</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Reservoir</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Ordered Date</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Received Date</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Status</th>
               <th className="px-3 py-2 text-left rounded-tr-[10px] whitespace-nowrap">Edit</th>
             </tr>
@@ -303,13 +332,13 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
           <tbody>
             {loading ? (
               <tr className="text-black text-[14px] h-[56px] bg-white">
-                <td className="px-3 py-2 text-gray-500" colSpan={7}>
+                <td className="px-3 py-2 text-gray-500" colSpan={11}>
                   Loading...
                 </td>
               </tr>
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px] bg-white">
-                <td className="px-3 py-2 text-red-600" colSpan={7}>
+                <td className="px-3 py-2 text-red-600" colSpan={11}>
                   {error}
                 </td>
               </tr>
@@ -356,14 +385,6 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                     <td className="px-3 py-2 h-[56px]">
                       <input
                         type="text"
-                        value={canisterNumber || ''}
-                        disabled
-                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-500"
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
                         value={newRefillLog.description}
                         onChange={(e) =>
                           setNewRefillLog({ ...newRefillLog, description: e.target.value })
@@ -371,6 +392,59 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
                         placeholder="Enter description"
                         required
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.cryoshipper}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, cryoshipper: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter cryoshipper"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.disinfected_shipper_infected_tank_description}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, disinfected_shipper_infected_tank_description: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter description"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="text"
+                        value={newRefillLog.reservoir}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, reservoir: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        placeholder="Enter reservoir"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="date"
+                        value={newRefillLog.ln2_ordered_date}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, ln2_ordered_date: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      <input
+                        type="date"
+                        value={newRefillLog.ln2_received_date}
+                        onChange={(e) =>
+                          setNewRefillLog({ ...newRefillLog, ln2_received_date: e.target.value })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
                       />
                     </td>
                     <td className="px-3 py-2 h-[56px]">
@@ -448,7 +522,7 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                 )}
                 {rows.length === 0 && !isAdding ? (
                   <tr className="text-black text-[14px] h-[56px] bg-white">
-                    <td className="px-3 py-2 text-gray-500" colSpan={7}>
+                    <td className="px-3 py-2 text-gray-500" colSpan={11}>
                       No refill logs found
                     </td>
                   </tr>
@@ -460,8 +534,12 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                     <td className="px-3 py-2 h-[56px]">{row.refill_date || '-'}</td>
                     <td className="px-3 py-2 h-[56px]">{row.refill_time || '-'}</td>
                     <td className="px-3 py-2 h-[56px]">{row.refilled_by || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.canister_id ?? '-'}</td>
                     <td className="px-3 py-2 h-[56px]">{row.description || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.cryoshipper || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.disinfected_shipper_infected_tank_description || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.reservoir || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.ln2_ordered_date || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">{row.ln2_received_date || '-'}</td>
                     <td className="px-3 py-2 h-[56px]">
                       {isEditing ? (
                         <div
