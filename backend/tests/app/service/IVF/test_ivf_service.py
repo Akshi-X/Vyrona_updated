@@ -208,16 +208,11 @@ def test_get_control_tower_map_locations_multiple_states(ivf_service, db_session
 
 
 # ==========================================
-# Tests for get_active_canisters
+# Tests for get_active_tanks
 # ==========================================
 
-def test_get_active_canisters_no_branch_filter(ivf_service, db_session, mock_canister):
-    """Test getting active canisters without branch filter"""
-    # Mock subquery
-    subquery = MagicMock()
-    subquery.c.latest_refill_date = None
-    subquery.c.latest_refill_time = None
-    
+def test_get_active_tanks_no_branch_filter(ivf_service, db_session, mock_tank):
+    """Test getting active tanks without branch filter"""
     # Mock branch
     branch_id = 1
     branch_name = "Test Branch"
@@ -225,13 +220,12 @@ def test_get_active_canisters_no_branch_filter(ivf_service, db_session, mock_can
     # Mock query result
     query = MagicMock()
     query.join.return_value = query
-    query.outerjoin.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [(mock_canister, branch_id, branch_name, None, None)]
+    query.all.return_value = [(mock_tank, branch_id, branch_name)]
     
     db_session.query.return_value = query
     
-    result = ivf_service.get_active_canisters()
+    result = ivf_service.get_active_tanks()
     
     assert "branches" in result
     assert "total" in result
@@ -239,58 +233,53 @@ def test_get_active_canisters_no_branch_filter(ivf_service, db_session, mock_can
     assert len(result["branches"]) == 1
 
 
-def test_get_active_canisters_with_branch_filter(ivf_service, db_session, mock_canister):
-    """Test getting active canisters with branch filter"""
+def test_get_active_tanks_with_branch_filter(ivf_service, db_session, mock_tank):
+    """Test getting active tanks with branch filter"""
     branch_id = 1
     branch_name = "Test Branch"
     
     query = MagicMock()
     query.join.return_value = query
-    query.outerjoin.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [(mock_canister, branch_id, branch_name, None, None)]
+    query.all.return_value = [(mock_tank, branch_id, branch_name)]
     
     db_session.query.return_value = query
     
-    result = ivf_service.get_active_canisters(branch_id=1)
+    result = ivf_service.get_active_tanks(branch_name="Test Branch")
     
     assert result["total"] == 1
     assert len(result["branches"]) == 1
 
 
-def test_get_active_canisters_with_refill_log(ivf_service, db_session, mock_canister):
-    """Test getting active canisters with refill log"""
+def test_get_active_tanks_with_refill_log(ivf_service, db_session, mock_tank):
+    """Test getting active tanks with refill log"""
     branch_id = 1
     branch_name = "Test Branch"
-    refill_date = date.today()
-    refill_time = time(10, 30, 0)
     
     query = MagicMock()
     query.join.return_value = query
-    query.outerjoin.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [(mock_canister, branch_id, branch_name, refill_date, refill_time)]
+    query.all.return_value = [(mock_tank, branch_id, branch_name)]
     
     db_session.query.return_value = query
     
-    result = ivf_service.get_active_canisters()
+    result = ivf_service.get_active_tanks()
     
     assert result["total"] == 1
     assert len(result["branches"]) == 1
-    assert result["branches"][0]["canisters"][0]["updated_at"] is not None
+    assert result["branches"][0]["tanks"][0]["updated_at"] is not None
 
 
-def test_get_active_canisters_empty_results(ivf_service, db_session):
-    """Test getting active canisters when no canisters exist"""
+def test_get_active_tanks_empty_results(ivf_service, db_session):
+    """Test getting active tanks when no tanks exist"""
     query = MagicMock()
     query.join.return_value = query
-    query.outerjoin.return_value = query
     query.filter.return_value = query
     query.all.return_value = []
     
     db_session.query.return_value = query
     
-    result = ivf_service.get_active_canisters()
+    result = ivf_service.get_active_tanks()
     
     assert result["total"] == 0
     assert len(result["branches"]) == 0
@@ -301,14 +290,13 @@ def test_get_active_canisters_empty_results(ivf_service, db_session):
 # ==========================================
 
 def test_calculate_branch_status_critical(ivf_service, db_session):
-    """Test calculating branch status when canister is critical"""
-    critical_canister = Mock()
-    critical_canister.canister_status = CanisterStatus.CRITICAL
+    """Test calculating branch status when tank is critical"""
+    critical_tank = Mock()
+    critical_tank.status = CanisterStatus.CRITICAL
     
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [critical_canister]
+    query.all.return_value = [critical_tank]
     
     db_session.query.return_value = query
     
@@ -318,14 +306,13 @@ def test_calculate_branch_status_critical(ivf_service, db_session):
 
 
 def test_calculate_branch_status_risk(ivf_service, db_session):
-    """Test calculating branch status when canister is risk"""
-    risk_canister = Mock()
-    risk_canister.canister_status = CanisterStatus.RISK
+    """Test calculating branch status when tank is risk"""
+    risk_tank = Mock()
+    risk_tank.status = CanisterStatus.RISK
     
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [risk_canister]
+    query.all.return_value = [risk_tank]
     
     db_session.query.return_value = query
     
@@ -335,14 +322,13 @@ def test_calculate_branch_status_risk(ivf_service, db_session):
 
 
 def test_calculate_branch_status_safe(ivf_service, db_session):
-    """Test calculating branch status when all canisters are safe"""
-    safe_canister = Mock()
-    safe_canister.canister_status = CanisterStatus.SAFE
+    """Test calculating branch status when all tanks are safe"""
+    safe_tank = Mock()
+    safe_tank.status = CanisterStatus.SAFE
     
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [safe_canister]
+    query.all.return_value = [safe_tank]
     
     db_session.query.return_value = query
     
@@ -351,10 +337,9 @@ def test_calculate_branch_status_safe(ivf_service, db_session):
     assert result == "safe"
 
 
-def test_calculate_branch_status_no_canisters(ivf_service, db_session):
-    """Test calculating branch status when no canisters exist"""
+def test_calculate_branch_status_no_tanks(ivf_service, db_session):
+    """Test calculating branch status when no tanks exist"""
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
     query.all.return_value = []
     
@@ -366,17 +351,16 @@ def test_calculate_branch_status_no_canisters(ivf_service, db_session):
 
 
 def test_calculate_branch_status_mixed_statuses(ivf_service, db_session):
-    """Test calculating branch status with mixed canister statuses (should return critical)"""
-    safe_canister = Mock()
-    safe_canister.canister_status = CanisterStatus.SAFE
+    """Test calculating branch status with mixed tank statuses (should return critical)"""
+    safe_tank = Mock()
+    safe_tank.status = CanisterStatus.SAFE
     
-    critical_canister = Mock()
-    critical_canister.canister_status = CanisterStatus.CRITICAL
+    critical_tank = Mock()
+    critical_tank.status = CanisterStatus.CRITICAL
     
     query = MagicMock()
-    query.join.return_value = query
     query.filter.return_value = query
-    query.all.return_value = [safe_canister, critical_canister]
+    query.all.return_value = [safe_tank, critical_tank]
     
     db_session.query.return_value = query
     

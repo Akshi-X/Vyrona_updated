@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime, timezone
 
 from app.controller import chat_controller
+from app.service import chat_service
 from app.exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
     ChatUserNotFoundException, ChatPatientNotFoundException,
@@ -25,11 +26,11 @@ from app.middleware.request_validation_middleware import RequestValidationMiddle
 from app.middleware.patient_validation_middleware import PatientValidationMiddleware
 from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.exception_handler import exception_handler_middleware
+from app.config import database
+from app.dependencies import auth_dependencies
 
 
 def _create_test_client(monkeypatch):
-    from app.service import chat_service
-    
     # Create mocks
     create_chat_message_mock = MagicMock()
     get_patient_messages_mock = AsyncMock()
@@ -111,8 +112,6 @@ def _create_test_client(monkeypatch):
     def override_get_db():
         yield db_mock
 
-    from app.config import database
-    from app.dependencies import auth_dependencies
     app.dependency_overrides[database.get_db] = override_get_db
     app.dependency_overrides[auth_dependencies.get_current_user] = lambda: mock_user
     app.dependency_overrides[auth_dependencies.get_pharma_id_from_request] = lambda: mock_user.pharma_id
@@ -377,7 +376,7 @@ def test_get_unread_messages_success(client):
         unread_messages=[],
         total_unread=0,
         unread_by_patient={},
-        unread_by_canister={}
+        unread_by_tank={}
     )
 
     service_mocks['get_unread_messages'].return_value = mock_response

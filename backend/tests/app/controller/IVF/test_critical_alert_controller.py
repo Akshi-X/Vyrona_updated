@@ -40,22 +40,22 @@ def override_get_db():
 
 
 # ==========================================
-# Tests for get_canister_alerts endpoint
+# Tests for get_tank_alerts endpoint
 # ==========================================
 
-def test_get_canister_alerts_success(app, monkeypatch):
-    """Test getting canister alerts successfully"""
-    from app.schemas.IVF.critical_alert_schema import CanisterAlertsResponse
+def test_get_tank_alerts_success(app, monkeypatch):
+    """Test getting tank alerts successfully"""
+    from app.schemas.IVF.critical_alert_schema import TankAlertsResponse
     
-    mock_response = CanisterAlertsResponse(
-        canister_id=1,
-        canister_number="C1",
+    mock_response = TankAlertsResponse(
+        tank_id=1,
+        tank_code="T1",
         alerts=[],
         total_count=0
     )
     
     mock_service = MagicMock()
-    mock_service.get_canister_alerts_by_number.return_value = mock_response
+    mock_service.get_tank_alerts_by_code.return_value = mock_response
     
     monkeypatch.setattr(
         critical_alert_controller,
@@ -72,18 +72,18 @@ def test_get_canister_alerts_success(app, monkeypatch):
     app.dependency_overrides[critical_alert_controller.get_db] = override_get_db
     
     client = TestClient(app)
-    response = client.get("/ivf/alerts/canister/C1")
+    response = client.get("/ivf/alerts/tank/T1")
     
     assert response.status_code == 200
     data = response.json()
-    assert data["canister_number"] == "C1"
+    assert data["tank_code"] == "T1"
     assert "alerts" in data
 
 
-def test_get_canister_alerts_not_found(app, monkeypatch):
-    """Test getting canister alerts when canister not found"""
+def test_get_tank_alerts_not_found(app, monkeypatch):
+    """Test getting tank alerts when tank not found"""
     mock_service = MagicMock()
-    mock_service.get_canister_alerts_by_number.side_effect = ValueError("Canister not found")
+    mock_service.get_tank_alerts_by_code.side_effect = ValueError("Tank not found")
     
     monkeypatch.setattr(
         critical_alert_controller,
@@ -100,16 +100,16 @@ def test_get_canister_alerts_not_found(app, monkeypatch):
     app.dependency_overrides[critical_alert_controller.get_db] = override_get_db
     
     client = TestClient(app)
-    response = client.get("/ivf/alerts/canister/INVALID")
+    response = client.get("/ivf/alerts/tank/INVALID")
     
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 
-def test_get_canister_alerts_error(app, monkeypatch):
-    """Test getting canister alerts with error"""
+def test_get_tank_alerts_error(app, monkeypatch):
+    """Test getting tank alerts with error"""
     mock_service = MagicMock()
-    mock_service.get_canister_alerts_by_number.side_effect = Exception("Database error")
+    mock_service.get_tank_alerts_by_code.side_effect = Exception("Database error")
     
     monkeypatch.setattr(
         critical_alert_controller,
@@ -126,7 +126,7 @@ def test_get_canister_alerts_error(app, monkeypatch):
     app.dependency_overrides[critical_alert_controller.get_db] = override_get_db
     
     client = TestClient(app)
-    response = client.get("/ivf/alerts/canister/C1")
+    response = client.get("/ivf/alerts/tank/T1")
     
     assert response.status_code == 500
     assert "error" in response.json()["detail"].lower()

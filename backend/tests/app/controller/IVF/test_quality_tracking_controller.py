@@ -72,7 +72,7 @@ def test_create_refill_log_success(app, monkeypatch, mock_user):
     
     mock_refill_log = RefillLogResponse(
         log_id=1,
-        canister_id=1,
+        tank_id=1,
         refill_date=date.today(),
         refill_time=time(10, 30, 0),
         refilled_by="Test User",
@@ -83,8 +83,8 @@ def test_create_refill_log_success(app, monkeypatch, mock_user):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1
-    mock_service.create_refill_log.return_value = mock_refill_log
+    mock_service.resolve_tank_id.return_value = 1
+    mock_service.create_refill_log_for_tank.return_value = mock_refill_log
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -95,7 +95,7 @@ def test_create_refill_log_success(app, monkeypatch, mock_user):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (1, "User") if x else (None, None)
+        lambda x, **kwargs: (1, "User") if x else (None, None)
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
@@ -103,7 +103,7 @@ def test_create_refill_log_success(app, monkeypatch, mock_user):
     
     client = TestClient(app)
     response = client.post(
-        "/quality-tracking/canisters/C1/refill-logs",
+        "/quality-tracking/tanks/T1/refill-logs",
         json={
             "refill_date": str(date.today()),
             "refill_time": "10:30:00",
@@ -114,8 +114,8 @@ def test_create_refill_log_success(app, monkeypatch, mock_user):
     )
     
     assert response.status_code == 201
-    assert mock_service.resolve_canister_id.called
-    assert mock_service.create_refill_log.called
+    assert mock_service.resolve_tank_id.called
+    assert mock_service.create_refill_log_for_tank.called
 
 
 def test_create_refill_log_canister_not_found(app, monkeypatch):
@@ -133,7 +133,7 @@ def test_create_refill_log_canister_not_found(app, monkeypatch):
         )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.side_effect = AppException(
+    mock_service.resolve_tank_id.side_effect = AppException(
         message="Canister not found",
         error_code="NOT_FOUND",
         status_code=404
@@ -148,7 +148,7 @@ def test_create_refill_log_canister_not_found(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (1, "User")
+        lambda x, **kwargs: (1, "User")
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
@@ -156,7 +156,7 @@ def test_create_refill_log_canister_not_found(app, monkeypatch):
     
     client = TestClient(app)
     response = client.post(
-        "/quality-tracking/canisters/INVALID/refill-logs",
+        "/quality-tracking/tanks/INVALID/refill-logs",
         json={
             "refill_date": str(date.today()),
             "refill_time": "10:30:00",
@@ -181,8 +181,8 @@ def test_get_refill_logs_by_container_success(app, monkeypatch):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1
-    mock_service.get_refill_logs.return_value = mock_response
+    mock_service.resolve_tank_id.return_value = 1
+    mock_service.get_refill_logs_for_tank.return_value = mock_response
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -193,18 +193,18 @@ def test_get_refill_logs_by_container_success(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (1, "User") if x else (None, None)
+        lambda x, **kwargs: (1, "User") if x else (None, None)
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
     app.dependency_overrides[quality_tracking_controller.get_current_user] = override_get_current_user
     
     client = TestClient(app)
-    response = client.get("/quality-tracking/canisters/C1/refill-logs")
+    response = client.get("/quality-tracking/tanks/T1/refill-logs")
     
     assert response.status_code == 200
-    assert mock_service.resolve_canister_id.called
-    assert mock_service.get_refill_logs.called
+    assert mock_service.resolve_tank_id.called
+    assert mock_service.get_refill_logs_for_tank.called
 
 
 def test_get_refill_logs_by_container_with_filters(app, monkeypatch):
@@ -217,8 +217,8 @@ def test_get_refill_logs_by_container_with_filters(app, monkeypatch):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1
-    mock_service.get_refill_logs.return_value = mock_response
+    mock_service.resolve_tank_id.return_value = 1
+    mock_service.get_refill_logs_for_tank.return_value = mock_response
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -229,28 +229,28 @@ def test_get_refill_logs_by_container_with_filters(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (1, "User") if x else (None, None)
+        lambda x, **kwargs: (1, "User") if x else (None, None)
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
     app.dependency_overrides[quality_tracking_controller.get_current_user] = override_get_current_user
     
     client = TestClient(app)
-    response = client.get("/quality-tracking/canisters/C1/refill-logs?status=Done&limit=10")
+    response = client.get("/quality-tracking/tanks/T1/refill-logs?status=Done&limit=10")
     
     assert response.status_code == 200
     # Verify service was called with filters
-    mock_service.get_refill_logs.assert_called_once()
-    call_args = mock_service.get_refill_logs.call_args
+    mock_service.get_refill_logs_for_tank.assert_called_once()
+    call_args = mock_service.get_refill_logs_for_tank.call_args
     assert call_args[1]["status"] == "Done"
     assert call_args[1]["limit"] == 10
 
 
 # ==========================================
-# Tests for get_canister_tracking_details endpoint
+# Tests for get_tank_tracking_details endpoint
 # ==========================================
 
-def test_get_canister_tracking_details_success(app, monkeypatch):
+def test_get_tank_tracking_details_success(app, monkeypatch):
     """Test getting canister tracking details successfully"""
     from app.schemas.IVF.quality_tracking_schema import IVFCanisterTrackingResponse
     
@@ -261,8 +261,7 @@ def test_get_canister_tracking_details_success(app, monkeypatch):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1  # Mock canister_id resolution
-    mock_service.get_canister_tracking_details.return_value = mock_response
+    mock_service.get_tank_tracking_details.return_value = mock_response
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -273,14 +272,14 @@ def test_get_canister_tracking_details_success(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (None, "Manager")
+        lambda x, **kwargs: (None, "Manager")
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
     app.dependency_overrides[quality_tracking_controller.get_current_user] = override_get_current_user
     
     client = TestClient(app)
-    response = client.get("/quality-tracking/canisters/C1/tracking-details")
+    response = client.get("/quality-tracking/tanks/T1/tracking-details")
     
     assert response.status_code == 200
     data = response.json()
@@ -289,13 +288,13 @@ def test_get_canister_tracking_details_success(app, monkeypatch):
     assert "available_slots" in data
 
 
-def test_get_canister_tracking_details_not_found(app, monkeypatch):
-    """Test getting canister tracking details when canister not found"""
+def test_get_tank_tracking_details_not_found(app, monkeypatch):
+    """Test getting tank tracking details when tank not found"""
     from app.exceptions.custom_exceptions import AppException
     
     mock_service = MagicMock()
-    mock_service.get_canister_tracking_details.side_effect = AppException(
-        message="Canister not found",
+    mock_service.get_tank_tracking_details.side_effect = AppException(
+        message="Tank not found",
         error_code="NOT_FOUND",
         status_code=404
     )
@@ -310,7 +309,7 @@ def test_get_canister_tracking_details_not_found(app, monkeypatch):
     app.dependency_overrides[quality_tracking_controller.get_current_user] = override_get_current_user
     
     client = TestClient(app)
-    response = client.get("/quality-tracking/canisters/INVALID/tracking")
+    response = client.get("/quality-tracking/tanks/INVALID/tracking-details")
     
     assert response.status_code == 404
 
@@ -331,8 +330,8 @@ def test_update_cryolock_color_success(app, monkeypatch):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1  # Mock canister_id resolution
-    mock_service.update_cryolock_color.return_value = mock_response
+    mock_service.resolve_tank_id.return_value = 1  # Mock canister_id resolution
+    mock_service.update_cryolock_color_for_tank.return_value = mock_response
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -343,7 +342,7 @@ def test_update_cryolock_color_success(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (None, "Manager")
+        lambda x, **kwargs: (None, "Manager")
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
@@ -351,12 +350,12 @@ def test_update_cryolock_color_success(app, monkeypatch):
     
     client = TestClient(app)
     response = client.patch(
-        "/quality-tracking/canisters/C1/cryolock-color",
+        "/quality-tracking/tanks/T1/cryolock-color",
         json={"cryolock_number": "CL1", "cryolock_color": "blue"}
     )
     
     assert response.status_code == 200
-    assert mock_service.update_cryolock_color.called
+    assert mock_service.update_cryolock_color_for_tank.called
 
 
 def test_update_cryolock_color_not_found(app, monkeypatch):
@@ -364,7 +363,7 @@ def test_update_cryolock_color_not_found(app, monkeypatch):
     from app.exceptions.custom_exceptions import AppException
     
     mock_service = MagicMock()
-    mock_service.update_cryolock_color.side_effect = AppException(
+    mock_service.update_cryolock_color_for_tank.side_effect = AppException(
         message="Cryolock not found",
         error_code="NOT_FOUND",
         status_code=404
@@ -404,8 +403,8 @@ def test_update_goblet_color_success(app, monkeypatch):
     )
     
     mock_service = MagicMock()
-    mock_service.resolve_canister_id.return_value = 1  # Mock canister_id resolution
-    mock_service.update_goblet_color.return_value = mock_response
+    mock_service.resolve_tank_id.return_value = 1  # Mock canister_id resolution
+    mock_service.update_goblet_color_for_tank.return_value = mock_response
     
     monkeypatch.setattr(
         quality_tracking_controller,
@@ -416,7 +415,7 @@ def test_update_goblet_color_success(app, monkeypatch):
     monkeypatch.setattr(
         quality_tracking_controller,
         "get_branch_filter_info",
-        lambda x: (None, "Manager")
+        lambda x, **kwargs: (None, "Manager")
     )
     
     app.dependency_overrides[quality_tracking_controller.get_db] = override_get_db
@@ -424,12 +423,12 @@ def test_update_goblet_color_success(app, monkeypatch):
     
     client = TestClient(app)
     response = client.patch(
-        "/quality-tracking/canisters/C1/goblet-color",
+        "/quality-tracking/tanks/T1/goblet-color",
         json={"cryolock_number": "CL1", "goblet_color": "blue"}
     )
     
     assert response.status_code == 200
-    assert mock_service.update_goblet_color.called
+    assert mock_service.update_goblet_color_for_tank.called
 
 
 def test_update_goblet_color_not_found(app, monkeypatch):
@@ -437,7 +436,7 @@ def test_update_goblet_color_not_found(app, monkeypatch):
     from app.exceptions.custom_exceptions import AppException
     
     mock_service = MagicMock()
-    mock_service.update_goblet_color.side_effect = AppException(
+    mock_service.update_goblet_color_for_tank.side_effect = AppException(
         message="Goblet not found",
         error_code="NOT_FOUND",
         status_code=404

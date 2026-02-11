@@ -197,7 +197,12 @@ def get_canister_tracking_details(
             tank_code=tank_code,
             branch_id=branch_id
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        from app.exceptions.custom_exceptions import AppException
+        if isinstance(e, AppException):
+            raise HTTPException(status_code=e.status_code, detail=e.message)
         logger.error(f"Error in get_canister_tracking_details endpoint: {str(e)}", exc_info=True)
         raise
 
