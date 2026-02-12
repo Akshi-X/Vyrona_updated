@@ -75,6 +75,13 @@ def _create_test_client(monkeypatch):
             self.role = "pharma_admin"  # Role that can access patient endpoints
             self.email = "test@example.com"
             self.is_approved = True
+            self.department = None  # For pharma users, department can be None
+            self.branch_id = None
+            self.hospital_id = None
+            self.status = True
+            self.approved_status = "approved"
+            self.first_name = "Test"
+            self.last_name = "User"
 
     mock_user = MockUser()
 

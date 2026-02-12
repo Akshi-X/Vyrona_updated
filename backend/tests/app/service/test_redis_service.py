@@ -187,7 +187,7 @@ def test_get_pubsub_success(mock_get_redis, reset_redis_globals):
     # Verify
     assert result == mock_pubsub
     mock_redis.pubsub.assert_called_once()
-    mock_pubsub.subscribe.assert_called_once_with('quality_channel')
+    mock_pubsub.subscribe.assert_called_once_with('quality_channel', 'ivf_quality_channel')
 
 
 @patch('app.service.redis_service.get_redis')
@@ -326,6 +326,6 @@ def test_get_pubsub_calls_get_redis(mock_redis_class, mock_settings, reset_redis
     # Verify get_redis was called (through redis.Redis creation)
     mock_redis_class.assert_called_once()
     mock_client.pubsub.assert_called_once()
-    mock_pubsub.subscribe.assert_called_once_with('quality_channel')
+    mock_pubsub.subscribe.assert_called_once_with('quality_channel', 'ivf_quality_channel')
     assert result == mock_pubsub
 

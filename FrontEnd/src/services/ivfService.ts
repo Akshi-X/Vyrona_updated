@@ -59,6 +59,16 @@ export interface TotalDeviationsResponse {
   status: string;
 }
 
+export interface IvfBranch {
+  branch_id: number;
+  branch_name: string;
+}
+
+export interface IvfBranchesResponse {
+  branches: IvfBranch[];
+  total: number;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -174,6 +184,43 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
 });
 
 export class IvfService extends BaseApiService {
+  private static readonly BRANCH_OVERRIDE_PARAM = 'branch_id_override';
+
+  private getEffectiveBranchId(): string | undefined {
+    // Only managers should send branch_id (for users, backend will scope by their branch automatically)
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      const isManager = role.includes('manager');
+      if (!isManager) return undefined;
+
+      // Prefer URL param if present (supports refresh/share link), otherwise use session storage
+      const fromUrl =
+        new URLSearchParams(window.location.search).get(IvfService.BRANCH_OVERRIDE_PARAM) ||
+        // Backward compatibility if any old links used branch_id
+        new URLSearchParams(window.location.search).get('branch_id') ||
+        undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return (fromUrl || fromSession || undefined) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private withBranchId(endpoint: string): string {
+    const branchId = this.getEffectiveBranchId();
+    if (!branchId) return endpoint;
+    const sep = endpoint.includes('?') ? '&' : '?';
+    return `${endpoint}${sep}${IvfService.BRANCH_OVERRIDE_PARAM}=${encodeURIComponent(branchId)}`;
+  }
+
+  async getBranches(): Promise<IvfBranchesResponse> {
+    return await this.request<IvfBranchesResponse>(
+      '/api/ivf/branches',
+      { method: 'GET' }
+    );
+  }
+
   async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
     const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
       method: 'GET',
@@ -234,15 +281,29 @@ export class IvfService extends BaseApiService {
   }
 
   async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
-    return await this.request<DeviationsGraphResponse>(
+    const raw = await this.request<DeviationsGraphResponse | DeviationsGraphResponse[]>(
       '/api/ivf/dashboard/metrics/deviations-graph',
       { method: 'GET' }
     );
+    // Some environments return an array like: [{ view_level, data, ... }]
+    // Normalize to a single object for consistent UI consumption.
+    if (Array.isArray(raw)) {
+      return (
+        raw[0] ?? {
+          view_level: 'container',
+          data: [],
+          top_deviation_type: null,
+          last_updated: new Date().toISOString(),
+          status: 'success',
+        }
+      );
+    }
+    return raw;
   }
 
-  async getCanisterTrackingDetails(canisterNumber: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
+  async getCanisterTrackingDetails(tank_code: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
     const response = await this.request<RawCanisterTrackingApiResponse>(
-      `/api/quality-tracking/canisters/${canisterNumber}/tracking-details`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/tracking-details`),
       { method: 'GET' }
     );
     return {
@@ -252,26 +313,26 @@ export class IvfService extends BaseApiService {
     };
   }
 
-  async getCanisterRefillLogs(canisterNumber: string | number): Promise<RefillLogsResponse> {
+  async getCanisterRefillLogs(tank_code: string | number): Promise<RefillLogsResponse> {
     return await this.request<RefillLogsResponse>(
-      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs`),
       { method: 'GET' }
     );
   }
 
   /**
-   * Update goblet color for a specific cryolock within a canister
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * Update goblet color for a specific cryolock within a tank
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
    * @param gobletColor - The goblet color value to set (e.g., "Yellow", "Red", "Blue")
    */
   async updateGobletColor(
-    canisterNumber: string | number,
+    tank_code: string | number,
     cryolockNumber: string,
     gobletColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/canisters/${canisterNumber}/goblet-color`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/goblet-color`),
       {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         goblet_color: gobletColor,
@@ -280,18 +341,18 @@ export class IvfService extends BaseApiService {
   }
 
   /**
-   * Update cryolock color for a specific cryolock within a canister
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * Update cryolock color for a specific cryolock within a tank
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
    * @param cryolockColor - The cryolock color value to set (e.g., "Yellow", "Red", "Blue")
    */
   async updateCryolockColor(
-    canisterNumber: string | number,
+    tank_code: string | number,
     cryolockNumber: string,
     cryolockColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/canisters/${canisterNumber}/cryolock-color`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/cryolock-color`),
       {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         cryolock_color: cryolockColor,
@@ -301,17 +362,17 @@ export class IvfService extends BaseApiService {
 
   /**
    * Update refill log status for a specific log
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param logId - The refill log ID
    * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
    */
   async updateRefillLogStatus(
-    canisterNumber: string | number,
+    tank_code: string | number,
     logId: number,
     status: string
   ): Promise<RefillLogItem> {
     return await this.patch<RefillLogItem>(
-      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs/${logId}/status`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}/status`),
       {
         status: status,
       }
@@ -319,12 +380,12 @@ export class IvfService extends BaseApiService {
   }
 
   /**
-   * Create a new refill log for a canister
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * Create a new refill log for a tank
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param refillLogData - The refill log data
    */
   async createRefillLog(
-    canisterNumber: string | number,
+    tank_code: string | number,
     refillLogData: {
       refill_date: string;
       refill_time: string;
@@ -339,19 +400,19 @@ export class IvfService extends BaseApiService {
     }
   ): Promise<RefillLogItem> {
     return await this.post<RefillLogItem>(
-      `/api/quality-tracking/canisters/${canisterNumber}/refill-logs`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs`),
       refillLogData
     );
   }
 
   /**
    * Mark container as moved to embryo transfer
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
    * @returns Promise with success status and response data
    */
   async markEmbryoTransfer(
-    canisterNumber: string | number,
+    tank_code: string | number,
     cryolockNumber: string
   ): Promise<{
     success: boolean;
@@ -367,7 +428,7 @@ export class IvfService extends BaseApiService {
       embryo_transfer: boolean;
       in_transit: boolean;
     }>(
-      `/api/quality-tracking/canisters/${canisterNumber}/embryo-transfer`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/embryo-transfer`),
       {
         cryolock_number: cryolockNumber,
       }
@@ -376,13 +437,13 @@ export class IvfService extends BaseApiService {
 
   /**
    * Mark container as in transit with shipment
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param cryolockNumber - The cryolock number string (e.g., "CAN-EGM-001-01")
    * @param description - Description of the move (e.g., "From Egmore to ptc, Device ID : XXXXXX")
    * @returns Promise with success status and response data
    */
   async markInTransitWithShipment(
-    canisterNumber: string | number,
+    tank_code: string | number,
     cryolockNumber: string,
     description: string
   ): Promise<{
@@ -399,7 +460,7 @@ export class IvfService extends BaseApiService {
       in_transit: boolean;
       shipment?: Record<string, any>;
     }>(
-      `/api/quality-tracking/canisters/${canisterNumber}/in-transit-with-shipment`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/in-transit-with-shipment`),
       {
         cryolock_number: cryolockNumber,
         description: description,
@@ -409,18 +470,22 @@ export class IvfService extends BaseApiService {
 
   /**
    * Export combined refill logs and KPI threshold deviations to Excel
-   * @param canisterNumber - The canister number (e.g., "C1" or numeric ID)
+   * @param tank_code - The tank code (e.g., "T1", "T10")
    * @param year - Year for the report (e.g., 2024). Optional - defaults to current year.
    * @param month - Month for the report (1-12). Optional - if not provided, exports entire year.
    * @returns Promise that resolves when download is triggered
    */
   async exportCombinedReportExcel(
-    canisterNumber: string | number,
+    tank_code: string | number,
     year?: number,
     month?: number
   ): Promise<void> {
-    const url = `${this.getBaseUrl()}/api/quality-tracking/canisters/${canisterNumber}/combined-report/export-excel`;
+    const url = `${this.getBaseUrl()}/api/quality-tracking/tanks/${tank_code}/combined-report/export-excel`;
     const params = new URLSearchParams();
+    const branchId = this.getEffectiveBranchId();
+    if (branchId) {
+      params.append(IvfService.BRANCH_OVERRIDE_PARAM, branchId);
+    }
     if (year !== undefined) {
       params.append('year', year.toString());
     }
@@ -463,7 +528,7 @@ export class IvfService extends BaseApiService {
 
     // Get filename from Content-Disposition header or use a default
     const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = `combined_report_${canisterNumber}_${year || new Date().getFullYear()}${month ? `_${month}` : ''}.xlsx`;
+    let filename = `combined_report_${tank_code}_${year || new Date().getFullYear()}${month ? `_${month}` : ''}.xlsx`;
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
       if (filenameMatch && filenameMatch[1]) {

@@ -11,8 +11,8 @@ from app.constants.enums import AlertType, AlertSource, AlertTriggeredBy, AlertS
 # ============================================
 
 class CriticalAlertBase(BaseModel):
-    """Base schema for critical alert"""
-    canister_id: int = Field(..., description="Reference to canister")
+    """Base schema for critical alert (tank-level monitoring)"""
+    tank_id: int = Field(..., description="Reference to tank (tank-level monitoring)")
     hospital_id: int = Field(..., description="Hospital ID for scoping and compliance")
     branch_id: int = Field(..., description="Branch ID for scoping and compliance")
     alert_type: AlertType = Field(..., description="Type of alert: Deviation alert, Quality alert, Refill log alert")
@@ -25,9 +25,10 @@ class CriticalAlertBase(BaseModel):
 
 
 class CriticalAlertResponse(CriticalAlertBase):
-    """Schema for critical alert response"""
+    """Schema for critical alert response (tank-level monitoring)"""
     alert_id: str = Field(..., description="UUID for alert identification")
-    canister_number: Optional[str] = Field(None, description="Canister number/code (e.g., 'C1')")
+    tank_code: Optional[str] = Field(None, description="Tank code (e.g., 'T1')")
+    branch_name: Optional[str] = Field(None, description="Branch name")
     status: AlertStatus = Field(default=AlertStatus.ACTIVE, description="Status: Active, Acknowledged")
     acknowledged_by: Optional[str] = Field(None, description="User ID who acknowledged the alert")
     acknowledged_at: Optional[datetime] = Field(None, description="Timestamp when alert was acknowledged")
@@ -59,12 +60,12 @@ class AcknowledgeAlertResponse(BaseModel):
     acknowledged_at: datetime
 
 
-class CanisterAlertsResponse(BaseModel):
-    """Schema for canister-specific alerts"""
-    canister_id: int = Field(..., description="Canister ID")
-    canister_number: Optional[str] = Field(None, description="Canister number/code (e.g., 'C1')")
-    alerts: List[CriticalAlertResponse] = Field(..., description="List of alerts for this canister")
-    total_count: int = Field(..., description="Total number of alerts for this canister")
+class TankAlertsResponse(BaseModel):
+    """Schema for tank-specific alerts (tank-level monitoring)"""
+    tank_id: int = Field(..., description="Tank ID")
+    tank_code: Optional[str] = Field(None, description="Tank code (e.g., 'T1')")
+    alerts: List[CriticalAlertResponse] = Field(..., description="List of alerts for this tank")
+    total_count: int = Field(..., description="Total number of alerts for this tank")
 
 
 class HospitalAlertsResponse(BaseModel):

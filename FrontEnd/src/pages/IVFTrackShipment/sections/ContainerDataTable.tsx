@@ -195,8 +195,8 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
         <table className="min-w-max w-full text-xs bg-white">
           <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px]">
             <tr>
-              <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS Number (PK)</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock Num</th>
+              <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS # (PK)</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock #</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Canister #</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cane ID</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Goblet Color</th>

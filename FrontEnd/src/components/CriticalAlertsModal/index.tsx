@@ -18,6 +18,7 @@ interface CriticalAlertsModalProps {
   alerts: CriticalAlert[];
   loading?: boolean;
   onAcknowledge?: (alertId: string) => Promise<void>;
+  patientIdLabel?: string;
 }
 
 const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
@@ -25,7 +26,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
   onClose,
   alerts,
   loading = false,
-  onAcknowledge
+  onAcknowledge,
 }) => {
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<string>>(new Set());
   // Filter states
@@ -125,7 +126,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
       <table className="alert-card-table w-full">
         <thead className="bg-[#fdeeff]">
           <tr className="border-b border-[#eeeeee]">
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Patient ID</th>
+            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Tank Code</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Type</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Message</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left">Timestamp</th>

@@ -16,7 +16,7 @@ from ..models.chat_message_tag import ChatMessageTag
 from ..models.user_model import User
 from ..models.patient_model import Patient
 from ..models.pharma_model import Pharma
-from ..models.IVF.canister_model import Canister
+from ..models.IVF.tank_model import Tank
 from ..schemas.chat_schema import (
     ChatMessageCreateRequest, ChatMessageCreateResponse, ChatMessageResponse,
     PatientMessagesResponse, UnreadMessageResponse, UnreadMessagesResponse
@@ -158,9 +158,9 @@ def mark_patient_as_read(user_id: str, patient_id: str, db: Session) -> int:
 # CANISTER-LEVEL HELPER FUNCTIONS (IVF FLOW)
 # ============================================
 
-def get_or_create_read_status_canister(user_id: str, canister_id: int, db: Session) -> ChatReadStatusCanister:
+def get_or_create_read_status_canister(user_id: str, tank_id: int, db: Session) -> ChatReadStatusCanister:
     """
-    Get or create read status entry for user-canister combination (IVF flow).
+    Get or create read status entry for user-tank combination (IVF flow).
     Uses lazy creation - only creates entry when needed.
     
     Returns ChatReadStatusCanister with last_read_message_id (NULL if never read)
@@ -168,14 +168,14 @@ def get_or_create_read_status_canister(user_id: str, canister_id: int, db: Sessi
     # Try to get existing read status first (most common case)
     read_status = db.query(ChatReadStatusCanister).filter(
         ChatReadStatusCanister.user_id == user_id,
-        ChatReadStatusCanister.canister_id == canister_id
+        ChatReadStatusCanister.tank_id == tank_id
     ).first()
     
     if not read_status:
         # Create with last_read_message_id = NULL (never read)
         read_status = ChatReadStatusCanister(
             user_id=user_id,
-            canister_id=canister_id,
+            tank_id=tank_id,
             last_read_message_id=None  # NULL = never read
         )
         db.add(read_status)
@@ -184,39 +184,39 @@ def get_or_create_read_status_canister(user_id: str, canister_id: int, db: Sessi
     return read_status
 
 
-def get_canister_unread_count(user_id: str, canister_id: int, db: Session) -> int:
+def get_canister_unread_count(user_id: str, tank_id: int, db: Session) -> int:
     """
-    Get unread count for ALL messages in canister dashboard (IVF flow).
+    Get unread count for ALL messages in tank dashboard (IVF flow).
     Counts messages where id > last_read_message_id.
     """
-    read_status = get_or_create_read_status_canister(user_id, canister_id, db)
+    read_status = get_or_create_read_status_canister(user_id, tank_id, db)
     last_read_id = read_status.last_read_message_id or 0
     
     # Count all messages after last_read
     unread_count = db.query(func.count(ChatMessage.id)).filter(
-        ChatMessage.canister_id == canister_id,
+        ChatMessage.tank_id == tank_id,
         ChatMessage.id > last_read_id
     ).scalar() or 0
     
     return unread_count
 
 
-def mark_canister_as_read(user_id: str, canister_id: int, db: Session) -> int:
+def mark_canister_as_read(user_id: str, tank_id: int, db: Session) -> int:
     """
-    Mark all messages for a canister as read by updating last_read_message_id to latest (IVF flow).
+    Mark all messages for a tank as read by updating last_read_message_id to latest (IVF flow).
     Returns the latest message ID that was set.
     """
-    # Get latest message ID for canister
+    # Get latest message ID for tank
     latest_message = db.query(func.max(ChatMessage.id)).filter(
-        ChatMessage.canister_id == canister_id
+        ChatMessage.tank_id == tank_id
     ).scalar()
     
     if latest_message is None:
-        # No messages for this canister
+        # No messages for this tank
         latest_message = 0
     
     # Get or create read status
-    read_status = get_or_create_read_status_canister(user_id, canister_id, db)
+    read_status = get_or_create_read_status_canister(user_id, tank_id, db)
     read_status.last_read_message_id = latest_message
     read_status.updated_at = datetime.now(timezone.utc)
     
@@ -288,7 +288,7 @@ async def broadcast_new_message(
             id=result.message_id,
             message_content=result.message_content,
             patient_id=result.patient_id,
-            canister_number=result.canister_number,
+            tank_code=result.tank_code,
             sender_id=result.sender_id,
             sender_name=result.sender_name,
             sender_role=result.sender_role,
@@ -313,10 +313,10 @@ async def broadcast_new_message(
                 sender_pharma_id,
                 db
             )
-        elif result.canister_number:
-            # IVF flow: broadcast to canister subscribers (handled via websocket manager)
-            # The websocket manager already supports canister_number broadcasting
-            pass  # Will be handled by existing canister subscription logic
+        elif result.tank_code:
+            # IVF flow: broadcast to tank subscribers (handled via websocket manager)
+            # The websocket manager already supports tank_code broadcasting
+            pass  # Will be handled by existing tank subscription logic
         
         # Send to tagged users (even if not subscribed to patient)
         if result.tagged_user_ids:
@@ -548,19 +548,19 @@ def create_chat_message(
         else:
             tagged_user_ids_json = None
         
-        # Resolve canister_number to canister_id if provided (for IVF flow)
-        canister_id = None
-        if request.canister_number:
-            canister = db.query(Canister).filter(Canister.canister_number == request.canister_number).first()
-            if not canister:
-                raise ChatPatientNotFoundException(f"Canister with number '{request.canister_number}' not found")
-            canister_id = canister.canister_id
+        # Resolve tank_code to tank_id if provided (for IVF flow)
+        tank_id = None
+        if request.tank_code:
+            tank = db.query(Tank).filter(Tank.tank_code == request.tank_code).first()
+            if not tank:
+                raise ChatPatientNotFoundException(f"Tank with code '{request.tank_code}' not found")
+            tank_id = tank.tank_id
         
         insert_start = time.time()
         chat_message = ChatMessage(
             message_content=request.message_content,
             patient_id=request.patient_id,
-            canister_id=canister_id,
+            tank_id=tank_id,
             sender_id=sender_id,
             tagged_user_ids=tagged_user_ids_json,
             created_by=sender_id
@@ -594,9 +594,9 @@ def create_chat_message(
             sender_read_status = get_or_create_read_status(sender_id, request.patient_id, db)
             sender_read_status.last_read_message_id = chat_message.id
             sender_read_status.updated_at = datetime.now(timezone.utc)
-        elif canister_id:
-            # IVF flow: use canister read status
-            sender_read_status = get_or_create_read_status_canister(sender_id, canister_id, db)
+        elif tank_id:
+            # IVF flow: use tank read status
+            sender_read_status = get_or_create_read_status_canister(sender_id, tank_id, db)
             sender_read_status.last_read_message_id = chat_message.id
             sender_read_status.updated_at = datetime.now(timezone.utc)
         read_status_time = time.time() - read_status_start
@@ -610,18 +610,18 @@ def create_chat_message(
         db.commit()
         commit_time = time.time() - commit_start
         
-        # Get canister_number for response if canister_id exists
-        canister_number = None
-        if canister_id:
-            canister = db.query(Canister).filter(Canister.canister_id == canister_id).first()
-            if canister:
-                canister_number = canister.canister_number
+        # Get tank_code for response if tank_id exists
+        tank_code = None
+        if tank_id:
+            tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if tank:
+                tank_code = tank.tank_code
         
         response_start = time.time()
         result = ChatMessageCreateResponse(
             message_id=chat_message.id,
             patient_id=chat_message.patient_id,
-            canister_number=canister_number,
+            tank_code=tank_code,
             message_content=chat_message.message_content,
             sender_id=chat_message.sender_id,
             sender_name=sender_name,
@@ -784,18 +784,18 @@ async def get_patient_messages(
                 for uid in tagged_user_ids
             ] if tagged_user_ids else []
             
-            # Get canister_number for message if canister_id exists
-            msg_canister_number = None
-            if message.canister_id:
-                msg_canister = db.query(Canister).filter(Canister.canister_id == message.canister_id).first()
-                if msg_canister:
-                    msg_canister_number = msg_canister.canister_number
+            # Get tank_code for message if tank_id exists (IVF flow)
+            msg_tank_code = None
+            if message.tank_id:
+                msg_tank = db.query(Tank).filter(Tank.tank_id == message.tank_id).first()
+                if msg_tank:
+                    msg_tank_code = msg_tank.tank_code
             
             message_responses.append(ChatMessageResponse(
                 id=message.id,
                 message_content=message.message_content,
                 patient_id=message.patient_id,
-                canister_number=msg_canister_number,
+                tank_code=msg_tank_code,
                 sender_id=message.sender_id,
                 sender_name=sender_name,
                 sender_role=sender_role,
@@ -838,7 +838,7 @@ async def get_patient_messages(
 
 
 async def get_canister_messages(
-    canister_number: str,
+    tank_code: str,
     current_user_id: str,
     current_user_pharma_id: Optional[int],
     current_user_hospital_id: Optional[int],
@@ -847,28 +847,28 @@ async def get_canister_messages(
     mark_as_read: bool = False
 ) -> PatientMessagesResponse:
     """
-    Get all messages for a specific canister (IVF flow).
+    Get all messages for a specific tank (IVF flow).
     Does NOT mark as read by default - frontend must explicitly call mark_as_read endpoint.
     
     For hospital users (IVF): filters by hospital_id
     For pharma users: filters by pharma_id (if provided)
     """
     try:
-        # Resolve canister_number to canister_id
-        canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
-        if not canister:
-            raise ChatPatientNotFoundException(f"Canister with number '{canister_number}' not found")
+        # Resolve tank_code to tank_id
+        tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+        if not tank:
+            raise ChatPatientNotFoundException(f"Tank with code '{tank_code}' not found")
         
-        canister_id = canister.canister_id
+        tank_id = tank.tank_id
         
-        # Get all messages for this canister
+        # Get all messages for this tank
         # For hospital users (IVF), filter by hospital_id
         # For pharma users, filter by pharma_id
         if current_user_hospital_id is not None:
             # Hospital user (IVF) - filter by hospital_id
             messages = db.query(ChatMessage).join(User, ChatMessage.sender_id == User.user_id).filter(
                 and_(
-                    ChatMessage.canister_id == canister_id,
+                    ChatMessage.tank_id == tank_id,
                     User.hospital_id == current_user_hospital_id
                 )
             ).order_by(ChatMessage.created_at.asc()).all()
@@ -876,14 +876,14 @@ async def get_canister_messages(
             # Pharma user - filter by pharma_id
             messages = db.query(ChatMessage).join(User, ChatMessage.sender_id == User.user_id).filter(
                 and_(
-                    ChatMessage.canister_id == canister_id,
+                    ChatMessage.tank_id == tank_id,
                     User.pharma_id == current_user_pharma_id
                 )
             ).order_by(ChatMessage.created_at.asc()).all()
         else:
             # Fallback: no filtering (should not happen, but handle gracefully)
             messages = db.query(ChatMessage).filter(
-                ChatMessage.canister_id == canister_id
+                ChatMessage.tank_id == tank_id
             ).order_by(ChatMessage.created_at.asc()).all()
         
         message_ids: List[int] = [message.id for message in messages]
@@ -937,8 +937,8 @@ async def get_canister_messages(
                 for user in tagged_users
             }
         
-        # Get or create read status for this user-canister combination
-        read_status = get_or_create_read_status_canister(current_user_id, canister_id, db)
+        # Get or create read status for this user-tank combination
+        read_status = get_or_create_read_status_canister(current_user_id, tank_id, db)
         last_read_id = read_status.last_read_message_id or 0
         
         # Track if messages were marked as read (to trigger broadcast)
@@ -988,18 +988,18 @@ async def get_canister_messages(
                 for uid in tagged_user_ids
             ] if tagged_user_ids else []
             
-            # Get canister_number for message if canister_id exists
-            msg_canister_number = None
-            if message.canister_id:
-                msg_canister = db.query(Canister).filter(Canister.canister_id == message.canister_id).first()
-                if msg_canister:
-                    msg_canister_number = msg_canister.canister_number
+            # Get tank_code for message if tank_id exists
+            msg_tank_code = None
+            if message.tank_id:
+                msg_tank = db.query(Tank).filter(Tank.tank_id == message.tank_id).first()
+                if msg_tank:
+                    msg_tank_code = msg_tank.tank_code
             
             message_responses.append(ChatMessageResponse(
                 id=message.id,
                 message_content=message.message_content,
                 patient_id=message.patient_id,
-                canister_number=msg_canister_number,
+                tank_code=msg_tank_code,
                 sender_id=message.sender_id,
                 sender_name=sender_name,
                 sender_role=sender_role,
@@ -1010,15 +1010,15 @@ async def get_canister_messages(
                 read_at=read_at
             ))
         
-        # Get canister number for response
-        canister_number = canister.canister_number if canister else None
+        # Get tank_code for response
+        tank_code_response = tank.tank_code if tank else None
         
-        # Compute unread count for the current user and canister (ALL messages)
-        unread_count = get_canister_unread_count(current_user_id, canister_id, db)
+        # Compute unread count for the current user and tank (ALL messages)
+        unread_count = get_canister_unread_count(current_user_id, tank_id, db)
         
         return PatientMessagesResponse(
             patient_id=None,
-            canister_number=canister_number,
+            tank_code=tank_code_response,
             patient_name=None,
             messages=message_responses,
             total_messages=len(message_responses),
@@ -1066,21 +1066,21 @@ def get_unread_messages(
                 ChatMessage.patient_id.isnot(None)  # Only patient messages
             ).order_by(desc(ChatMessage.created_at)).all()
         
-        # Get unread messages for canisters (IVF flow)
-        unread_canister_messages = db.query(ChatMessage).join(
+        # Get unread messages for tanks (IVF flow)
+        unread_tank_messages = db.query(ChatMessage).join(
             ChatMessageTag, ChatMessageTag.message_id == ChatMessage.id
         ).join(
-            Canister, Canister.canister_id == ChatMessage.canister_id
+            Tank, Tank.tank_id == ChatMessage.tank_id
         ).filter(
             ChatMessageTag.user_id == current_user_id,
-            ChatMessage.canister_id.isnot(None)  # Only canister messages
+            ChatMessage.tank_id.isnot(None)  # Only tank messages
         ).order_by(desc(ChatMessage.created_at)).all()
         
         # Combine both lists
-        unread_messages = list(unread_patient_messages) + list(unread_canister_messages)
+        unread_messages = list(unread_patient_messages) + list(unread_tank_messages)
         
         patient_ids = list({msg.patient_id for msg in unread_messages if msg.patient_id})
-        canister_ids = list({msg.canister_id for msg in unread_messages if msg.canister_id})
+        tank_ids = list({msg.tank_id for msg in unread_messages if msg.tank_id})
         
         # Legacy fallback (during migration) when junction table has no entries yet
         # Only for pharma users (pharma_id is not None)
@@ -1088,12 +1088,12 @@ def get_unread_messages(
             legacy_patients = db.query(Patient).filter(Patient.pharma_id == current_user_pharma_id).all()
             patient_ids = [p.id for p in legacy_patients]
             
-            if not patient_ids and not canister_ids:
+            if not patient_ids and not tank_ids:
                 return UnreadMessagesResponse(
                     unread_messages=[],
                     total_unread=0,
                     unread_by_patient={},
-                    unread_by_canister={}
+                    unread_by_tank={}
                 )
         elif not unread_messages and current_user_pharma_id is None:
             # Hospital user with no unread messages
@@ -1101,13 +1101,13 @@ def get_unread_messages(
                 unread_messages=[],
                 total_unread=0,
                 unread_by_patient={},
-                unread_by_canister={}
+                unread_by_tank={}
             )
         
         # OPTIMIZATION: Batch fetch all read statuses at once (fixes N+1 query problem)
-        # Get unique patient IDs and canister IDs from messages
+        # Get unique patient IDs and tank IDs from messages
         unique_patient_ids = list(set([msg.patient_id for msg in unread_messages if msg.patient_id]))
-        unique_canister_ids = list(set([msg.canister_id for msg in unread_messages if msg.canister_id]))
+        unique_tank_ids = list(set([msg.tank_id for msg in unread_messages if msg.tank_id]))
         
         # Batch fetch all patient read statuses in one query
         read_statuses = []
@@ -1117,12 +1117,12 @@ def get_unread_messages(
                 ChatReadStatus.patient_id.in_(unique_patient_ids)
             ).all()
         
-        # Batch fetch all canister read statuses in one query
+        # Batch fetch all tank read statuses in one query
         read_statuses_canister = []
-        if unique_canister_ids:
+        if unique_tank_ids:
             read_statuses_canister = db.query(ChatReadStatusCanister).filter(
                 ChatReadStatusCanister.user_id == current_user_id,
-                ChatReadStatusCanister.canister_id.in_(unique_canister_ids)
+                ChatReadStatusCanister.tank_id.in_(unique_tank_ids)
             ).all()
         
         # Build read status maps
@@ -1130,23 +1130,23 @@ def get_unread_messages(
         for rs in read_statuses:
             read_status_map[rs.patient_id] = rs.last_read_message_id or 0
         
-        read_status_canister_map: Dict[int, int] = {}
+        read_status_tank_map: Dict[int, int] = {}
         for rs in read_statuses_canister:
-            read_status_canister_map[rs.canister_id] = rs.last_read_message_id or 0
+            read_status_tank_map[rs.tank_id] = rs.last_read_message_id or 0
         
         # Create missing read status entries (lazy creation)
         missing_patient_ids = set(unique_patient_ids) - set(read_status_map.keys())
         for patient_id in missing_patient_ids:
             read_status_map[patient_id] = 0  # Never read
         
-        missing_canister_ids = set(unique_canister_ids) - set(read_status_canister_map.keys())
-        for canister_id in missing_canister_ids:
-            read_status_canister_map[canister_id] = 0  # Never read
+        missing_tank_ids = set(unique_tank_ids) - set(read_status_tank_map.keys())
+        for tank_id in missing_tank_ids:
+            read_status_tank_map[tank_id] = 0  # Never read
         
-        # Filter by read status and build unread_by_patient and unread_by_canister maps
+        # Filter by read status and build unread_by_patient and unread_by_tank maps
         filtered_unread_messages = []
         unread_by_patient: Dict[str, int] = {}
-        unread_by_canister: Dict[str, int] = {}  # Changed to Dict[str, int] for canister_number
+        unread_by_tank: Dict[str, int] = {}
         
         for msg in unread_messages:
             if msg.patient_id:
@@ -1155,15 +1155,15 @@ def get_unread_messages(
                 if msg.id > last_read_id:
                     filtered_unread_messages.append(msg)
                     unread_by_patient[msg.patient_id] = unread_by_patient.get(msg.patient_id, 0) + 1
-            elif msg.canister_id:
-                # IVF flow: check canister read status
-                last_read_id = read_status_canister_map.get(msg.canister_id, 0)
+            elif msg.tank_id:
+                # IVF flow: check tank read status
+                last_read_id = read_status_tank_map.get(msg.tank_id, 0)
                 if msg.id > last_read_id:
                     filtered_unread_messages.append(msg)
-                    # Get canister_number for the map key
-                    canister = db.query(Canister).filter(Canister.canister_id == msg.canister_id).first()
-                    if canister and canister.canister_number:
-                        unread_by_canister[canister.canister_number] = unread_by_canister.get(canister.canister_number, 0) + 1
+                    # Get tank_code for the map key
+                    tank = db.query(Tank).filter(Tank.tank_id == msg.tank_id).first()
+                    if tank and tank.tank_code:
+                        unread_by_tank[tank.tank_code] = unread_by_tank.get(tank.tank_code, 0) + 1
         
         unread_messages = filtered_unread_messages
         
@@ -1195,7 +1195,7 @@ def get_unread_messages(
         # Build lookup maps
         sender_ids: Set[str] = {msg.sender_id for msg in unread_messages if msg.sender_id}
         patient_ids_set: Set[str] = {msg.patient_id for msg in unread_messages if msg.patient_id}
-        canister_ids_set: Set[int] = {msg.canister_id for msg in unread_messages if msg.canister_id}
+        tank_ids_set: Set[int] = {msg.tank_id for msg in unread_messages if msg.tank_id}
         
         sender_map: Dict[str, str] = {}
         if sender_ids:
@@ -1213,12 +1213,12 @@ def get_unread_messages(
                 for patient in patients
             }
         
-        canister_map: Dict[int, str] = {}
-        if canister_ids_set:
-            canisters = db.query(Canister).filter(Canister.canister_id.in_(canister_ids_set)).all()
-            canister_map = {
-                canister.canister_id: canister.canister_number or f"Canister {canister.canister_id}"
-                for canister in canisters
+        tank_map: Dict[int, str] = {}
+        if tank_ids_set:
+            tanks = db.query(Tank).filter(Tank.tank_id.in_(tank_ids_set)).all()
+            tank_map = {
+                tank.tank_id: tank.tank_code or f"Tank {tank.tank_id}"
+                for tank in tanks
             }
         
         # Build response
@@ -1239,15 +1239,14 @@ def get_unread_messages(
                     sender_name=sender_name,
                     created_at=message.created_at
                 ))
-            elif message.canister_id:
-                # IVF flow - get canister_number
-                canister = db.query(Canister).filter(Canister.canister_id == message.canister_id).first()
-                canister_number = canister.canister_number if canister and canister.canister_number else f"Canister {message.canister_id}"
+            elif message.tank_id:
+                # IVF flow - get tank_code (backward compatibility: map to canister_number)
+                tank_code = tank_map.get(message.tank_id, f"Tank {message.tank_id}")
                 unread_responses.append(UnreadMessageResponse(
                     message_id=message.id,
                     message_content=message.message_content,
                     patient_id=None,
-                    canister_number=canister_number,
+                    tank_code=tank_code,
                     patient_name=None,
                     sender_id=message.sender_id,
                     sender_name=sender_name,
@@ -1258,7 +1257,7 @@ def get_unread_messages(
             unread_messages=unread_responses,
             total_unread=len(unread_responses),
             unread_by_patient=unread_by_patient,
-            unread_by_canister=unread_by_canister
+            unread_by_tank=unread_by_tank
         )
         
     except Exception as e:

@@ -11,7 +11,7 @@ from app.constants.enums import TaskStatus
 
 class RefillLogBase(BaseModel):
     """Base schema for refill log"""
-    canister_id: int = Field(..., description="Canister ID identifier")
+    tank_id: int = Field(..., description="Tank ID identifier")
     refill_date: date = Field(..., description="Date when refill was performed")
     refill_time: time = Field(..., description="Time when refill was performed")
     refilled_by: str = Field(..., description="Name of person who performed the refill")
@@ -66,6 +66,7 @@ class IVFCanisterTrackingItem(BaseModel):
     his_number: str = Field(..., description="Patient HIS Number (PK)")
     cryolock_number: str = Field(..., description="Cryolock number")
     canister_number: Optional[str] = Field(None, description="Canister number/code")
+    tank_code: str = Field(..., description="Tank code (e.g., T1, T2) - from ARC API format: Tank Number / Canister Number / Location / Cryolock Serial Number")
     cane_code: str = Field(..., description="Cane code")
     goblet_color: str = Field(..., description="Goblet color")
     cryolock_color: str = Field(..., description="Cryolock color")
@@ -79,7 +80,7 @@ class IVFCanisterTrackingResponse(BaseModel):
     """Response for canister tracking details"""
     data: List[IVFCanisterTrackingItem] = Field(default_factory=list, description="Tracking rows")
     total: int = Field(..., description="Total number of cryolocks (total slots)")
-    available_slots: int = Field(..., description="Available slots = total - moved (embryo_transfer/in_transit/embryo_grading set)")
+    available_slots: int = Field(..., description="Count of records where embryo_transfer or in_transit is true")
 
 
 class CryolockFlagUpdate(BaseModel):

@@ -337,12 +337,17 @@ export default function IVFTrackShipmentPage() {
                     id: a.alert_id,
                     type: a.alert_type,
                     severity: a.severity === 'High' ? 'High' : a.severity === 'Medium' ? 'Medium' : 'Low',
-                    patientId: a.canister_number || `Canister ${a.canister_id}`,
+                    patientId: a.tank_code
+                        ? a.tank_code
+                        : a.canister_number
+                            ? a.canister_number
+                            : `Canister ${a.canister_id}`,
                     message: a.message,
                     timestamp: new Date(a.occurred_at).toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
+                patientIdLabel="Tank Code"
                 onAcknowledge={async (alertId) => {
                     try {
                         await ivfAlertsService.acknowledgeAlert(alertId);
@@ -421,7 +426,7 @@ export default function IVFTrackShipmentPage() {
                             description?: string;
                             assignee_id?: string;
                             patient_id?: string;
-                            canister_number?: string;
+                            tank_code?: string;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
                             status?: 'Not started' | 'In progress' | 'Done';
@@ -440,9 +445,9 @@ export default function IVFTrackShipmentPage() {
                                 updateData.assignee_id = String(assigneeId);
                             }
 
-                            // IVF tasks are canister-scoped; CGT tasks are patient-scoped
+                            // IVF tasks are tank-scoped; CGT tasks are patient-scoped
                             if (task.canisterNumber && task.canisterNumber !== 'N/A') {
-                                updateData.canister_number = String(task.canisterNumber);
+                                updateData.tank_code = String(task.canisterNumber);
                                 updateData.patient_id = undefined;
                             } else {
                                 updateData.patient_id = task.patientId && task.patientId !== 'N/A' ? task.patientId : undefined;

@@ -23,7 +23,7 @@ from app.dependencies.auth_dependencies import (
     get_hospital_id_from_request, authenticate_websocket
 )
 from app.models import user_model
-from app.models.IVF.canister_model import Canister
+from app.models.IVF.tank_model import Tank
 from app.utils.chat_websocket_manager import ChatConnectionManager
 from app.exceptions.custom_exceptions import (
     ChatMessageCreateFailedException, ChatMessageNotFoundException,
@@ -211,11 +211,11 @@ def get_user_unread_messages(
         })
 
 
-@router.get("/canisters/{canister_number}/messages",
+@router.get("/canisters/{tank_code}/messages",
     response_model=PatientMessagesResponse,
-    summary="Get canister messages",
+    summary="Get tank messages",
     description="""
-    Get all messages for a specific canister (IVF flow).
+    Get all messages for a specific tank (IVF flow).
     Messages are NOT automatically marked as read.
     Frontend must explicitly call the mark_as_read endpoint when user:
     - Sends a message
@@ -223,12 +223,12 @@ def get_user_unread_messages(
     - Keeps chat window open while receiving new messages
     """)
 async def get_canister_chat_messages(
-    canister_number: str = Path(..., description="Canister number/code (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
     http_request: Request = None
 ):
-    """Get all messages for a specific canister (does NOT mark as read)"""
+    """Get all messages for a specific tank (does NOT mark as read)"""
     try:
         # Get pharma_id or hospital_id based on user type
         pharma_id = None
@@ -239,7 +239,7 @@ async def get_canister_chat_messages(
             hospital_id = http_request.state.hospital_id
         
         result = await get_canister_messages(
-            canister_number, 
+            tank_code, 
             current_user.user_id, 
             pharma_id, 
             hospital_id,
@@ -315,38 +315,38 @@ async def mark_patient_messages_as_read(
         })
 
 
-@router.post("/canisters/{canister_number}/mark-read",
-    summary="Mark canister messages as read",
+@router.post("/canisters/{tank_code}/mark-read",
+    summary="Mark tank messages as read",
     description="""
-    Mark all messages for a canister as read (IVF flow).
+    Mark all messages for a tank as read (IVF flow).
     Frontend should call this when:
     - User sends a message
     - User closes chat window
     - User keeps chat window open while receiving new messages
     """)
 async def mark_canister_messages_as_read(
-    canister_number: str = Path(..., description="Canister number/code (e.g., 'C1')"),
+    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
     http_request: Request = None
 ):
-    """Mark all messages for a canister as read"""
+    """Mark all messages for a tank as read"""
     try:
-        # Resolve canister_number to canister_id
-        canister = db.query(Canister).filter(Canister.canister_number == canister_number).first()
-        if not canister:
+        # Resolve tank_code to tank_id
+        tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+        if not tank:
             raise HTTPException(status_code=404, detail={
-                "error_code": "CHAT_CANISTER_NOT_FOUND",
-                "message": f"Canister with number '{canister_number}' not found"
+                "error_code": "CHAT_TANK_NOT_FOUND",
+                "message": f"Tank with code '{tank_code}' not found"
             })
         
-        canister_id = canister.canister_id
+        tank_id = tank.tank_id
         
         # Mark all messages as read
-        latest_message_id = mark_canister_as_read(current_user.user_id, canister_id, db)
+        latest_message_id = mark_canister_as_read(current_user.user_id, tank_id, db)
         
         # Get updated unread count
-        unread_count = get_canister_unread_count(current_user.user_id, canister_id, db)
+        unread_count = get_canister_unread_count(current_user.user_id, tank_id, db)
         
         # Broadcast unread update via WebSocket (non-blocking)
         # Get pharma_id for broadcast (can be None for hospital users)
@@ -370,8 +370,8 @@ async def mark_canister_messages_as_read(
         
         return {
             "success": True,
-            "message": f"Messages for canister {canister_number} marked as read",
-            "canister_number": canister_number,
+            "message": f"Messages for tank {tank_code} marked as read",
+            "tank_code": tank_code,
             "last_read_message_id": latest_message_id,
             "unread_count": unread_count
         }
