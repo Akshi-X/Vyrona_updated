@@ -281,10 +281,24 @@ export class IvfService extends BaseApiService {
   }
 
   async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
-    return await this.request<DeviationsGraphResponse>(
+    const raw = await this.request<DeviationsGraphResponse | DeviationsGraphResponse[]>(
       '/api/ivf/dashboard/metrics/deviations-graph',
       { method: 'GET' }
     );
+    // Some environments return an array like: [{ view_level, data, ... }]
+    // Normalize to a single object for consistent UI consumption.
+    if (Array.isArray(raw)) {
+      return (
+        raw[0] ?? {
+          view_level: 'container',
+          data: [],
+          top_deviation_type: null,
+          last_updated: new Date().toISOString(),
+          status: 'success',
+        }
+      );
+    }
+    return raw;
   }
 
   async getCanisterTrackingDetails(tank_code: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {

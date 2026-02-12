@@ -53,7 +53,6 @@ interface QualityData {
 interface DataPoint {
   timestamp: string;
   temperature: number;
-  humidity: number;
   agitation: number;
 }
 
@@ -216,7 +215,6 @@ export default function QualityTrackingChart() {
                   {
                     timestamp: qualityData.timestamp,
                     temperature: qualityData.temperature,
-                    humidity: qualityData.humidity,
                     agitation: qualityData.agitation,
                   },
                 ];
@@ -306,7 +304,6 @@ export default function QualityTrackingChart() {
     // Unified color palette
     const palette = {
       temperature: '#8AB6F9',
-      humidity: '#DE88E6',
       agitation: '#BDBDBD',
     } as const;
 
@@ -333,20 +330,6 @@ export default function QualityTrackingChart() {
           pointRadius: 2,
           pointHoverRadius: 5,
           pointBackgroundColor: palette.temperature,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
-          tension: 0.4,
-          fill: false,
-        },
-        {
-          label: 'Humidity (%)',
-          data: dataPoints.map((point) => point.humidity),
-          borderColor: palette.humidity,
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.humidity,
           pointBorderColor: '#ffffff',
           pointBorderWidth: 1,
           tension: 0.4,
@@ -422,8 +405,6 @@ export default function QualityTrackingChart() {
               switch (label) {
                 case 'Temperature (°C)':
                   return `Temperature (°C): ${fmt(point.temperature)}`;
-                case 'Humidity (%)':
-                  return `Humidity (%): ${fmt(point.humidity)}`;
                 case 'Agitation / Vibration':
                   return `Agitation / Vibration: ${fmt(point.agitation)}`;
                 default:
@@ -470,7 +451,6 @@ export default function QualityTrackingChart() {
           suggestedMax: (() => {
             const allValues = dataPoints.flatMap((p) => [
               p.temperature,
-              p.humidity,
               p.agitation,
             ]);
             if (allValues.length === 0) return 110;
