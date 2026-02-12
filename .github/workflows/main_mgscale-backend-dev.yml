@@ -28,26 +28,27 @@ jobs:
       # 4️⃣ Login to ACR
       - name: Login to ACR
         run: |
-          docker login mgscaleprod.azurecr.io \
-            -u mgscaleprod \
-            -p ${{ secrets.ACR_ADMIN_PASSWORD_PROD }}
+          docker login myscaledev.azurecr.io \
+            -u myscaledev \
+            -p ${{ secrets.ACR_ADMIN_PASSWORD }}
 
       # 5️⃣ Build Docker image
       - name: Build Docker Image
         run: |
           docker build \
-            -t mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }} \
+            -t myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }} \
             ./backend
 
       # 6️⃣ Push Docker image
       - name: Push Docker Image
         run: |
-          docker push mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
+          docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
 
       # 7️⃣ Deploy image to Azure Web App (Container)
       - name: Deploy to Azure Web App (Container)
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-backend-service-dev
-          images: mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
+          images: myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
+
 
