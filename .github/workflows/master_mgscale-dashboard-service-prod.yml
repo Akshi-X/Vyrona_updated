@@ -35,7 +35,7 @@ jobs:
       - name: Build frontend
         working-directory: FrontEnd
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
         run: |
           npm run build
@@ -76,3 +76,4 @@ jobs:
         with:
           app-name: mgscale-dashboard-service-prod
           package: dist
+
