@@ -193,7 +193,7 @@ export class AuthService extends BaseApiService {
   /**
    * Clear auth token from cookie
    */
-  private clearAuthToken(): void {
+  private _clearAuthToken(): void {
     try {
       if (typeof document !== 'undefined') {
         document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
