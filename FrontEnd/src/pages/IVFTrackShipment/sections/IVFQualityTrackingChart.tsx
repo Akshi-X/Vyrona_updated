@@ -25,12 +25,53 @@ interface DataPoint {
   timestamp: string;
   temp_internal: number;
   temp_external: number | null;
-  humidity: number;
   shock: number;
 }
  
  
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
+const TIME_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+const INTERVAL_MINUTES = 10; // 10-minute intervals
+const INTERVALS_COUNT = 6; // 6 intervals for 1 hour (0, 10, 20, 30, 40, 50 minutes ago)
+
+// Helper function to filter data points within the last 1 hour
+const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
+  const now = new Date().getTime();
+  return points.filter((point) => {
+    try {
+      const pointTime = new Date(point.timestamp).getTime();
+      const timeDiff = now - pointTime;
+      return timeDiff >= 0 && timeDiff <= TIME_WINDOW_MS;
+    } catch {
+      return false; // Exclude invalid timestamps
+    }
+  });
+};
+
+// Helper function to get interval index (0-5) for a timestamp within the 1-hour window
+const getIntervalIndex = (timestamp: string): number => {
+  try {
+    const now = new Date().getTime();
+    const pointTime = new Date(timestamp).getTime();
+    const minutesAgo = Math.floor((now - pointTime) / (60 * 1000));
+    // Return index 0-5, where 0 is most recent (0-10 min ago) and 5 is oldest (50-60 min ago)
+    const intervalIndex = Math.floor(minutesAgo / INTERVAL_MINUTES);
+    return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
+  } catch {
+    return 0;
+  }
+};
+
+// Format timestamp to show hour and minute
+const formatTimestampToInterval = (minutesAgo: number): string => {
+  const now = new Date();
+  const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
+  const hours = intervalTime.getHours();
+  const minutes = intervalTime.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes} ${ampm}`;
+};
  
 interface IVFQualityTrackingChartProps {
   canisterNumber?: string;
@@ -50,6 +91,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [batteryPercentage, setBatteryPercentage] = useState<number | null>(null);
+  const [hasReceivedData, setHasReceivedData] = useState(false);
  
   // Get base URL for WebSocket
   const getWebSocketUrl = () => {
@@ -151,10 +193,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           setError(null);
           reconnectAttemptsRef.current = 0;
           isConnectingRef.current = false;
- 
-          // Subscribe to canister_number
+          setHasReceivedData(false);
+
+          // Subscribe to tank_code
           if (ws.readyState === WebSocket.OPEN && canisterNumber) {
-            ws.send(JSON.stringify({ canister_number: canisterNumber }));
+            ws.send(JSON.stringify({ tank_code: canisterNumber }));
           }
         };
  
@@ -181,9 +224,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               return;
             }
  
-            // Check if this is quality data (has canister_number or canister_id and timestamp)
-            // IVF data uses temp_internal, temp_external, humidity, and shock
-            const hasCanisterId = data.canister_number || data.canister_id;
+            // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
+            // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
+            const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
             const hasTimestamp = data.timestamp;
             const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
             
@@ -191,7 +234,6 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               // Extract IVF field names
               const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
               const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
-              const humidity = data.humidity;
               const shock = data.shock !== undefined ? data.shock : data.agitation;
               
               // Update battery percentage if available
@@ -201,15 +243,16 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               
               // Only add if we have valid numeric values for required fields
               if (temp_internal !== undefined && temp_internal !== null &&
-                  humidity !== undefined && humidity !== null &&
                   shock !== undefined && shock !== null) {
                 const qualityData: DataPoint = {
                   timestamp: data.timestamp,
                   temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
                   temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                  humidity: typeof humidity === 'number' ? humidity : parseFloat(humidity),
                   shock: typeof shock === 'number' ? shock : parseFloat(shock),
                 };
+                
+                // Mark that we've received data
+                setHasReceivedData(true);
                 
                 // Add new data point
                 setDataPoints((prev) => {
@@ -217,7 +260,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                     ...prev,
                     qualityData,
                   ];
- 
+
                   // Keep only last MAX_DATA_POINTS
                   if (newPoints.length > MAX_DATA_POINTS) {
                     return newPoints.slice(-MAX_DATA_POINTS);
@@ -287,39 +330,101 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     };
  
     connectWebSocket();
- 
+
+    // Periodic cleanup to remove old data points (older than 1 hour)
+    const cleanupInterval = setInterval(() => {
+      if (isMountedRef.current) {
+        setDataPoints((prev) => {
+          const filtered = filterDataByTimeWindow(prev);
+          // Only update if we actually removed some points
+          if (filtered.length !== prev.length) {
+            return filtered;
+          }
+          return prev;
+        });
+      }
+    }, 60000); // Run cleanup every minute
+
     // Cleanup on unmount or when dependencies change
     return () => {
       isMountedRef.current = false;
+      clearInterval(cleanupInterval);
       closeWebSocket();
     };
   }, [canisterNumber, token]);
  
   const chartData = useMemo(() => {
+    // Filter data points to only show last 1 hour
+    const filteredDataPoints = filterDataByTimeWindow(dataPoints);
+    
     const palette = {
       temp_internal: '#8AB6F9',
       temp_external: '#4A90E2',
-      humidity: '#DE88E6',
       shock: '#BDBDBD',
     } as const;
- 
-    const labels = dataPoints.map((point) => formatTimestamp(point.timestamp));
-    
-    // Show only first, middle, and last labels to avoid clutter
-    const displayLabels = labels.map((label, index) => {
-      if (labels.length <= 4) return label;
-      if (index === 0) return label;
-      if (index === Math.floor(labels.length / 2)) return label;
-      if (index === labels.length - 1) return label;
-      return '';
+
+    // Generate 6 interval labels (from 50 minutes ago to now, in 10-minute steps)
+    const intervalLabels: string[] = [];
+    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
+      const minutesAgo = i * INTERVAL_MINUTES;
+      intervalLabels.push(formatTimestampToInterval(minutesAgo));
+    }
+
+    // Group data points by interval index (0-5)
+    const intervalData: { [key: number]: DataPoint[] } = {};
+    filteredDataPoints.forEach((point) => {
+      const intervalIndex = getIntervalIndex(point.timestamp);
+      if (!intervalData[intervalIndex]) {
+        intervalData[intervalIndex] = [];
+      }
+      intervalData[intervalIndex].push(point);
     });
- 
+
+    // For each interval, get the latest data point (most recent within that interval)
+    const intervalValues: { [key: number]: { temp_internal: number; temp_external: number | null; shock: number } } = {};
+    Object.keys(intervalData).forEach((key) => {
+      const index = parseInt(key);
+      const points = intervalData[index];
+      if (points.length > 0) {
+        // Sort by timestamp and use the most recent point in that interval
+        const sortedPoints = points.sort((a, b) => {
+          const timeA = new Date(a.timestamp).getTime();
+          const timeB = new Date(b.timestamp).getTime();
+          return timeB - timeA; // Most recent first
+        });
+        const latestPoint = sortedPoints[0];
+        intervalValues[index] = {
+          temp_internal: latestPoint.temp_internal,
+          temp_external: latestPoint.temp_external,
+          shock: latestPoint.shock,
+        };
+      }
+    });
+
+    // Create data arrays for each interval (0-5, where 0 is most recent)
+    const tempInternalData: (number | null)[] = [];
+    const tempExternalData: (number | null)[] = [];
+    const shockData: (number | null)[] = [];
+
+    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
+      if (intervalValues[i]) {
+        tempInternalData.push(intervalValues[i].temp_internal);
+        tempExternalData.push(intervalValues[i].temp_external);
+        shockData.push(intervalValues[i].shock);
+      } else {
+        // No data for this interval, use null
+        tempInternalData.push(null);
+        tempExternalData.push(null);
+        shockData.push(null);
+      }
+    }
+
     return {
-      labels: displayLabels,
+      labels: intervalLabels,
       datasets: [
         {
           label: 'Temperature Internal (°C)',
-          data: dataPoints.map((point) => point.temp_internal),
+          data: tempInternalData,
           borderColor: palette.temp_internal,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -330,10 +435,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 1,
           tension: 0.4,
           fill: false,
+          spanGaps: true, // Connect across null values
         },
         {
           label: 'Temperature External (°C)',
-          data: dataPoints.map((point) => point.temp_external),
+          data: tempExternalData,
           borderColor: palette.temp_external,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -344,25 +450,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 1,
           tension: 0.4,
           fill: false,
-          hidden: dataPoints.every(p => p.temp_external === null), // Hide if all values are null
-        },
-        {
-          label: 'Humidity (%)',
-          data: dataPoints.map((point) => point.humidity),
-          borderColor: palette.humidity,
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          pointBackgroundColor: palette.humidity,
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
-          tension: 0.4,
-          fill: false,
+          hidden: tempExternalData.every(v => v === null), // Hide if all values are null
+          spanGaps: true, // Connect across null values
         },
         {
           label: 'Shock (G)',
-          data: dataPoints.map((point) => point.shock),
+          data: shockData,
           borderColor: palette.shock,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -373,13 +466,17 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 1,
           tension: 0.4,
           fill: false,
+          spanGaps: true, // Connect across null values
         },
       ],
     };
   }, [dataPoints]);
  
-  const chartOptions = useMemo(
-    () => ({
+  const chartOptions = useMemo(() => {
+    // Filter data points to only show last 1 hour (same as chartData)
+    const filteredDataPoints = filterDataByTimeWindow(dataPoints);
+    
+    return {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -418,30 +515,23 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             title: (items: any[]) => {
               if (!items?.length) return '';
               const index = items[0].dataIndex;
-              return dataPoints[index] ? formatTimestamp(dataPoints[index].timestamp) : '';
+              // Index represents interval (0-5), where 0 is most recent and 5 is oldest
+              const intervalIndex = INTERVALS_COUNT - 1 - index; // Reverse to get actual interval index
+              const minutesAgo = intervalIndex * INTERVAL_MINUTES;
+              const now = new Date();
+              const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
+              return formatTimestamp(intervalTime.toISOString());
             },
             label: (context: any) => {
-              const index = context.dataIndex;
-              const point = dataPoints[index];
-              if (!point) return '';
- 
+              const value = context.parsed.y;
+              if (value === null || value === undefined) return '';
+
               const label = context.dataset.label || '';
               const fmt = (v: number | null) => {
                 if (v === null || v === undefined) return 'N/A';
                 return typeof v === 'number' ? (Math.round(v * 10) / 10).toFixed(1) : v;
               };
-              switch (label) {
-                case 'Temperature Internal (°C)':
-                  return `Temperature Internal (°C): ${fmt(point.temp_internal)}`;
-                case 'Temperature External (°C)':
-                  return `Temperature External (°C): ${fmt(point.temp_external)}`;
-                case 'Humidity (%)':
-                  return `Humidity (%): ${fmt(point.humidity)}`;
-                case 'Shock (G)':
-                  return `Shock (G): ${fmt(point.shock)}`;
-                default:
-                  return `${label}: ${context.parsed.y}`;
-              }
+              return `${label}: ${fmt(value)}`;
             },
             labelPointStyle: (context: any) => {
               const color = context.dataset.borderColor || '#999999';
@@ -479,10 +569,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         y: {
           beginAtZero: true,
           suggestedMax: (() => {
-            const allValues = dataPoints.flatMap((p) => [
+            const allValues = filteredDataPoints.flatMap((p) => [
               p.temp_internal,
               p.temp_external,
-              p.humidity,
               p.shock,
             ].filter(v => v !== null && v !== undefined)) as number[];
             if (allValues.length === 0) return 10;
@@ -507,9 +596,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           },
         },
       },
-    }),
-    [dataPoints]
-  );
+    };
+  }, [dataPoints]);
  
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px]">
@@ -536,10 +624,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               <span className="text-xs font-medium text-gray-700">{Math.round(batteryPercentage)}%</span>
             </div>
           )}
-          {isConnected && (
+          {isConnected && wsRef.current?.readyState === WebSocket.OPEN && (
             <span className="text-xs text-green-600">● Connected</span>
           )}
-          {!isConnected && !error && (
+          {(!isConnected || wsRef.current?.readyState !== WebSocket.OPEN) && !error && (
             <span className="text-xs text-yellow-600">● Connecting...</span>
           )}
           {error && (
@@ -555,9 +643,15 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       )}
  
       <div className="h-[380px]">
-        {dataPoints.length === 0 ? (
+        {filterDataByTimeWindow(dataPoints).length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
-            {isConnected ? 'Waiting for data...' : 'Connecting...'}
+            {!isConnected || wsRef.current?.readyState !== WebSocket.OPEN ? (
+              'Connecting...'
+            ) : isConnected && wsRef.current?.readyState === WebSocket.OPEN && !hasReceivedData ? (
+              'No data available'
+            ) : (
+              'Waiting for data...'
+            )}
           </div>
         ) : (
           <Line data={chartData} options={chartOptions as any} />
