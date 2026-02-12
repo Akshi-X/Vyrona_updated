@@ -80,7 +80,7 @@ class IVFCanisterTrackingResponse(BaseModel):
     """Response for canister tracking details"""
     data: List[IVFCanisterTrackingItem] = Field(default_factory=list, description="Tracking rows")
     total: int = Field(..., description="Total number of cryolocks (total slots)")
-    available_slots: int = Field(..., description="Available slots = total - moved (embryo_transfer/in_transit/embryo_grading set)")
+    available_slots: int = Field(..., description="Count of records where embryo_transfer or in_transit is true")
 
 
 class CryolockFlagUpdate(BaseModel):
