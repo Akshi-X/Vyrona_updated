@@ -73,7 +73,7 @@ class IVFShipment(Base):
         # Index for querying by IoT shipment ID
         Index('idx_ivf_shipment_iot_id', 'iot_shipment_id'),
         # Index for querying by patient crylock info
-        Index('idx_ivf_shipment_patient_crylock', 'patient_crylock_info_id'),  # SQLAlchemy maps to cryolock_id automatically
+        Index('idx_ivf_shipment_patient_crylock', 'cryolock_id'),  # Use actual DB column name
         # Index for querying by device
         Index('idx_ivf_shipment_device', 'device_id'),
         # Index for querying by status
