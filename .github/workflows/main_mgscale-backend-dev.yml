@@ -3,7 +3,7 @@ name: Build, Push & Deploy Docker Image - mgscale-backend-dev
 on:
   push:
     branches:
-      - master
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -50,3 +50,4 @@ jobs:
         with:
           app-name: mgscale-backend-service-dev
           images: mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
+
