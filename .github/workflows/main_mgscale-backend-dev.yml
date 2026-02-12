@@ -48,5 +48,6 @@ jobs:
       - name: Deploy to Azure Web App (Container)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: mgscale-backend-service-dev
+          app-name: mgscale-alerting-service-prod
           images: mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
+
