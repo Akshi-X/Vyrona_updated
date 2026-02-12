@@ -3,6 +3,8 @@ Critical Alert Service
 Handles business logic for critical alerts including detection, creation, and email notifications
 """
 import logging
+import threading
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy import and_, or_, desc, func
@@ -10,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from psycopg2.errors import UniqueViolation
 
+from ...config.database import SessionLocal
 from ...models.IVF.critical_alert_model import CriticalAlert, AlertType, AlertSeverity, AlertStatus
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
@@ -17,7 +20,6 @@ from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.user_model import User
 from ...constants.enums import CanisterStatus, ApprovalStatus, AlertSource, AlertTriggeredBy
-import uuid
 from ...schemas.IVF.critical_alert_schema import (
     CriticalAlertResponse,
     CriticalAlertListResponse,
@@ -33,7 +35,7 @@ from jinja2 import Environment, FileSystemLoader
 logger = logging.getLogger(__name__)
 
 # Note: IVF thresholds are checked in publisher.py using check_ivf_threshold_magnitude()
-# The quality_log already has violation flags set by publisher logic.
+# The quality_log already has violation flags set (is_temp_internal_loss, is_temp_external_loss, is_shock_loss, etc.)
 # We use those flags instead of re-checking thresholds here
 
 # Quality Loss Thresholds
@@ -45,6 +47,10 @@ REFILL_LOG_DAYS = 3  # Alert if refill log not created within 3 days
 
 # Reminder interval
 REMINDER_INTERVAL_HOURS = 1  # Send reminder every 1 hour
+
+# Occurrence tracking window for immediate alerts (24 hours)
+OCCURRENCE_TRACKING_HOURS = 24  # Track occurrences in last 24 hours
+OCCURRENCE_THRESHOLD = 3  # Send to managers after 3 occurrences
 
 
 class CriticalAlertService:
@@ -83,53 +89,92 @@ class CriticalAlertService:
         except Exception as e:
             logger.error(f"Error resolving tank_id for tank_code={tank_code}: {str(e)}", exc_info=True)
             raise ValueError(f"Failed to resolve tank: {str(e)}")
+
+    def _max_severity(self, current: AlertSeverity, candidate: AlertSeverity) -> AlertSeverity:
+        """Return the higher severity between current and candidate."""
+        rank = {
+            AlertSeverity.LOW: 1,
+            AlertSeverity.MEDIUM: 2,
+            AlertSeverity.HIGH: 3
+        }
+        return candidate if rank[candidate] > rank[current] else current
+
+    def _map_kpi_status_to_severity(self, kpi_status: Optional[str]) -> Optional[AlertSeverity]:
+        """Map KPI status string to alert severity."""
+        if not kpi_status:
+            return None
+        normalized = kpi_status.strip().lower()
+        if normalized == "critical":
+            return AlertSeverity.HIGH
+        if normalized == "warning":
+            return AlertSeverity.MEDIUM
+        return None
+
+    def _infer_deviation_severity_from_value(self, metric: str, value: Optional[float]) -> AlertSeverity:
+        """
+        Infer deviation severity from measured value when explicit KPI status is unavailable.
+        Uses IVF parameter rules; defaults to HIGH for safety when value is missing/invalid.
+        """
+        if value is None:
+            return AlertSeverity.HIGH
+
+        if metric == "temp_external":
+            if value < -20.0:
+                deviation = -20.0 - value
+                return AlertSeverity.HIGH if deviation > 5.0 else AlertSeverity.MEDIUM
+            if value > 60.0:
+                deviation = value - 60.0
+                return AlertSeverity.HIGH if deviation > 5.0 else AlertSeverity.MEDIUM
+            # Flag is true but value appears in range; keep warning level as safer fallback.
+            return AlertSeverity.MEDIUM
+
+        # temp_internal (cryogenic breach) and shock are treated as high risk breaches.
+        return AlertSeverity.HIGH
     
     def _check_kpi_deviation(self, quality_log: IVFQualityLog) -> Optional[Dict[str, Any]]:
         """
-        Check if quality log has KPI deviations using violation flags.
-        The quality_log already has violation flags set by publisher using IVF-specific thresholds.
+        Check if quality log has KPI deviations using persisted violation flags.
+        Threshold evaluation is performed upstream in publisher before writing quality_log.
         Returns dict with alert info if deviation found, None otherwise.
         """
         violations = []
-        severity = None
-        
-        # Use violation flags from quality_log (already set by publisher using IVF thresholds)
-        # IVF KPIs: temp_internal, temp_external, shock (stored as agitation)
-        
-        # Check temperature violations (covers both temp_internal and temp_external)
-        if quality_log.is_temp_loss:
-            temp_value = quality_log.temperature
-            if temp_value is not None:
-                # Determine if it's internal or external temp violation
-                # For IVF: temp_internal > 60°C or temp_external > 30°C triggers is_temp_loss
-                if temp_value > 60.0:
-                    violations.append(f"Temperature Internal: {temp_value}°C (exceeds 60°C limit)")
-                elif temp_value > 30.0:
-                    violations.append(f"Temperature External: {temp_value}°C (exceeds 30°C limit)")
-                else:
-                    violations.append(f"Temperature: {temp_value}°C (violation detected)")
-                severity = AlertSeverity.HIGH
-        
-        # Check agitation/shock violations (shock stored in agitation column)
-        if quality_log.is_agitation_loss:
-            agitation_value = quality_log.agitation
-            if agitation_value is not None:
-                # IVF: shock target 0G, acceptable 0-5G, violation if > 5G
-                violations.append(f"Shock/Agitation: {agitation_value}G (exceeds 5G limit)")
-                if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.HIGH
-        
-        # Check light violations (if applicable)
-        if quality_log.is_light_loss:
-            light_value = quality_log.light
-            if light_value is not None:
-                violations.append(f"Light: {light_value}lux (violation detected)")
-                if severity != AlertSeverity.HIGH:
-                    severity = AlertSeverity.HIGH
+        overall_severity = AlertSeverity.LOW
+
+        # Trust stored flags from quality_log.
+        # IVF KPIs: temp_internal, temp_external, shock (humidity not monitored for IVF).
+        if quality_log.is_temp_internal_loss:
+            temp_internal_value = quality_log.temperature_internal
+            violation_severity = self._infer_deviation_severity_from_value("temp_internal", temp_internal_value)
+            overall_severity = self._max_severity(overall_severity, violation_severity)
+            severity_text = "Critical" if violation_severity == AlertSeverity.HIGH else "Warning"
+            if temp_internal_value is not None:
+                violations.append(f"Temperature Internal: {temp_internal_value}°C ({severity_text} deviation)")
+            else:
+                violations.append(f"Temperature Internal {severity_text.lower()} deviation detected")
+
+        if quality_log.is_temp_external_loss:
+            temp_external_value = quality_log.temperature_external
+            violation_severity = self._infer_deviation_severity_from_value("temp_external", temp_external_value)
+            overall_severity = self._max_severity(overall_severity, violation_severity)
+            severity_text = "Critical" if violation_severity == AlertSeverity.HIGH else "Warning"
+            if temp_external_value is not None:
+                violations.append(f"Temperature External: {temp_external_value}°C ({severity_text} deviation)")
+            else:
+                violations.append(f"Temperature External {severity_text.lower()} deviation detected")
+
+        if quality_log.is_shock_loss:
+            shock_value = quality_log.shock
+            violation_severity = self._infer_deviation_severity_from_value("shock", shock_value)
+            overall_severity = self._max_severity(overall_severity, violation_severity)
+            severity_text = "Critical" if violation_severity == AlertSeverity.HIGH else "Warning"
+            if shock_value is not None:
+                violations.append(f"Shock: {shock_value}G ({severity_text} deviation)")
+            else:
+                violations.append(f"Shock {severity_text.lower()} deviation detected")
         
         if violations:
             return {
-                "severity": severity or AlertSeverity.HIGH,
+                "severity": overall_severity if overall_severity != AlertSeverity.LOW else AlertSeverity.HIGH,
                 "message": f"KPI Deviation detected: {', '.join(violations)}"
             }
         
@@ -321,7 +366,12 @@ class CriticalAlertService:
                 # Re-raise if it's a different integrity error
                 raise
     
-    def check_and_create_alerts(self, tank_id: Optional[int] = None, branch_id: Optional[int] = None) -> List[CriticalAlert]:
+    def check_and_create_alerts(
+        self,
+        tank_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+        send_notifications: bool = True
+    ) -> List[CriticalAlert]:
         """
         Check for alerts and create them if needed (tank-level monitoring).
         If tank_id is provided, only check that tank.
@@ -330,6 +380,7 @@ class CriticalAlertService:
         Args:
             tank_id: Optional tank ID to check
             branch_id: Optional branch filter for authorization
+            send_notifications: If True, queue alert emails. If False, only create/update alerts.
         """
         alerts_created = []
         # Track dedup_keys we've already sent emails for to prevent duplicate emails
@@ -354,7 +405,7 @@ class CriticalAlertService:
         for tank in tanks:
             logger.info(f"Checking alerts for tank_id={tank.tank_id} (tank_code={tank.tank_code})")
             
-            # Check for KPI deviations from recent quality logs (last 24 hours)
+            # Check for KPI deviations and quality loss from recent quality logs (last 24 hours)
             time_threshold = current_time - timedelta(days=1)
             recent_quality_logs = (
                 self.db.query(IVFQualityLog)
@@ -366,7 +417,7 @@ class CriticalAlertService:
                 .all()
             )
             
-            logger.info(f"Found {len(recent_quality_logs)} quality logs from last 24 hours for tank_id={tank.tank_id}")
+            logger.info(f"Found {len(recent_quality_logs)} quality logs from last 24 hours for tank_id={tank.tank_id} (tank_code={tank.tank_code})")
             
             if not recent_quality_logs:
                 # Check if there are any quality logs at all (for debugging)
@@ -379,15 +430,19 @@ class CriticalAlertService:
                     ).order_by(desc(IVFQualityLog.reading_timestamp)).first()
                     if latest_log:
                         hours_ago = (current_time - latest_log.reading_timestamp).total_seconds() / 3600
-                        logger.warning(f"No recent quality logs for tank_id={tank.tank_id}. "
-                                     f"Latest log is {hours_ago:.1f} hours old (timestamp: {latest_log.reading_timestamp})")
+                        logger.warning(f"No recent quality logs for tank_id={tank.tank_id} (tank_code={tank.tank_code}). "
+                                     f"Latest log is {hours_ago:.1f} hours old (timestamp: {latest_log.reading_timestamp}). "
+                                     f"Will only check refill logs.")
+                else:
+                    logger.info(f"No quality logs found for tank_id={tank.tank_id} (tank_code={tank.tank_code}). "
+                              f"Will check refill logs only. KPI and quality alerts require quality log entries with violations.")
             
             for quality_log in recent_quality_logs:
                 logger.info(f"Checking quality_log id={quality_log.id}, timestamp={quality_log.reading_timestamp}, "
-                            f"temp={quality_log.temperature}°C, "
-                            f"agitation={quality_log.agitation}G, quality_loss={quality_log.quality_loss}%, "
-                            f"violations: temp={quality_log.is_temp_loss}, "
-                            f"agitation={quality_log.is_agitation_loss}")
+                            f"temp_internal={quality_log.temperature_internal}°C, temp_external={quality_log.temperature_external}°C, "
+                            f"shock={quality_log.shock}G, quality_loss={quality_log.quality_loss}%, "
+                            f"violations: temp_internal={quality_log.is_temp_internal_loss}, temp_external={quality_log.is_temp_external_loss}, "
+                            f"shock={quality_log.is_shock_loss}")
                 
                 # Check KPI deviation (uses violation flags from quality_log)
                 kpi_alert = self._check_kpi_deviation(quality_log)
@@ -454,7 +509,8 @@ class CriticalAlertService:
                     logger.debug(f"No quality loss found in quality_log id={quality_log.id} (quality_loss={quality_log.quality_loss})")
             
             # Check refill log (for the tank)
-            # Refill logs are tank-based
+            # Refill logs are tank-based - this check always runs regardless of quality logs
+            logger.info(f"Checking refill log status for tank_id={tank.tank_id} (tank_code={tank.tank_code})")
             refill_alert = self._check_refill_log(tank.tank_id)
             if refill_alert:
                 dedup_key = self._generate_dedup_key(
@@ -479,15 +535,44 @@ class CriticalAlertService:
         
         self.db.commit()
         
-        # Send emails ONLY for alerts with dedup_keys we haven't sent emails for yet
-        alerts_to_email = [alert for alert in alerts_created if alert.dedup_key in sent_email_dedup_keys]
-        logger.info(f"Sending emails for {len(alerts_to_email)} new alert(s) out of {len(alerts_created)} total alert(s) processed")
-        
-        for alert in alerts_to_email:
-            try:
-                self._send_alert_email(alert)
-            except Exception as e:
-                logger.error(f"Failed to send alert email for alert_id={alert.alert_id}: {str(e)}")
+        # Send emails ONLY for dedup_keys we haven't sent emails for yet.
+        # Keep a single alert per dedup_key to prevent duplicate emails in the same run.
+        alerts_to_email = []
+        queued_dedup_keys = set()
+        for alert in alerts_created:
+            if alert.dedup_key in sent_email_dedup_keys and alert.dedup_key not in queued_dedup_keys:
+                alerts_to_email.append(alert)
+                queued_dedup_keys.add(alert.dedup_key)
+        logger.info(f"Queueing {len(alerts_to_email)} email(s) for background sending out of {len(alerts_created)} total alert(s) processed")
+
+        if not send_notifications:
+            logger.info("Email notifications disabled for this check_and_create_alerts run")
+            return alerts_created
+
+        # Send emails in background thread to avoid blocking
+        if alerts_to_email:
+            def send_emails_background():
+                """Send emails in background thread"""
+                # Create new database session for background thread
+                bg_db = SessionLocal()
+                try:
+                    for alert in alerts_to_email:
+                        try:
+                            # Refresh alert from database for background thread
+                            alert_refreshed = bg_db.query(CriticalAlert).filter(
+                                CriticalAlert.alert_id == alert.alert_id
+                            ).first()
+                            if alert_refreshed:
+                                self._send_alert_email(alert_refreshed)
+                        except Exception as e:
+                            logger.error(f"Failed to send alert email for alert_id={alert.alert_id}: {str(e)}")
+                finally:
+                    bg_db.close()
+            
+            # Start background thread
+            thread = threading.Thread(target=send_emails_background, daemon=True)
+            thread.start()
+            logger.info(f"Started background thread to send {len(alerts_to_email)} email(s)")
         
         return alerts_created
     
@@ -613,6 +698,372 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
     
+    def _count_occurrences(self, tank_id: int, violation_type: str, occurred_at: datetime) -> int:
+        """
+        Count how many times a specific violation type occurred for a tank in the tracking window.
+        
+        Args:
+            tank_id: Tank ID
+            violation_type: Type of violation ('temp_internal', 'temp_external', 'shock', 'quality_loss')
+            occurred_at: Timestamp of current occurrence
+            
+        Returns:
+            Count of occurrences in the tracking window
+        """
+        time_threshold = occurred_at - timedelta(hours=OCCURRENCE_TRACKING_HOURS)
+        
+        query = self.db.query(IVFQualityLog).filter(
+            IVFQualityLog.tank_id == tank_id,
+            IVFQualityLog.reading_timestamp >= time_threshold,
+            IVFQualityLog.reading_timestamp <= occurred_at
+        )
+        
+        # Apply violation-specific filter
+        if violation_type == 'quality_loss':
+            query = query.filter(IVFQualityLog.quality_loss > 0)
+        elif violation_type == 'temp_internal':
+            query = query.filter(IVFQualityLog.is_temp_internal_loss == True)
+        elif violation_type == 'temp_external':
+            query = query.filter(IVFQualityLog.is_temp_external_loss == True)
+        elif violation_type == 'shock':
+            query = query.filter(IVFQualityLog.is_shock_loss == True)
+        else:
+            return 0
+        
+        count = query.count()
+        return count
+    
+    def send_immediate_alert_email(
+        self,
+        tank_id: int,
+        quality_log_data: Dict[str, Any],
+        occurred_at: datetime
+    ):
+        """
+        Send immediate alert email after inserting quality log with deviation/quality loss.
+        This is called directly from publisher after inserting ivf_quality_log.
+        
+        Logic:
+        - If same issue occurs < 3 times: Send email to branch users
+        - If same issue occurs >= 3 times: Send email to managers
+        
+        Args:
+            tank_id: Tank ID
+            quality_log_data: Dict with violation flags and quality loss info
+            occurred_at: Timestamp when violation occurred
+        """
+        try:
+            # Get tank and branch info
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
+                logger.warning(f"Tank {tank_id} not found - skipping immediate alert email")
+                return
+            
+            branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+            if not branch:
+                logger.warning(f"Branch for tank {tank_id} not found - skipping immediate alert email")
+                return
+            
+            hospital_id = branch.hospital_id
+            tank_code = tank.tank_code or f"Tank-{tank_id}"
+            
+            # Determine violation types from quality_log_data
+            violations_to_check = []
+            
+            kpi_statuses = quality_log_data.get("kpi_statuses", {}) or {}
+
+            # Check KPI violations
+            if quality_log_data.get("is_temp_internal_loss"):
+                status_severity = self._map_kpi_status_to_severity(kpi_statuses.get("temp_internal"))
+                severity = status_severity or self._infer_deviation_severity_from_value(
+                    "temp_internal",
+                    quality_log_data.get("temp_internal")
+                )
+                severity_text = "Critical" if severity == AlertSeverity.HIGH else "Warning"
+                violations_to_check.append({
+                    "type": "temp_internal",
+                    "alert_type": AlertType.DEVIATION_ALERT.value,
+                    "source": AlertSource.KPI.value,
+                    "message": f"Temperature Internal {severity_text.lower()} deviation detected: {quality_log_data.get('temp_internal', 'N/A')}°C",
+                    "severity": severity.value
+                })
+            
+            if quality_log_data.get("is_temp_external_loss"):
+                status_severity = self._map_kpi_status_to_severity(kpi_statuses.get("temp_external"))
+                severity = status_severity or self._infer_deviation_severity_from_value(
+                    "temp_external",
+                    quality_log_data.get("temp_external")
+                )
+                severity_text = "Critical" if severity == AlertSeverity.HIGH else "Warning"
+                violations_to_check.append({
+                    "type": "temp_external",
+                    "alert_type": AlertType.DEVIATION_ALERT.value,
+                    "source": AlertSource.KPI.value,
+                    "message": f"Temperature External {severity_text.lower()} deviation detected: {quality_log_data.get('temp_external', 'N/A')}°C",
+                    "severity": severity.value
+                })
+            
+            if quality_log_data.get("is_shock_loss"):
+                status_severity = self._map_kpi_status_to_severity(kpi_statuses.get("shock"))
+                severity = status_severity or self._infer_deviation_severity_from_value(
+                    "shock",
+                    quality_log_data.get("shock")
+                )
+                severity_text = "Critical" if severity == AlertSeverity.HIGH else "Warning"
+                violations_to_check.append({
+                    "type": "shock",
+                    "alert_type": AlertType.DEVIATION_ALERT.value,
+                    "source": AlertSource.KPI.value,
+                    "message": f"Shock {severity_text.lower()} deviation detected: {quality_log_data.get('shock', 'N/A')}G",
+                    "severity": severity.value
+                })
+            
+            # Check quality loss
+            quality_loss = quality_log_data.get("quality_loss", 0.0) or 0.0
+            if quality_loss > 0:
+                if quality_loss >= QUALITY_LOSS_HIGH:
+                    severity = AlertSeverity.HIGH.value
+                    message = f"High quality loss detected: {quality_loss}%"
+                elif quality_loss >= QUALITY_LOSS_MEDIUM:
+                    severity = AlertSeverity.MEDIUM.value
+                    message = f"Quality loss detected: {quality_loss}%"
+                else:
+                    severity = AlertSeverity.MEDIUM.value
+                    message = f"Quality loss detected: {quality_loss}%"
+                
+                violations_to_check.append({
+                    "type": "quality_loss",
+                    "alert_type": AlertType.QUALITY_ALERT.value,
+                    "source": AlertSource.QUALITY.value,
+                    "message": message,
+                    "severity": severity
+                })
+            
+            if not violations_to_check:
+                logger.debug(f"No violations detected in quality_log_data for tank {tank_id} - skipping email")
+                return
+            
+            # Process each violation
+            for violation in violations_to_check:
+                violation_type = violation["type"]
+                
+                # Count occurrences of this violation type
+                occurrence_count = self._count_occurrences(tank_id, violation_type, occurred_at)
+                
+                # Determine recipients based on occurrence count
+                if occurrence_count >= OCCURRENCE_THRESHOLD:
+                    # Send to BOTH managers AND branch users when >= 3 occurrences
+                    
+                    # Get managers from the branch
+                    branch_managers = self.db.query(User).filter(
+                        User.department == "IVF",
+                        User.role == "Manager",
+                        User.branch_id == tank.branch_id,
+                        User.status == True,
+                        User.approved_status == ApprovalStatus.APPROVED
+                    ).all()
+                    
+                    # Get managers from all branches in the hospital
+                    all_branches = self.db.query(HospitalBranch).filter(
+                        HospitalBranch.hospital_id == hospital_id
+                    ).all()
+                    branch_ids = [b.branch_id for b in all_branches]
+                    
+                    hospital_managers = self.db.query(User).filter(
+                        User.department == "IVF",
+                        User.role == "Manager",
+                        User.branch_id.in_(branch_ids),
+                        User.status == True,
+                        User.approved_status == ApprovalStatus.APPROVED
+                    ).all()
+                    
+                    # Get branch users (User role) from the occurred branch
+                    branch_users = self.db.query(User).filter(
+                        User.department == "IVF",
+                        User.role == "User",
+                        User.branch_id == tank.branch_id,
+                        User.status == True,
+                        User.approved_status == ApprovalStatus.APPROVED
+                    ).all()
+                    
+                    # Combine managers and branch users, deduplicate
+                    all_recipients = {user.user_id: user for user in branch_managers + hospital_managers + branch_users}.values()
+                    recipient_type = "managers and branch users"
+                else:
+                    # Send to branch users only when < 3 occurrences
+                    all_recipients = self.db.query(User).filter(
+                        User.department == "IVF",
+                        User.role == "User",
+                        User.branch_id == tank.branch_id,
+                        User.status == True,
+                        User.approved_status == ApprovalStatus.APPROVED
+                    ).all()
+                    recipient_type = "branch users"
+                
+                if not all_recipients:
+                    logger.warning(f"No {recipient_type} found for tank {tank_id} - skipping email")
+                    continue
+                
+                # Send emails in background thread to avoid blocking
+                # Prepare email data for background sending
+                
+                email_data = {
+                    'recipients': list(all_recipients),  # Convert to list to avoid session issues
+                    'tank_code': tank_code,
+                    'branch_name': branch.branch_name or "N/A",
+                    'alert_type': violation["alert_type"],
+                    'severity': violation["severity"],
+                    'message': violation["message"],
+                    'occurred_at': occurred_at,
+                    'occurrence_count': occurrence_count,
+                    'tank_id': tank_id,
+                    'violation_type': violation_type,
+                    'recipient_type': recipient_type
+                }
+                
+                def send_emails_background():
+                    """Send emails in background thread"""
+                    bg_db = SessionLocal()
+                    try:
+                        emails_sent = 0
+                        emails_failed = 0
+                        failed_recipients = []
+                        
+                        for recipient in email_data['recipients']:
+                            try:
+                                # Create a new service instance for background thread
+                                bg_service = CriticalAlertService(bg_db)
+                                bg_service._send_immediate_alert_email_to_users(
+                                    recipients=[recipient],
+                                    tank_code=email_data['tank_code'],
+                                    branch_name=email_data['branch_name'],
+                                    alert_type=email_data['alert_type'],
+                                    severity=email_data['severity'],
+                                    message=email_data['message'],
+                                    occurred_at=email_data['occurred_at'],
+                                    occurrence_count=email_data['occurrence_count']
+                                )
+                                emails_sent += 1
+                            except Exception as e:
+                                emails_failed += 1
+                                failed_recipients.append(recipient.email)
+                                logger.error(f"Failed to send email to {recipient.email}: {str(e)}")
+                        
+                        # Log summary
+                        if emails_sent > 0:
+                            logger.info(f"✓ Sent immediate alert emails: {emails_sent} successful, {emails_failed} failed "
+                                      f"to {email_data['recipient_type']} for tank {email_data['tank_id']}, "
+                                      f"violation_type={email_data['violation_type']}, "
+                                      f"occurrence_count={email_data['occurrence_count']}")
+                        if emails_failed > 0:
+                            logger.warning(f"⚠ Failed to send emails to {emails_failed} recipient(s): {', '.join(failed_recipients)}")
+                    finally:
+                        bg_db.close()
+                
+                # Start background thread
+                thread = threading.Thread(target=send_emails_background, daemon=True)
+                thread.start()
+                logger.info(f"Queued {len(all_recipients)} email(s) for background sending to {recipient_type} for tank {tank_id}")
+        
+        except Exception as e:
+            logger.error(f"Error sending immediate alert email for tank {tank_id}: {str(e)}", exc_info=True)
+    
+    def _send_immediate_alert_email_to_users(
+        self,
+        recipients: List[User],
+        tank_code: str,
+        branch_name: str,
+        alert_type: str,
+        severity: str,
+        message: str,
+        occurred_at: datetime,
+        occurrence_count: int
+    ):
+        """
+        Send immediate alert email to a list of users.
+        
+        Args:
+            recipients: List of User objects to send email to
+            tank_code: Tank code
+            branch_name: Branch name
+            alert_type: Type of alert
+            severity: Alert severity
+            message: Alert message
+            occurred_at: When violation occurred
+            occurrence_count: How many times this issue occurred
+        """
+        # Load email template
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+        
+        try:
+            template = jinja_env.get_template("critical_alert_email.html")
+        except Exception as e:
+            logger.error(f"Failed to load alert email template: {str(e)}")
+            template = None
+        
+        # Determine severity class for styling
+        severity_class = "high-severity"
+        if severity == "Medium":
+            severity_class = "medium-severity"
+        elif severity == "Low":
+            severity_class = "low-severity"
+        
+        # Dashboard URL
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard"
+        
+        # Add occurrence count to message if >= threshold
+        if occurrence_count >= OCCURRENCE_THRESHOLD:
+            message_with_count = f"{message} (This issue has occurred {occurrence_count} times in the last {OCCURRENCE_TRACKING_HOURS} hours)"
+        else:
+            message_with_count = message
+        
+        subject = f"Critical Alert: {alert_type} - {severity} Severity - {tank_code}"
+        
+        for user in recipients:
+            try:
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        alert_type=alert_type,
+                        severity=severity,
+                        tank_id=None,  # Not needed for template
+                        tank_code=tank_code,
+                        canister_number=tank_code,  # Template uses canister_number
+                        branch_name=branch_name,
+                        message=message_with_count,
+                        occurred_at=occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                        acknowledge_url=alerts_url,
+                        severity_class=severity_class
+                    )
+                else:
+                    # Fallback HTML
+                    html_body = f"""
+                    <html>
+                    <body>
+                        <h2>Critical Alert Notification</h2>
+                        <p><strong>Alert Type:</strong> {alert_type}</p>
+                        <p><strong>Severity:</strong> {severity}</p>
+                        <p><strong>Tank:</strong> {tank_code}</p>
+                        <p><strong>Branch:</strong> {branch_name}</p>
+                        <p><strong>Message:</strong> {message_with_count}</p>
+                        <p><strong>Occurred At:</strong> {occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+                        <br/>
+                        <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                            View Alerts
+                        </a>
+                    </body>
+                    </html>
+                    """
+                
+                # Send email and track result
+                send_email(user.email, subject, html_body)
+                logger.info(f"✓ Successfully sent immediate alert email to {user.email} for tank {tank_code}, violation: {alert_type}")
+            except Exception as email_error:
+                logger.error(f"✗ Failed to send immediate alert email to {user.email}: {str(email_error)}", exc_info=True)
+                # Re-raise to track in calling function
+                raise
+    
     def get_tank_alerts(self, tank_id: int) -> TankAlertsResponse:
         """Get all alerts for a specific tank by tank_id (tank-level monitoring)"""
         # Get tank
@@ -708,19 +1159,14 @@ class CriticalAlertService:
         tank_ids = [alert.tank_id for alert in alerts]
         tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
         tank_code_map = {t.tank_id: t.tank_code for t in tanks}
-        branch_ids = list({alert.branch_id for alert in alerts})
-        branches = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id.in_(branch_ids)).all()
-        branch_name_map = {b.branch_id: b.branch_name for b in branches}
         
         # Build alert responses with tank_code
         alert_responses = []
         for alert in alerts:
             tank_code = tank_code_map.get(alert.tank_id) or f"Tank-{alert.tank_id}"
-            branch_name = branch_name_map.get(alert.branch_id) or "N/A"
             alert_dict = {
                 **alert.__dict__,
-                'tank_code': tank_code,
-                'branch_name': branch_name
+                'tank_code': tank_code
             }
             alert_responses.append(CriticalAlertResponse.model_validate(alert_dict))
         
