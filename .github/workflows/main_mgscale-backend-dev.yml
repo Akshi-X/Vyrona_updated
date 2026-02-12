@@ -3,7 +3,7 @@ name: Build, Push & Deploy Docker Image - mgscale-backend-dev
 on:
   push:
     branches:
-      - develop
+      - master
   workflow_dispatch:
 
 jobs:
@@ -25,38 +25,28 @@ jobs:
           auth-type: SERVICE_PRINCIPAL
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3️⃣ Verify Web App access (RBAC check)
-      - name: Verify Web App
-        run: |
-          az webapp show \
-            --name mgscale-backend-service-dev \
-            --resource-group Mgscale
-
       # 4️⃣ Login to ACR
       - name: Login to ACR
         run: |
-          docker login myscaledev.azurecr.io \
-            -u myscaledev \
-            -p ${{ secrets.ACR_ADMIN_PASSWORD }}
+          docker login mgscaleprod.azurecr.io \
+            -u mgscaleprod \
+            -p ${{ secrets.ACR_ADMIN_PASSWORD_PROD }}
 
       # 5️⃣ Build Docker image
       - name: Build Docker Image
         run: |
           docker build \
-            -t myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }} \
+            -t mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }} \
             ./backend
 
       # 6️⃣ Push Docker image
       - name: Push Docker Image
         run: |
-          docker push myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
+          docker push mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
 
       # 7️⃣ Deploy image to Azure Web App (Container)
       - name: Deploy to Azure Web App (Container)
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-backend-service-dev
-          images: myscaledev.azurecr.io/mgscale-backend:${{ github.run_number }}
-
-
-
+          images: mgscaleprod.azurecr.io/mgscale-backend:${{ github.run_number }}
