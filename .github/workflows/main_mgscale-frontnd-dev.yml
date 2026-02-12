@@ -3,7 +3,7 @@ name: Build and Deploy Frontend (Vite) - mgscale-frontnd-dev
 on:
   push:
     branches:
-      - main
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -76,3 +76,4 @@ jobs:
         with:
           app-name: mgscale-frontnd-dev
           package: dist
+
