@@ -38,31 +38,11 @@ describe('RoleBasedRoute', () => {
     mockHistoryBack.mockClear()
   })
 
-  const renderWithAuth = (isAuthenticated: boolean, userRole?: string) => {
-    ;(authUtils.authUtils.getToken as any).mockReturnValue(
-      isAuthenticated ? 'test-token' : undefined
-    )
-    
-    if (userRole) {
-      localStorage.setItem('user_role', userRole)
-    }
-
-    return render(
-      <MemoryRouter>
-        <AuthProvider>
-          <RoleBasedRoute allowedRoles={['admin', 'user']}>
-            <div>Protected Content</div>
-          </RoleBasedRoute>
-        </AuthProvider>
-      </MemoryRouter>
-    )
-  }
-
   describe('Loading State', () => {
     it('shows loading spinner when isLoading is true', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue(undefined)
       
-      const { container } = render(
+      render(
         <MemoryRouter>
           <AuthProvider>
             <RoleBasedRoute>

@@ -1,9 +1,10 @@
-name: Build and Deploy Frontend (Vite) - mgscale-dashboard-service-prod
+
+name: Build and Deploy Frontend (Vite) - mgscale-frontnd-dev
 
 on:
   push:
     branches:
-      - master
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -74,5 +75,6 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: mgscale-dashboard-service-prod
+          app-name: mgscale-frontnd-dev
           package: dist
+
