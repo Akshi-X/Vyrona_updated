@@ -28,6 +28,7 @@ class CriticalAlertResponse(CriticalAlertBase):
     """Schema for critical alert response (tank-level monitoring)"""
     alert_id: str = Field(..., description="UUID for alert identification")
     tank_code: Optional[str] = Field(None, description="Tank code (e.g., 'T1')")
+    branch_name: Optional[str] = Field(None, description="Branch name")
     status: AlertStatus = Field(default=AlertStatus.ACTIVE, description="Status: Active, Acknowledged")
     acknowledged_by: Optional[str] = Field(None, description="User ID who acknowledged the alert")
     acknowledged_at: Optional[datetime] = Field(None, description="Timestamp when alert was acknowledged")

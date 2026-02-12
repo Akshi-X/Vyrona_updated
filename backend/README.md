@@ -674,7 +674,7 @@ All API endpoints are prefixed with `/api` (configurable via `API_PREFIX`)
 - Automatic routing: Data broadcasted to connections subscribed to matching `tank_code`
 
 **Message Types:**
-- Telemetry data (temperature, humidity, shock)
+- Telemetry data (temperature, shock)
 - Quality log entries
 - Geolocation updates
 - Critical alerts
@@ -684,8 +684,7 @@ All API endpoints are prefixed with `/api` (configurable via `API_PREFIX`)
 // Webhook receives:
 {
   "device_id": "J712149",
-  "temperature": 25.5,
-  "humidity": 60.0
+  "temperature": 25.5
 }
 
 // WebSocket automatically:

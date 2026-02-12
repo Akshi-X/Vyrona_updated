@@ -65,7 +65,7 @@ class CriticalAlert(Base):
     """
     Model to store critical alerts for IVF tanks (tank-level monitoring).
     Alerts are triggered for:
-    - KPI deviations (temperature, humidity, agitation, light)
+    - KPI deviations (internal/external temperature and shock)
     - Quality loss events
     - Missing refill logs (not filled within 3 days)
     
