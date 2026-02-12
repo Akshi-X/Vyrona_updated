@@ -51,6 +51,18 @@ A comprehensive FastAPI-based backend for the MyGrape Supply Chain Tracking Plat
   - Unread message tracking
   - Message history
 
+- **IVF (In Vitro Fertilization) Management**
+  - Tank-level monitoring with device ID mapping
+  - Real-time quality monitoring via WebSocket
+  - Embryo and cryolock tracking
+  - LN2 refill log management
+  - Quality deviation tracking
+  - Critical alert system
+  - Control tower map visualization
+  - ARC IVF storage integration
+  - Multi-branch support with role-based access
+  - Device ID to tank code automatic routing
+
 - **Dashboard & Analytics**
   - Performance metrics
   - Risk assessment
@@ -166,6 +178,10 @@ FLIGHTRADAR24_API_KEY=your-flightradar24-api-key
 # Weather API (for weather adversities calculation)
 WEATHER_API_KEY=your-weatherapi-key
 WEATHER_API_PROVIDER=weatherapi  # Options: "weatherapi"
+
+# ARC IVF API (for IVF storage data integration)
+ARC_API_TOKEN=your-arc-ivf-token-id  # Token ID for ARC IVF Storage API authentication
+ARC_IVF_TOKEN_ID=your-arc-ivf-token-id  # Alias for ARC_API_TOKEN (for backward compatibility)
 
 # ============================================
 # Admin Account Configuration
@@ -388,7 +404,13 @@ backend/
 │   │   ├── task_controller.py   # Task management endpoints
 │   │   ├── chat_controller.py   # Chat/messaging endpoints
 │   │   ├── dashboard_controller.py # Dashboard analytics endpoints
-│   │   └── lane_risk_controller.py # Risk assessment endpoints
+│   │   ├── lane_risk_controller.py # Risk assessment endpoints
+│   │   ├── IVF/                 # IVF module controllers
+│   │   │   ├── ivf_controller.py # IVF control tower & tracking
+│   │   │   ├── ivf_dashboard_controller.py # IVF dashboard metrics
+│   │   │   ├── ivf_quality_controller.py # Real-time quality monitoring (WebSocket)
+│   │   │   ├── quality_tracking_controller.py # Quality tracking & refill logs
+│   │   │   └── critical_alert_controller.py # Critical alerts management
 │   │
 │   ├── dependencies/            # FastAPI dependencies
 │   │   ├── auth_dependencies.py # Authentication dependencies
@@ -414,6 +436,17 @@ backend/
 │   │   ├── feedback_model.py
 │   │   ├── task_model.py
 │   │   ├── chat_model.py
+│   │   ├── IVF/                 # IVF module models
+│   │   │   ├── tank_model.py   # Tank model with tive_device_id mapping
+│   │   │   ├── patient_crylock_info_model.py # Patient crylock information
+│   │   │   ├── ivf_telemetry_data_model.py # IoT telemetry data storage
+│   │   │   ├── ivf_quality_log_model.py # Quality log entries
+│   │   │   ├── ivf_geolocation_model.py # Geolocation tracking
+│   │   │   ├── ivf_shipment_model.py # IVF shipment tracking
+│   │   │   ├── canister_ln2_log_model.py # LN2 refill logs
+│   │   │   ├── critical_alert_model.py # Critical alerts
+│   │   │   ├── hospital_model.py # Hospital information
+│   │   │   └── hospital_branch_model.py # Hospital branch information
 │   │   └── ... (other models)
 │   │
 │   ├── schemas/                 # Pydantic request/response schemas
@@ -422,6 +455,12 @@ backend/
 │   │   ├── user_schema.py
 │   │   ├── feedback_schema.py
 │   │   ├── task_schema.py
+│   │   ├── IVF/                 # IVF module schemas
+│   │   │   ├── ivf_schema.py   # IVF control tower & tracking schemas
+│   │   │   ├── ivf_dashboard_schema.py # Dashboard metrics schemas
+│   │   │   ├── quality_tracking_schema.py # Quality tracking schemas
+│   │   │   ├── critical_alert_schema.py # Critical alert schemas
+│   │   │   └── arc_ivf_schema.py # ARC IVF integration schemas
 │   │   └── ... (other schemas)
 │   │
 │   ├── service/                 # Business logic layer
@@ -433,6 +472,12 @@ backend/
 │   │   ├── chat_service.py
 │   │   ├── email_service.py
 │   │   ├── login_service.py
+│   │   ├── IVF/                 # IVF module services
+│   │   │   ├── ivf_service.py  # IVF control tower & tracking logic
+│   │   │   ├── ivf_dashboard_service.py # Dashboard metrics logic
+│   │   │   ├── quality_tracking_service.py # Quality tracking & refill logs
+│   │   │   ├── critical_alert_service.py # Critical alerts logic
+│   │   │   └── arc_ivf_service.py # ARC IVF API integration
 │   │   └── ... (other services)
 │   │
 │   ├── templates/               # Email templates
@@ -443,7 +488,9 @@ backend/
 │   │
 │   ├── utils/                   # Utility functions
 │   │   ├── utils.py
-│   │   └── patient_utils.py
+│   │   ├── patient_utils.py
+│   │   ├── ivf_helpers.py      # IVF helper functions (tank lookup, branch filtering)
+│   │   └── websocket_manager.py # WebSocket connection manager (supports device_id → tank_code mapping)
 │   │
 │   ├── init_db.py               # Database initialization
 │   └── main.py                  # FastAPI application entry point
@@ -609,6 +656,43 @@ All API endpoints are prefixed with `/api` (configurable via `API_PREFIX`)
 - `GET /api/unread` - Get unread messages count
 - `GET /api/health` - Chat service health check
 
+### WebSocket Endpoints
+
+#### IVF Quality Monitoring WebSocket
+
+- `WS /api/ivf/quality/ws?token=<jwt_token>` - Real-time IVF tank quality monitoring
+
+**Connection Flow:**
+1. Connect with JWT token in query parameter
+2. Send subscription message: `{"tank_code": "T1"}`
+3. Receive real-time updates for subscribed tank
+
+**Device ID Support:**
+- Webhook data with `device_id` automatically resolves to `tank_code` via database lookup
+- Each tank has `tive_device_id` field mapping device to tank
+- Supports multiple devices: Each of 10+ device KPI data points routed independently
+- Automatic routing: Data broadcasted to connections subscribed to matching `tank_code`
+
+**Message Types:**
+- Telemetry data (temperature, shock)
+- Quality log entries
+- Geolocation updates
+- Critical alerts
+
+**Example Webhook → WebSocket Flow:**
+```json
+// Webhook receives:
+{
+  "device_id": "J712149",
+  "temperature": 25.5
+}
+
+// WebSocket automatically:
+// 1. Looks up tank where tive_device_id = "J712149"
+// 2. Extracts tank_code (e.g., "T1")
+// 3. Broadcasts to all connections subscribed to "T1"
+```
+
 ### Dashboard Endpoints
 
 - `GET /api/performance` - Performance metrics
@@ -620,6 +704,76 @@ All API endpoints are prefixed with `/api` (configurable via `API_PREFIX`)
 ### Lane Risk Assessment Endpoints
 
 - `GET /api/lane-risk-assessment` - Get lane risk assessment
+
+### IVF (In Vitro Fertilization) Endpoints
+
+The IVF module provides comprehensive tracking and monitoring for IVF tanks, cryolocks, and embryo storage with real-time quality monitoring, role-based access control, and integration with ARC IVF storage system.
+
+#### Control Tower & Tracking
+
+- `GET /api/ivf/control_tower` - Get IVF control tower map locations with hospital and branch information
+- `GET /api/ivf/control_tower/active_canisters` - Get active tanks grouped by branch
+- `GET /api/ivf/embryo_tracking` - Get embryo tracking data grouped by cryolock
+- `GET /api/ivf/embryo-transfer` - Get all crylocks where embryo_transfer is True
+- `GET /api/ivf/in-transit` - Get all crylocks where in_transit is True
+- `GET /api/ivf/canisters/{tank_code}/check` - Check if a tank exists by tank code
+- `GET /api/ivf/branches` - Get list of branches for the logged-in IVF user's hospital
+
+#### Dashboard Metrics
+
+- `GET /api/ivf/dashboard/metrics/total-embryos-cryolocks` - Get total embryos and cryolocks count
+- `GET /api/ivf/dashboard/metrics/total-containers` - Get total containers count
+- `GET /api/ivf/dashboard/metrics/quality-deviations-flagged` - Get quality deviations flagged count
+- `GET /api/ivf/dashboard/metrics/top-deviation-driver` - Get top deviation driver
+- `GET /api/ivf/dashboard/metrics/outbound-shipments` - Get outbound shipments count
+- `GET /api/ivf/dashboard/metrics/deviations-graph` - Get deviations graph data
+- `GET /api/ivf/dashboard/metrics/total-deviations` - Get total deviations count
+
+#### Quality Tracking & Refill Logs
+
+- `POST /api/quality-tracking/tanks/{tank_code}/refill-logs` - Create LN2 refill log entry
+- `GET /api/quality-tracking/tanks/{tank_code}/refill-logs` - Get refill logs for a tank
+- `PATCH /api/quality-tracking/tanks/{tank_code}/refill-logs/{log_id}/status` - Update refill log status
+- `GET /api/quality-tracking/tanks/{tank_code}/tracking-details` - Get canister tracking details
+- `PATCH /api/quality-tracking/tanks/{tank_code}/goblet-color` - Update goblet color
+- `PATCH /api/quality-tracking/tanks/{tank_code}/cryolock-color` - Update cryolock color
+- `PATCH /api/quality-tracking/tanks/{tank_code}/embryo-transfer` - Mark cryolock for embryo transfer
+- `PATCH /api/quality-tracking/tanks/{tank_code}/in-transit-with-shipment` - Mark cryolock in transit and create IoT shipment
+- `GET /api/quality-tracking/tanks/{tank_code}/combined-report/export-excel` - Export combined refill logs and deviations report
+
+#### Real-time Quality Monitoring (WebSocket)
+
+- `WS /api/ivf/quality/ws` - WebSocket endpoint for real-time IVF tank quality monitoring
+  - Requires authentication token: `?token=<jwt_token>`
+  - Subscribe to tank updates by sending: `{"tank_code": "T1"}`
+  - Supports device_id-based routing: Webhook data with `device_id` automatically resolves to `tank_code` via `tive_device_id` mapping
+  - Broadcasts telemetry data, quality logs, and geolocation updates in real-time
+
+#### Critical Alerts
+
+- `GET /api/ivf/alerts/tank/{tank_code}` - Get all alerts for a specific tank
+- `GET /api/ivf/alerts/hospital` - Get all alerts for hospital branches
+- `POST /api/ivf/alerts/acknowledge` - Acknowledge critical alerts
+- `POST /api/ivf/alerts/check` - Check for new critical alerts
+
+#### ARC IVF Storage Integration
+
+- `GET /api/ivf/storage` - Fetch IVF storage information from ARC IVF external API
+  - Automatically saves data to database
+  - Returns storage list with HIS numbers, cryolock numbers, tank IDs, and site information
+
+#### Key Features
+
+- **Role-Based Access Control**: 
+  - User (IVF): Only see data from assigned branch
+  - Manager (IVF): See data from all branches in hospital
+  - Admin: See data from all branches
+- **Device ID Support**: Webhook data with `device_id` automatically maps to `tank_code` using `tive_device_id` field in tanks table
+- **Real-time Monitoring**: WebSocket connections for live quality parameter updates
+- **Tank-Level Monitoring**: Each tank has unique device for monitoring (device_id → tank_code mapping)
+- **Multi-Branch Support**: Tanks organized by hospital branches with geographic coordinates
+- **Quality Tracking**: LN2 refill logs, deviation tracking, and quality loss monitoring
+- **Embryo Tracking**: Complete tracking of cryolocks, canisters, canes, and embryo locations
 
 ### Utility Endpoints
 
@@ -674,6 +828,19 @@ Key database models include:
 - **Carrier**: Shipping carriers
 - **PatientStage**: Patient stage tracking
 - **OTP**: One-time passwords for verification
+
+#### IVF Module Models
+
+- **Tank**: IVF tank information with `tive_device_id` for device mapping
+- **PatientCrylockInfo**: Patient crylock information and storage details
+- **IVFTelemetryData**: Raw IoT telemetry data from Tive webhooks with `device_id`
+- **IVFQualityLog**: Quality log entries tracking telemetry data and quality loss
+- **IVFGeolocation**: Geolocation coordinates for tank monitoring
+- **IVFShipment**: IVF shipment tracking with device associations
+- **CanisterLn2Log**: Liquid Nitrogen refill logs for tanks
+- **CriticalAlert**: Critical alerts for tanks and branches
+- **Hospital**: Hospital information
+- **HospitalBranch**: Hospital branch locations with geographic coordinates
 
 ### Database Migrations
 
@@ -885,6 +1052,8 @@ poetry shell
 | `FLIGHTRADAR24_API_KEY` | No | - | FlightRadar24 API key for flight performance data |
 | `WEATHER_API_KEY` | No | - | WeatherAPI.com API key for weather data |
 | `WEATHER_API_PROVIDER` | No | `weatherapi` | Weather API provider |
+| `ARC_API_TOKEN` | No | - | ARC IVF Storage API token ID for storage data integration |
+| `ARC_IVF_TOKEN_ID` | No | - | Alias for ARC_API_TOKEN (for backward compatibility) |
 
 ## 🔒 Security Best Practices
 

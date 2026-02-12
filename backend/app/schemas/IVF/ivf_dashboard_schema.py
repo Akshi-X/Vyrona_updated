@@ -18,7 +18,7 @@ class TotalEmbryosCryolocksResponse(BaseModel):
 
 class TotalContainersResponse(BaseModel):
     """Response for total containers metric"""
-    total_containers: int = Field(..., description="Total number of active containers (canisters)")
+    total_containers: int = Field(..., description="Total number of containers (cryolocks). Note: In ARC IVF API context, 'containers' refers to cryolocks, not canisters.")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 
@@ -26,7 +26,6 @@ class TotalContainersResponse(BaseModel):
 class QualityDeviationsFlaggedResponse(BaseModel):
     """Response for quality deviations flagged metric"""
     total_quality_deviations: int = Field(..., description="Total number of quality deviations flagged")
-    canister_status_deviations: int = Field(..., description="Deviations from canister status (risk/critical)")
     ln2_level_deviations: int = Field(..., description="Deviations from low LN2 levels")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
@@ -36,7 +35,6 @@ class TopDeviationDriverResponse(BaseModel):
     """Response for top deviation driver metric"""
     driver_name: str = Field(..., description="Name of the top deviation driver")
     count: int = Field(..., description="Count of deviations for this driver")
-    percentage: float = Field(..., description="Percentage of total deviations")
     all_drivers: Optional[Dict[str, int]] = Field(None, description="Counts for all deviation drivers")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
@@ -65,10 +63,9 @@ class DeviationsGraphResponse(BaseModel):
 class TotalDeviationsResponse(BaseModel):
     """Response for total deviations metric"""
     total_deviations: int = Field(..., description="Total number of deviations (any KPI violation)")
-    temperature_deviations: int = Field(..., description="Count of temperature deviations")
-    humidity_deviations: int = Field(..., description="Count of humidity deviations")
-    agitation_deviations: int = Field(..., description="Count of agitation/vibration deviations")
-    light_deviations: int = Field(..., description="Count of light deviations")
+    temp_internal_deviations: int = Field(..., description="Count of internal temperature deviations")
+    temp_external_deviations: int = Field(..., description="Count of external temperature deviations")
+    shock_deviations: int = Field(..., description="Count of shock deviations")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 

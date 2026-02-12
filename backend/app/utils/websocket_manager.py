@@ -9,7 +9,6 @@ from typing import Dict, Optional
 
 from fastapi import WebSocket
 
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.tank_model import Tank
 from app.models.patient_model import Patient
 
@@ -20,7 +19,7 @@ class ConnectionManager:
     """Manages WebSocket connections for quality monitoring"""
     
     def __init__(self):
-        self.active_connections: Dict[str, Dict] = {}  # {connection_id: {websocket, connected_at, client_info, patient_id, canister_id, branch_id}}
+        self.active_connections: Dict[str, Dict] = {}  # {connection_id: {websocket, connected_at, client_info, patient_id, tank_id, tank_code, branch_id}}
 
     async def connect(self, websocket: WebSocket, connection_id: str = None) -> str:
         """Register WebSocket connection (connection should already be accepted)"""
@@ -36,8 +35,8 @@ class ConnectionManager:
                 "port": websocket.client.port if websocket.client else "unknown"
             },
             "patient_id": None,  # Patient ID this connection is subscribed to (CGT)
-            "canister_id": None,  # Canister ID this connection is subscribed to (IVF)
-            "canister_number": None,  # Canister number this connection is subscribed to (IVF)
+            "tank_id": None,  # Tank ID this connection is subscribed to (IVF)
+            "tank_code": None,  # Tank code this connection is subscribed to (IVF, e.g., "T1", "T2")
             "branch_id": None    # Branch ID for IVF users (for validation)
         }
         logger.info(f"WebSocket connection registered: {connection_id}")
@@ -64,25 +63,30 @@ class ConnectionManager:
             self.active_connections[connection_id]["patient_id"] = patient_id
             logger.info(f"Connection {connection_id} subscribed to patient {patient_id}")
 
-    def set_canister_subscription(self, connection_id: str, canister_id: int, canister_number: str = None):
-        """Set which canister this connection is subscribed to (IVF) - tracks by canister_number (string)"""
+    def set_tank_subscription(self, connection_id: str, tank_id: int, tank_code: str = None):
+        """Set which tank this connection is subscribed to (IVF) - tracks by tank_code (string, e.g., 'T1', 'T2')"""
         if connection_id in self.active_connections:
-            self.active_connections[connection_id]["canister_id"] = canister_id
-            if canister_number is not None:
-                # Store as string (database column is VARCHAR)
-                self.active_connections[connection_id]["canister_number"] = str(canister_number)
-            logger.info(f"Connection {connection_id} subscribed to canister_id {canister_id} (canister_number: {canister_number})")
+            self.active_connections[connection_id]["tank_id"] = tank_id
+            if tank_code is not None:
+                # Store as string
+                self.active_connections[connection_id]["tank_code"] = str(tank_code)
+            logger.info(f"Connection {connection_id} subscribed to tank_id {tank_id} (tank_code: {tank_code})")
+    
 
     async def broadcast(self, data: dict, db):
         """
-        Broadcast data to connections subscribed to this patient (CGT) or canister (IVF).
-        Handles both CGT (patient_id) and IVF (canister_id) messages.
+        Broadcast data to connections subscribed to this patient (CGT) or tank (IVF).
+        Handles both CGT (patient_id) and IVF (tank_id/tank_code/device_id) messages.
+        
+        For IVF messages, supports multiple identifiers:
+        - tank_code: Direct tank code (e.g., "T1", "T2")
+        - tank_id: Direct tank ID
+        - device_id: Device ID that maps to tank via tive_device_id field
         """
         if not self.active_connections:
             return
         
         patient_id = data.get("patient_id")
-        canister_id = data.get("canister_id")
         
         # Handle CGT messages (patient_id)
         if patient_id:
@@ -113,74 +117,91 @@ class ConnectionManager:
             for conn_id in disconnected:
                 self.disconnect(conn_id)
         
-        # Handle IVF messages (canister_id or canister_number)
-        canister_number = data.get("canister_number")
-        if canister_id or canister_number:
-            # For IVF, validate canister belongs to user's branch
-            # Get canister's branch_id from database
-            # If only canister_number is provided, look up canister_id
-            if canister_number and not canister_id:
-                # Convert to string (database column is VARCHAR)
-                canister_number_str = str(canister_number)
-                canister = db.query(Canister).filter(Canister.canister_number == canister_number_str).first()
-                if canister:
-                    canister_id = canister.canister_id
-                else:
-                    return  # Canister doesn't exist
-            elif canister_id:
-                canister = db.query(Canister).filter(Canister.canister_id == canister_id).first()
+        # Handle IVF messages (tank_id, tank_code, or device_id)
+        tank_code = data.get("tank_code")
+        tank_id_from_data = data.get("tank_id")
+        device_id = data.get("device_id")
+        
+        # Resolve to tank_id, tank_code, and tank_branch_id
+        tank = None
+        tank_branch_id = None
+        
+        # Priority: device_id > tank_code > tank_id
+        if device_id and not tank_code and not tank_id_from_data:
+            # Look up tank by device_id (tive_device_id field)
+            tank = db.query(Tank).filter(Tank.tive_device_id == str(device_id)).first()
+            if tank:
+                tank_id_from_data = tank.tank_id
+                tank_code = tank.tank_code
+                tank_branch_id = tank.branch_id
+                logger.debug(f"Resolved device_id {device_id} to tank_code {tank_code} (tank_id: {tank_id_from_data})")
             else:
-                return  # Neither canister_id nor canister_number provided
-            
-            if not canister:
-                return  # Canister doesn't exist
-            
-            # Get canister's branch_id through tank
-            tank = db.query(Tank).filter(Tank.tank_id == canister.tank_id).first()
+                logger.warning(f"No tank found for device_id: {device_id}")
+                return  # Tank not found for this device_id
+        elif tank_code:
+            # Look up tank by tank_code
+            tank = db.query(Tank).filter(Tank.tank_code == str(tank_code)).first()
+            if tank:
+                tank_id_from_data = tank.tank_id
+                tank_branch_id = tank.branch_id
+            else:
+                return  # Tank code doesn't exist
+        elif tank_id_from_data:
+            # Get tank info by tank_id
+            tank = db.query(Tank).filter(Tank.tank_id == tank_id_from_data).first()
             if not tank:
                 return  # Tank doesn't exist
+            tank_branch_id = tank.branch_id
+            if not tank_code:
+                tank_code = tank.tank_code
+        else:
+            return  # No valid identifier provided (no device_id, tank_code, or tank_id)
+        
+        # At this point, we have tank_id_from_data, tank_code, and tank_branch_id resolved
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            # Check if connection is subscribed to this tank (by tank_code - primary identifier)
+            subscribed_tank_code = conn_data.get("tank_code")
+            subscribed_tank_id = conn_data.get("tank_id")
             
-            canister_branch_id = tank.branch_id
+            # Match by tank_code (primary identifier for IVF tracking)
+            matches = False
+            if subscribed_tank_code is not None and tank_code is not None:
+                # Compare as strings
+                if str(subscribed_tank_code) == str(tank_code):
+                    matches = True
+            # Fallback: match by tank_id if tank_code not available
+            elif subscribed_tank_id is not None and tank_id_from_data is not None:
+                if subscribed_tank_id == tank_id_from_data:
+                    matches = True
             
-            disconnected = []
-            for connection_id, conn_data in list(self.active_connections.items()):
-                # Check if connection is subscribed to this canister (by canister_number - primary identifier)
-                subscribed_canister_number = conn_data.get("canister_number")
-                
-                # Match by canister_number (primary identifier for IVF tracking)
-                matches = False
-                if subscribed_canister_number is not None and canister_number is not None:
-                    # Compare as strings (database stores canister_number as VARCHAR)
-                    if str(subscribed_canister_number) == str(canister_number):
-                        matches = True
-                
-                if not matches:
-                    continue
-                
-                # Validate branch access for IVF users
-                # Admin: can see all branches (branch_id is None)
-                # User/Manager: can only see their branch
-                connection_branch_id = conn_data.get("branch_id")
-                user_role = conn_data.get("role")
-                
-                # Admin can see all branches
-                if user_role == "Admin":
-                    pass  # Allow access
-                # User/Manager must match branch
-                elif connection_branch_id is not None:
-                    if connection_branch_id != canister_branch_id:
-                        continue  # Skip connections from different branches
-                # If no branch_id set, allow (might be CGT user or legacy connection)
-                
-                try:
-                    await conn_data["websocket"].send_json(data)
-                except Exception as e:
-                    logger.error(f"Error sending IVF data to client {connection_id}: {e}")
-                    disconnected.append(connection_id)
+            if not matches:
+                continue
             
-            # Remove disconnected clients
-            for conn_id in disconnected:
-                self.disconnect(conn_id)
+            # Validate branch access for IVF users
+            # Admin: can see all branches (branch_id is None)
+            # User/Manager: can only see their branch
+            connection_branch_id = conn_data.get("branch_id")
+            user_role = conn_data.get("role")
+            
+            # Admin can see all branches
+            if user_role == "Admin":
+                pass  # Allow access
+            # User/Manager must match branch
+            elif connection_branch_id is not None:
+                if connection_branch_id != tank_branch_id:
+                    continue  # Skip connections from different branches
+            # If no branch_id set, allow (might be CGT user or legacy connection)
+            
+            try:
+                await conn_data["websocket"].send_json(data)
+            except Exception as e:
+                logger.error(f"Error sending IVF data to client {connection_id}: {e}")
+                disconnected.append(connection_id)
+        
+        # Remove disconnected clients
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
 
     def get_connections_info(self):
         """Get information about all active connections"""
@@ -192,8 +213,8 @@ class ConnectionManager:
                     "connected_at": conn_data["connected_at"],
                     "client_info": conn_data["client_info"],
                     "patient_id": conn_data.get("patient_id", None),
-                    "canister_id": conn_data.get("canister_id", None),
-                    "canister_number": conn_data.get("canister_number", None)
+                    "tank_id": conn_data.get("tank_id", None),
+                    "tank_code": conn_data.get("tank_code", None)
                 }
                 for conn_id, conn_data in self.active_connections.items()
             ]

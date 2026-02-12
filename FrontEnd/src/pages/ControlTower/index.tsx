@@ -87,6 +87,14 @@ const ControlTower = () => {
   }, [isCgtUser, direction]);
 
   useEffect(() => {
+    // Only fetch active routes for CGT users
+    if (!isCgtUser || !isAuthenticated) {
+      setRoutes([]);
+      setRoutesError(null);
+      setLoadingRoutes(false);
+      return;
+    }
+
     const fetchRoutes = async () => {
       setLoadingRoutes(true);
       setRoutesError(null);
@@ -100,8 +108,8 @@ const ControlTower = () => {
         setLoadingRoutes(false);
       }
     };
-    if (isAuthenticated) fetchRoutes();
-  }, [isAuthenticated]);
+    fetchRoutes();
+  }, [isAuthenticated, isCgtUser]);
 
   // Fetch map routes data for coordinates (outbound)
   useEffect(() => {
@@ -132,11 +140,26 @@ const ControlTower = () => {
   }, [isAuthenticated, direction, selectedRegion, selectedStatusOutbound, selectedCarrier]);
 
   useEffect(() => {
+    // Only fetch active canisters for IVF users
+    if (!isIvfUser || !isAuthenticated) {
+      setCanisters([]);
+      setCanistersError(null);
+      setLoadingCanisters(false);
+      return;
+    }
+
     const fetchCanisters = async () => {
       setLoadingCanisters(true);
       setCanistersError(null);
       try {
-        const data = await shipmentService.getActiveCanisters();
+        const filters: { branch_name?: string; status?: string } = {};
+        if (selectedBranch && selectedBranch !== 'All') {
+          filters.branch_name = selectedBranch;
+        }
+        if (selectedStatusInbound && selectedStatusInbound !== 'All') {
+          filters.status = selectedStatusInbound.toLowerCase();
+        }
+        const data = await shipmentService.getActiveCanisters(filters);
         let flattenedCanisters: Array<{
           id: string;
           canisterId: string;
@@ -145,7 +168,7 @@ const ControlTower = () => {
           date: string;
         }> = [];
 
-        // Handle flat format (canisters array)
+        // Handle flat format (canisters array) - legacy format
         if (data.canisters && Array.isArray(data.canisters)) {
           flattenedCanisters = data.canisters.map((canister: any) => {
             // Normalize status
@@ -175,37 +198,62 @@ const ControlTower = () => {
             };
           });
         }
-        // Handle nested format (branches with canisters)
+        // Handle nested format (branches with tanks) - new API format
         else if ((data as any).branches && Array.isArray((data as any).branches)) {
-          flattenedCanisters = (data as any).branches.flatMap((branch: any) => 
-            branch.canisters.map((canister: any) => {
-              // Normalize status
-              let statusText = 'Safe';
-              const status = canister.canister_status?.toLowerCase() || '';
-              if (status === 'risk' || status === 'critical') {
-                statusText = status === 'critical' ? 'Critical' : 'Risk';
-              } else if (status === 'safe') {
-                statusText = 'Safe';
-              }
-
-              // Format date
-              let date = '-';
-              if (canister.updated_at) {
-                const d = new Date(canister.updated_at);
-                if (!isNaN(d.getTime())) {
-                  date = d.toLocaleDateString('en-GB');
+          flattenedCanisters = (data as any).branches.flatMap((branch: any) => {
+            // Check if branch has tanks array
+            if (branch.tanks && Array.isArray(branch.tanks)) {
+              return branch.tanks.map((tank: any) => {
+                // Format date
+                let date = '-';
+                if (tank.updated_at) {
+                  const d = new Date(tank.updated_at);
+                  if (!isNaN(d.getTime())) {
+                    date = d.toLocaleDateString('en-GB');
+                  }
                 }
-              }
 
-              return {
-                id: `canister-${canister.canister_number || canister.canister_id}`,
-                canisterId: String(canister.canister_number || canister.canister_id),
-                branchName: branch.branch_name || 'N/A',
-                status: statusText,
-                date: date,
-              };
-            })
-          );
+                return {
+                  id: `tank-${tank.tank_code || ''}`,
+                  canisterId: String(tank.tank_code || ''),
+                  branchName: branch.branch_name || 'N/A',
+                  status: 'Safe', // Default status since tanks don't have status in API response
+                  date: date,
+                };
+              });
+            }
+            // Legacy format: branches with canisters
+            else if (branch.canisters && Array.isArray(branch.canisters)) {
+              return branch.canisters.map((canister: any) => {
+                // Normalize status
+                let statusText = 'Safe';
+                const status = canister.canister_status?.toLowerCase() || '';
+                if (status === 'risk' || status === 'critical') {
+                  statusText = status === 'critical' ? 'Critical' : 'Risk';
+                } else if (status === 'safe') {
+                  statusText = 'Safe';
+                }
+
+                // Format date
+                let date = '-';
+                if (canister.updated_at) {
+                  const d = new Date(canister.updated_at);
+                  if (!isNaN(d.getTime())) {
+                    date = d.toLocaleDateString('en-GB');
+                  }
+                }
+
+                return {
+                  id: `canister-${canister.canister_number || canister.canister_id}`,
+                  canisterId: String(canister.canister_number || canister.canister_id),
+                  branchName: branch.branch_name || 'N/A',
+                  status: statusText,
+                  date: date,
+                };
+              });
+            }
+            return [];
+          });
         }
 
         setCanisters(flattenedCanisters);
@@ -216,8 +264,8 @@ const ControlTower = () => {
         setLoadingCanisters(false);
       }
     };
-    if (isAuthenticated) fetchCanisters();
-  }, [isAuthenticated]);
+    fetchCanisters();
+  }, [isAuthenticated, isIvfUser, selectedBranch, selectedStatusInbound]);
 
   // Fetch user profile to compute initials
   useEffect(() => {
@@ -313,14 +361,11 @@ const ControlTower = () => {
     });
   }, [routes, selectedRegion, selectedStatusOutbound, selectedCarrier]);
 
-  // Apply filters to canisters (inbound only)
+  // Canisters are already filtered by the API when filters are applied,
+  // so no additional client-side filtering is needed.
   const filteredCanisters = useMemo(() => {
-    return (canisters || []).filter(c => {
-      const matchBranch = selectedBranch === 'All' || c.branchName === selectedBranch;
-      const matchStatus = selectedStatusInbound === 'All' || c.status === selectedStatusInbound;
-      return matchBranch && matchStatus;
-    });
-  }, [canisters, selectedBranch, selectedStatusInbound]);
+    return canisters || [];
+  }, [canisters]);
 
   // Reset zoomToLocation after it's been used
   useEffect(() => {
@@ -650,13 +695,13 @@ const ControlTower = () => {
                 </div>
               </div>
 
-              {/* Active Routes List */}
-              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${direction === 'inbound' ? 'h-[544px]' : 'h-[460px]'}`}>
+              {/* Active Routes/Canisters List */}
+              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${isIvfUser ? 'h-[544px]' : 'h-[460px]'}`}>
                 <h2 className="font-bold text-black text-base mb-2">
-                  {direction === 'inbound' ? 'Active Canisters' : 'Active Routes'}
+                  {isIvfUser ? 'Active Canisters' : 'Active Routes'}
                 </h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">{direction === 'inbound' ? 'Canisters Number' : 'Routes ID'}</div>
+                  <div className="text-left">{isIvfUser ? 'Canisters Number' : 'Routes ID'}</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
@@ -669,13 +714,13 @@ const ControlTower = () => {
                   {(loadingRoutes || loadingCanisters) && (
                     <div className="p-4 text-xs text-gray-500">Loading...</div>
                   )}
-                  {!loadingRoutes && !loadingCanisters && routesError && canistersError && (
-                    <div className="p-4 text-xs text-red-600">{routesError}</div>
+                  {!loadingRoutes && !loadingCanisters && ((isCgtUser && routesError) || (isIvfUser && canistersError)) && (
+                    <div className="p-4 text-xs text-red-600">{isIvfUser ? canistersError : routesError}</div>
                   )}
-                  {!loadingRoutes && !loadingCanisters && (!routesError || !canistersError) && (
+                  {!loadingRoutes && !loadingCanisters && ((isCgtUser && !routesError) || (isIvfUser && !canistersError)) && (
                     <>
-                      {/* Display Routes (Outbound only) */}
-                      {direction === 'outbound' && filteredRoutes && filteredRoutes.length > 0 && (
+                      {/* Display Routes (CGT users only) */}
+                      {isCgtUser && filteredRoutes && filteredRoutes.length > 0 && (
                         filteredRoutes.map((route) => {
                       const statusText = route?.status || 'N/A';
                       const statusColor = statusText === 'Safe'
@@ -744,8 +789,8 @@ const ControlTower = () => {
                       );
                     })
                       )}
-                      {/* Display Canisters (Inbound only) */}
-                      {direction === 'inbound' && filteredCanisters && filteredCanisters.length > 0 && (
+                      {/* Display Canisters (IVF users only) */}
+                      {isIvfUser && filteredCanisters && filteredCanisters.length > 0 && (
                         filteredCanisters.map((canister) => {
                           const statusColor = canister.status === 'Safe'
                             ? 'text-[#00B050]'
@@ -754,7 +799,11 @@ const ControlTower = () => {
                               : canister.status === 'Critical'
                                 ? 'text-[#FF0000]'
                                 : 'text-gray-500';
-                          const handleCanisterClick = () => {
+                          const handleCanisterClick = (e: React.MouseEvent) => {
+                            // Don't navigate if clicking on the link
+                            if ((e.target as HTMLElement).tagName === 'A') {
+                              return;
+                            }
                             if (canister.branchName && canister.branchName !== 'N/A') {
                               setZoomToBranchName(canister.branchName);
                             }
@@ -767,9 +816,19 @@ const ControlTower = () => {
                               onClick={handleCanisterClick}
                             >
                               <div className="min-w-0 text-left overflow-hidden">
-                                <span className="text-[#6b1176] text-xs font-bold">
-                                  Canister {canister.canisterId}
-                                </span>
+                                {canister.canisterId ? (
+                                  <Link 
+                                    to={`/ivf-track-shipment/${encodeURIComponent(canister.canisterId)}`}
+                                    className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Canister {canister.canisterId}
+                                  </Link>
+                                ) : (
+                                  <span className="text-[#6b1176] text-xs font-bold">
+                                    Canister {canister.canisterId}
+                                  </span>
+                                )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (
                                   <div className="text-xs text-gray-900 leading-snug">
                                     <div className="truncate">{canister.branchName}</div>
@@ -782,10 +841,10 @@ const ControlTower = () => {
                           );
                         })
                       )}
-                      {direction === 'inbound' && (!filteredCanisters || filteredCanisters.length === 0) && (
+                      {isIvfUser && (!filteredCanisters || filteredCanisters.length === 0) && !loadingCanisters && (
                         <div className="p-4 text-xs text-gray-500">No active canisters found.</div>
                       )}
-                      {direction === 'outbound' && (!filteredRoutes || filteredRoutes.length === 0) && (
+                      {isCgtUser && (!filteredRoutes || filteredRoutes.length === 0) && !loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">No active routes found.</div>
                       )}
                     </>

@@ -98,6 +98,7 @@ class TankBase(BaseModel):
     tank_code: Optional[str] = Field(None, description="Tank code")
     capacity_liters: Optional[float] = Field(None, description="Tank capacity in liters")
     is_active: bool = Field(default=True, description="Whether the tank is active")
+    status: CanisterStatus = Field(default=CanisterStatus.SAFE, description="Tank status (safe, risk, critical)")
     created_by: Optional[str] = Field(None, description="User who created the record")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
 
@@ -112,6 +113,7 @@ class TankUpdate(BaseModel):
     tank_code: Optional[str] = Field(None, description="Tank code")
     capacity_liters: Optional[float] = Field(None, description="Tank capacity in liters")
     is_active: Optional[bool] = Field(None, description="Whether the tank is active")
+    status: Optional[CanisterStatus] = Field(None, description="Tank status (safe, risk, critical)")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
 
 
@@ -134,7 +136,6 @@ class CanisterBase(BaseModel):
     tank_id: int = Field(..., description="Reference to tank")
     canister_number: Optional[int] = Field(None, description="Canister number")
     is_active: bool = Field(default=True, description="Whether the canister is active")
-    canister_status: CanisterStatus = Field(default=CanisterStatus.SAFE, description="Canister status (safe, risk, critical)")
     created_by: Optional[str] = Field(None, description="User who created the record")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
 
@@ -150,19 +151,16 @@ class CanisterUpdate(BaseModel):
 
 
 class CanisterCheckResponse(BaseModel):
-    """Schema for canister existence check response"""
-    exists: bool = Field(..., description="Whether the canister exists")
-    canister_number: str = Field(..., description="The canister number that was checked")
-    canister_id: Optional[int] = Field(None, description="Canister ID if exists")
-    is_active: Optional[bool] = Field(None, description="Whether the canister is active (if exists)")
-    canister_status: Optional[str] = Field(None, description="Canister status (if exists)")
+    """Schema for tank existence check response (kept name for backward compatibility)"""
+    exists: bool = Field(..., description="Whether the tank exists")
+    canister_number: str = Field(..., description="The tank code that was checked (kept as canister_number for backward compatibility)")
+    canister_id: Optional[int] = Field(None, description="Tank ID if exists (kept as canister_id for backward compatibility)")
+    is_active: Optional[bool] = Field(None, description="Whether the tank is active (if exists)")
+    canister_status: Optional[str] = Field(None, description="Tank status if exists (kept as canister_status for backward compatibility)")
     message: str = Field(..., description="Response message")
     
     class Config:
         from_attributes = True
-    is_active: Optional[bool] = Field(None, description="Whether the canister is active")
-    canister_status: Optional[CanisterStatus] = Field(None, description="Canister status (safe, risk, critical)")
-    updated_by: Optional[str] = Field(None, description="User who last updated the record")
 
 
 class CanisterResponse(CanisterBase):
@@ -180,8 +178,8 @@ class CanisterResponse(CanisterBase):
 # ============================================
 
 class CanisterLn2LogBase(BaseModel):
-    """Base schema for canister LN2 log"""
-    canister_id: Optional[int] = Field(None, description="Reference to canister (for IVF)")
+    """Base schema for tank LN2 log"""
+    tank_id: Optional[int] = Field(None, description="Reference to tank (for IVF)")
     container_id: Optional[str] = Field(None, description="Container ID (for quality tracking)")
     refill_date: Optional[date] = Field(None, description="Date when refill/opening was performed")
     refill_time: Optional[time] = Field(None, description="Time when refill/opening was performed")
@@ -414,30 +412,30 @@ class IVFControlTowerResponse(BaseModel):
 # ACTIVE CANISTERS CONTROL TOWER SCHEMA
 # ============================================
 
-class ActiveCanisterItem(BaseModel):
-    """Schema for a single active canister in control tower"""
-    canister_number: str = Field(..., description="Canister number/code (e.g., 'C1')")
-    canister_status: CanisterStatus = Field(..., description="Canister status (safe, risk, critical)")
-    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from canister log refill_date+refill_time")
+class ActiveTankItem(BaseModel):
+    """Schema for a single active tank in control tower"""
+    tank_code: str = Field(..., description="Tank code (e.g., 'T1')")
+    updated_at: Optional[datetime] = Field(None, description="Last updated date and time from tanks table")
+    status: CanisterStatus = Field(..., description="Tank status (safe, risk, critical)")
     
     class Config:
         from_attributes = True
 
 
-class BranchCanisters(BaseModel):
-    """Schema for canisters grouped by branch"""
+class BranchTanks(BaseModel):
+    """Schema for tanks grouped by branch"""
     branch_id: int = Field(..., description="Branch ID")
     branch_name: str = Field(..., description="Branch name")
-    canisters: List[ActiveCanisterItem] = Field(..., description="List of active canisters for this branch")
+    tanks: List[ActiveTankItem] = Field(..., description="List of active tanks for this branch")
     
     class Config:
         from_attributes = True
 
 
 class ActiveCanistersResponse(BaseModel):
-    """Schema for active canisters control tower API response grouped by branch"""
-    branches: List[BranchCanisters] = Field(..., description="List of branches with their active canisters")
-    total: int = Field(..., description="Total number of active canisters across all branches")
+    """Schema for active tanks control tower API response grouped by branch (kept name for backward compatibility)"""
+    branches: List[BranchTanks] = Field(..., description="List of branches with their active tanks")
+    total: int = Field(..., description="Total number of active tanks across all branches")
     
     class Config:
         from_attributes = True
@@ -461,6 +459,94 @@ class EmbryoTrackingItem(BaseModel):
     site_name: Optional[str] = Field(None, description="Branch name (Manager/Admin roles only)")
     status: Optional[str] = Field(None, description="Embryo status (Manager/Admin roles only)")
     description: Optional[str] = Field(None, description="Shipment description if cryolock is in transit (from ivf_shipment table)")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchListItem(BaseModel):
+    """Schema for branch list item (simplified for dropdowns)"""
+    branch_id: int = Field(..., description="Branch ID")
+    branch_name: str = Field(..., description="Branch name")
+    
+    class Config:
+        from_attributes = True
+
+
+class BranchListResponse(BaseModel):
+    """Response schema for branch list endpoint"""
+    branches: List[BranchListItem] = Field(..., description="List of branches")
+    total: int = Field(..., description="Total number of branches")
+    
+    class Config:
+        from_attributes = True
+
+
+class EmbryoTransferCrylockItem(BaseModel):
+    """Schema for embryo transfer crylock item"""
+    his_number: str = Field(..., description="Patient HIS Number")
+    cryolock_number: str = Field(..., description="Cryolock number")
+    canister_number: str = Field(..., description="Canister number")
+    tank_code: str = Field(..., description="Tank code")
+    cane_code: str = Field(..., description="Cane code")
+    goblet_color: str = Field(..., description="Goblet color")
+    cryolock_color: str = Field(..., description="Cryolock color")
+    date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
+    branch_name: str = Field(..., description="Branch name")
+    tank_id: int = Field(..., description="Tank ID")
+
+
+class EmbryoTransferResponse(BaseModel):
+    """Response schema for embryo transfer crylocks"""
+    data: List[EmbryoTransferCrylockItem] = Field(..., description="List of embryo transfer crylocks")
+    total: int = Field(..., description="Total number of embryo transfer crylocks")
+    
+    class Config:
+        from_attributes = True
+
+
+class ShipmentDetails(BaseModel):
+    """Schema for shipment details"""
+    shipment_id: Optional[str] = Field(None, description="Shipment ID")
+    iot_shipment_id: Optional[str] = Field(None, description="IoT shipment ID from Tive")
+    source_branch_id: Optional[int] = Field(None, description="Source branch ID")
+    destination_branch_id: Optional[int] = Field(None, description="Destination branch ID")
+    source_location: Optional[str] = Field(None, description="Source location name")
+    destination_location: Optional[str] = Field(None, description="Destination location name")
+    source_latitude: Optional[float] = Field(None, description="Source latitude")
+    source_longitude: Optional[float] = Field(None, description="Source longitude")
+    destination_latitude: Optional[float] = Field(None, description="Destination latitude")
+    destination_longitude: Optional[float] = Field(None, description="Destination longitude")
+    description: Optional[str] = Field(None, description="Shipment description")
+    device_id: Optional[str] = Field(None, description="IoT tracker device ID")
+    shipment_status: Optional[str] = Field(None, description="Shipment status (created, in_transit, delivered, cancelled, failed)")
+    departure_time: Optional[datetime] = Field(None, description="Actual departure time")
+    arrival_time: Optional[datetime] = Field(None, description="Actual arrival time")
+    scheduled_departure_time: Optional[datetime] = Field(None, description="Scheduled departure time")
+    
+    class Config:
+        from_attributes = True
+
+
+class InTransitCrylockItem(BaseModel):
+    """Schema for in-transit crylock item"""
+    his_number: str = Field(..., description="Patient HIS Number")
+    cryolock_number: str = Field(..., description="Cryolock number")
+    canister_number: str = Field(..., description="Canister number")
+    tank_code: str = Field(..., description="Tank code")
+    cane_code: str = Field(..., description="Cane code")
+    goblet_color: str = Field(..., description="Goblet color")
+    cryolock_color: str = Field(..., description="Cryolock color")
+    date_of_vitrification: Optional[date] = Field(None, description="Date of vitrification")
+    branch_name: str = Field(..., description="Branch name")
+    tank_id: int = Field(..., description="Tank ID")
+    shipment_details: Optional[ShipmentDetails] = Field(None, description="Shipment details if available")
+
+
+class InTransitResponse(BaseModel):
+    """Response schema for in-transit crylocks"""
+    data: List[InTransitCrylockItem] = Field(..., description="List of in-transit crylocks")
+    total: int = Field(..., description="Total number of in-transit crylocks")
     
     class Config:
         from_attributes = True

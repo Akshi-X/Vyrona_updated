@@ -69,6 +69,7 @@ interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, logout, userRole } = useAuth();
+  const normalizedRole = (userRole || '').trim().toLowerCase();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -111,7 +112,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   // IVF total embryos/cryolocks metric (live API data)
   const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
-  const [ivfTotalCryolocks, setIvfTotalCryolocks] = useState<number | null>(null);
+  const [, setIvfTotalCryolocks] = useState<number | null>(null);
   const [loadingIvfTotals, setLoadingIvfTotals] = useState(false);
   const [ivfTotalsError, setIvfTotalsError] = useState<string | null>(null);
 
@@ -572,32 +573,34 @@ export default function Dashboard({ }: DashboardProps) {
         const response = await ivfService.getDeviationsGraph();
         if (!cancelled && response?.data) {
           // Transform API response to chart format
-          // Use container_name if role is 'user', otherwise use site_name
-          const containers = response.data.map((item) => 
-            userRole === 'user' ? (item.container_name || '') : (item.site_name || '')
-          );
+          // Manager -> show site_name, User -> show container_name
+          const isManagerRole = normalizedRole.includes('manager');
+          const containers = response.data.map((item) => {
+            const preferred = isManagerRole ? item.site_name : item.container_name;
+            return preferred || item.site_name || item.container_name || '';
+          });
           
           // Extract data for each metric
-          const temperatureData = response.data.map((item) => item.temperature);
-          const humidityData = response.data.map((item) => item.humidity);
-          const agitationVibrationData = response.data.map((item) => item.agitation_vibration);
-          const topRiskDriverData = response.data.map((item) => item.top_risk_driver);
+          const tempInternalData = response.data.map((item) => item.temp_internal || 0);
+          const tempExternalData = response.data.map((item) => item.temp_external || 0);
+          const shockData = response.data.map((item) => item.shock || 0);
+          const topRiskDriverData = response.data.map((item) => item.top_risk_driver || 0);
 
           const metrics = [
             {
-              name: 'Temperature',
+              name: 'Internal temperature',
               color: '#C7A0E8',
-              data: temperatureData,
+              data: tempInternalData,
             },
             {
-              name: 'Humidity',
-              color: '#C9CBCD',
-              data: humidityData,
+              name: 'External temperature',
+              color: '#4A90E2',
+              data: tempExternalData,
             },
             {
-              name: 'Agitation / Vibration',
+              name: 'Shock',
               color: '#F5A9E1',
-              data: agitationVibrationData,
+              data: shockData,
             },
             {
               name: 'Top risk driver',
@@ -674,7 +677,13 @@ export default function Dashboard({ }: DashboardProps) {
         id: ivfAlert.alert_id,
         type: ivfAlert.alert_type,
         severity,
-        patientId: ivfAlert.canister_number || `Canister ${ivfAlert.canister_id}`,
+        patientId: ivfAlert.tank_code
+          ? ivfAlert.tank_code
+          : ivfAlert.canister_number
+            ? ivfAlert.canister_number
+            : (typeof ivfAlert.canister_id === 'number'
+              ? `Canister ${ivfAlert.canister_id}`
+              : 'N/A'),
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at).toLocaleString(),
         status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
@@ -1717,15 +1726,7 @@ export default function Dashboard({ }: DashboardProps) {
         onClose={() => setShowCriticalAlerts(false)}
         alerts={transformedAlerts}
         loading={loadingAlerts}
-        onAcknowledge={isIVF ? async (alertId) => {
-          try {
-            await ivfAlertsService.acknowledgeAlert(alertId);
-            // Refresh alerts after acknowledgment
-            fetchCriticalAlerts();
-          } catch (error) {
-            throw error;
-          }
-        } : undefined}
+        patientIdLabel={isIVF ? 'Tank Code' : 'Patient ID'}
       />
 
       {/* My Tasks Modal */}

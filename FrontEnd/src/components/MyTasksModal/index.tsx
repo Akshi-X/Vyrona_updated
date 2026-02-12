@@ -161,7 +161,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         description: newTask.description.trim(),
         assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
         patient_id: isIvfVariant ? undefined : (newTask.patientId.trim() || undefined),
-        canister_number: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
+        tank_code: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
         due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : undefined,
         priority: newTask.priority,
         status: newTask.status as 'Not started' | 'In progress' | 'Done'
@@ -420,7 +420,11 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     <AlertCard
       isOpen={isOpen}
       onClose={onClose}
-      title={variant === 'track' ? 'My Tasks (Track & Trace)' : 'My Tasks (Dashboard)'}
+      title={
+        variant === 'track' ? 'My Tasks (Track & Trace)' :
+        variant === 'ivf' ? 'My Tasks (Container Quality Tracking)' :
+        'My Tasks (Dashboard)'
+      }
       description="Manage and track your assigned tasks"
       icon={
         <img
@@ -430,7 +434,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         />
       }
       headerAction={
-        onAdd && !isUserRole ? (
+        onAdd && (!isUserRole || isIvfVariant) ? (
           <button
             onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
             className="px-4 py-2 bg-[#6b1176] hover:bg-[#8b2a96] text-white text-sm font-medium rounded-md transition-colors flex items-center gap-1"

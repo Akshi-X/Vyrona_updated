@@ -63,9 +63,9 @@ class AlertStatus(str, Enum):
 
 class CriticalAlert(Base):
     """
-    Model to store critical alerts for IVF canisters.
+    Model to store critical alerts for IVF tanks (tank-level monitoring).
     Alerts are triggered for:
-    - KPI deviations (temperature, humidity, agitation, light)
+    - KPI deviations (internal/external temperature and shock)
     - Quality loss events
     - Missing refill logs (not filled within 3 days)
     
@@ -81,8 +81,8 @@ class CriticalAlert(Base):
     # Primary Key - UUID for audit and compliance
     alert_id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()), comment="UUID for alert identification")
     
-    # Foreign Keys - reference to canisters, hospitals, and branches
-    canister_id = Column(Integer, ForeignKey("canisters.canister_id"), nullable=False, index=True, comment="Reference to canister")
+    # Foreign Keys - reference to tanks, hospitals, and branches (tank-level monitoring)
+    tank_id = Column(Integer, ForeignKey("tanks.tank_id"), nullable=False, index=True, comment="Reference to tank (tank-level monitoring)")
     hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id"), nullable=False, index=True, comment="Hospital ID for scoping and compliance")
     branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id"), nullable=False, index=True, comment="Branch ID for scoping and compliance")
     
@@ -100,7 +100,7 @@ class CriticalAlert(Base):
     occurred_at = Column(DateTime, nullable=False, index=True, comment="Timestamp when the alert was triggered")
     
     # Deduplication Key - prevents duplicate alerts
-    dedup_key = Column(String(255), nullable=True, unique=True, index=True, comment="Deduplication key to prevent alert spam (e.g., canister_id:source:alert_type:date)")
+    dedup_key = Column(String(255), nullable=True, unique=True, index=True, comment="Deduplication key to prevent alert spam (e.g., tank_id:source:alert_type:date)")
     
     # Acknowledgment information
     acknowledged_by = Column(String, nullable=True, comment="User ID who acknowledged the alert")
@@ -110,7 +110,7 @@ class CriticalAlert(Base):
     last_reminder_sent_at = Column(DateTime, nullable=True, index=True, comment="Timestamp when last reminder email was sent")
     
     # Relationships
-    canister = relationship("Canister", backref="critical_alerts")
+    tank = relationship("Tank", backref="critical_alerts")
     hospital = relationship("Hospital", backref="critical_alerts")
     branch = relationship("HospitalBranch", backref="critical_alerts")
     
@@ -122,7 +122,7 @@ class CriticalAlert(Base):
     
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('idx_alert_canister_status', 'canister_id', 'status'),
+        Index('idx_alert_tank_status', 'tank_id', 'status'),
         Index('idx_alert_type_status', 'alert_type', 'status'),
         Index('idx_alert_occurred', 'occurred_at'),
         Index('idx_alert_severity_status', 'severity', 'status'),
