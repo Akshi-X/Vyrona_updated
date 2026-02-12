@@ -3,9 +3,7 @@ name: Build and deploy Frontend (Vite) to Azure Web App - mgscale-frontnd-dev
 on:
   push:
     branches:
-      - main
-    paths:
-      - 'FrontEnd/**'
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -19,14 +17,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: FrontEnd/package-lock.json
 
-      - name: Install dependencies and build
+      - name: Install dependencies
         working-directory: FrontEnd
+        run: npm ci
+
+      - name: Build frontend (inject Vite env vars)
+        working-directory: FrontEnd
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
         run: |
-          npm ci
           npm run build
           cp web.config dist/
 
