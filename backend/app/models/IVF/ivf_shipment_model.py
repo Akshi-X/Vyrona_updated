@@ -23,6 +23,7 @@ class IVFShipment(Base):
     
     # Foreign Keys
     patient_crylock_info_id = Column(Integer, ForeignKey("patient_crylock_info.id", ondelete="CASCADE"), 
+                                     name="cryolock_id",  # Map to actual database column name
                                      nullable=False, index=True, comment="Patient crylock info being shipped")
     source_branch_id = Column(Integer, ForeignKey("hospital_branches.branch_id", ondelete="SET NULL"), 
                              nullable=False, index=True, comment="Source branch (current location)")
@@ -72,7 +73,7 @@ class IVFShipment(Base):
         # Index for querying by IoT shipment ID
         Index('idx_ivf_shipment_iot_id', 'iot_shipment_id'),
         # Index for querying by patient crylock info
-        Index('idx_ivf_shipment_patient_crylock', 'patient_crylock_info_id'),
+        Index('idx_ivf_shipment_patient_crylock', 'patient_crylock_info_id'),  # SQLAlchemy maps to cryolock_id automatically
         # Index for querying by device
         Index('idx_ivf_shipment_device', 'device_id'),
         # Index for querying by status
