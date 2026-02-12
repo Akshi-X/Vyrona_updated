@@ -581,26 +581,26 @@ export default function Dashboard({ }: DashboardProps) {
           });
           
           // Extract data for each metric
-          const temperatureData = response.data.map((item) => item.temperature);
-          const humidityData = response.data.map((item) => item.humidity);
-          const agitationVibrationData = response.data.map((item) => item.agitation_vibration);
-          const topRiskDriverData = response.data.map((item) => item.top_risk_driver);
+          const tempInternalData = response.data.map((item) => item.temp_internal || 0);
+          const tempExternalData = response.data.map((item) => item.temp_external || 0);
+          const shockData = response.data.map((item) => item.shock || 0);
+          const topRiskDriverData = response.data.map((item) => item.top_risk_driver || 0);
 
           const metrics = [
             {
-              name: 'Temperature',
+              name: 'Internal temperature',
               color: '#C7A0E8',
-              data: temperatureData,
+              data: tempInternalData,
             },
             {
-              name: 'Humidity',
-              color: '#C9CBCD',
-              data: humidityData,
+              name: 'External temperature',
+              color: '#4A90E2',
+              data: tempExternalData,
             },
             {
-              name: 'Agitation / Vibration',
+              name: 'Shock',
               color: '#F5A9E1',
-              data: agitationVibrationData,
+              data: shockData,
             },
             {
               name: 'Top risk driver',

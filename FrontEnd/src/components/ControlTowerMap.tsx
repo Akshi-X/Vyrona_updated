@@ -766,9 +766,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl shadow-lg px-4 py-3 w-[230px]">
 
-              <div className="text-sm font-semibold">Logistics Network</div>
-
-              <div className="text-[11px] text-gray-200 mt-0.5">Route Status</div>
+              <div className="text-sm font-semibold">Container Quality Status</div>
 
               <div className="mt-3 flex flex-col gap-2">
 
@@ -776,7 +774,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
                   <span className="inline-block w-4 h-1.5 rounded-full bg-[#22DC0E]" />
 
-                  <span className="text-[12px]">Safe Route (On Time)</span>
+                  <span className="text-[12px]">Safe</span>
 
                 </div>
 
@@ -784,7 +782,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
                   <span className="inline-block w-4 h-1.5 rounded-full bg-[#FFD901]" />
 
-                  <span className="text-[12px]">Delayed Routes</span>
+                  <span className="text-[12px]">Risk</span>
 
                 </div>
 
@@ -792,7 +790,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
                   <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
 
-                  <span className="text-[12px]">High-Risk Routes</span>
+                  <span className="text-[12px]">Critical</span>
 
                 </div>
 
