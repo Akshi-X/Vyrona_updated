@@ -34,6 +34,8 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
   const [sourcePosition, setSourcePosition] = useState<TrackingPosition | null>(null);
   const [destinationPosition, setDestinationPosition] = useState<TrackingPosition | null>(null);
   const [mapType, setMapType] = useState<google.maps.MapTypeId | "roadmap" | "satellite">("satellite");
+  const [isConnected, setIsConnected] = useState(false);
+  const [hasReceivedData, setHasReceivedData] = useState(false);
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const sourceMarkerRef = useRef<google.maps.Marker | null>(null);
@@ -61,8 +63,10 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
       const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
 
       ws.onopen = () => {
+        setIsConnected(true);
+        setHasReceivedData(false);
         if (canisterNumber) {
-          ws.send(JSON.stringify({ canister_number: canisterNumber }));
+          ws.send(JSON.stringify({ tank_code: canisterNumber }));
         }
       };
 
@@ -76,6 +80,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
           }
 
           if (data.type === 'error') {
+            console.error('WebSocket error:', data.message);
             return;
           }
 
@@ -102,6 +107,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
             });
 
             if (validPositions.length > 0) {
+              setHasReceivedData(true);
               setPositions(validPositions);
               setCurrentPosition(validPositions[validPositions.length - 1]);
               
@@ -115,31 +121,72 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
                 setDestinationPosition(validPositions[validPositions.length - 1]);
               }
             }
+            return; // Don't process further if this is history data
           }
 
           // Handle real-time geolocation updates (if sent in quality data)
-          if (data.latitude != null && data.longitude != null &&
+          // Check if this is quality data with geolocation (has tank_code or canister_number and coordinates)
+          const hasTankCode = data.tank_code || data.canister_number || data.canister_id;
+          const hasCoordinates = data.latitude != null && data.longitude != null &&
               !isNaN(data.latitude) && !isNaN(data.longitude) &&
-              isFinite(data.latitude) && isFinite(data.longitude)) {
+              isFinite(data.latitude) && isFinite(data.longitude);
+          
+          if (hasTankCode && hasCoordinates) {
+            setHasReceivedData(true);
             const newPosition: TrackingPosition = {
               lat: data.latitude,
               lng: data.longitude,
               timestamp: data.timestamp,
             };
 
+            // Set source position from ship_from if available
+            if (data.ship_from && 
+                data.ship_from.latitude != null && 
+                data.ship_from.longitude != null &&
+                !isNaN(data.ship_from.latitude) && 
+                !isNaN(data.ship_from.longitude)) {
+              setSourcePosition({
+                lat: data.ship_from.latitude,
+                lng: data.ship_from.longitude,
+              });
+            }
+
+            // Set destination position from ship_to if available
+            if (data.ship_to && 
+                data.ship_to.latitude != null && 
+                data.ship_to.longitude != null &&
+                !isNaN(data.ship_to.latitude) && 
+                !isNaN(data.ship_to.longitude)) {
+              setDestinationPosition({
+                lat: data.ship_to.latitude,
+                lng: data.ship_to.longitude,
+              });
+            }
+
             setCurrentPosition(newPosition);
             setPositions((prev) => {
+              // Avoid duplicates by checking if the last position is different
+              const lastPos = prev.length > 0 ? prev[prev.length - 1] : null;
+              if (lastPos && 
+                  Math.abs(lastPos.lat - newPosition.lat) < 0.0001 && 
+                  Math.abs(lastPos.lng - newPosition.lng) < 0.0001) {
+                return prev; // Skip duplicate position
+              }
               const updated = [...prev, newPosition];
               return updated;
             });
           }
         } catch (e) {
-          // Error parsing WebSocket message
+          console.error('Error parsing WebSocket message:', e);
         }
       };
 
-      ws.onerror = () => {};
-      ws.onclose = () => {};
+      ws.onerror = () => {
+        setIsConnected(false);
+      };
+      ws.onclose = () => {
+        setIsConnected(false);
+      };
 
       wsRef.current = ws;
     } catch (e) {
@@ -345,7 +392,15 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
 
       {positions.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-75 rounded-lg">
-          <div className="text-gray-500 text-sm">Waiting for location data...</div>
+          <div className="text-gray-500 text-sm">
+            {!isConnected || wsRef.current?.readyState !== WebSocket.OPEN ? (
+              'Connecting...'
+            ) : isConnected && wsRef.current?.readyState === WebSocket.OPEN && !hasReceivedData ? (
+              'No data available'
+            ) : (
+              'Waiting for location data...'
+            )}
+          </div>
         </div>
       )}
     </div>

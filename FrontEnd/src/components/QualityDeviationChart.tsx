@@ -74,16 +74,23 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
   // Fixed color palette matching design
   const getColorForMetric = (name: string): string => {
     const key = name.toLowerCase();
-    if (key.includes('temperature')) return '#C7A0E8';
+    if (key.includes('internal temperature')) return '#C7A0E8';
+    if (key.includes('external temperature')) return '#4A90E2';
+    if (key.includes('shock')) return '#F5A9E1';
     if (key.includes('top risk driver') || key.includes('top risk')) return '#85A2DF';
     if (key.includes('empty') || key.includes('remaining') || key.includes('unused')) return '#F4F4F4';
-    // Agitation / Vibration (default)
+    // Default color
     return '#F5A9E1';
   };
 
-  // Hide humidity metric everywhere (chart + legend)
+  // Filter out agitation/vibration metrics and humidity (but keep shock)
   const visibleMetrics = useMemo(
-    () => metrics.filter((m) => !m.name.toLowerCase().includes('humidity')),
+    () => metrics.filter((m) => {
+      const key = m.name.toLowerCase();
+      return !key.includes('humidity') && 
+             !key.includes('agitation') && 
+             !key.includes('vibration');
+    }),
     [metrics]
   );
 

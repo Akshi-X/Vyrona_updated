@@ -1,8 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
-import ExtractIcon from '../../../assets/TrackAndTraceIcons/Extract.svg';
-import LightExtractIcon from '../../../assets/TrackAndTraceIcons/LightExtract.svg';
 import QualityLossModal from '../../../components/QualityLossModal';
 
 interface Threshold {
@@ -14,18 +12,15 @@ interface Threshold {
 interface QualityPayload {
   temp_internal: number;
   temp_external: number | null;
-  humidity: number;
   shock: number;
   thresholds: {
     temp_internal: Threshold;
     temp_external: Threshold;
-    humidity: Threshold;
     shock: Threshold;
   };
   threshold_violations: {
     temp_internal: boolean;
     temp_external: boolean;
-    humidity: boolean;
     shock: boolean;
   };
   quality_loss?: number;
@@ -45,6 +40,8 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [showQualityLossModal, setShowQualityLossModal] = useState(false);
   const [latest, setLatest] = useState<QualityPayload | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [hasReceivedData, setHasReceivedData] = useState(false);
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -64,7 +61,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
 
       ws.onopen = () => {
-        if (canisterNumber) ws.send(JSON.stringify({ canister_number: canisterNumber }));
+        setIsConnected(true);
+        setHasReceivedData(false);
+        if (canisterNumber) ws.send(JSON.stringify({ tank_code: canisterNumber }));
       };
 
       ws.onmessage = (event) => {
@@ -80,9 +79,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             return;
           }
           
-          // Check if this is quality data (has canister_number or canister_id and timestamp)
+          // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
           // IVF data uses temp_internal (not temperature) and shock (not agitation)
-          const hasCanisterId = data.canister_number || data.canister_id;
+          const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
           const hasTimestamp = data.timestamp;
           const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
           
@@ -90,29 +89,24 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             // Extract IVF field names
             const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
             const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
-            const humidity = data.humidity;
             const shock = data.shock !== undefined ? data.shock : data.agitation;
             
             // Only process if we have valid numeric values for required fields
             if (temp_internal !== undefined && temp_internal !== null && 
-                humidity !== undefined && humidity !== null && 
                 shock !== undefined && shock !== null) {
               // Map the data to QualityPayload format
               const qualityPayload: QualityPayload = {
                 temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
                 temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                humidity: typeof humidity === 'number' ? humidity : parseFloat(humidity),
                 shock: typeof shock === 'number' ? shock : parseFloat(shock),
                 thresholds: {
                   temp_internal: data.thresholds?.temperature || data.thresholds?.temp_internal || { min: null, max: null, unit: '°C' },
                   temp_external: data.thresholds?.temp_external || { min: null, max: null, unit: '°C' },
-                  humidity: data.thresholds?.humidity || { min: null, max: null, unit: '%' },
                   shock: data.thresholds?.agitation || data.thresholds?.shock || { min: null, max: null, unit: 'G' },
                 },
                 threshold_violations: {
                   temp_internal: data.threshold_violations?.temperature || data.threshold_violations?.temp_internal || false,
                   temp_external: data.threshold_violations?.temp_external || false,
-                  humidity: data.threshold_violations?.humidity || false,
                   shock: data.threshold_violations?.agitation || data.threshold_violations?.shock || false,
                 },
                 quality_loss: data.quality_loss,
@@ -120,6 +114,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
                 quality_percentage: data.quality_percentage,
               };
               
+              setHasReceivedData(true);
               setLatest(qualityPayload);
             }
           }
@@ -128,8 +123,12 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         }
       };
 
-      ws.onerror = () => {};
-      ws.onclose = () => {};
+      ws.onerror = () => {
+        setIsConnected(false);
+      };
+      ws.onclose = () => {
+        setIsConnected(false);
+      };
 
       wsRef.current = ws;
     } catch (e) {
@@ -161,7 +160,6 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     const mapping: Array<{ key: Row['key']; label: string; value: number | null }> = [
       { key: 'temp_internal', label: 'Temperature Internal (°C)', value: latest.temp_internal },
       { key: 'temp_external', label: 'Temperature External (°C)', value: latest.temp_external },
-      { key: 'humidity', label: 'Humidity (%)', value: latest.humidity },
       { key: 'shock', label: 'Shock (G)', value: latest.shock },
     ];
 
@@ -193,8 +191,15 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   const hasRows = filteredRows.length > 0;
 
   const formatRange = (t: Threshold) => {
-    const min = t.min !== null && t.min !== undefined ? `${t.min}` : '-';
-    const max = t.max !== null && t.max !== undefined ? `${t.max}` : '-';
+    // Round threshold values to 1 decimal place for consistency
+    const formatThresholdValue = (val: number | null | undefined): string => {
+      if (val === null || val === undefined) return '-';
+      const rounded = Math.round(val * 10) / 10;
+      return rounded.toString();
+    };
+    
+    const min = formatThresholdValue(t.min);
+    const max = formatThresholdValue(t.max);
     const unit = t.unit || '';
     if (min !== '-' && max !== '-') return `${min}${unit ? ` ${unit}` : ''} - ${max}${unit ? ` ${unit}` : ''}`;
     if (min !== '-') return `≥ ${min}${unit ? ` ${unit}` : ''}`;
@@ -203,11 +208,23 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   };
 
   const formatValueWithUnit = (value: number, t: Threshold, label: string) => {
-    if (t.unit) return `${value}${t.unit ? ` ${t.unit}` : ''}`;
-    if (label.includes('Temperature')) return `${value} °C`;
-    if (label.includes('Humidity')) return `${value} %`;
-    if (label.includes('Shock')) return `${value} G`;
-    return `${value}`;
+    // Round values appropriately based on type
+    let roundedValue: number;
+    if (label.includes('Temperature')) {
+      // Round temperature to 1 decimal place
+      roundedValue = Math.round(value * 10) / 10;
+    } else if (label.includes('Shock')) {
+      // Round shock to 1 decimal place
+      roundedValue = Math.round(value * 10) / 10;
+    } else {
+      // Default: round to 1 decimal place
+      roundedValue = Math.round(value * 10) / 10;
+    }
+    
+    if (t.unit) return `${roundedValue}${t.unit ? ` ${t.unit}` : ''}`;
+    if (label.includes('Temperature')) return `${roundedValue} °C`;
+    if (label.includes('Shock')) return `${roundedValue} G`;
+    return `${roundedValue}`;
   };
 
   return (
@@ -253,15 +270,6 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
                 Quality Loss: —
               </span>
             )}
-            <button
-              type="button"
-              aria-label="Download"
-              disabled
-              className="group flex h-8 w-8 items-center justify-center rounded-lg bg-[#6B1176] text-white shadow opacity-50 cursor-not-allowed"
-            >
-              <img src={ExtractIcon} alt="Download" className="h-4 w-4 block group-hover:hidden" />
-              <img src={LightExtractIcon} alt="Download" className="h-5 w-5 hidden group-hover:block" />
-            </button>
           </div>
         </div>
       </div>
@@ -290,7 +298,13 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
               <tr>
                 <td className="px-3 py-4 text-gray-600 text-center" colSpan={4}>
                   <div className="flex items-center justify-center">
-                    {latest ? 'No anomalies' : 'Waiting for live data...'}
+                    {latest ? (
+                      'No anomalies'
+                    ) : isConnected && wsRef.current?.readyState === WebSocket.OPEN && !hasReceivedData ? (
+                      'No data available'
+                    ) : (
+                      'Waiting for live data...'
+                    )}
                   </div>
                 </td>
               </tr>
