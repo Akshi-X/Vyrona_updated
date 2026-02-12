@@ -75,20 +75,25 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
   const getColorForMetric = (name: string): string => {
     const key = name.toLowerCase();
     if (key.includes('temperature')) return '#C7A0E8';
-    if (key.includes('humidity')) return '#C9CBCD';
     if (key.includes('top risk driver') || key.includes('top risk')) return '#85A2DF';
     if (key.includes('empty') || key.includes('remaining') || key.includes('unused')) return '#F4F4F4';
     // Agitation / Vibration (default)
     return '#F5A9E1';
   };
 
+  // Hide humidity metric everywhere (chart + legend)
+  const visibleMetrics = useMemo(
+    () => metrics.filter((m) => !m.name.toLowerCase().includes('humidity')),
+    [metrics]
+  );
+
   const chartData = useMemo(
     () => {
       // Separate top risk driver from other metrics
-      const topRiskDriverMetric = metrics.find(
+      const topRiskDriverMetric = visibleMetrics.find(
         (m) => m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk')
       );
-      const otherMetrics = metrics.filter(
+      const otherMetrics = visibleMetrics.filter(
         (m) => !(m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk'))
       );
 
@@ -169,12 +174,12 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         ],
       };
     },
-    [containers, metrics]
+    [containers, visibleMetrics]
   );
 
   const legendItems = useMemo(
     () =>
-      metrics
+      visibleMetrics
         .filter((m) => {
           // Exclude background/remaining metrics from legend
           const key = m.name.toLowerCase();
@@ -184,7 +189,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
           label: m.name,
           color: getColorForMetric(m.name),
         })),
-    [metrics]
+    [visibleMetrics]
   );
 
   const chartOptions = useMemo(

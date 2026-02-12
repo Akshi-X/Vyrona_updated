@@ -7,8 +7,12 @@ import { BaseApiService } from './baseApiService';
 
 export interface IVFAlert {
   alert_id: string;
+  // Backward-compat: older responses used canister_* naming
   canister_id: number;
   canister_number?: string;
+  // Current tank-based responses
+  tank_id?: number;
+  tank_code?: string;
   hospital_id: number;
   branch_id: number;
   alert_type: string;
