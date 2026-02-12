@@ -14,7 +14,7 @@ export const authUtils = {
     
     Cookies.set(AUTH_TOKEN_KEY, token, {
       expires: expirationDate,
-      secure: false, // Only send over HTTPS
+      secure: true, // Only send over HTTPS
       sameSite: 'strict' // CSRF protection
     });
   },
