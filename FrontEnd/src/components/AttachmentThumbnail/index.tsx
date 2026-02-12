@@ -18,18 +18,12 @@ const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({
   attachmentPath,
   filename,
   fileSize,
-  uploadedAt,
+  uploadedAt: _uploadedAt,
   onRemove,
   canRemove = false,
   className = '',
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  const getFileType = useCallback(() => {
-    if (file) return file.type;
-    if (filename) return getFileTypeInfo(filename).mimeType;
-    return 'application/octet-stream';
-  }, [file, filename]);
 
   const getDisplayName = useCallback(() => {
     if (file) return file.name;
@@ -55,7 +49,6 @@ const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({
     }
   }, [file, attachmentPath, filename]);
 
-  const fileType = getFileType();
   const displayName = getDisplayName();
   const formattedFileSize = getFileSize();
   const isImage = isImageFile(filename);

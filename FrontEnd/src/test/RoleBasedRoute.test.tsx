@@ -38,7 +38,7 @@ describe('RoleBasedRoute', () => {
     mockHistoryBack.mockClear()
   })
 
-  const renderWithAuth = (isAuthenticated: boolean, userRole?: string) => {
+  const _renderWithAuth = (isAuthenticated: boolean, userRole?: string) => {
     ;(authUtils.authUtils.getToken as any).mockReturnValue(
       isAuthenticated ? 'test-token' : undefined
     )
@@ -62,7 +62,7 @@ describe('RoleBasedRoute', () => {
     it('shows loading spinner when isLoading is true', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue(undefined)
       
-      const { container } = render(
+      render(
         <MemoryRouter>
           <AuthProvider>
             <RoleBasedRoute>
