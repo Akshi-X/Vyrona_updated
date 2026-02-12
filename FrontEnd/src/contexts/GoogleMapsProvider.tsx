@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, type ReactNode } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 
 interface GoogleMapsContextType {

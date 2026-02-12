@@ -63,15 +63,6 @@ const PatientSummaryAlertModal: React.FC<PatientSummaryAlertModalProps> = ({
     }
   };
 
-  const getInitials = (text?: string): string => {
-    if (!text) return 'PT';
-    const words = text.trim().split(/\s+/);
-    if (words.length >= 2) {
-      return `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase();
-    }
-    return text.substring(0, 2).toUpperCase();
-  };
-
   const getStatusColors = (status: string): { borderColor: string; bgColor: string; textColor: string } | null => {
     if (!status) return null;
     

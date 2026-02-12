@@ -163,14 +163,16 @@ export default function TrackPage() {
   // Update stakeholder chats from WebSocket data
   useEffect(() => {
     if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-      const transformedChats = wsUnreadMessages.map((msg) => ({
-        id: msg.patient_id,
-        sender: msg.sender_name,
-        patientId: `Patient ID : ${msg.patient_id}`,
-        message: msg.message_content,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        isRead: false
-      }));
+      const transformedChats = wsUnreadMessages
+        .filter((msg) => msg.patient_id) // Filter out messages without patient_id
+        .map((msg) => ({
+          id: msg.patient_id!,
+          sender: msg.sender_name,
+          patientId: `Patient ID : ${msg.patient_id}`,
+          message: msg.message_content,
+          timestamp: new Date(msg.created_at).toLocaleString(),
+          isRead: false
+        }));
       setStakeholderChats(transformedChats);
     } else {
       setStakeholderChats([]);

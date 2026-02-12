@@ -22,7 +22,7 @@ const Modal: React.FC<ModalProps> = ({
   children,
   containerClassName,
   headerAction,
-  scrollableContainerClassName
+  scrollableContainerClassName: _scrollableContainerClassName
 }) => {
   // Lock body scroll when modal is open
   useBodyScrollLock(isOpen);

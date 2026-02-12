@@ -79,6 +79,9 @@ export interface DeviationsGraphDataItem {
   top_risk_driver_name: string;
   top_risk_driver_count: number;
   top_risk_driver: number;
+  temp_internal?: number;
+  temp_external?: number;
+  shock?: number;
 }
 
 export interface DeviationsGraphResponse {
