@@ -337,12 +337,17 @@ export default function IVFTrackShipmentPage() {
                     id: a.alert_id,
                     type: a.alert_type,
                     severity: a.severity === 'High' ? 'High' : a.severity === 'Medium' ? 'Medium' : 'Low',
-                    patientId: a.canister_number || `Canister ${a.canister_id}`,
+                    patientId: a.tank_code
+                        ? a.tank_code
+                        : a.canister_number
+                            ? a.canister_number
+                            : `Canister ${a.canister_id}`,
                     message: a.message,
                     timestamp: new Date(a.occurred_at).toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
+                patientIdLabel="Tank Code"
                 onAcknowledge={async (alertId) => {
                     try {
                         await ivfAlertsService.acknowledgeAlert(alertId);

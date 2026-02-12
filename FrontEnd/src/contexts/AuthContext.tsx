@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { ReactNode } from 'react';
 import { authUtils } from '../utils/auth';
 import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -50,6 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const sessionTimeoutRef = useRef<number | null>(null);
   const rememberMeRef = useRef<boolean>(false);
+  const roleSyncAttemptedRef = useRef(false);
   const [isEmailNotificationsEnabled, setIsEmailNotificationsEnabled] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('email_notify_pref');
@@ -192,6 +194,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // If we have a token but the role wasn't persisted (some OTP flows may not return role),
+  // fetch the profile once to hydrate userRole for role-based UI.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!token) return;
+    if (userRole) return;
+    if (roleSyncAttemptedRef.current) return;
+
+    roleSyncAttemptedRef.current = true;
+
+    (async () => {
+      try {
+        const profile = await userService.getProfile();
+        const role = (profile?.role || '').toString();
+        if (role) {
+          setUserRole(role);
+          try {
+            localStorage.setItem('user_role', role);
+          } catch {}
+        }
+      } catch {
+        // If profile fails, keep role undefined; UI will default to non-manager behavior.
+      }
+    })();
+  }, [isAuthenticated, token, userRole]);
 
   // Persist email notification preference
   useEffect(() => {

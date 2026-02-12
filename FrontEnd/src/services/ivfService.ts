@@ -59,6 +59,16 @@ export interface TotalDeviationsResponse {
   status: string;
 }
 
+export interface IvfBranch {
+  branch_id: number;
+  branch_name: string;
+}
+
+export interface IvfBranchesResponse {
+  branches: IvfBranch[];
+  total: number;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -174,6 +184,43 @@ const mapCanisterTrackingItemToTreatment = (item: RawCanisterTrackingApiItem): I
 });
 
 export class IvfService extends BaseApiService {
+  private static readonly BRANCH_OVERRIDE_PARAM = 'branch_id_override';
+
+  private getEffectiveBranchId(): string | undefined {
+    // Only managers should send branch_id (for users, backend will scope by their branch automatically)
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      const isManager = role.includes('manager');
+      if (!isManager) return undefined;
+
+      // Prefer URL param if present (supports refresh/share link), otherwise use session storage
+      const fromUrl =
+        new URLSearchParams(window.location.search).get(IvfService.BRANCH_OVERRIDE_PARAM) ||
+        // Backward compatibility if any old links used branch_id
+        new URLSearchParams(window.location.search).get('branch_id') ||
+        undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return (fromUrl || fromSession || undefined) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private withBranchId(endpoint: string): string {
+    const branchId = this.getEffectiveBranchId();
+    if (!branchId) return endpoint;
+    const sep = endpoint.includes('?') ? '&' : '?';
+    return `${endpoint}${sep}${IvfService.BRANCH_OVERRIDE_PARAM}=${encodeURIComponent(branchId)}`;
+  }
+
+  async getBranches(): Promise<IvfBranchesResponse> {
+    return await this.request<IvfBranchesResponse>(
+      '/api/ivf/branches',
+      { method: 'GET' }
+    );
+  }
+
   async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
     const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
       method: 'GET',
@@ -234,15 +281,29 @@ export class IvfService extends BaseApiService {
   }
 
   async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
-    return await this.request<DeviationsGraphResponse>(
+    const raw = await this.request<DeviationsGraphResponse | DeviationsGraphResponse[]>(
       '/api/ivf/dashboard/metrics/deviations-graph',
       { method: 'GET' }
     );
+    // Some environments return an array like: [{ view_level, data, ... }]
+    // Normalize to a single object for consistent UI consumption.
+    if (Array.isArray(raw)) {
+      return (
+        raw[0] ?? {
+          view_level: 'container',
+          data: [],
+          top_deviation_type: null,
+          last_updated: new Date().toISOString(),
+          status: 'success',
+        }
+      );
+    }
+    return raw;
   }
 
   async getCanisterTrackingDetails(tank_code: string | number): Promise<EmbryoTrackingApiResponse & { available_slots: number }> {
     const response = await this.request<RawCanisterTrackingApiResponse>(
-      `/api/quality-tracking/tanks/${tank_code}/tracking-details`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/tracking-details`),
       { method: 'GET' }
     );
     return {
@@ -254,7 +315,7 @@ export class IvfService extends BaseApiService {
 
   async getCanisterRefillLogs(tank_code: string | number): Promise<RefillLogsResponse> {
     return await this.request<RefillLogsResponse>(
-      `/api/quality-tracking/tanks/${tank_code}/refill-logs`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs`),
       { method: 'GET' }
     );
   }
@@ -271,7 +332,7 @@ export class IvfService extends BaseApiService {
     gobletColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/tanks/${tank_code}/goblet-color`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/goblet-color`),
       {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         goblet_color: gobletColor,
@@ -291,7 +352,7 @@ export class IvfService extends BaseApiService {
     cryolockColor: string
   ): Promise<{ success: boolean; message: string; updated_color: string }> {
     return await this.patch<{ success: boolean; message: string; updated_color: string }>(
-      `/api/quality-tracking/tanks/${tank_code}/cryolock-color`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/cryolock-color`),
       {
         cryolock_number: cryolockNumber, // Cryolock number string (e.g., "CAN-EGM-001-01"), NOT an ID
         cryolock_color: cryolockColor,
@@ -311,7 +372,7 @@ export class IvfService extends BaseApiService {
     status: string
   ): Promise<RefillLogItem> {
     return await this.patch<RefillLogItem>(
-      `/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}/status`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}/status`),
       {
         status: status,
       }
@@ -339,7 +400,7 @@ export class IvfService extends BaseApiService {
     }
   ): Promise<RefillLogItem> {
     return await this.post<RefillLogItem>(
-      `/api/quality-tracking/tanks/${tank_code}/refill-logs`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs`),
       refillLogData
     );
   }
@@ -367,7 +428,7 @@ export class IvfService extends BaseApiService {
       embryo_transfer: boolean;
       in_transit: boolean;
     }>(
-      `/api/quality-tracking/tanks/${tank_code}/embryo-transfer`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/embryo-transfer`),
       {
         cryolock_number: cryolockNumber,
       }
@@ -399,7 +460,7 @@ export class IvfService extends BaseApiService {
       in_transit: boolean;
       shipment?: Record<string, any>;
     }>(
-      `/api/quality-tracking/tanks/${tank_code}/in-transit-with-shipment`,
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/in-transit-with-shipment`),
       {
         cryolock_number: cryolockNumber,
         description: description,
@@ -421,6 +482,10 @@ export class IvfService extends BaseApiService {
   ): Promise<void> {
     const url = `${this.getBaseUrl()}/api/quality-tracking/tanks/${tank_code}/combined-report/export-excel`;
     const params = new URLSearchParams();
+    const branchId = this.getEffectiveBranchId();
+    if (branchId) {
+      params.append(IvfService.BRANCH_OVERRIDE_PARAM, branchId);
+    }
     if (year !== undefined) {
       params.append('year', year.toString());
     }

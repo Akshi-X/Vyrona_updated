@@ -152,7 +152,14 @@ const ControlTower = () => {
       setLoadingCanisters(true);
       setCanistersError(null);
       try {
-        const data = await shipmentService.getActiveCanisters();
+        const filters: { branch_name?: string; status?: string } = {};
+        if (selectedBranch && selectedBranch !== 'All') {
+          filters.branch_name = selectedBranch;
+        }
+        if (selectedStatusInbound && selectedStatusInbound !== 'All') {
+          filters.status = selectedStatusInbound.toLowerCase();
+        }
+        const data = await shipmentService.getActiveCanisters(filters);
         let flattenedCanisters: Array<{
           id: string;
           canisterId: string;
@@ -258,7 +265,7 @@ const ControlTower = () => {
       }
     };
     fetchCanisters();
-  }, [isAuthenticated, isIvfUser]);
+  }, [isAuthenticated, isIvfUser, selectedBranch, selectedStatusInbound]);
 
   // Fetch user profile to compute initials
   useEffect(() => {
@@ -354,14 +361,11 @@ const ControlTower = () => {
     });
   }, [routes, selectedRegion, selectedStatusOutbound, selectedCarrier]);
 
-  // Apply filters to canisters (inbound only)
+  // Canisters are already filtered by the API when filters are applied,
+  // so no additional client-side filtering is needed.
   const filteredCanisters = useMemo(() => {
-    return (canisters || []).filter(c => {
-      const matchBranch = selectedBranch === 'All' || c.branchName === selectedBranch;
-      const matchStatus = selectedStatusInbound === 'All' || c.status === selectedStatusInbound;
-      return matchBranch && matchStatus;
-    });
-  }, [canisters, selectedBranch, selectedStatusInbound]);
+    return canisters || [];
+  }, [canisters]);
 
   // Reset zoomToLocation after it's been used
   useEffect(() => {
