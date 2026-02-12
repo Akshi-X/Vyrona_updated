@@ -1,36 +1,48 @@
-name: Build and deploy Frontend (Vite) to Azure Web App - mgscale-frontnd-dev
+name: Build and Deploy Frontend (Vite) - mgscale-dashboard-service-prod
 
 on:
   push:
     branches:
-      - main
-    paths:
-      - 'FrontEnd/**'
+      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: FrontEnd/package-lock.json
 
-      - name: Install dependencies and build
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
         working-directory: FrontEnd
+        run: npm ci
+
+      # 4️⃣ Build frontend (inject Vite env vars)
+      - name: Build frontend
+        working-directory: FrontEnd
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
         run: |
-          npm ci
           npm run build
           cp web.config dist/
 
-      - name: Upload build artifact (dist only)
+      # 5️⃣ Upload dist artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -39,27 +51,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+
     permissions:
-      id-token: write
       contents: read
 
     steps:
+      # 6️⃣ Download dist artifact
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: dist
 
+      # 7️⃣ Azure Login using SAME Service Principal as Backend
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3F8F541F3D8546418162DF69EEC5261C }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B8A298CD937648F7A6EE3B62C0DA9A42 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7B56C7B8CC7A4F9797D5C0721CA100C4 }}
+          auth-type: SERVICE_PRINCIPAL
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy ONLY dist to Azure Web App
+      # 8️⃣ Deploy dist folder to Azure Web App
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: mgscale-frontnd-dev
-          slot-name: Production
+          app-name: mgscale-dashboard-service-prod
           package: dist
