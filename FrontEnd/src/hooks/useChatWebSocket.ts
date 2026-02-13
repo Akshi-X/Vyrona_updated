@@ -82,10 +82,6 @@ export function useDashboardChatWebSocket() {
         }
       };
 
-      ws.onerror = (error) => {
-        setIsConnected(false);
-      };
-
       ws.onclose = () => {
         
         setIsConnected(false);
