@@ -31,6 +31,20 @@ jobs:
         working-directory: FrontEnd
         run: npm ci
 
+      # 4️⃣ Validate PROD API URL secret
+      - name: Validate PROD API URL secret
+        working-directory: FrontEnd
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
+        run: |
+          echo "Checking secret..."
+          if [ "$VITE_API_BASE_URL" = "https://mgscale-backend-service-dev-h8f7bhcbagh5gyez.westeurope-01.azurewebsites.net" ]; then
+            echo "Correct value"
+          else
+            echo "Wrong value"
+          fi
+
+
       # 4️⃣ Build frontend (inject Vite env vars)
       - name: Build frontend
         working-directory: FrontEnd
@@ -76,4 +90,5 @@ jobs:
         with:
           app-name: mgscale-dashboard-service-prod
           package: dist
+
 
