@@ -83,7 +83,6 @@ export function useDashboardChatWebSocket() {
       };
 
       ws.onerror = (error) => {
-        console.error('[Dashboard Chat WS] Error:', error);
         setIsConnected(false);
       };
 
@@ -104,7 +103,6 @@ export function useDashboardChatWebSocket() {
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('[Dashboard Chat WS] Connection error:', error);
       setIsConnected(false);
     }
   }, [isAuthenticated, token, getWebSocketUrl]);

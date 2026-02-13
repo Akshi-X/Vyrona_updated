@@ -214,7 +214,7 @@ const ControlTower = () => {
                 }
 
                 return {
-                  id: `tank-${tank.tank_code || ''}`,
+                  id: `tank-${branch.branch_name || 'N/A'}-${tank.tank_code || ''}`,
                   canisterId: String(tank.tank_code || ''),
                   branchName: branch.branch_name || 'N/A',
                   status: 'Safe', // Default status since tanks don't have status in API response
@@ -435,9 +435,31 @@ const ControlTower = () => {
 
         {/* Control Tower Content */}
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
-          <h1 className="font-semibold text-black text-2xl">
-            Control Tower
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="font-semibold text-black text-2xl">
+              Control Tower
+            </h1>
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={async () => {
+                  // Call API in background (non-blocking)
+                  shipmentService.getIVFStorage().catch((error) => {
+                    console.error('Failed to fetch latest IVF storage data:', error);
+                  });
+                }}
+                className="px-4 py-2 bg-[#6b1176] text-white text-sm font-medium rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#6b1176] focus:ring-offset-2"
+              >
+                Get latest Data
+              </button>
+              {/* Tooltip */}
+              <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="font-semibold text-black text-xs whitespace-nowrap">
+                  Retrieve new patient data from the connected system?
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Main Content Grid */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_544px] gap-6 min-h-0 items-start">
