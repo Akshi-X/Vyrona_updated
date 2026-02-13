@@ -41,7 +41,7 @@ jobs:
           if [ "$VITE_API_BASE_URL" = "https://mgscale-alerting-service-prod-d5hfgmdnd6d3f2f8.westeurope-01.azurewebsites.net" ]; then
             echo "Correct value"
           else
-            echo "Wrong value"
+            echo "Wrong value "
           fi
 
 
@@ -90,5 +90,6 @@ jobs:
         with:
           app-name: mgscale-dashboard-service-prod
           package: dist
+
 
 
