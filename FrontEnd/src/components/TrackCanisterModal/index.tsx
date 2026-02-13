@@ -151,12 +151,12 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     };
   }, [isOpen, isManager]);
 
-  const checkCanister = async (tankCode: string) => {
+  const checkCanister = async (tankCode: string): Promise<boolean | null> => {
     const trimmed = tankCode.trim();
     if (!trimmed) {
       setCanisterCheckMessage(null);
       setCanisterCheckError(null);
-      return;
+      return null;
     }
 
     setCanisterCheckLoading(true);
@@ -171,10 +171,12 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       } else {
         setCanisterCheckError(null);
       }
+      return response.exists;
     } catch (e: any) {
       const errorMessage = (e?.message as string) || 'Failed to check tank code';
       setCanisterCheckError(errorMessage);
       setCanisterCheckMessage(null);
+      return false;
     } finally {
       setCanisterCheckLoading(false);
     }
@@ -188,24 +190,25 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     setCanisterCheckError(null);
   };
 
-  const handleCanisterIdBlur = () => {
-    if (canisterId.trim()) {
-      checkCanister(canisterId);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedCanisterId = canisterId.trim();
     if (!trimmedCanisterId) return;
     if (isManager && !selectedBranchName) return;
-    if (canisterCheckError) return; // Don't submit if there's a validation error
-    if (isManager && selectedBranchId != null) {
-      try {
-        sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
-      } catch {}
+    
+    // Check canister when Track button is clicked
+    const exists = await checkCanister(trimmedCanisterId);
+    
+    // Only navigate if canister exists (exists === true)
+    if (exists === true) {
+      if (isManager && selectedBranchId != null) {
+        try {
+          sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
+        } catch {}
+      }
+      onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
     }
-    onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
+    // If exists === false, error message is already set by checkCanister
   };
 
   return (
@@ -231,7 +234,6 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
               type="text"
               value={canisterId}
               onChange={handleCanisterIdChange}
-              onBlur={handleCanisterIdBlur}
               placeholder="e.g., 1"
               className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
                 canisterCheckError
@@ -368,7 +370,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           <button
             type="submit"
             className="px-5 py-2.5 rounded-md bg-[#650458] text-white hover:opacity-95 disabled:opacity-50"
-            disabled={!canisterId.trim() || (isManager && !selectedBranchName) || !!canisterCheckError || canisterCheckLoading}
+            disabled={!canisterId.trim() || (isManager && !selectedBranchName) || canisterCheckLoading}
           >
             Track
           </button>

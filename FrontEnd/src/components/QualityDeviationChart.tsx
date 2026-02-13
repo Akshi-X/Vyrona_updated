@@ -94,6 +94,26 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
     [metrics]
   );
 
+  // Calculate maximum value from all metrics data
+  const maxValue = useMemo(() => {
+    if (visibleMetrics.length === 0 || containers.length === 0) return 100;
+    
+    let max = 0;
+    visibleMetrics.forEach((metric) => {
+      metric.data.forEach((value) => {
+        if (value > max) max = value;
+      });
+    });
+    
+    // Round up to the next nice number (multiple of 10, 20, 50, or 100)
+    if (max <= 0) return 100;
+    if (max <= 10) return Math.ceil(max / 5) * 5;
+    if (max <= 50) return Math.ceil(max / 10) * 10;
+    if (max <= 200) return Math.ceil(max / 20) * 20;
+    if (max <= 500) return Math.ceil(max / 50) * 50;
+    return Math.ceil(max / 100) * 100;
+  }, [visibleMetrics, containers]);
+
   const chartData = useMemo(
     () => {
       // Separate top risk driver from other metrics
@@ -104,10 +124,10 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         (m) => !(m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk'))
       );
 
-      // Calculate remaining space for background bar (100 - sum of other metrics for each container)
+      // Calculate remaining space for background bar (maxValue - sum of other metrics for each container)
       const backgroundData = containers.map((_, containerIndex) => {
         const total = otherMetrics.reduce((sum, metric) => sum + (metric.data[containerIndex] || 0), 0);
-        return Math.max(0, 100 - total);
+        return Math.max(0, maxValue - total);
       });
 
       // Create datasets for other metrics (main stack)
@@ -154,7 +174,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
       const topRiskDriverBackgroundData = topRiskDriverMetric
         ? containers.map((_, containerIndex) => {
             const riskDriverValue = topRiskDriverMetric.data[containerIndex] || 0;
-            return Math.max(0, 100 - riskDriverValue);
+            return Math.max(0, maxValue - riskDriverValue);
           })
         : [];
 
@@ -181,7 +201,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         ],
       };
     },
-    [containers, visibleMetrics]
+    [containers, visibleMetrics, maxValue]
   );
 
   const legendItems = useMemo(
@@ -230,14 +250,14 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
       scales: {
         x: {
           beginAtZero: true,
-          max: 100,
+          max: maxValue,
           grid: {
             color: '#E5E5E5',
             drawBorder: false,
             borderDash: [2, 2],
           },
           ticks: {
-            stepSize: 20,
+            stepSize: maxValue / 5, // Divide into 5 steps for consistent spacing
             color: '#4B4B4B',
             font: {
               size: 11,
@@ -265,7 +285,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         },
       },
     }),
-    []
+    [maxValue]
   );
 
   return (
