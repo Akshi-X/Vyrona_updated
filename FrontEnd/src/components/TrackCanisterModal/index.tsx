@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Modal from '../Modal';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/DarkContainerQualityTracking.svg';
 import { useAuth } from '../../contexts/AuthContext';
-import { ivfService, type IvfBranch } from '../../services/ivfService';
+import { ivfService, type IvfBranch, type CanisterCheckResponse } from '../../services/ivfService';
 
 interface TrackCanisterModalProps {
   isOpen: boolean;
@@ -33,6 +33,9 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   const [selectedBranchName, setSelectedBranchName] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [canisterCheckLoading, setCanisterCheckLoading] = useState(false);
+  const [canisterCheckMessage, setCanisterCheckMessage] = useState<string | null>(null);
+  const [canisterCheckError, setCanisterCheckError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const branchDropdownRef = useRef<HTMLDivElement | null>(null);
   const branchMenuRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +58,9 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       setSelectedBranchId(null);
       setIsBranchDropdownOpen(false);
       setBranchMenuStyle(null);
+      setCanisterCheckMessage(null);
+      setCanisterCheckError(null);
+      setCanisterCheckLoading(false);
     }
   }, [isOpen]);
 
@@ -145,11 +151,55 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     };
   }, [isOpen, isManager]);
 
+  const checkCanister = async (tankCode: string) => {
+    const trimmed = tankCode.trim();
+    if (!trimmed) {
+      setCanisterCheckMessage(null);
+      setCanisterCheckError(null);
+      return;
+    }
+
+    setCanisterCheckLoading(true);
+    setCanisterCheckError(null);
+    setCanisterCheckMessage(null);
+
+    try {
+      const response: CanisterCheckResponse = await ivfService.checkCanisterExists(trimmed);
+      setCanisterCheckMessage(response.message);
+      if (!response.exists) {
+        setCanisterCheckError(response.message);
+      } else {
+        setCanisterCheckError(null);
+      }
+    } catch (e: any) {
+      const errorMessage = (e?.message as string) || 'Failed to check tank code';
+      setCanisterCheckError(errorMessage);
+      setCanisterCheckMessage(null);
+    } finally {
+      setCanisterCheckLoading(false);
+    }
+  };
+
+  const handleCanisterIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCanisterId(value);
+    // Clear previous messages when user types
+    setCanisterCheckMessage(null);
+    setCanisterCheckError(null);
+  };
+
+  const handleCanisterIdBlur = () => {
+    if (canisterId.trim()) {
+      checkCanister(canisterId);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedCanisterId = canisterId.trim();
     if (!trimmedCanisterId) return;
     if (isManager && !selectedBranchName) return;
+    if (canisterCheckError) return; // Don't submit if there's a validation error
     if (isManager && selectedBranchId != null) {
       try {
         sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
@@ -163,7 +213,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      description={isManager ? "Please enter the canister ID and branch" : "Please enter the canister ID"}
+      description={isManager ? "Please enter the tank code and branch" : "Please enter the tank code"}
       icon={
         <img
           src={icon}
@@ -175,15 +225,52 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <input
-            ref={inputRef}
-            type="text"
-            value={canisterId}
-            onChange={(e) => setCanisterId(e.target.value)}
-            placeholder="e.g., 1"
-            className="w-full px-4 py-3 rounded-md border border-[#650458] outline-none focus:ring-2 focus:ring-[#bd56af] focus:border-[#bd56af]"
-          />
-          {error ? (
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={canisterId}
+              onChange={handleCanisterIdChange}
+              onBlur={handleCanisterIdBlur}
+              placeholder="e.g., 1"
+              className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
+                canisterCheckError
+                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                  : canisterCheckMessage && !canisterCheckError
+                  ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
+                  : 'border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]'
+              }`}
+            />
+            {canisterCheckLoading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <svg
+                  className="animate-spin h-5 w-5 text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </div>
+            )}
+          </div>
+          {canisterCheckError ? (
+            <p className="mt-2 text-sm text-red-600">{canisterCheckError}</p>
+          ) : canisterCheckMessage && !canisterCheckError ? (
+            <p className="mt-2 text-sm text-green-600">{canisterCheckMessage}</p>
+          ) : error ? (
             <p className="mt-2 text-sm text-red-600">{error}</p>
           ) : null}
         </div>
@@ -281,7 +368,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           <button
             type="submit"
             className="px-5 py-2.5 rounded-md bg-[#650458] text-white hover:opacity-95 disabled:opacity-50"
-            disabled={!canisterId.trim() || (isManager && !selectedBranchName)}
+            disabled={!canisterId.trim() || (isManager && !selectedBranchName) || !!canisterCheckError || canisterCheckLoading}
           >
             Track
           </button>
