@@ -163,16 +163,14 @@ export default function TrackPage() {
   // Update stakeholder chats from WebSocket data
   useEffect(() => {
     if (wsUnreadMessages && wsUnreadMessages.length > 0) {
-      const transformedChats = wsUnreadMessages
-        .filter((msg) => msg.patient_id) // Filter out messages without patient_id
-        .map((msg) => ({
-          id: msg.patient_id!,
-          sender: msg.sender_name,
-          patientId: `Patient ID : ${msg.patient_id}`,
-          message: msg.message_content,
-          timestamp: new Date(msg.created_at).toLocaleString(),
-          isRead: false
-        }));
+      const transformedChats = wsUnreadMessages.map((msg) => ({
+        id: msg.patient_id,
+        sender: msg.sender_name,
+        patientId: `Patient ID : ${msg.patient_id}`,
+        message: msg.message_content,
+        timestamp: new Date(msg.created_at).toLocaleString(),
+        isRead: false
+      }));
       setStakeholderChats(transformedChats);
     } else {
       setStakeholderChats([]);
@@ -220,6 +218,7 @@ export default function TrackPage() {
       return {
         id: task.id.toString(),
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name,
         description: task.description || '',
         assigneeBy: task.created_by 
@@ -237,6 +236,7 @@ export default function TrackPage() {
       return {
         id: task.id?.toString() || 'unknown',
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name || 'Unknown Task',
         description: task.description || '',
         assigneeBy: 'Unknown',
