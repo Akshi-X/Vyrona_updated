@@ -67,6 +67,7 @@ def init_db():
         task_model,
         chat_model,
         chat_read_status,
+        chat_read_status_canister,
         chat_message_tag,
         telemetry_model,
         quality_log_model,

@@ -264,6 +264,20 @@ cd migration
 alembic upgrade head
 ```
 
+#### Seed Demo Data
+
+To populate sample data for CGT and IVF dashboards:
+
+```bash
+poetry run python seed_db.py
+```
+
+This creates:
+- **CGT (Pharma)**: Patients, shipments, provider, carrier (5 patients, 5 shipments with legs)
+- **IVF**: Tanks, cryolocks (embryos), outbound shipments
+
+Log in as pharma user or `admin@zucisystems.com` (IVF) to view the dashboards.
+
 ### 6. Redis Setup
 
 #### Install Redis

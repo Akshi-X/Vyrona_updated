@@ -1,14 +1,85 @@
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import text, inspect as sa_inspect
+
 from app.config.database import engine, Base, SessionLocal
 from app.models import user_model, otp_model, patient_model, pharma_model, provider_model
 from app.models.user_model import User
+from app.models.IVF.hospital_model import Hospital
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.auth.auth import get_password_hash
 from app.config.config import settings
 from app.utils.utils import generate_user_id
 
 logger = logging.getLogger(__name__)
+
+
+def sync_ivf_schema():
+    """
+    Add missing columns to IVF tables for older databases.
+    Handles schema drift when model was updated (e.g. tank-level monitoring).
+    """
+    db = SessionLocal()
+    try:
+        # ivf_quality_log: tank_id, telemetry_data_id for deviations graph
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS tank_id INTEGER REFERENCES tanks(tank_id) ON DELETE CASCADE"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS telemetry_data_id INTEGER REFERENCES ivf_telemetry_data(id) ON DELETE CASCADE"))
+        # Boolean violation flags (required for deviations graph / total-deviations)
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS is_temp_internal_loss BOOLEAN DEFAULT false NOT NULL"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS is_temp_external_loss BOOLEAN DEFAULT false NOT NULL"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS is_shock_loss BOOLEAN DEFAULT false NOT NULL"))
+        # Other columns the model expects
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS device_id VARCHAR"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS temperature_internal FLOAT"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS temperature_external FLOAT"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS shock FLOAT"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS quality_loss FLOAT"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS reading_timestamp TIMESTAMP WITH TIME ZONE"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS created_by VARCHAR"))
+        db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS updated_by VARCHAR"))
+        db.commit()
+        logger.info("IVF schema sync completed")
+    except Exception as e:
+        logger.warning(f"IVF schema sync skipped or failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def sync_chat_schema():
+    """
+    Ensure chat tables have required columns for IVF canister chat.
+    - chat_messages.tank_id (for tank-level messages)
+    - chat_read_status_canister table
+    """
+    db = SessionLocal()
+    try:
+        # chat_messages: tank_id required for IVF canister chat
+        db.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS tank_id INTEGER REFERENCES tanks(tank_id)"))
+        db.commit()
+        logger.info("Chat schema sync: ensured chat_messages.tank_id exists")
+
+        insp = sa_inspect(db.get_bind())
+        if "chat_read_status_canister" not in insp.get_table_names():
+            db.execute(text("""
+                CREATE TABLE IF NOT EXISTS chat_read_status_canister (
+                    user_id VARCHAR NOT NULL REFERENCES users(user_id),
+                    tank_id INTEGER NOT NULL REFERENCES tanks(tank_id),
+                    last_read_message_id INTEGER REFERENCES chat_messages(id),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (user_id, tank_id)
+                )
+            """))
+            db.commit()
+            logger.info("Chat schema sync: created chat_read_status_canister table")
+    except Exception as e:
+        logger.warning(f"Chat schema sync skipped or failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def create_pharma_admins():
@@ -175,6 +246,177 @@ def create_pharma_companies():
         db.close()
 
 
+def create_hospitals_and_branches():
+    """
+    Create default hospital and branch for IVF users if they don't exist.
+    Required for hospital users (email @zucisystems.com or @mygrape.org).
+    """
+    logger.info("=" * 60)
+    logger.info("CHECKING HOSPITALS AND BRANCHES...")
+    logger.info("=" * 60)
+
+    db = SessionLocal()
+    try:
+        hospital_name = "ARC Fertility Hospitals"
+        branch_name = "Main Branch"
+
+        # Create hospital if not exists
+        existing_hospital = db.query(Hospital).filter(
+            Hospital.hospital_name == hospital_name
+        ).first()
+
+        if not existing_hospital:
+            hospital = Hospital(
+                hospital_name=hospital_name,
+                hospital_type="IVF",
+                created_by="system"
+            )
+            db.add(hospital)
+            db.commit()
+            db.refresh(hospital)
+            logger.info(f"Hospital created: {hospital_name} (ID: {hospital.hospital_id})")
+            hospital_id = hospital.hospital_id
+        else:
+            hospital_id = existing_hospital.hospital_id
+            logger.info(f"Hospital already exists: {hospital_name} (ID: {hospital_id})")
+
+        # Create branch if not exists
+        existing_branch = db.query(HospitalBranch).filter(
+            HospitalBranch.hospital_id == hospital_id,
+            HospitalBranch.branch_name == branch_name
+        ).first()
+
+        if not existing_branch:
+            branch = HospitalBranch(
+                hospital_id=hospital_id,
+                branch_name=branch_name,
+                district_name="Default",
+                state_name="Default",
+                country_name="India",
+                created_by="system"
+            )
+            db.add(branch)
+            db.commit()
+            db.refresh(branch)
+            logger.info(f"Branch created: {branch_name} (ID: {branch.branch_id}) for {hospital_name}")
+        else:
+            logger.info(f"Branch already exists: {branch_name} for {hospital_name}")
+
+        logger.info("=" * 60)
+        logger.info("HOSPITALS AND BRANCHES SETUP COMPLETE")
+        logger.info("=" * 60)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"ERROR creating hospitals/branches: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
+def create_ivf_admins():
+    """
+    Create IVF admin/user accounts on startup.
+    Users must have email @zucisystems.com or @mygrape.org.
+    """
+    logger.info("=" * 60)
+    logger.info("CHECKING IVF ADMIN ACCOUNTS...")
+    logger.info("=" * 60)
+
+    db = SessionLocal()
+    try:
+        ivf_admins = settings.get_ivf_admins()
+        if not ivf_admins:
+            logger.info("No ivf_admins.json found - skip IVF admin setup")
+            return
+
+        for admin in ivf_admins:
+            email = admin.get("email")
+            if not email:
+                logger.warning("IVF admin entry missing email, skipping")
+                continue
+
+            hospital_name = admin.get("hospital_name") or "ARC Fertility Hospitals"
+            branch_name = admin.get("branch_name") or "Main Branch"
+            department = admin.get("department") or "IVF"
+            role = admin.get("role") or "Admin"
+
+            # Validate hospital exists
+            hospital = db.query(Hospital).filter(
+                Hospital.hospital_name == hospital_name
+            ).first()
+            if not hospital:
+                logger.error(f"Hospital '{hospital_name}' not found. Run create_hospitals_and_branches first.")
+                continue
+
+            # Validate branch exists
+            branch = db.query(HospitalBranch).filter(
+                HospitalBranch.hospital_id == hospital.hospital_id,
+                HospitalBranch.branch_name == branch_name
+            ).first()
+            if not branch:
+                logger.error(f"Branch '{branch_name}' not found for {hospital_name}")
+                continue
+
+            existing = db.query(User).filter(User.email == email).first()
+            if existing:
+                needs_update = False
+                if existing.branch_id != branch.branch_id:
+                    existing.branch_id = branch.branch_id
+                    needs_update = True
+                if existing.hospital_id != hospital.hospital_id:
+                    existing.hospital_id = hospital.hospital_id
+                    needs_update = True
+                if existing.department != department:
+                    existing.department = department
+                    needs_update = True
+                if existing.role != role:
+                    existing.role = role
+                    needs_update = True
+                if not existing.status:
+                    existing.status = True
+                    needs_update = True
+                if existing.approved_status != "approved":
+                    existing.approved_status = "approved"
+                    needs_update = True
+                if needs_update:
+                    db.commit()
+                    db.refresh(existing)
+                    logger.info(f"IVF user updated: {email}")
+                else:
+                    logger.info(f"IVF user already exists: {email}")
+                continue
+
+            # Create new IVF user
+            user = User(
+                user_id=generate_user_id(),
+                email=email,
+                password_hash=get_password_hash(admin.get("password", "")),
+                first_name=admin.get("first_name", "IVF"),
+                last_name=admin.get("last_name", "User"),
+                role=role,
+                pharma_id=None,
+                branch_id=branch.branch_id,
+                hospital_id=hospital.hospital_id,
+                department=department,
+                status=True,
+                approved_status="approved",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"IVF user created: {email} (role={role}, dept={department})")
+
+        logger.info("=" * 60)
+        logger.info("IVF ADMIN SETUP COMPLETE")
+        logger.info("=" * 60)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"ERROR creating IVF admins: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 def create_mygrape_admin():
     """
     Create MyGrape platform admin account.
@@ -232,6 +474,8 @@ def init_db():
     logger.info("=" * 60)
     
     Base.metadata.create_all(bind=engine)
+    sync_ivf_schema()
+    sync_chat_schema()
     logger.info("Database tables created/verified")
     
     # Create pharma companies if not exists
@@ -239,6 +483,12 @@ def init_db():
     
     # Create pharma admins if not exists
     create_pharma_admins()
+    
+    # Create hospitals and branches for IVF users
+    create_hospitals_and_branches()
+    
+    # Create IVF admins if ivf_admins.json exists
+    create_ivf_admins()
     
     # Create MyGrape platform admin if not exists
     create_mygrape_admin()
