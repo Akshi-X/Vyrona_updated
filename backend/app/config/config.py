@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6380  # Default to 6380 for Azure Redis SSL
     REDIS_DB: int = 0
+    REDIS_USERNAME: Optional[str] = None  # For Redis Labs / Redis 6+ ACL (e.g. "default")
     REDIS_PASSWORD: Optional[str] = None
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 10  # Increased timeout for Azure Redis
     REDIS_SOCKET_TIMEOUT: int = 10  # Increased timeout for Azure Redis

@@ -20,10 +20,12 @@ from app.middleware.sanitization_middleware import SanitizationMiddleware
 from app.middleware.token_validation_middleware import TokenValidationMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.service.quality_service import QualityService
-from app.config.database import SessionLocal
+from app.config.database import SessionLocal, engine
 from app.constants.app_constants import FEEDBACK_UPLOAD_DIR
 from app.schemas.response_schema import HealthCheckResponse
-from app.constants.status_constants import HEALTH_HEALTHY
+from app.constants.status_constants import HEALTH_HEALTHY, HEALTH_UNHEALTHY
+from app.service.redis_service import get_redis
+from sqlalchemy import text
 from app.utils.lane_risk_utils import schedule_daily_lpi_fetch
 import uvicorn
 
@@ -187,13 +189,35 @@ app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 # Health check endpoint
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with database and Redis connection status."""
+    db_ok = False
+    redis_ok = False
+
+    # Check database connection
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+
+    # Check Redis connection
+    try:
+        r = get_redis()
+        r.ping()
+        redis_ok = True
+    except Exception:
+        pass
+
+    overall_status = HEALTH_HEALTHY if (db_ok and redis_ok) else HEALTH_UNHEALTHY
+
     return HealthCheckResponse(
-        status=HEALTH_HEALTHY,
+        status=overall_status,
         platform="MyGrape",
         service="Supply Chain Tracking",
         environment=settings.ENVIRONMENT,
-        database_connected=True
+        database_connected=db_ok,
+        redis_connected=redis_ok,
     )
 
 if __name__ == "__main__":

@@ -55,7 +55,8 @@ class HealthCheckResponse(BaseModel):
     platform: str
     service: str
     environment: str
-    database_connected: bool = True
+    database_connected: bool
+    redis_connected: bool
 
 
 class UserProfileResponse(BaseModel):
