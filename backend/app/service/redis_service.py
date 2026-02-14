@@ -50,6 +50,9 @@ def get_redis() -> redis.Redis:
                     connection_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
                 logger.info(f"SSL/TLS enabled for Redis connection")
             
+            # Add username (Redis Labs / Redis 6+ ACL) if provided
+            if settings.REDIS_USERNAME:
+                connection_params["username"] = settings.REDIS_USERNAME
             # Add password if provided
             if settings.REDIS_PASSWORD:
                 connection_params["password"] = settings.REDIS_PASSWORD
