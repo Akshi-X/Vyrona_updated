@@ -30,47 +30,115 @@ interface DataPoint {
  
  
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
-const TIME_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
-const INTERVAL_MINUTES = 10; // 10-minute intervals
-const INTERVALS_COUNT = 6; // 6 intervals for 1 hour (0, 10, 20, 30, 40, 50 minutes ago)
+const TIME_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+const INTERVAL_MINUTES = 60; // 1-hour intervals
+const INTERVALS_COUNT = 6; // 6 intervals for 6 hours (0, 1, 2, 3, 4, 5 hours ago)
 
-// Helper function to filter data points within the last 1 hour
+// Helper function to parse timestamp string to Date
+const parseTimestamp = (timestamp: string): Date | null => {
+  try {
+    if (!timestamp) return null;
+    
+    // Convert "YYYY-MM-DD HH:MM:SS" format to ISO format for better parsing
+    // JavaScript's Date constructor can be inconsistent with space-separated dates
+    let normalizedTimestamp = timestamp.trim();
+    
+    // If it's space-separated format, convert to ISO-like format
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(normalizedTimestamp)) {
+      normalizedTimestamp = normalizedTimestamp.replace(' ', 'T');
+      // Add 'Z' to indicate UTC if no timezone info, or parse as-is
+      if (!normalizedTimestamp.includes('Z') && !normalizedTimestamp.includes('+') && !normalizedTimestamp.includes('-', 10)) {
+        // No timezone info, parse as local time
+        const parsed = new Date(normalizedTimestamp);
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+    }
+    
+    // Try parsing with the normalized timestamp or original
+    const parsed = new Date(normalizedTimestamp);
+    if (isNaN(parsed.getTime())) {
+      // Last resort: try original timestamp
+      const fallbackParsed = new Date(timestamp);
+      if (isNaN(fallbackParsed.getTime())) {
+        return null;
+      }
+      return fallbackParsed;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+// Helper function to filter data points within the last 6 hours
 const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
+  if (points.length === 0) return points;
+  
   const now = new Date().getTime();
-  return points.filter((point) => {
+  const filtered = points.filter((point) => {
     try {
-      const pointTime = new Date(point.timestamp).getTime();
+      const pointDate = parseTimestamp(point.timestamp);
+      if (!pointDate) {
+        return false; // Exclude invalid timestamps
+      }
+      const pointTime = pointDate.getTime();
       const timeDiff = now - pointTime;
-      return timeDiff >= 0 && timeDiff <= TIME_WINDOW_MS;
+      // Allow data within the last 6 hours, or data that's up to 10 minutes in the future (clock skew tolerance)
+      // Also allow data up to 12 hours old if it's the only data we have
+      const maxAge = points.length === 1 ? 2 * TIME_WINDOW_MS : TIME_WINDOW_MS;
+      return timeDiff >= -10 * 60 * 1000 && timeDiff <= maxAge;
     } catch {
       return false; // Exclude invalid timestamps
     }
   });
+  
+  // If filtering removed all points but we had valid points, return the most recent one
+  if (filtered.length === 0 && points.length > 0) {
+    const validPoints = points.filter(p => parseTimestamp(p.timestamp) !== null);
+    if (validPoints.length > 0) {
+      // Sort by timestamp and return the most recent
+      validPoints.sort((a, b) => {
+        const dateA = parseTimestamp(a.timestamp);
+        const dateB = parseTimestamp(b.timestamp);
+        if (!dateA || !dateB) return 0;
+        return dateB.getTime() - dateA.getTime();
+      });
+      return [validPoints[0]]; // Return at least one point to show the chart
+    }
+  }
+  
+  return filtered;
 };
 
-// Helper function to get interval index (0-5) for a timestamp within the 1-hour window
+// Helper function to get interval index (0-5) for a timestamp within the 6-hour window
 const getIntervalIndex = (timestamp: string): number => {
   try {
     const now = new Date().getTime();
-    const pointTime = new Date(timestamp).getTime();
+    const pointDate = parseTimestamp(timestamp);
+    if (!pointDate) {
+      return 0;
+    }
+    const pointTime = pointDate.getTime();
     const minutesAgo = Math.floor((now - pointTime) / (60 * 1000));
-    // Return index 0-5, where 0 is most recent (0-10 min ago) and 5 is oldest (50-60 min ago)
-    const intervalIndex = Math.floor(minutesAgo / INTERVAL_MINUTES);
+    // Return index 0-5, where 0 is most recent (0-1 hour ago) and 5 is oldest (5-6 hours ago)
+    // Handle future timestamps by placing them in interval 0
+    const intervalIndex = minutesAgo < 0 ? 0 : Math.floor(minutesAgo / INTERVAL_MINUTES);
     return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
   } catch {
     return 0;
   }
 };
 
-// Format timestamp to show hour and minute
+// Format timestamp to show hour (for 1-hour intervals)
 const formatTimestampToInterval = (minutesAgo: number): string => {
   const now = new Date();
   const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
   const hours = intervalTime.getHours();
-  const minutes = intervalTime.getMinutes().toString().padStart(2, '0');
   const ampm = hours >= 12 ? 'pm' : 'am';
   const displayHours = hours % 12 || 12;
-  return `${displayHours}:${minutes} ${ampm}`;
+  return `${displayHours}:00 ${ampm}`;
 };
  
 interface IVFQualityTrackingChartProps {
@@ -104,7 +172,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   // Format timestamp for display
   const formatTimestamp = (timestamp: string): string => {
     try {
-      const date = new Date(timestamp);
+      const date = parseTimestamp(timestamp);
+      if (!date) {
+        return timestamp;
+      }
       const hours = date.getHours();
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const seconds = date.getSeconds().toString().padStart(2, '0');
@@ -331,7 +402,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
  
     connectWebSocket();
 
-    // Periodic cleanup to remove old data points (older than 1 hour)
+    // Periodic cleanup to remove old data points (older than 6 hours)
     const cleanupInterval = setInterval(() => {
       if (isMountedRef.current) {
         setDataPoints((prev) => {
@@ -354,7 +425,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [canisterNumber, token]);
  
   const chartData = useMemo(() => {
-    // Filter data points to only show last 1 hour
+    // Filter data points to only show last 6 hours
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
     const palette = {
@@ -363,7 +434,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       shock: '#BDBDBD',
     } as const;
 
-    // Generate 6 interval labels (from 50 minutes ago to now, in 10-minute steps)
+    // Generate 6 interval labels (from 5 hours ago to now, in 1-hour steps)
     const intervalLabels: string[] = [];
     for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
       const minutesAgo = i * INTERVAL_MINUTES;
@@ -388,8 +459,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       if (points.length > 0) {
         // Sort by timestamp and use the most recent point in that interval
         const sortedPoints = points.sort((a, b) => {
-          const timeA = new Date(a.timestamp).getTime();
-          const timeB = new Date(b.timestamp).getTime();
+          const dateA = parseTimestamp(a.timestamp);
+          const dateB = parseTimestamp(b.timestamp);
+          if (!dateA || !dateB) return 0;
+          const timeA = dateA.getTime();
+          const timeB = dateB.getTime();
           return timeB - timeA; // Most recent first
         });
         const latestPoint = sortedPoints[0];
@@ -473,7 +547,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [dataPoints]);
  
   const chartOptions = useMemo(() => {
-    // Filter data points to only show last 1 hour (same as chartData)
+    // Filter data points to only show last 6 hours (same as chartData)
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
     return {

@@ -451,44 +451,41 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
         # Approver must be pharma admin from same pharma
         if approver.role.lower() != 'pharma_admin':
             raise CompanyAccessForbiddenException(
-                company_name=f"pharma_id_{user.pharma_id}",
-                reason="Only Pharma Admin can approve pharma users"
+                user_company=f"pharma_id_{approver.pharma_id}",
+                target_company=f"pharma_id_{user.pharma_id}"
             )
         
         if approver.pharma_id != user.pharma_id:
             raise CompanyAccessForbiddenException(
-                company_name=f"pharma_id_{user.pharma_id}",
-                reason=ErrorMessages.PHARMA_ADMIN_APPROVE_ONLY
+                user_company=f"pharma_id_{approver.pharma_id}",
+                target_company=f"pharma_id_{user.pharma_id}"
             )
     
     # ============================================
-    # HOSPITAL APPROVAL LOGIC (NEW)
+    # HOSPITAL APPROVAL LOGIC (IVF)
     # ============================================
     else:  # is_hospital_user == True
-        role_lower = user.role.lower()
+        # For IVF: Admin from same hospital (any branch) can approve both User and Manager roles
+        approver_role_lower = approver.role.lower()
         
-        if role_lower == 'user':
-            # User approval: Manager from same branch and department
-            if approver.role.lower() != 'manager':
-                raise CompanyAccessForbiddenException(
-                    company_name=f"branch_id_{user.branch_id}",
-                    reason="Only Managers can approve User registrations"
-                )
-            
-            if (approver.branch_id != user.branch_id or 
-                approver.department != user.department):
-                raise CompanyAccessForbiddenException(
-                    company_name=f"branch_id_{user.branch_id}",
-                    reason="Only Managers from same branch and department can approve User registrations"
-                )
+        # Only Admin can approve hospital users
+        if approver_role_lower != 'admin':
+            raise CompanyAccessForbiddenException(
+                user_company=f"branch_id_{approver.branch_id if approver.branch_id else approver.role.lower()}",
+                target_company=f"branch_id_{user.branch_id}"
+            )
         
-        elif role_lower == 'manager':
-            # Manager approval: Admin
-            if approver.role.lower() != 'admin':
-                raise CompanyAccessForbiddenException(
-                    company_name=f"branch_id_{user.branch_id}",
-                    reason="Only Admin can approve Manager registrations"
-                )
+        # Verify Admin is from same hospital (any branch allowed)
+        if not approver.hospital_id or not user.hospital_id:
+            raise CompanyAccessForbiddenException(
+                user_company=f"hospital_id_{approver.hospital_id or 'unknown'}",
+                target_company=f"hospital_id_{user.hospital_id or 'unknown'}"
+            )
+        if approver.hospital_id != user.hospital_id:
+            raise CompanyAccessForbiddenException(
+                user_company=f"hospital_id_{approver.hospital_id}",
+                target_company=f"hospital_id_{user.hospital_id}"
+            )
     
     # ============================================
     # APPROVE USER (UNIFIED)
@@ -601,8 +598,8 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     # Validate that rejector is a pharma admin for the same pharma
     if rejector.role.lower() != 'pharma_admin' or rejector.pharma_id != user.pharma_id:
         raise CompanyAccessForbiddenException(
-            company_name=f"pharma_id_{user.pharma_id}",
-            reason=ErrorMessages.PHARMA_ADMIN_REJECT_ONLY
+            user_company=f"pharma_id_{rejector.pharma_id}",
+            target_company=f"pharma_id_{user.pharma_id}"
         )
     
     # Business Logic: Set rejection status and audit trail

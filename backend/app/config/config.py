@@ -2,7 +2,7 @@
 Application Configuration
 Loaded from environment variables (.env file)
 """
- 
+
 from pydantic_settings import BaseSettings  # pyright: ignore[reportMissingImports]
 from pydantic import model_validator
 from typing import List, Optional, Dict, Any
@@ -84,8 +84,8 @@ def resolve_keyvault_reference(value: str) -> str:
         # Return original value to allow the app to continue
         # In production, you might want to raise an exception instead
         return value
- 
- 
+
+
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
@@ -128,11 +128,13 @@ class Settings(BaseSettings):
     AUDIT_LOG_ENABLED: bool = True
     # Redis Configuration (Optional - defaults provided)
     REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
+    REDIS_PORT: int = 6380  # Default to 6380 for Azure Redis SSL
     REDIS_DB: int = 0
     REDIS_PASSWORD: Optional[str] = None
-    REDIS_SOCKET_CONNECT_TIMEOUT: int = 5
-    REDIS_SOCKET_TIMEOUT: int = 5
+    REDIS_SOCKET_CONNECT_TIMEOUT: int = 10  # Increased timeout for Azure Redis
+    REDIS_SOCKET_TIMEOUT: int = 10  # Increased timeout for Azure Redis
+    REDIS_SSL: bool = True  # Default to True for Azure Redis Cache (set False for local Redis)
+    REDIS_SSL_CERT_REQS: Optional[str] = "required"  # Options: None, "required", "optional" (for Azure Redis, use "required")
     # World Bank LPI API Configuration (Optional - defaults to v2 API)
     LPI_TIMELINESS_API_URL: str = "https://api.worldbank.org/v2/country/all/indicator/LP.LPI.TIM.XQ"
     LPI_OVERALL_API_URL: str = "https://api.worldbank.org/v2/country/all/indicator/LP.LPI.OVRL.XQ"
@@ -231,6 +233,7 @@ class Settings(BaseSettings):
             file_secret_settings,
         ):
             # Prioritize .env file, then environment variables
+            # Key Vault references are resolved by the model_validator
             return (
                 init_settings,
                 env_settings,

@@ -69,6 +69,15 @@ export interface IvfBranchesResponse {
   total: number;
 }
 
+export interface CanisterCheckResponse {
+  exists: boolean;
+  canister_number: string;
+  canister_id: number;
+  is_active: boolean;
+  canister_status: string;
+  message: string;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -78,10 +87,10 @@ export interface DeviationsGraphDataItem {
   agitation_vibration: number;
   top_risk_driver_name: string;
   top_risk_driver_count: number;
-  top_risk_driver: number;
-  temp_internal?: number;
-  temp_external?: number;
-  shock?: number;
+  top_risk_driver: number; 
+  temp_internal: number;
+  temp_external: number;
+  shock: number;
 }
 
 export interface DeviationsGraphResponse {
@@ -220,6 +229,13 @@ export class IvfService extends BaseApiService {
   async getBranches(): Promise<IvfBranchesResponse> {
     return await this.request<IvfBranchesResponse>(
       '/api/ivf/branches',
+      { method: 'GET' }
+    );
+  }
+
+  async checkCanisterExists(canisterId: string | number): Promise<CanisterCheckResponse> {
+    return await this.request<CanisterCheckResponse>(
+      `/api/ivf/canisters/${encodeURIComponent(canisterId)}/check`,
       { method: 'GET' }
     );
   }

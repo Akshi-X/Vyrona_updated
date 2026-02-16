@@ -942,14 +942,14 @@ export default function Dashboard({ }: DashboardProps) {
 
                       {/* Top Deviation Driver */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
-                        <div className="flex flex-col items-start mb-2 ml-3">
+                        <div className="flex flex-col items-start mb-2 ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
                             Top Deviation Driver
                           </div>
-                          <div className="font-semibold text-black text-[28px] mt-1">
+                          <div className="font-semibold text-black text-[28px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfTopDeviationDriverName || undefined}>
                             {loadingIvfTopDeviationDriver
                               ? '--'
                               : ivfTopDeviationDriverError

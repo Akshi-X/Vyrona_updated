@@ -352,6 +352,14 @@ class ShipmentService extends BaseApiService {
   }> {
     return this.get('/api/ivf/control_tower/active_canisters');
   }
+
+  /**
+   * Get latest IVF storage data
+   * GET /api/ivf/storage
+   */
+  async getIVFStorage(): Promise<any> {
+    return this.get('/api/ivf/storage');
+  }
 }
 
 export interface ShipmentLegDetail {

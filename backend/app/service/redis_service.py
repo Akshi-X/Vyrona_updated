@@ -29,6 +29,27 @@ def get_redis() -> redis.Redis:
                 "socket_connect_timeout": settings.REDIS_SOCKET_CONNECT_TIMEOUT,
                 "socket_timeout": settings.REDIS_SOCKET_TIMEOUT
             }
+            
+            # Add SSL/TLS support for Azure Redis Cache
+            if settings.REDIS_SSL:
+                import ssl
+                connection_params["ssl"] = True
+                # Configure SSL certificate requirements
+                if settings.REDIS_SSL_CERT_REQS:
+                    cert_reqs_map = {
+                        "required": ssl.CERT_REQUIRED,
+                        "optional": ssl.CERT_OPTIONAL,
+                        "none": ssl.CERT_NONE
+                    }
+                    connection_params["ssl_cert_reqs"] = cert_reqs_map.get(
+                        settings.REDIS_SSL_CERT_REQS.lower(), 
+                        ssl.CERT_REQUIRED
+                    )
+                else:
+                    # Default to CERT_REQUIRED for Azure Redis
+                    connection_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+                logger.info(f"SSL/TLS enabled for Redis connection")
+            
             # Add password if provided
             if settings.REDIS_PASSWORD:
                 connection_params["password"] = settings.REDIS_PASSWORD
@@ -36,12 +57,18 @@ def get_redis() -> redis.Redis:
             _redis_client = redis.Redis(**connection_params)
             # Test connection
             _redis_client.ping()
-            logger.info(f"Redis connection established successfully: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+            logger.info(f"Redis connection established successfully: {settings.REDIS_HOST}:{settings.REDIS_PORT} (SSL: {settings.REDIS_SSL})")
         except redis.exceptions.ConnectionError as e:
             logger.error(f"Failed to connect to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT}: {e}")
+            logger.error("Common Azure Redis issues:")
+            logger.error("1. Ensure REDIS_SSL=True for Azure Redis Cache")
+            logger.error("2. Use port 6380 (SSL) instead of 6379 (non-SSL) for Azure Redis")
+            logger.error("3. Check firewall rules allow your IP address")
+            logger.error("4. Verify REDIS_PASSWORD matches the access key from Azure portal")
             raise
         except redis.exceptions.AuthenticationError as e:
             logger.error(f"Redis authentication failed: {e}")
+            logger.error("Check that REDIS_PASSWORD matches your Azure Redis access key")
             raise
         except Exception as e:
             logger.error(f"Unexpected error connecting to Redis: {e}")
