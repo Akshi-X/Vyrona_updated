@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Path, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from typing import Optional
 import logging
+import time
 
 from app.config.database import get_db
 from app.config.config import settings
@@ -27,6 +30,55 @@ from app.utils.user_helpers import is_hospital_department
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
+ARC_IVF_STORAGE_SYNC_LOCK_KEY = 78430219
+
+
+def _is_deadlock_error(exc: Exception) -> bool:
+    """Detect PostgreSQL deadlock errors even when wrapped."""
+    current = exc
+    visited = 0
+    while current is not None and visited < 5:
+        if isinstance(current, OperationalError):
+            original = getattr(current, "orig", None)
+            pgcode = getattr(original, "pgcode", None)
+            if pgcode == "40P01":
+                return True
+        if "deadlock detected" in str(current).lower():
+            return True
+        current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
+        visited += 1
+    return False
+
+
+def _try_acquire_arc_sync_lock(db: Session):
+    """
+    Acquire a PostgreSQL advisory lock on a dedicated connection.
+    Returns the lock connection when acquired, otherwise None.
+    """
+    lock_conn = db.get_bind().connect()
+    lock_acquired = lock_conn.execute(
+        text("SELECT pg_try_advisory_lock(:lock_key)"),
+        {"lock_key": ARC_IVF_STORAGE_SYNC_LOCK_KEY}
+    ).scalar()
+    if lock_acquired:
+        return lock_conn
+    lock_conn.close()
+    return None
+
+
+def _release_arc_sync_lock(lock_conn) -> None:
+    """Release the advisory lock and close the dedicated connection."""
+    if not lock_conn:
+        return
+    try:
+        lock_conn.execute(
+            text("SELECT pg_advisory_unlock(:lock_key)"),
+            {"lock_key": ARC_IVF_STORAGE_SYNC_LOCK_KEY}
+        )
+    except Exception as unlock_err:
+        logger.warning(f"Failed to release ARC sync advisory lock cleanly: {unlock_err}")
+    finally:
+        lock_conn.close()
 
 
 def _get_authenticated_user(request: Request):
@@ -495,7 +547,19 @@ def get_ivf_storage(
         result = service.get_ivf_storage()
         
         # Save data to database if API call was successful
+        lock_conn = None
         if result.get("status") == "SUCCESS":
+            # Prevent concurrent ARC storage sync runs that can deadlock on tanks updates.
+            lock_conn = _try_acquire_arc_sync_lock(db)
+            if not lock_conn:
+                logger.warning("Skipping ARC IVF sync because another sync is already running")
+                return ARCIVFStorageResponse(
+                    storage_list=[],
+                    status="FAILURE",
+                    error_code=409,
+                    error_message="ARC IVF sync already in progress. Please retry shortly."
+                )
+
             storage_list = result.get("storageList", [])
             
             # IMPORTANT: Save ALL data from ARC API to database (for all branches)
@@ -536,81 +600,86 @@ def get_ivf_storage(
             failed_count = 0
             skipped_count = 0
             failed_items = []  # Track failed items with details
-            BATCH_SIZE = 100  # Commit every 100 items for better performance
+            max_deadlock_retries = 3
+            initial_retry_delay = 0.1
+            max_retry_delay = 1.0
             
             # Save each storage item to database
             for idx, storage_item in enumerate(storage_list, 1):
-                try:
-                    # Save to database (created_by will be None for now, can be enhanced later with auth)
-                    save_result = service.save_ivf_storage_to_db(
-                        db=db,
-                        api_data=storage_item,
-                        created_by=None
-                    )
-                    
-                    # Check if record was skipped (e.g., invalid cryolock position)
-                    if save_result.get("status") == "SKIPPED":
-                        skipped_count += 1
-                        # Log skipped records at debug level (not error)
-                        logger.debug(
-                            f"Skipped ARC IVF data item {idx}/{len(storage_list)} "
-                            f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
-                            f"Cryolock={storage_item.get('cryolockNumber')}): {save_result.get('message')}"
-                        )
-                    else:
-                        saved_count += 1
-                    
-                    # Log progress every 100 items or at milestones
-                    if idx % 100 == 0 or idx == len(storage_list):
-                        logger.info(f"Progress: {idx}/{len(storage_list)} items processed ({saved_count} saved, {skipped_count} skipped, {failed_count} failed)")
-                    elif idx % 10 == 0:
-                        # Less verbose logging every 10 items
-                        logger.debug(f"Processing item {idx}/{len(storage_list)}")
-                        
-                except Exception as save_error:
-                    failed_count += 1
-                    error_type = type(save_error).__name__
-                    error_message = str(save_error)
-                    
-                    # Track failed item details
-                    failed_item = {
-                        "index": idx,
-                        "hisNumber": storage_item.get('hisNumber'),
-                        "siteName": storage_item.get('siteName'),
-                        "cryolockNumber": storage_item.get('cryolockNumber'),
-                        "canisterNumber": storage_item.get('canisterNumber'),
-                        "tankID": storage_item.get('tankID'),
-                        "caneID": storage_item.get('caneID'),
-                        "error_type": error_type,
-                        "error_message": error_message
-                    }
-                    failed_items.append(failed_item)
-                    
-                    # Log the error but don't fail the API response
-                    logger.error(
-                        f"Failed to save ARC IVF data item {idx}/{len(storage_list)} "
-                        f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
-                        f"Cryolock={storage_item.get('cryolockNumber')}): "
-                        f"[{error_type}] {error_message}",
-                        exc_info=True
-                    )
-                
-                # Batch commit every BATCH_SIZE items for better performance
-                if idx % BATCH_SIZE == 0:
+                item_retries = 0
+                retry_delay = initial_retry_delay
+                item_saved = False
+                while item_retries <= max_deadlock_retries and not item_saved:
                     try:
+                        # Save to database (created_by will be None for now, can be enhanced later with auth)
+                        save_result = service.save_ivf_storage_to_db(
+                            db=db,
+                            api_data=storage_item,
+                            created_by=None,
+                            rollback_on_error=False
+                        )
                         db.commit()
-                        logger.debug(f"Committed batch at item {idx}")
-                    except Exception as commit_error:
+                        item_saved = True
+
+                        # Check if record was skipped (e.g., invalid cryolock position)
+                        if save_result.get("status") == "SKIPPED":
+                            skipped_count += 1
+                            # Log skipped records at debug level (not error)
+                            logger.debug(
+                                f"Skipped ARC IVF data item {idx}/{len(storage_list)} "
+                                f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                                f"Cryolock={storage_item.get('cryolockNumber')}): {save_result.get('message')}"
+                            )
+                        else:
+                            saved_count += 1
+
+                        # Log progress every 100 items or at milestones
+                        if idx % 100 == 0 or idx == len(storage_list):
+                            logger.info(f"Progress: {idx}/{len(storage_list)} items processed ({saved_count} saved, {skipped_count} skipped, {failed_count} failed)")
+                        elif idx % 10 == 0:
+                            # Less verbose logging every 10 items
+                            logger.debug(f"Processing item {idx}/{len(storage_list)}")
+                    except Exception as save_error:
                         db.rollback()
-                        logger.error(f"Error committing batch at item {idx}: {str(commit_error)}")
-            
-            # Final commit for remaining items
-            try:
-                db.commit()
-                logger.info(f"Final commit completed")
-            except Exception as commit_error:
-                db.rollback()
-                logger.error(f"Error in final commit: {str(commit_error)}")
+                        if _is_deadlock_error(save_error) and item_retries < max_deadlock_retries:
+                            item_retries += 1
+                            logger.warning(
+                                f"Deadlock while saving ARC IVF item {idx}/{len(storage_list)} "
+                                f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                                f"Cryolock={storage_item.get('cryolockNumber')}). "
+                                f"Retrying {item_retries}/{max_deadlock_retries} after {retry_delay:.2f}s"
+                            )
+                            time.sleep(retry_delay)
+                            retry_delay = min(retry_delay * 2, max_retry_delay)
+                            continue
+
+                        failed_count += 1
+                        error_type = type(save_error).__name__
+                        error_message = str(save_error)
+
+                        # Track failed item details
+                        failed_item = {
+                            "index": idx,
+                            "hisNumber": storage_item.get('hisNumber'),
+                            "siteName": storage_item.get('siteName'),
+                            "cryolockNumber": storage_item.get('cryolockNumber'),
+                            "canisterNumber": storage_item.get('canisterNumber'),
+                            "tankID": storage_item.get('tankID'),
+                            "caneID": storage_item.get('caneID'),
+                            "error_type": error_type,
+                            "error_message": error_message
+                        }
+                        failed_items.append(failed_item)
+
+                        # Log the error but don't fail the API response
+                        logger.error(
+                            f"Failed to save ARC IVF data item {idx}/{len(storage_list)} "
+                            f"(HIS={storage_item.get('hisNumber')}, Site={storage_item.get('siteName')}, "
+                            f"Cryolock={storage_item.get('cryolockNumber')}): "
+                            f"[{error_type}] {error_message}",
+                            exc_info=True
+                        )
+                        break
             
             logger.info(f"Database save summary: {saved_count} saved, {skipped_count} skipped, {failed_count} failed out of {len(storage_list)} total items")
             
@@ -680,6 +749,8 @@ def get_ivf_storage(
             error_code=500,
             error_message=f"Internal server error: {str(e)}"
         )
+    finally:
+        _release_arc_sync_lock(locals().get("lock_conn"))
 
 
 @router.get("/branches", response_model=BranchListResponse)
