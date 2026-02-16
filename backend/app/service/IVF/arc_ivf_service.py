@@ -93,6 +93,13 @@ class ARCIVFService:
             )
         else:
             self._http_client = None
+
+    def _create_http_client(self):
+        """Create an HTTP client with ARC API-friendly timeout/connection settings."""
+        return httpx.Client(
+            timeout=httpx.Timeout(60.0, connect=20.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
     
     def get_ivf_storage(self) -> Dict[str, Any]:
         """
@@ -126,10 +133,7 @@ class ARCIVFService:
         
         if not self._http_client:
             # Increased timeout: 60 seconds total, 20 seconds for connection
-            self._http_client = httpx.Client(
-                timeout=httpx.Timeout(60.0, connect=20.0),
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-            )
+            self._http_client = self._create_http_client()
         
         try:
             # Build API URL with TokenId query parameter
@@ -139,42 +143,77 @@ class ARCIVFService:
             }
             
             logger.info(f"Calling ARC IVF API: {url} with TokenId")
-            
-            # Make GET request
-            response = self._http_client.get(url, params=params)
-            
-            # Check response status
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check if API returned success or failure
-                status = data.get("status", "").upper()
-                error_code = data.get("errorCode")
-                storage_list = data.get("storageList", [])
-                
-                if status == "SUCCESS":
-                    logger.info(f"ARC IVF API call successful. Retrieved {len(storage_list)} storage items")
-                    return {
-                        "storageList": storage_list,
-                        "status": "SUCCESS",
-                        "errorCode": error_code
-                    }
-                else:
-                    # API returned failure status
-                    logger.warning(f"ARC IVF API returned failure status: {status}, errorCode: {error_code}")
+            max_retries = 3
+            initial_delay = 0.5
+            transient_http_statuses = {429, 500, 502, 503, 504}
+
+            for attempt in range(max_retries + 1):
+                try:
+                    # Ask server to close connection after response; reduces stale keep-alive failures.
+                    response = self._http_client.get(
+                        url,
+                        params=params,
+                        headers={"Connection": "close"}
+                    )
+
+                    # Retry transient upstream errors.
+                    if response.status_code in transient_http_statuses and attempt < max_retries:
+                        delay = initial_delay * (2 ** attempt)
+                        logger.warning(
+                            f"ARC IVF API transient HTTP {response.status_code} on attempt {attempt + 1}/{max_retries + 1}. "
+                            f"Retrying after {delay:.2f}s."
+                        )
+                        time.sleep(delay)
+                        continue
+
+                    # Check response status
+                    if response.status_code == 200:
+                        data = response.json()
+
+                        # Check if API returned success or failure
+                        status = data.get("status", "").upper()
+                        error_code = data.get("errorCode")
+                        storage_list = data.get("storageList", [])
+
+                        if status == "SUCCESS":
+                            logger.info(f"ARC IVF API call successful. Retrieved {len(storage_list)} storage items")
+                            return {
+                                "storageList": storage_list,
+                                "status": "SUCCESS",
+                                "errorCode": error_code
+                            }
+                        else:
+                            # API returned failure status
+                            logger.warning(f"ARC IVF API returned failure status: {status}, errorCode: {error_code}")
+                            return {
+                                "storageList": [],
+                                "status": "FAILURE",
+                                "errorCode": error_code or 412
+                            }
+
+                    # Non-transient HTTP error
+                    logger.error(f"ARC IVF API returned HTTP {response.status_code}: {response.text}")
                     return {
                         "storageList": [],
                         "status": "FAILURE",
-                        "errorCode": error_code or 412
+                        "errorCode": response.status_code
                     }
-            else:
-                # HTTP error
-                logger.error(f"ARC IVF API returned HTTP {response.status_code}: {response.text}")
-                return {
-                    "storageList": [],
-                    "status": "FAILURE",
-                    "errorCode": response.status_code
-                }
+                except (httpx.ConnectTimeout, httpx.TimeoutException, httpx.RequestError) as request_err:
+                    # Retry transport and timeout errors (including incomplete chunked read) with backoff.
+                    if attempt < max_retries:
+                        delay = initial_delay * (2 ** attempt)
+                        logger.warning(
+                            f"ARC IVF API transient request failure on attempt {attempt + 1}/{max_retries + 1}: {request_err}. "
+                            f"Retrying after {delay:.2f}s."
+                        )
+                        try:
+                            self._http_client.close()
+                        except Exception:
+                            pass
+                        self._http_client = self._create_http_client()
+                        time.sleep(delay)
+                        continue
+                    raise
         
         except httpx.ConnectTimeout as e:
             # Handle connection timeout specifically (more specific than TimeoutException)
