@@ -723,7 +723,7 @@ const ControlTower = () => {
                   {isIvfUser ? 'Active Canisters' : 'Active Routes'}
                 </h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">{isIvfUser ? 'Canisters Number' : 'Routes ID'}</div>
+                  <div className="text-left">{isIvfUser ? 'Canisters #' : 'Routes ID'}</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>

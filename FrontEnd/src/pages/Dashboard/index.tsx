@@ -636,6 +636,7 @@ export default function Dashboard({ }: DashboardProps) {
       return {
         id: task.id.toString(),
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name,
         description: task.description || '',
         assigneeBy: task.created_by 
@@ -652,6 +653,7 @@ export default function Dashboard({ }: DashboardProps) {
       return {
         id: task.id?.toString() || 'unknown',
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name || 'Unknown Task',
         description: task.description || '',
         assigneeBy: 'Unknown',
@@ -949,7 +951,7 @@ export default function Dashboard({ }: DashboardProps) {
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
                             Top Deviation Driver
                           </div>
-                          <div className="font-semibold text-black text-[28px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfTopDeviationDriverName || undefined}>
+                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfTopDeviationDriverName || undefined}>
                             {loadingIvfTopDeviationDriver
                               ? '--'
                               : ivfTopDeviationDriverError
