@@ -48,6 +48,7 @@ from ..exceptions import TokenExpiredException
 from ..models.user_model import User
 from ..schemas.user_schema import UserRegister
 from ..auth.auth import verify_token
+from ..utils.user_helpers import get_hospital_by_email_domain
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,18 @@ def validate_registration_request(request: UserRegister, db: Session) -> UserReg
     if existing_user:
         raise EmailAlreadyExistsException(email=request.email)
     
+    # Validation 3: Apply DB-driven domain classification defaults
+    hospital = get_hospital_by_email_domain(request.email, db)
+
+    if hospital:
+        # Keep request aligned with domain-resolved hospital when not explicitly set.
+        if not request.hospital_name:
+            request.hospital_name = hospital.hospital_name
+    else:
+        # Pharma default department.
+        if not request.department:
+            request.department = "CGT"
+
     return request
 
 

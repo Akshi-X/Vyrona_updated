@@ -121,13 +121,21 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching IVF control tower map locations: {str(e)}")
     
-    def get_active_tanks(self, branch_name: Optional[str] = None, status: Optional[CanisterStatus] = None) -> Dict[str, Any]:
+    def get_active_tanks(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+        branch_name: Optional[str] = None,
+        status: Optional[CanisterStatus] = None
+    ) -> Dict[str, Any]:
         """
         Get active tanks grouped by branch for the current logged-in user's branch.
         
         Args:
-            branch_name: Optional branch name to filter by. If provided, only returns tanks for that branch.
-                        If None, returns tanks for all branches (Manager/Admin roles).
+            hospital_id: Optional hospital ID to scope results. If provided, only returns tanks
+                         for branches under that hospital.
+            branch_id: Optional branch ID to filter by. If provided, only returns tanks for that branch.
+            branch_name: Optional branch name filter (additional compatibility filter).
             status: Optional tank status to filter by (safe, risk, critical). If provided, only returns tanks with that status.
         
         Returns:
@@ -153,8 +161,16 @@ class IVFService:
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .filter(Tank.is_active == True)
             )
+
+            # Scope by hospital when provided
+            if hospital_id is not None:
+                query = query.filter(HospitalBranch.hospital_id == hospital_id)
+
+            # Scope by branch when provided
+            if branch_id is not None:
+                query = query.filter(Tank.branch_id == branch_id)
             
-            # Apply branch name filter if provided
+            # Apply branch name filter if provided (backward-compatible)
             if branch_name is not None:
                 query = query.filter(HospitalBranch.branch_name == branch_name)
             
