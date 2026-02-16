@@ -361,7 +361,8 @@ class ARCIVFService:
         self,
         db: Session,
         api_data: Dict[str, Any],
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
+        rollback_on_error: bool = True
     ) -> Dict[str, Any]:
         """
         Save ARC IVF storage data to database using simplified patient_crylock_info structure.
@@ -674,7 +675,8 @@ class ARCIVFService:
             }
             
         except Exception as e:
-            db.rollback()
+            if rollback_on_error:
+                db.rollback()
             # Log detailed error information
             error_details = {
                 "error": str(e),
@@ -697,7 +699,7 @@ class ARCIVFService:
                 f"HIS Number: {api_data.get('hisNumber')}, "
                 f"Site: {api_data.get('siteName')}, "
                 f"Cryolock: {api_data.get('cryolockNumber')}"
-            )
+            ) from e
     
     def __del__(self):
         """Cleanup HTTP client on deletion"""
