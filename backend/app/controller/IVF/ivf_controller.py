@@ -8,6 +8,7 @@ from app.config.config import settings
 from app.service.IVF.ivf_service import IVFService
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.hospital_model import Hospital
 from app.schemas.IVF.ivf_schema import (
     ActiveCanistersResponse,
     BranchListResponse,
@@ -26,6 +27,56 @@ from app.utils.user_helpers import is_hospital_department
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ivf", tags=["IVF"])
+
+
+def _get_authenticated_user(request: Request):
+    """Return authenticated user from request state or raise 401."""
+    if not hasattr(request.state, "current_user"):
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    return request.state.current_user
+
+
+def _ensure_ivf_user(request: Request, *, arc_only: bool = False):
+    """Validate IVF user access and return authenticated user."""
+    user = _get_authenticated_user(request)
+    if not user.department or not is_hospital_department(user.department):
+        detail = (
+            "Access denied: This endpoint is for ARC IVF users only"
+            if arc_only
+            else "Access denied: This endpoint is for IVF users only"
+        )
+        raise HTTPException(status_code=403, detail=detail)
+    return user
+
+
+def _resolve_hospital_id(request: Request, db: Session, user) -> int:
+    """Resolve hospital_id from request state, user profile, or user's branch."""
+    if hasattr(request.state, "hospital_id") and request.state.hospital_id:
+        return request.state.hospital_id
+    if user.hospital_id:
+        return user.hospital_id
+    if user.branch_id:
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_id == user.branch_id
+        ).first()
+        if branch:
+            return branch.hospital_id
+
+    raise HTTPException(
+        status_code=400,
+        detail="Unable to determine hospital. User must be associated with a hospital."
+    )
+
+
+def _ensure_arc_hospital(db: Session, hospital_id: int) -> None:
+    """Ensure hospital belongs to ARC group for ARC-specific endpoints."""
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    hospital_name = (hospital.hospital_name or "").strip() if hospital else ""
+    if not hospital_name or "arc" not in hospital_name.lower():
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This endpoint is only accessible by ARC users"
+        )
 
 
 @router.get("/control_tower", response_model=IVFControlTowerResponse)
@@ -132,36 +183,80 @@ def get_active_canisters(
     }
     """
     try:
+        user = _ensure_ivf_user(request)
+
+        # Normalize optional branch filter once
+        normalized_branch_name = branch_name.strip() if branch_name else None
+
+        # Resolve hospital scope (always required to prevent cross-hospital data access)
+        hospital_id = _resolve_hospital_id(request, db, user)
+        resolved_user_branch = None
+        if user.branch_id:
+            resolved_user_branch = db.query(HospitalBranch).filter(
+                HospitalBranch.branch_id == user.branch_id
+            ).first()
+
         # Get branch filter info for IVF department users
         user_branch_id, role = get_branch_filter_info(request)
-        
-        # Get user's branch name if User role
-        user_branch_name = None
-        if user_branch_id is not None:
-            user_branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user_branch_id).first()
-            if user_branch:
-                user_branch_name = user_branch.branch_name
-        
-        # Determine filter branch_name based on role and provided filter
-        filter_branch_name = None
-        if user_branch_id is not None and branch_name is None:
-            # User role - use their assigned branch
-            filter_branch_name = user_branch_name
-        elif branch_name is not None:
-            # Explicit filter provided
-            if role == "User" and user_branch_name:
-                # User role: verify the provided branch_name matches their branch
-                if branch_name != user_branch_name:
+
+        if role is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: This endpoint is for IVF users only"
+            )
+
+        filter_branch_id = None
+
+        if role == "User":
+            # User role must always be restricted to own branch
+            if user_branch_id is None:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: User account is not associated with any branch"
+                )
+            filter_branch_id = user_branch_id
+
+            # If branch_name is explicitly provided by user role, verify it matches their own branch
+            if normalized_branch_name is not None:
+                # Reuse previously fetched branch when possible to avoid an extra query.
+                if (
+                    resolved_user_branch is None
+                    or resolved_user_branch.branch_id != user_branch_id
+                    or resolved_user_branch.hospital_id != hospital_id
+                ):
+                    resolved_user_branch = db.query(HospitalBranch).filter(
+                        HospitalBranch.branch_id == user_branch_id,
+                        HospitalBranch.hospital_id == hospital_id
+                    ).first()
+                if not resolved_user_branch:
                     raise HTTPException(
                         status_code=403,
-                        detail=f"Access denied: You can only view tanks from your assigned branch ({user_branch_name})"
+                        detail="Access denied: Assigned branch not found in your hospital"
                     )
-            # Manager/Admin can filter by any branch, or User's branch matches
-            filter_branch_name = branch_name
-        # else: No filter - return all branches (Manager/Admin only)
-        
+                if normalized_branch_name.lower() != (resolved_user_branch.branch_name or "").strip().lower():
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Access denied: You can only view tanks from your assigned branch ({resolved_user_branch.branch_name})"
+                    )
+        elif normalized_branch_name is not None:
+            # Manager/Admin can filter by branch, but only within their hospital
+            selected_branch = db.query(HospitalBranch).filter(
+                HospitalBranch.branch_name == normalized_branch_name,
+                HospitalBranch.hospital_id == hospital_id
+            ).first()
+            if not selected_branch:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Branch '{normalized_branch_name}' not found in your hospital"
+                )
+            filter_branch_id = selected_branch.branch_id
+
         service = IVFService(db)
-        tanks_data = service.get_active_tanks(branch_name=filter_branch_name, status=status)
+        tanks_data = service.get_active_tanks(
+            hospital_id=hospital_id,
+            branch_id=filter_branch_id,
+            status=status
+        )
         return ActiveCanistersResponse(**tanks_data)
     except HTTPException:
         raise
@@ -391,15 +486,9 @@ def get_ivf_storage(
     ```
     """
     try:
-        # Get branch filter info for IVF department users
-        branch_id, role = get_branch_filter_info(request)
-        
-        # Get branch name if branch filtering is needed
-        branch_name = None
-        if branch_id is not None:
-            branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == branch_id).first()
-            if branch:
-                branch_name = branch.branch_name
+        user = _ensure_ivf_user(request, arc_only=True)
+        hospital_id = _resolve_hospital_id(request, db, user)
+        _ensure_arc_hospital(db, hospital_id)
         
         service = ARCIVFService()
         # Fetch data from ARC IVF API (TokenId is automatically read from .env)
@@ -580,6 +669,8 @@ def get_ivf_storage(
         
         # Return all ARC data in response (no filtering)
         return ARCIVFStorageResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in get_ivf_storage: {str(e)}", exc_info=True)
         # Return failure response format on exception
@@ -622,39 +713,8 @@ def get_branches(
     }
     """
     try:
-        # Get current user from request state (injected by middleware)
-        if not hasattr(request.state, "current_user"):
-            raise HTTPException(status_code=401, detail="User not authenticated")
-        
-        user = request.state.current_user
-        
-        # Verify user is from IVF department
-        if not user.department or not is_hospital_department(user.department):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: This endpoint is for IVF users only"
-            )
-        
-        # Get hospital_id from user or request state
-        hospital_id = None
-        if hasattr(request.state, "hospital_id") and request.state.hospital_id:
-            hospital_id = request.state.hospital_id
-        elif user.hospital_id:
-            hospital_id = user.hospital_id
-        else:
-            # Fallback: get hospital_id from user's branch
-            if user.branch_id:
-                branch = db.query(HospitalBranch).filter(
-                    HospitalBranch.branch_id == user.branch_id
-                ).first()
-                if branch:
-                    hospital_id = branch.hospital_id
-        
-        if not hospital_id:
-            raise HTTPException(
-                status_code=400,
-                detail="Unable to determine hospital. User must be associated with a hospital."
-            )
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
         
         # Use service to get branches
         service = IVFService(db)

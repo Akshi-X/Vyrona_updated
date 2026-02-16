@@ -1,7 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, Literal, List
 from datetime import datetime
-from ..utils.user_helpers import is_hospital_email, get_hospital_name_from_email
 
 class UserRegister(BaseModel):
     first_name: str
@@ -40,27 +39,12 @@ class UserRegister(BaseModel):
     
     @model_validator(mode='after')
     def validate_fields(self):
-        """Validate required fields based on email domain and department."""
-        email_lower = self.email.lower().strip()
-        is_hospital = is_hospital_email(email_lower)
-        
-        if is_hospital:
-            # Hospital user - department, branch_name required
-            if not self.department:
-                raise ValueError("department is required for hospital users")
-            if not self.branch_name:
-                raise ValueError("branch_name is required for hospital users")
-            # Auto-detect hospital name from email if not provided
-            if not self.hospital_name:
-                self.hospital_name = get_hospital_name_from_email(email_lower)
-        else:
-            # Pharma user - company_name required
-            if not self.company_name:
-                raise ValueError("company_name is required for pharma users")
-            # Set department to CGT if not provided (default for pharma)
-            if not self.department:
-                self.department = "CGT"
-        
+        """
+        Keep schema validation lightweight.
+
+        Domain-driven pharma vs hospital validation is done in
+        validate_registration_request() where DB access is available.
+        """
         return self
 
 class UserResponse(BaseModel):

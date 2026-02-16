@@ -40,8 +40,7 @@ from app.models.pharma_model import Pharma
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.utils.user_helpers import (
-    is_hospital_email,
-    get_hospital_name_from_email,
+    get_hospital_by_email_domain,
     is_hospital_department
 )
 from app.utils.utils import normalize_role_to_title_case
@@ -127,9 +126,9 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     """
     Register a new user with proper transaction handling (supports both pharma and hospital).
     
-    Uses email domain detection:
-    - @zucisystems.com or @mygrape.org = hospital (department: IVF, Oncology, etc.)
-    - Other domains = pharma (department: CGT, etc.)
+    Uses DB-driven email domain detection from hospitals.hospital_head_email:
+    - Matching domain = hospital flow (department: IVF, Oncology, etc.)
+    - Non-matching domain = pharma flow (department: CGT, etc.)
     
     If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
@@ -140,9 +139,10 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Generate custom user ID (USR-XXXXXX format) - same format for both types
     user_id = utils.generate_user_id()
     
-    # Detect user type from email domain
+    # Detect user type from DB-driven email-domain mapping
     email_lower = request.email.lower().strip()
-    is_hospital = is_hospital_email(email_lower)
+    domain_hospital = get_hospital_by_email_domain(email_lower, db)
+    is_hospital = domain_hospital is not None
     
     # Initialize variables
     pharma_id = None
@@ -156,6 +156,14 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # PHARMA REGISTRATION LOGIC (EXISTING - NO CHANGES)
     # ============================================
     if not is_hospital:
+        if not request.company_name:
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Company name required",
+                custom_message="company_name is required for pharma users",
+                status_code=400
+            )
+
         # Check if pharma exists
         existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
         
@@ -198,29 +206,31 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # HOSPITAL REGISTRATION LOGIC (NEW)
     # ============================================
     else:  # is_hospital == True
-        # Auto-detect hospital name from email if not provided
-        hospital_name = request.hospital_name or get_hospital_name_from_email(email_lower)
-        
-        if not hospital_name:
+        hospital = domain_hospital
+        hospital_name = hospital.hospital_name
+
+        if not department:
             raise DatabaseQueryException(
                 operation="user registration",
-                reason="Hospital name required",
-                custom_message="Hospital name is required for hospital users",
+                reason="Department required",
+                custom_message="department is required for hospital users",
                 status_code=400
             )
-        
-        # Validate hospital exists
-        hospital = db.query(Hospital).filter(
-            Hospital.hospital_name == hospital_name
-        ).first()
-        
-        if not hospital:
-            logger.error(f"Hospital '{hospital_name}' not found")
+
+        if not request.branch_name:
             raise DatabaseQueryException(
                 operation="user registration",
-                reason="Hospital not found",
-                custom_message=f"Hospital '{hospital_name}' not found",
-                status_code=404
+                reason="Branch required",
+                custom_message="branch_name is required for hospital users",
+                status_code=400
+            )
+
+        if request.hospital_name and request.hospital_name.strip().lower() != hospital_name.strip().lower():
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Hospital mismatch",
+                custom_message="hospital_name does not match email domain",
+                status_code=400
             )
         
         hospital_id = hospital.hospital_id
