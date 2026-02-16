@@ -4,10 +4,13 @@ Handles integration with ARC IVF Storage API
 """
 import logging
 import os
+import time
 from typing import Dict, Optional, Any
 from datetime import datetime, date, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError
+from psycopg2.errors import DeadlockDetected
 from app.config.config import settings
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
@@ -23,6 +26,54 @@ try:
 except ImportError:
     HTTPX_AVAILABLE = False
     logger.warning("httpx not available. ARC IVF API calls will fail.")
+
+
+def retry_on_deadlock(max_retries=3, initial_delay=0.1, max_delay=2.0, backoff_factor=2.0):
+    """
+    Decorator to retry database operations on deadlock errors.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds before first retry
+        max_delay: Maximum delay in seconds between retries
+        backoff_factor: Multiplier for exponential backoff
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            delay = initial_delay
+            
+            while retries <= max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except OperationalError as e:
+                    # Check if it's a deadlock error
+                    if isinstance(e.orig, DeadlockDetected):
+                        if retries < max_retries:
+                            retries += 1
+                            logger.warning(
+                                f"Deadlock detected in {func.__name__}. "
+                                f"Retrying ({retries}/{max_retries}) after {delay:.2f}s delay..."
+                            )
+                            time.sleep(delay)
+                            delay = min(delay * backoff_factor, max_delay)
+                            continue
+                        else:
+                            logger.error(
+                                f"Deadlock detected in {func.__name__}. "
+                                f"Max retries ({max_retries}) exceeded."
+                            )
+                    # Re-raise if not a deadlock or max retries exceeded
+                    raise
+                except Exception as e:
+                    # Re-raise non-deadlock exceptions immediately
+                    raise
+            
+            # This should never be reached, but just in case
+            raise Exception(f"Failed after {max_retries} retries")
+        
+        return wrapper
+    return decorator
 
 
 class ARCIVFService:
@@ -438,32 +489,69 @@ class ARCIVFService:
             # Each branch can have T1, T2, etc. (e.g., Branch 1 (Tambaram) has T1, T2; Branch 5 has T1, T2, T3)
             tank = None
             if tank_code_to_use and branch:
-                # Find tank by tank_code and branch_id (unique constraint ensures one tank per code per branch)
-                tank = db.query(Tank).filter(
-                    Tank.tank_code == tank_code_to_use,
-                    Tank.branch_id == branch.branch_id
-                ).first()
+                # Use retry logic for tank operations to handle deadlocks
+                retries = 0
+                max_retries = 3
+                initial_delay = 0.1
+                max_delay = 1.0
+                backoff_factor = 2.0
+                delay = initial_delay
                 
-                if not tank:
-                    # Create new tank with tank_code (unique per branch)
-                    tank = Tank(
-                        branch_id=branch.branch_id,
-                        tank_code=tank_code_to_use,  # e.g., "T10", "T1", "T2"
-                        tank_id_arc=tank_id_str,  # Store ARC API tankID for reference
-                        is_active=True,
-                        created_by=created_by
-                    )
-                    db.add(tank)
-                    db.flush()
-                    logger.info(f"Created new tank: {tank.tank_id} - tank_code: {tank_code_to_use} (branch: {branch.branch_name}, tankID: {tank_id_str})")
-                else:
-                    # Update tank_id_arc if it's different or missing
-                    if tank_id_str and tank.tank_id_arc != tank_id_str:
-                        tank.tank_id_arc = tank_id_str
-                        tank.updated_by = created_by
-                        tank.updated_at = datetime.now(timezone.utc)
-                        db.flush()
-                        logger.debug(f"Updated tank {tank.tank_id} tank_id_arc to {tank_id_str}")
+                while retries <= max_retries:
+                    try:
+                        # Query with FOR UPDATE and consistent ordering to prevent deadlocks
+                        # Ordering by tank_id ensures all processes lock rows in the same order
+                        # This prevents circular wait conditions that cause deadlocks
+                        tank = db.query(Tank).filter(
+                            Tank.tank_code == tank_code_to_use,
+                            Tank.branch_id == branch.branch_id
+                        ).order_by(Tank.tank_id).with_for_update(nowait=False).first()
+                        
+                        if not tank:
+                            # Create new tank with tank_code (unique per branch)
+                            # Unique constraint will handle concurrent inserts gracefully
+                            tank = Tank(
+                                branch_id=branch.branch_id,
+                                tank_code=tank_code_to_use,  # e.g., "T10", "T1", "T2"
+                                tank_id_arc=tank_id_str,  # Store ARC API tankID for reference
+                                is_active=True,
+                                created_by=created_by
+                            )
+                            db.add(tank)
+                            db.flush()
+                            logger.info(f"Created new tank: {tank.tank_id} - tank_code: {tank_code_to_use} (branch: {branch.branch_name}, tankID: {tank_id_str})")
+                        else:
+                            # Update tank_id_arc if it's different or missing
+                            if tank_id_str and tank.tank_id_arc != tank_id_str:
+                                tank.tank_id_arc = tank_id_str
+                                tank.updated_by = created_by
+                                tank.updated_at = datetime.now(timezone.utc)
+                                db.flush()
+                                logger.debug(f"Updated tank {tank.tank_id} tank_id_arc to {tank_id_str}")
+                        
+                        break  # Success, exit retry loop
+                    except OperationalError as e:
+                        # Check if it's a deadlock error
+                        if isinstance(e.orig, DeadlockDetected):
+                            if retries < max_retries:
+                                retries += 1
+                                logger.warning(
+                                    f"Deadlock detected while updating tank (tank_code={tank_code_to_use}, branch_id={branch.branch_id}). "
+                                    f"Retrying ({retries}/{max_retries}) after {delay:.2f}s delay..."
+                                )
+                                db.rollback()  # Rollback the failed transaction
+                                time.sleep(delay)
+                                delay = min(delay * backoff_factor, max_delay)
+                                continue
+                            else:
+                                logger.error(
+                                    f"Deadlock detected while updating tank. Max retries ({max_retries}) exceeded."
+                                )
+                        # Re-raise if not a deadlock or max retries exceeded
+                        raise
+                    except Exception as e:
+                        # Re-raise non-deadlock exceptions immediately
+                        raise
             
             if not tank:
                 raise Exception(f"Cannot create patient_crylock_info without a tank. tank_code: {tank_code_to_use}, branch: {branch.branch_name if branch else 'N/A'}")
