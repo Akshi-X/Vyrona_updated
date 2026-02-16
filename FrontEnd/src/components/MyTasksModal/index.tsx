@@ -12,6 +12,7 @@ export interface MyTask {
   id: string;
   patientId: string;
   canisterNumber?: string;
+  tankCode?: string;
   assigneeId?: string; // user_id (stored for update calls)
   taskName: string;
   description: string;
@@ -556,7 +557,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         <thead className="bg-[#fdeeff]">
           <tr className="border-b border-[#eeeeee]">
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
-              {isIvfVariant ? 'Canister ID' : 'Patient ID'}
+               Tank Code
             </th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Task Name</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Description</th>
@@ -982,7 +983,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   <div className="font-mono truncate">
-                    {isIvfVariant ? (task.canisterNumber || 'N/A') : task.patientId}
+                    {task.tankCode || (isIvfVariant ? (task.canisterNumber || 'N/A') : task.patientId)}
                   </div>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
