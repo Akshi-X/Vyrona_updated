@@ -30,9 +30,9 @@ interface DataPoint {
  
  
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
-const TIME_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-const INTERVAL_MINUTES = 60; // 1-hour intervals
-const INTERVALS_COUNT = 6; // 6 intervals for 6 hours (0, 1, 2, 3, 4, 5 hours ago)
+const TIME_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+const INTERVAL_MINUTES = 10; // 10-minute intervals
+const INTERVALS_COUNT = 6; // 6 intervals for 1 hour (0, 10, 20, 30, 40, 50 minutes ago)
 
 // Helper function to parse timestamp string to Date
 const parseTimestamp = (timestamp: string): Date | null => {
@@ -72,7 +72,7 @@ const parseTimestamp = (timestamp: string): Date | null => {
   }
 };
 
-// Helper function to filter data points within the last 6 hours
+// Helper function to filter data points within the last 1 hour
 const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
   if (points.length === 0) return points;
   
@@ -85,8 +85,8 @@ const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
       }
       const pointTime = pointDate.getTime();
       const timeDiff = now - pointTime;
-      // Allow data within the last 6 hours, or data that's up to 10 minutes in the future (clock skew tolerance)
-      // Also allow data up to 12 hours old if it's the only data we have
+      // Allow data within the last 1 hour, or data that's up to 10 minutes in the future (clock skew tolerance)
+      // Also allow data up to 2 hours old if it's the only data we have
       const maxAge = points.length === 1 ? 2 * TIME_WINDOW_MS : TIME_WINDOW_MS;
       return timeDiff >= -10 * 60 * 1000 && timeDiff <= maxAge;
     } catch {
@@ -112,7 +112,7 @@ const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
   return filtered;
 };
 
-// Helper function to get interval index (0-5) for a timestamp within the 6-hour window
+// Helper function to get interval index (0-5) for a timestamp within the 1-hour window
 const getIntervalIndex = (timestamp: string): number => {
   try {
     const now = new Date().getTime();
@@ -122,7 +122,7 @@ const getIntervalIndex = (timestamp: string): number => {
     }
     const pointTime = pointDate.getTime();
     const minutesAgo = Math.floor((now - pointTime) / (60 * 1000));
-    // Return index 0-5, where 0 is most recent (0-1 hour ago) and 5 is oldest (5-6 hours ago)
+    // Return index 0-5, where 0 is most recent (0-10 min ago) and 5 is oldest (50-60 min ago)
     // Handle future timestamps by placing them in interval 0
     const intervalIndex = minutesAgo < 0 ? 0 : Math.floor(minutesAgo / INTERVAL_MINUTES);
     return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
@@ -131,14 +131,17 @@ const getIntervalIndex = (timestamp: string): number => {
   }
 };
 
-// Format timestamp to show hour (for 1-hour intervals)
+// Format timestamp to show time with 10-minute intervals
 const formatTimestampToInterval = (minutesAgo: number): string => {
   const now = new Date();
   const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
   const hours = intervalTime.getHours();
+  const minutes = intervalTime.getMinutes();
   const ampm = hours >= 12 ? 'pm' : 'am';
   const displayHours = hours % 12 || 12;
-  return `${displayHours}:00 ${ampm}`;
+  // Round minutes to nearest 10 (0, 10, 20, 30, 40, 50)
+  const roundedMinutes = Math.floor(minutes / 10) * 10;
+  return `${displayHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
 };
  
 interface IVFQualityTrackingChartProps {
@@ -421,7 +424,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
  
     connectWebSocket();
 
-    // Periodic cleanup to remove old data points (older than 6 hours)
+    // Periodic cleanup to remove old data points (older than 1 hour)
     const cleanupInterval = setInterval(() => {
       if (isMountedRef.current) {
         setDataPoints((prev) => {
@@ -444,7 +447,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [canisterNumber, token]);
  
   const chartData = useMemo(() => {
-    // Filter data points to only show last 6 hours
+    // Filter data points to only show last 1 hour
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
     const palette = {
@@ -453,7 +456,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       shock: '#BDBDBD',
     } as const;
 
-    // Generate 6 interval labels (from 5 hours ago to now, in 1-hour steps)
+    // Generate 6 interval labels (from 50 minutes ago to now, in 10-minute steps)
     const intervalLabels: string[] = [];
     for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
       const minutesAgo = i * INTERVAL_MINUTES;
@@ -566,7 +569,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [dataPoints]);
  
   const chartOptions = useMemo(() => {
-    // Filter data points to only show last 6 hours (same as chartData)
+    // Filter data points to only show last 1 hour (same as chartData)
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
     return {
