@@ -239,7 +239,9 @@ def create_feedback(
     # Send email notifications - always send to admin, conditionally to user
     try:
         # Get common MyGrape admin email
-        mygrape_admin_email = get_mygrape_admin_email()
+        mygrape_admin_email = get_mygrape_admin_email(db)
+        if not mygrape_admin_email:
+            raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
         
         send_feedback_new_ticket_email(
             ticket_id=feedback.ticket_id,
@@ -311,7 +313,9 @@ def add_comment(
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
         # Get common MyGrape admin email (cache this if possible, but for now keep it simple)
-        mygrape_admin_email = get_mygrape_admin_email()
+        mygrape_admin_email = get_mygrape_admin_email(db)
+        if not mygrape_admin_email:
+            raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
         
         # Prepare email data
         commented_by_name = f"{user.first_name} {user.last_name}"
@@ -331,7 +335,9 @@ def add_comment(
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
-            mygrape_admin_email = get_mygrape_admin_email()
+            mygrape_admin_email = get_mygrape_admin_email(db)
+            if not mygrape_admin_email:
+                raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
             send_feedback_new_comment_email(
                 ticket_id=feedback.ticket_id,
                 subject=feedback.subject,
@@ -394,7 +400,9 @@ def update_feedback_status(
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
         # Get common MyGrape admin email
-        mygrape_admin_email = get_mygrape_admin_email()
+        mygrape_admin_email = get_mygrape_admin_email(db)
+        if not mygrape_admin_email:
+            raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
         
         # Prepare email data
         updated_by_name = f"{user.first_name} {user.last_name}"
@@ -415,7 +423,9 @@ def update_feedback_status(
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
-            mygrape_admin_email = get_mygrape_admin_email()
+            mygrape_admin_email = get_mygrape_admin_email(db)
+            if not mygrape_admin_email:
+                raise FeedbackUserNotFoundException(user_id="Mygrape_admin")
             send_feedback_status_update_email(
                 ticket_id=feedback.ticket_id,
                 subject=feedback.subject,

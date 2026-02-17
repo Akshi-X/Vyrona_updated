@@ -3,7 +3,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 import logging
 
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import and_, case, desc, func, or_
 from sqlalchemy.orm import Session
 
 from ...constants.enums import CanisterStatus
@@ -668,7 +668,7 @@ class IVFService:
                       - Manager/Admin roles: No filtering (branch_id is None) - see all branches
             user_role: User's role ("User", "Manager", "Admin") to determine field visibility.
             branch_name: Optional branch/site name filter.
-            status: Optional shipment status filter (created, in_transit, delivered, cancelled, failed).
+            status: Optional tracking status filter (derived from cryolock flags and shipment status).
             cryolock_color: Optional cryolock color filter.
             goblet_color: Optional goblet color filter.
             offset: Number of records to skip (for lazy loading / infinite scroll).
@@ -687,13 +687,23 @@ class IVFService:
                 - date_of_vitrification: Date of Vitrification
                 - embryo_grading: Comma-separated embryo gradings (User role only)
                 - site_name: Branch name (Manager/Admin roles only)
-                - status: Embryo status (Manager/Admin roles only)
+                - status: Embryo tracking status (Manager/Admin roles only)
             - total: Total number of records
         """
         try:
             # Determine which fields to include based on role
             is_user_role = user_role and user_role.title() == "User"
             
+            # Status priority for embryo tracking:
+            # 1) in_transit flag -> "in transit"
+            # 2) embryo_transfer flag -> "internal"
+            # 3) fallback to latest shipment_status
+            tracking_status_expr = case(
+                (PatientCrylockInfo.in_transit == True, "in transit"),
+                (PatientCrylockInfo.embryo_transfer == True, "internal"),
+                else_=func.coalesce(IVFShipment.shipment_status, "")
+            ).label("tracking_status")
+
             # Optimized query with LEFT JOIN for shipment descriptions to avoid N+1 query
             # Use subquery to get latest shipment per patient crylock
             latest_shipments_subq = (
@@ -721,7 +731,8 @@ class IVFService:
                     PatientCrylockInfo.id,
                     HospitalBranch.branch_name,
                     IVFShipment.description.label('shipment_description'),
-                    IVFShipment.shipment_status.label('shipment_status')
+                    IVFShipment.shipment_status.label('shipment_status'),
+                    tracking_status_expr
                 )
                 .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
                 .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
@@ -753,8 +764,9 @@ class IVFService:
             # Apply optional status filter
             normalized_status = status.strip() if status else None
             if normalized_status:
+                normalized_status = normalized_status.replace("_", " ")
                 query = query.filter(
-                    func.lower(func.coalesce(IVFShipment.shipment_status, "")) == func.lower(normalized_status)
+                    func.lower(tracking_status_expr) == func.lower(normalized_status)
                 )
 
             # Apply optional cryolock color filter
@@ -770,9 +782,6 @@ class IVFService:
                 query = query.filter(
                     func.lower(func.coalesce(PatientCrylockInfo.goblet_color, "")) == func.lower(normalized_goblet_color)
                 )
-            
-            # Exclude cryolocks that have been moved to embryo transfer
-            query = query.filter(PatientCrylockInfo.embryo_transfer != True)
             
             # Count total before lazy-load slice.
             total_records = int(query.count() or 0)
@@ -790,7 +799,7 @@ class IVFService:
             for row in results:
                 # Get description from the joined query result
                 description = row.shipment_description if hasattr(row, 'shipment_description') else None
-                shipment_status = row.shipment_status if hasattr(row, 'shipment_status') else None
+                tracking_status = row.tracking_status if hasattr(row, 'tracking_status') else None
                 
                 tracking_data = {
                     "his_number": decrypt_sensitive_ivf_value(row.his_number) or "",
@@ -811,7 +820,7 @@ class IVFService:
                 else:
                     # Manager/Admin roles: Include site_name and shipment status.
                     tracking_data["site_name"] = row.branch_name or ""
-                    tracking_data["status"] = shipment_status or ""
+                    tracking_data["status"] = tracking_status or ""
                 
                 # Append the tracking data to the list
                 tracking_list.append(tracking_data)
