@@ -743,16 +743,35 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         UserListResponse with users from current user's company
     """
     try:
-        # Query all approved and active users FROM SAME PHARMA (multi-tenant filtering)
-        users = db.query(User).filter(
+        # Scope users based on tenant type:
+        # - Hospital users (IVF/Oncology): same hospital (+ same department when available)
+        # - Pharma users (CGT): same pharma
+        # This prevents cross-tenant leakage (e.g., MyGrape admin users in IVF mentions).
+        base_query = db.query(User).filter(
             User.approved_status == 'approved',
-            User.status == True,
-            User.pharma_id == current_user.pharma_id  # ✅ FILTER BY PHARMA
-        ).all()
-        
-        # Get company names from pharma table
-        pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
-        company_name = pharma.pharma_name if pharma else None
+            User.status == True
+        )
+
+        company_name = None
+        if current_user.hospital_id is not None:
+            users_query = base_query.filter(
+                User.hospital_id == current_user.hospital_id
+            )
+
+            if current_user.department:
+                users_query = users_query.filter(
+                    User.department.ilike(current_user.department)
+                )
+
+            users = users_query.all()
+        else:
+            users = base_query.filter(
+                User.pharma_id == current_user.pharma_id
+            ).all()
+
+            # Get company names from pharma table (pharma users only)
+            pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
+            company_name = pharma.pharma_name if pharma else None
         
         # Convert to UserListItem
         user_items = [
