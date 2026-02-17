@@ -247,8 +247,12 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             # Store subscription using tank_code (primary identifier)
                             manager.set_tank_subscription(connection_id, tank_id, tank_code_for_sub)
                             
-                            # Get last 12 IVF quality logs from Redis for this tank
-                            ivf_history = quality_service.get_tank_redis_history(tank_id, limit=12)
+                            # Get last 12 IVF telemetry records from DB for this tank+branch scope
+                            ivf_history = quality_service.get_tank_telemetry_history(
+                                tank_id=tank_id,
+                                branch_id=tank.branch_id,
+                                limit=12
+                            )
                             
                             # Get IVF geolocation records from database (using tank_id)
                             ivf_geolocation_history = quality_service.get_tank_geolocation_history(tank_id, limit=100)
