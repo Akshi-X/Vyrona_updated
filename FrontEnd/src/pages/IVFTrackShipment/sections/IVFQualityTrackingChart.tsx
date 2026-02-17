@@ -111,38 +111,6 @@ const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
   
   return filtered;
 };
-
-// Helper function to get interval index (0-5) for a timestamp within the 1-hour window
-const getIntervalIndex = (timestamp: string): number => {
-  try {
-    const now = new Date().getTime();
-    const pointDate = parseTimestamp(timestamp);
-    if (!pointDate) {
-      return 0;
-    }
-    const pointTime = pointDate.getTime();
-    const minutesAgo = Math.floor((now - pointTime) / (60 * 1000));
-    // Return index 0-5, where 0 is most recent (0-10 min ago) and 5 is oldest (50-60 min ago)
-    // Handle future timestamps by placing them in interval 0
-    const intervalIndex = minutesAgo < 0 ? 0 : Math.floor(minutesAgo / INTERVAL_MINUTES);
-    return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
-  } catch {
-    return 0;
-  }
-};
-
-// Format timestamp to show time with 10-minute intervals
-const formatTimestampToInterval = (minutesAgo: number): string => {
-  const now = new Date();
-  const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
-  const hours = intervalTime.getHours();
-  const minutes = intervalTime.getMinutes();
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  const displayHours = hours % 12 || 12;
-  // Round minutes to nearest 10 (0, 10, 20, 30, 40, 50)
-  const roundedMinutes = Math.floor(minutes / 10) * 10;
-  return `${displayHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
-};
  
 interface IVFQualityTrackingChartProps {
   canisterNumber?: string;
