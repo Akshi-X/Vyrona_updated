@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller, iot_controller
-from app.controller.IVF import ivf_controller, ivf_dashboard_controller
+from app.controller.IVF import (ivf_controller, ivf_dashboard_controller, ivf_quality_controller, quality_tracking_controller, critical_alert_controller, ln2_readings_controller)
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -134,6 +134,10 @@ async def startup_event():
     quality_service = QualityService(db)
     asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
     asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
+
+    # Step 3b: Start LN2 readings WebSocket listener (separate from quality)
+    from app.controller.IVF import ivf_quality_controller
+    asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
     
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
     logger.info("Starting World Bank LPI daily fetch scheduler...")
@@ -184,6 +188,10 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
+app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
+app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
+app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
+app.include_router(ln2_readings_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint

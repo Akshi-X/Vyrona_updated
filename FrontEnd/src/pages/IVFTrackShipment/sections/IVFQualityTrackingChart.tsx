@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ivfService } from '../../../services/ivfService';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -216,6 +217,34 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     isConnectingRef.current = false;
   };
  
+  // Fetch initial quality history via REST (shows data immediately in UI)
+  useEffect(() => {
+    if (!canisterNumber) return;
+    ivfService.getQualityHistory(canisterNumber).then((res) => {
+      if (!isMountedRef.current) return;
+      if (res?.history?.length) {
+        const points: DataPoint[] = res.history.map((h) => ({
+          timestamp: h.timestamp,
+          temp_internal: h.temp_internal,
+          temp_external: h.temp_external ?? null,
+          shock: h.shock,
+        }));
+        setDataPoints((prev) => {
+          const combined = [...points];
+          prev.forEach((p) => {
+            if (!combined.some((c) => c.timestamp === p.timestamp)) combined.push(p);
+          });
+          combined.sort((a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0));
+          return combined.slice(-MAX_DATA_POINTS);
+        });
+        setHasReceivedData(true);
+        if (res.history[res.history.length - 1]?.battery_percentage != null) {
+          setBatteryPercentage(res.history[res.history.length - 1].battery_percentage!);
+        }
+      }
+    }).catch(() => { /* ignore - WebSocket will provide data */ });
+  }, [canisterNumber]);
+
   // Connect to WebSocket
   useEffect(() => {
     isMountedRef.current = true;
@@ -325,18 +354,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 // Mark that we've received data
                 setHasReceivedData(true);
                 
-                // Add new data point
+                // Add new data point (dedupe by timestamp - REST may have loaded same data)
                 setDataPoints((prev) => {
-                  const newPoints = [
-                    ...prev,
-                    qualityData,
-                  ];
-
-                  // Keep only last MAX_DATA_POINTS
-                  if (newPoints.length > MAX_DATA_POINTS) {
-                    return newPoints.slice(-MAX_DATA_POINTS);
-                  }
-                  return newPoints;
+                  if (prev.some((p) => p.timestamp === qualityData.timestamp)) return prev;
+                  const newPoints = [...prev, qualityData];
+                  return newPoints.length > MAX_DATA_POINTS ? newPoints.slice(-MAX_DATA_POINTS) : newPoints;
                 });
               }
             }

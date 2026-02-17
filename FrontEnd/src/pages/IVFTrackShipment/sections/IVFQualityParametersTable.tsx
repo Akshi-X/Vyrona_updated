@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
+import { ivfService } from '../../../services/ivfService';
 import QualityLossModal from '../../../components/QualityLossModal';
 
 interface Threshold {
@@ -49,6 +50,33 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
   };
+
+  // Fetch initial latest via REST (shows in Quality Parameter table immediately)
+  useEffect(() => {
+    if (!canisterNumber) return;
+    ivfService.getQualityHistory(canisterNumber, 1).then((res) => {
+      if (!isMountedRef.current) return;
+      const last = res?.history?.[res.history.length - 1];
+      if (last) {
+        setLatest({
+          temp_internal: last.temp_internal,
+          temp_external: last.temp_external,
+          shock: last.shock,
+          thresholds: {
+            temp_internal: { min: null, max: null, unit: '°C' },
+            temp_external: { min: null, max: null, unit: '°C' },
+            shock: { min: null, max: null, unit: 'G' },
+          },
+          threshold_violations: {
+            temp_internal: false,
+            temp_external: false,
+            shock: false,
+          },
+        });
+        setHasReceivedData(true);
+      }
+    }).catch(() => { /* ignore */ });
+  }, [canisterNumber]);
 
   useEffect(() => {
     isMountedRef.current = true;
