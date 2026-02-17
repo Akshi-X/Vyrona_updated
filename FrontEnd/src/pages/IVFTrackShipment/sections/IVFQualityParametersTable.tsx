@@ -50,6 +50,20 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     return `${wsUrl}/api/ivf/quality/ws`;
   };
 
+  const getManagerBranchOverride = (): string | undefined => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      if (!role.includes('manager')) return undefined;
+      const fromUrl = new URLSearchParams(window.location.search).get('branch_id_override')
+        || new URLSearchParams(window.location.search).get('branch_id')
+        || undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return fromUrl || fromSession || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -58,7 +72,12 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     if (!authToken) return;
 
     try {
-      const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
+      const params = new URLSearchParams({ token: authToken });
+      const branchOverride = getManagerBranchOverride();
+      if (branchOverride) {
+        params.set('branch_id_override', branchOverride);
+      }
+      const ws = new WebSocket(`${getWebSocketUrl()}?${params.toString()}`);
 
       ws.onopen = () => {
         setIsConnected(true);

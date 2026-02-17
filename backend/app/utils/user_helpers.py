@@ -97,3 +97,12 @@ def is_hospital_department(department: str) -> bool:
     
     # Default: if department exists and not CGT, assume hospital
     return True
+
+
+def is_specific_department(department: str, expected_department: str) -> bool:
+    """
+    Check if user belongs to a specific department (case-insensitive exact match).
+    """
+    if not department or not expected_department:
+        return False
+    return department.strip().upper() == expected_department.strip().upper()
