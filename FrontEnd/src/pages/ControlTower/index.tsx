@@ -844,11 +844,11 @@ const ControlTower = () => {
                                     className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    Canister {canister.canisterId}
+                                    Container {canister.canisterId}
                                   </Link>
                                 ) : (
                                   <span className="text-[#6b1176] text-xs font-bold">
-                                    Canister {canister.canisterId}
+                                    Container {canister.canisterId}
                                   </span>
                                 )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (
@@ -864,7 +864,7 @@ const ControlTower = () => {
                         })
                       )}
                       {isIvfUser && (!filteredCanisters || filteredCanisters.length === 0) && !loadingCanisters && (
-                        <div className="p-4 text-xs text-gray-500">No active canisters found.</div>
+                        <div className="p-4 text-xs text-gray-500">No active containers found.</div>
                       )}
                       {isCgtUser && (!filteredRoutes || filteredRoutes.length === 0) && !loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">No active routes found.</div>
