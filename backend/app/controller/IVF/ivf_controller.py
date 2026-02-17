@@ -19,6 +19,7 @@ from app.schemas.IVF.ivf_schema import (
     EmbryoTransferResponse,
     EmbryoTrackingResponse,
     InTransitResponse,
+    TankInTransitCheckResponse,
     IVFControlTowerResponse,
 )
 from app.constants.enums import CanisterStatus
@@ -502,6 +503,48 @@ def check_tank_exists(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
+
+
+@router.get("/canisters/{tank_code}/in-transit-check", response_model=TankInTransitCheckResponse)
+def check_tank_in_transit_status(
+    tank_code: str = Path(..., description="Tank code to check (e.g., 'T15')"),
+    branch_id: Optional[int] = Query(
+        None,
+        description="Optional branch ID override (Manager/Admin). User role always uses their own branch."
+    ),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Check whether a tank has any in-transit shipment records.
+
+    Role-based access:
+    - User (IVF): Can check only their own branch tanks (branch_id override ignored).
+    - Manager (IVF): Can select a branch via branch_id (or defaults to their own branch).
+    - Admin: Can check tanks across branches; provide branch_id when same tank code exists in multiple branches.
+    """
+    try:
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
+
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        service = IVFService(db)
+        result = service.check_tank_in_transit_status(
+            tank_code=tank_code,
+            user_role=role,
+            user_branch_id=user.branch_id,
+            hospital_id=hospital_id,
+            selected_branch_id=branch_id
+        )
+        return TankInTransitCheckResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking tank in-transit status: {str(e)}")
+
+
 @router.get("/storage", response_model=ARCIVFStorageResponse)
 def get_ivf_storage(
     request: Request,

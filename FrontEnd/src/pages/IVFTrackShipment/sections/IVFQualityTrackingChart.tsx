@@ -168,6 +168,20 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
   };
+
+  const getManagerBranchOverride = (): string | undefined => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      if (!role.includes('manager')) return undefined;
+      const fromUrl = new URLSearchParams(window.location.search).get('branch_id_override')
+        || new URLSearchParams(window.location.search).get('branch_id')
+        || undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return fromUrl || fromSession || undefined;
+    } catch {
+      return undefined;
+    }
+  };
  
   // Format timestamp for display
   const formatTimestamp = (timestamp: string): string => {
@@ -251,7 +265,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       try {
         isConnectingRef.current = true;
         const wsUrl = getWebSocketUrl();
-        const url = `${wsUrl}?token=${encodeURIComponent(authToken)}`;
+        const params = new URLSearchParams({ token: authToken });
+        const branchOverride = getManagerBranchOverride();
+        if (branchOverride) {
+          params.set('branch_id_override', branchOverride);
+        }
+        const url = `${wsUrl}?${params.toString()}`;
         const ws = new WebSocket(url);
  
         ws.onopen = () => {

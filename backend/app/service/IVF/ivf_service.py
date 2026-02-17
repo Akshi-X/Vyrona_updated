@@ -302,6 +302,114 @@ class IVFService:
         except Exception as e:
             logger.error(f"Error fetching embryo transfer crylocks: {str(e)}", exc_info=True)
             raise Exception(f"Error fetching embryo transfer crylocks: {str(e)}")
+
+    def check_tank_in_transit_status(
+        self,
+        tank_code: str,
+        user_role: str,
+        user_branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
+        selected_branch_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Check whether a tank has any in-transit shipments with role-based branch access.
+
+        Access rules:
+        - User: Always restricted to own branch.
+        - Manager: Can check selected branch when provided, otherwise own branch.
+        - Admin: Can check any branch; if branch is not provided and tank code is duplicated across
+                 branches, client must provide branch_id.
+        """
+        try:
+            normalized_tank_code = (tank_code or "").strip()
+            if not normalized_tank_code:
+                raise ValueError("Tank code is required")
+
+            role_normalized = (user_role or "").title()
+
+            query = (
+                self.db.query(
+                    Tank.tank_id,
+                    Tank.tank_code,
+                    Tank.branch_id,
+                    HospitalBranch.branch_name
+                )
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(func.lower(Tank.tank_code) == func.lower(normalized_tank_code))
+            )
+
+            if role_normalized == "User":
+                if not user_branch_id:
+                    raise Exception("User account is not associated with any branch")
+                query = query.filter(Tank.branch_id == user_branch_id)
+            elif role_normalized == "Manager":
+                effective_branch_id = selected_branch_id if selected_branch_id is not None else user_branch_id
+                if not effective_branch_id:
+                    raise ValueError("Manager account is not associated with any branch. Please provide branch_id")
+                query = query.filter(Tank.branch_id == effective_branch_id)
+                if hospital_id is not None:
+                    query = query.filter(HospitalBranch.hospital_id == hospital_id)
+            else:
+                if selected_branch_id is not None:
+                    query = query.filter(Tank.branch_id == selected_branch_id)
+                if role_normalized == "Admin" and hospital_id is not None:
+                    query = query.filter(HospitalBranch.hospital_id == hospital_id)
+
+            matching_tanks = query.all()
+
+            if not matching_tanks:
+                branch_suffix = ""
+                if role_normalized == "User" and user_branch_id is not None:
+                    branch_suffix = " in your branch"
+                elif selected_branch_id is not None:
+                    branch_suffix = f" in branch {selected_branch_id}"
+                return {
+                    "exists": False,
+                    "tank_code": normalized_tank_code,
+                    "tank_id": None,
+                    "branch_id": selected_branch_id if selected_branch_id is not None else user_branch_id,
+                    "branch_name": None,
+                    "has_in_transit_shipments": False,
+                    "in_transit_count": 0,
+                    "message": f"Tank {normalized_tank_code} does not exist{branch_suffix}"
+                }
+
+            if len(matching_tanks) > 1:
+                raise ValueError(
+                    f"Multiple tanks found for code '{normalized_tank_code}'. Please provide branch_id"
+                )
+
+            tank_row = matching_tanks[0]
+
+            in_transit_count = (
+                self.db.query(func.count(PatientCrylockInfo.id))
+                .filter(
+                    PatientCrylockInfo.tank_id == tank_row.tank_id,
+                    PatientCrylockInfo.in_transit == True
+                )
+                .scalar()
+            ) or 0
+
+            has_in_transit = in_transit_count > 0
+            return {
+                "exists": True,
+                "tank_code": tank_row.tank_code or normalized_tank_code,
+                "tank_id": tank_row.tank_id,
+                "branch_id": tank_row.branch_id,
+                "branch_name": tank_row.branch_name or "",
+                "has_in_transit_shipments": has_in_transit,
+                "in_transit_count": in_transit_count,
+                "message": (
+                    f"Tank {tank_row.tank_code} has {in_transit_count} in-transit shipment(s)"
+                    if has_in_transit
+                    else f"Tank {tank_row.tank_code} has no in-transit shipments"
+                )
+            }
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error checking in-transit status for tank {tank_code}: {str(e)}", exc_info=True)
+            raise Exception(f"Error checking in-transit status for tank: {str(e)}")
     
     def get_in_transit_crylocks(
         self,
