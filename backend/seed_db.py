@@ -23,6 +23,13 @@ from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.ivf_quality_log_model import IVFQualityLog
 from app.models.IVF.ivf_shipment_model import IVFShipment
+from app.models.IVF.device_model import Device
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+from app.models.IVF.ln2_readings_model import Ln2Reading
+from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
+from app.service.quality_service import push_ivf_quality_to_redis
+from app.controller.IVF.ivf_quality_controller import push_ln2_reading_to_redis
+from sqlalchemy import text
 from app.constants.enums import PatientStage as PatientStageEnum, RouteStatus
 from app.utils.patient_utils import generate_patient_id
 
@@ -205,7 +212,7 @@ def seed_ivf_data(db):
 
     # Tanks
     tanks = db.query(Tank).filter(Tank.branch_id == branch.branch_id).all()
-    if len(tanks) < 2:
+    if len(tanks) < 3:
         for i in range(1, 4):
             tank = Tank(
                 branch_id=branch.branch_id,
@@ -329,11 +336,180 @@ def seed_ivf_data(db):
         db.rollback()
         logger.info(f"  Skipped IVF shipments (schema may differ): {e}")
 
+    # LN2 tables + Quality Tracking seed for T30
+    seed_ln2_and_quality_data(db, branch, tanks)
+    # TIVE-TEST-001 test device, tank, ln2_iot_device
+    seed_tive_test_data(db, branch)
+
+
+def seed_ln2_and_quality_data(db, branch, tanks):
+    """Seed LN2 devices, ln2_iot_raw_data for Quality Tracking chart. Push to Redis for T30."""
+    tank_t30 = next((t for t in tanks if t.tank_code == "T30"), None)
+    if not tank_t30:
+        logger.info("  Skipping LN2 seed: T30 tank not found")
+        return
+    tank_id = tank_t30.tank_id
+    tank_code = "T30"
+    try:
+        # Device for branch
+        device = db.query(Device).filter(Device.branch_id == branch.branch_id).first()
+        if not device:
+            device = Device(branch_id=branch.branch_id, device_code=f"LN2-{branch.branch_id}")
+            db.add(device)
+            db.flush()
+            logger.info(f"  Created device {device.device_code}")
+
+        # Ln2IotDevice mapping T30 -> device
+        mapping = db.query(Ln2IotDevice).filter(
+            Ln2IotDevice.tank_id == tank_id,
+            Ln2IotDevice.device_id == device.id,
+        ).first()
+        if not mapping:
+            mapping = Ln2IotDevice(
+                tank_id=tank_id,
+                device_id=device.id,
+                tank_max_capacity_reading=100.0,
+                tank_min_capacity_reading=10.0,
+            )
+            db.add(mapping)
+            db.flush()
+
+        # LN2 readings (evaporation_rate_kg_per_h, ln2_mass_kg) - mock data for LN2 Readings card
+        # Clear existing readings for this device to ensure clean mock data (device_id is INTEGER FK)
+        db.query(Ln2Reading).filter(Ln2Reading.device_id == device.id).delete()
+        db.flush()
+        now = datetime.now(timezone.utc)
+        dev_code = device.device_code or f"LN2-{device.id}"
+        for i in range(12):
+            ts = now - timedelta(minutes=i * 30)  # Every 30 min over last 6 hours
+            evap = 0.04 + (i % 5) * 0.02  # 0.04–0.12 kg/h
+            mass = 18.0 - (i * 0.8) + (i % 3) * 0.3  # ~7–19 kg varying
+            r = Ln2Reading(
+                device_id=device.id,
+                tank_id=tank_id,
+                evaporation_rate_kg_per_h=round(evap, 4),
+                ln2_mass_kg=round(mass, 2),
+                ln2_level_pct=round(50 + (12 - i) * 2.5, 1),
+                reading_timestamp=ts,
+            )
+            db.add(r)
+            db.flush()
+            # Push to Redis so LN2 Readings card shows data immediately
+            item = {
+                "device_id": dev_code,
+                "timestamp": ts.isoformat(),
+                "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h),
+                "ln2_mass_kg": float(r.ln2_mass_kg),
+                "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct else None,
+            }
+            push_ln2_reading_to_redis(tank_id, tank_code, item, publish=False)
+        db.commit()
+        logger.info(f"  Created 12 ln2_readings + pushed to Redis for LN2 Readings card (T30)")
+
+        # ln2_iot_raw_data with quality payload (temp_internal, temp_external, shock) for chart
+        existing_raw = db.query(Ln2IotRawData).filter(Ln2IotRawData.tank_id == tank_id).count()
+        if existing_raw < 6:
+            now = datetime.now(timezone.utc)
+            for i in range(6):
+                ts = now - timedelta(hours=i)
+                payload = {
+                    "temp_internal": -196 + (i * 1.5),
+                    "temp_external": -150 + i,
+                    "shock": 0.1 + (i * 0.15),
+                    "timestamp": ts.isoformat(),
+                }
+                if i == 0:
+                    payload["battery_percentage"] = 85
+                raw = Ln2IotRawData(
+                    tank_id=tank_id,
+                    device_id=device.id,
+                    raw_data=float(payload["temp_internal"]),
+                    payload=payload,
+                    created_at=ts,
+                )
+                db.add(raw)
+                db.flush()
+                push_ivf_quality_to_redis(tank_id, tank_code, payload, publish=False)
+            db.commit()
+            logger.info(f"  Created 6 ln2_iot_raw_data + pushed to Redis for {tank_code}")
+    except Exception as e:
+        db.rollback()
+        logger.info(f"  Skipped LN2 seed: {e}")
+
+
+def seed_tive_test_data(db, branch):
+    """Seed TIVE-TEST-001: device, tank (TIVE-TEST-999), ln2_iot_device with Tive params."""
+    try:
+        # 1. Device
+        device = db.query(Device).filter(Device.device_code == "TIVE-TEST-001").first()
+        if not device:
+            device = Device(branch_id=branch.branch_id, device_code="TIVE-TEST-001")
+            db.add(device)
+            db.flush()
+            logger.info("  Created device TIVE-TEST-001")
+
+        # 2. Tank (tank_code TIVE-TEST-999, use safe status - no 'active' in our enum)
+        tank = db.query(Tank).filter(Tank.tank_code == "TIVE-TEST-999").first()
+        if not tank:
+            tank = Tank(
+                branch_id=branch.branch_id,
+                tank_code="TIVE-TEST-999",
+                capacity_liters=47.3,
+                tive_device_id="TIVE-TEST-001",
+                is_active=True,
+            )
+            db.add(tank)
+            db.flush()
+            db.execute(text("""
+                UPDATE tanks SET
+                    empty_weight_kg = 15.9,
+                    full_weight_kg = 54.1,
+                    static_evap_rate_l_per_day = 0.38
+                WHERE tank_id = :tid
+            """), {"tid": tank.tank_id})
+            logger.info(f"  Created tank TIVE-TEST-999 (tank_id={tank.tank_id})")
+
+        # 3. Ln2IotDevice: link device to tank with Tive params
+        existing = db.query(Ln2IotDevice).filter(
+            Ln2IotDevice.tank_id == tank.tank_id,
+            Ln2IotDevice.device_id == device.id,
+        ).first()
+        if not existing:
+            mapping = Ln2IotDevice(
+                tank_id=tank.tank_id,
+                device_id=device.id,
+                tank_min_capacity_reading=13.9,
+                tank_max_capacity_reading=56.1,
+            )
+            db.add(mapping)
+            db.flush()
+            db.execute(text("""
+                UPDATE ln2_iot_devices SET
+                    closed_noise_margin_kg_per_h = 0.027,
+                    open_rate_min_kg_per_h = 0.10,
+                    refill_threshold_kg = 1.0,
+                    window_minutes = 10,
+                    window_min_points = 5,
+                    consecutive_windows_for_state = 2
+                WHERE id = :mid
+            """), {"mid": mapping.id})
+            logger.info("  Created ln2_iot_device for TIVE-TEST-001 -> TIVE-TEST-999")
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.info(f"  Skipped TIVE-TEST seed: {e}")
+
 
 def main():
     logger.info("=" * 60)
     logger.info("SEEDING DEMO DATA")
     logger.info("=" * 60)
+    # Run schema sync (migrations) so new columns exist before seeding
+    try:
+        from app.init_db import sync_ivf_schema
+        sync_ivf_schema()
+    except Exception as e:
+        logger.warning(f"  Schema sync skipped: {e}")
     db = SessionLocal()
     try:
         seed_cgt_data(db)

@@ -5,6 +5,7 @@ import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
+import LN2ReadingsChart from './sections/LN2ReadingsChart';
 import { IVFQualityParametersTable } from './sections/IVFQualityParametersTable';
 import { userService, type UserProfileDto } from '../../services/userService';
 // Header icons & modals
@@ -305,12 +306,17 @@ export default function IVFTrackShipmentPage() {
                         </div>
                     </div>
 
-                    {/* Row 2: Container Data (full width) */}
+                    {/* Row 2: LN2 Readings (ws://.../api/ivf/quality/ln2-ws) */}
+                    <div>
+                        <LN2ReadingsChart canisterNumber={canisterId} />
+                    </div>
+
+                    {/* Row 3: Container Data (full width) */}
                     <div>
                         <ContainerDataTable canisterNumber={canisterId} />
                     </div>
 
-                    {/* Row 3: Refill Log (full width) */}
+                    {/* Row 4: Refill Log (full width) */}
                     <div>
                         <RefillLogTable canisterNumber={canisterId} />
                     </div>

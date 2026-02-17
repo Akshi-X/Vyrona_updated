@@ -15,6 +15,54 @@ from app.utils.utils import generate_user_id
 logger = logging.getLogger(__name__)
 
 
+def _migrate_ln2_readings_device_id(db):
+    """Migrate ln2_readings.device_id from VARCHAR (device_code) to INTEGER FK (devices.id)."""
+    try:
+        insp = sa_inspect(db.get_bind())
+        if "ln2_readings" not in insp.get_table_names():
+            return
+        cols = {c["name"]: c for c in insp.get_columns("ln2_readings")}
+        if "device_id" not in cols:
+            db.execute(text("ALTER TABLE ln2_readings ADD COLUMN device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE"))
+            return
+        if "VARCHAR" not in str(cols["device_id"]["type"]) and "CHARACTER" not in str(cols["device_id"]["type"]):
+            return  # Already migrated (integer)
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS device_fk INTEGER REFERENCES devices(id) ON DELETE CASCADE"))
+        db.execute(text("""
+            UPDATE ln2_readings r SET device_fk = d.id
+            FROM devices d WHERE d.device_code = r.device_id
+        """))
+        db.execute(text("ALTER TABLE ln2_readings DROP COLUMN device_id"))
+        db.execute(text("ALTER TABLE ln2_readings RENAME COLUMN device_fk TO device_id"))
+        db.execute(text("ALTER TABLE ln2_readings ALTER COLUMN device_id SET NOT NULL"))
+    except Exception as e:
+        logger.warning(f"ln2_readings device_id migration skipped: {e}")
+
+
+def _migrate_ln2_iot_raw_data_device_id(db):
+    """Migrate ln2_iot_raw_data.device_id from VARCHAR to INTEGER FK (devices.id)."""
+    try:
+        insp = sa_inspect(db.get_bind())
+        if "ln2_iot_raw_data" not in insp.get_table_names():
+            return
+        cols = {c["name"]: c for c in insp.get_columns("ln2_iot_raw_data")}
+        if "device_id" not in cols:
+            db.execute(text("ALTER TABLE ln2_iot_raw_data ADD COLUMN device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE"))
+            return
+        if "VARCHAR" not in str(cols["device_id"]["type"]) and "CHARACTER" not in str(cols["device_id"]["type"]):
+            return  # Already migrated (integer)
+        db.execute(text("ALTER TABLE ln2_iot_raw_data ADD COLUMN IF NOT EXISTS device_fk INTEGER REFERENCES devices(id) ON DELETE CASCADE"))
+        db.execute(text("""
+            UPDATE ln2_iot_raw_data r SET device_fk = d.id
+            FROM devices d WHERE d.device_code = r.device_id
+        """))
+        db.execute(text("ALTER TABLE ln2_iot_raw_data DROP COLUMN device_id"))
+        db.execute(text("ALTER TABLE ln2_iot_raw_data RENAME COLUMN device_fk TO device_id"))
+        db.execute(text("ALTER TABLE ln2_iot_raw_data ALTER COLUMN device_id SET NOT NULL"))
+    except Exception as e:
+        logger.warning(f"ln2_iot_raw_data device_id migration skipped: {e}")
+
+
 def sync_ivf_schema():
     """
     Add missing columns to IVF tables for older databases.
@@ -40,6 +88,49 @@ def sync_ivf_schema():
         db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
         db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS created_by VARCHAR"))
         db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS updated_by VARCHAR"))
+        # canister_ln2_logs: branch_id and quality-tracking columns
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES hospital_branches(branch_id)"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS refill_date DATE"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS refill_time TIME"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS refilled_by VARCHAR(255)"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS description TEXT"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS status VARCHAR"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS cryoshipper VARCHAR(255)"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS disinfected_shipper_infected_tank_description TEXT"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS reservoir VARCHAR(255)"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS ln2_ordered_date DATE"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS ln2_received_date DATE"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
+        db.execute(text("ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS updated_by VARCHAR"))
+        # ln2_readings.device_id: migrate from VARCHAR to INTEGER FK (devices.id)
+        _migrate_ln2_readings_device_id(db)
+        # ln2_readings: new schema columns (tank_id, raw_weight_kg, ln2_mass_kg, evaporation_rate_kg_per_h, etc.)
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS tank_id INTEGER REFERENCES tanks(tank_id) ON DELETE CASCADE"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS raw_weight_kg NUMERIC(12,4)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS ln2_mass_kg NUMERIC(12,4)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS ln2_level_pct NUMERIC(6,2)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS ln2_volume_l NUMERIC(12,4)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS sensor_status VARCHAR(50)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS evaporation_rate_kg_per_h NUMERIC(12,6)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS lid_state VARCHAR(50)"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS refill_detected BOOLEAN"))
+        db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS quality_status VARCHAR(50)"))
+        # ln2_readings: drop legacy columns (replaced by evaporation_rate_kg_per_h, ln2_mass_kg)
+        db.execute(text("ALTER TABLE ln2_readings DROP COLUMN IF EXISTS ln2_evaporation_rate"))
+        db.execute(text("ALTER TABLE ln2_readings DROP COLUMN IF EXISTS ln2_level"))
+        # ln2_iot_raw_data.device_id: migrate from VARCHAR to INTEGER FK (devices.id)
+        _migrate_ln2_iot_raw_data_device_id(db)
+        # tanks: Tive-related columns (empty_weight_kg, full_weight_kg, static_evap_rate_l_per_day)
+        db.execute(text("ALTER TABLE tanks ADD COLUMN IF NOT EXISTS empty_weight_kg NUMERIC(10,2)"))
+        db.execute(text("ALTER TABLE tanks ADD COLUMN IF NOT EXISTS full_weight_kg NUMERIC(10,2)"))
+        db.execute(text("ALTER TABLE tanks ADD COLUMN IF NOT EXISTS static_evap_rate_l_per_day NUMERIC(10,4)"))
+        # ln2_iot_devices: Tive algorithm params
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS closed_noise_margin_kg_per_h NUMERIC(10,4)"))
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS open_rate_min_kg_per_h NUMERIC(10,4)"))
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS refill_threshold_kg NUMERIC(10,4)"))
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_minutes INTEGER"))
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_min_points INTEGER"))
+        db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS consecutive_windows_for_state INTEGER"))
         db.commit()
         logger.info("IVF schema sync completed")
     except Exception as e:
