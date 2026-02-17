@@ -1,8 +1,10 @@
 import os
-import shutil
 import logging
+import base64
+import json
 from datetime import datetime, timezone
 from typing import Optional, List
+from urllib.parse import quote
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from sqlalchemy.exc import IntegrityError
@@ -29,14 +31,47 @@ from ..schemas.feedback_schema import (
 )
 from ..constants.app_constants import (
     FEEDBACK_TICKET_PREFIX, FEEDBACK_ID_LENGTH, 
-    FEEDBACK_MAX_ATTACHMENT_SIZE_MB, FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS,
-    FEEDBACK_UPLOAD_DIR
+    FEEDBACK_MAX_ATTACHMENT_SIZE_MB, FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS
 )
 from ..constants.enums import FeedbackStatus
 from .email_service import send_feedback_new_ticket_email, send_feedback_status_update_email, send_feedback_new_comment_email
 
 # Setup logger
 logger = logging.getLogger(__name__)
+
+BASE64_ATTACHMENT_PREFIX = "base64_attachment:"
+
+
+def _encode_attachment_payload(
+    original_filename: str,
+    stored_filename: str,
+    mime_type: Optional[str],
+    file_bytes: bytes
+) -> str:
+    """Encode file metadata + bytes as a compact JSON string in file_path column."""
+    payload = {
+        "original_filename": original_filename,
+        "stored_filename": stored_filename,
+        "mime_type": mime_type or "application/octet-stream",
+        "data": base64.b64encode(file_bytes).decode("ascii"),
+    }
+    return BASE64_ATTACHMENT_PREFIX + json.dumps(payload, separators=(",", ":"))
+
+
+def _decode_attachment_payload(file_path: str) -> Optional[dict]:
+    if not file_path or not file_path.startswith(BASE64_ATTACHMENT_PREFIX):
+        return None
+    encoded_payload = file_path[len(BASE64_ATTACHMENT_PREFIX):]
+    return json.loads(encoded_payload)
+
+
+def _build_attachment_path(ticket_id: str, attachment: FeedbackAttachment) -> str:
+    """Build frontend-compatible attachment URL without changing response shape."""
+    if attachment.file_path and attachment.file_path.startswith(BASE64_ATTACHMENT_PREFIX):
+        filename = attachment.stored_filename or attachment.original_filename or f"attachment_{attachment.id}"
+        return f"/api/feedback/{ticket_id}/attachments/{attachment.id}/{quote(filename)}"
+
+    return f"/uploads/feedback/{ticket_id}/{os.path.basename(attachment.file_path)}"
 
 
 def generate_ticket_id(db: Session) -> str:
@@ -66,19 +101,7 @@ def generate_ticket_id(db: Session) -> str:
 
 
 def save_attachment(file: UploadFile, feedback_id: str) -> dict:
-    """Save uploaded file and return attachment info"""
-    # Create directory structure: uploads/feedback/{ticket_id}/
-    upload_dir = os.path.join(FEEDBACK_UPLOAD_DIR, feedback_id)
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Validate file size
-    file_size_mb = file.size / (1024 * 1024)
-    if file_size_mb > FEEDBACK_MAX_ATTACHMENT_SIZE_MB:
-        raise FeedbackAttachmentTooLargeException(
-            file_size_mb=file_size_mb,
-            max_size_mb=FEEDBACK_MAX_ATTACHMENT_SIZE_MB
-        )
-    
+    """Persist uploaded file as base64 payload in DB and return attachment metadata."""
     # Validate file extension
     file_extension = os.path.splitext(file.filename)[1].lower()
     if file_extension not in FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS:
@@ -86,27 +109,42 @@ def save_attachment(file: UploadFile, feedback_id: str) -> dict:
             file_extension=file_extension,
             allowed_extensions=FEEDBACK_ALLOWED_ATTACHMENT_EXTENSIONS
         )
-    
-    # Generate unique filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
-    stored_filename = f"{timestamp}_{file.filename}"
-    file_path = os.path.join(upload_dir, stored_filename)
-    
-    # Save file
+
+    # Read bytes from upload stream.
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        file.file.seek(0)
+        file_bytes = file.file.read()
+        file.file.seek(0)
     except Exception as e:
         raise FeedbackAttachmentSaveFailedException(
             filename=file.filename,
             reason=str(e)
         )
-    
+
+    file_size = len(file_bytes)
+    file_size_mb = file_size / (1024 * 1024)
+    if file_size_mb > FEEDBACK_MAX_ATTACHMENT_SIZE_MB:
+        raise FeedbackAttachmentTooLargeException(
+            file_size_mb=file_size_mb,
+            max_size_mb=FEEDBACK_MAX_ATTACHMENT_SIZE_MB
+        )
+
+    # Keep stored_filename semantics unchanged for display and compatibility.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    stored_filename = f"{timestamp}_{file.filename}"
+
+    encoded_payload = _encode_attachment_payload(
+        original_filename=file.filename,
+        stored_filename=stored_filename,
+        mime_type=file.content_type,
+        file_bytes=file_bytes
+    )
+
     return {
         "original_filename": file.filename,
         "stored_filename": stored_filename,
-        "file_path": file_path.replace("\\", "/"),  # Normalize path separators for cross-platform compatibility
-        "file_size": file.size,
+        "file_path": encoded_payload,
+        "file_size": file_size,
         "mime_type": file.content_type
     }
 
@@ -493,8 +531,50 @@ def get_feedback_by_id(db: Session, feedback_id: str) -> FeedbackDetailResponse:
         created_at=feedback.created_at,
         updated_at=feedback.updated_at,
         comments=[comment.comment for comment in comments],
-        attachment_paths=[f"/uploads/feedback/{feedback.ticket_id}/{os.path.basename(attachment.file_path)}" for attachment in attachments]
+        attachment_paths=[_build_attachment_path(feedback.ticket_id, attachment) for attachment in attachments]
     )
+
+
+def get_feedback_attachment_content(db: Session, feedback_id: str, attachment_id: int) -> dict:
+    """Return attachment bytes and metadata directly from DB payload (or legacy path)."""
+    attachment = db.query(FeedbackAttachment).filter(
+        and_(
+            FeedbackAttachment.ticket_id == feedback_id,
+            FeedbackAttachment.id == attachment_id
+        )
+    ).first()
+
+    if not attachment:
+        raise FeedbackNotFoundException(feedback_id=feedback_id)
+
+    parsed = _decode_attachment_payload(attachment.file_path)
+    if parsed:
+        try:
+            content = base64.b64decode(parsed["data"])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Invalid base64 attachment data: {str(e)}")
+
+        return {
+            "filename": parsed.get("stored_filename") or attachment.stored_filename or attachment.original_filename,
+            "mime_type": parsed.get("mime_type") or attachment.mime_type or "application/octet-stream",
+            "content": content
+        }
+
+    # Legacy fallback for historical filesystem records.
+    if not os.path.exists(attachment.file_path):
+        raise HTTPException(status_code=404, detail="Attachment file not found")
+
+    try:
+        with open(attachment.file_path, "rb") as attachment_file:
+            content = attachment_file.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read attachment file: {str(e)}")
+
+    return {
+        "filename": attachment.stored_filename or attachment.original_filename,
+        "mime_type": attachment.mime_type or "application/octet-stream",
+        "content": content
+    }
 
 
 def get_feedback_comments(db: Session, feedback_id: str) -> List[CommentResponse]:
