@@ -323,7 +323,7 @@ def get_active_canisters(
 def get_embryo_tracking(
     request: Request,
     branch_name: Optional[str] = Query(None, description="Optional branch/site name filter"),
-    status: Optional[str] = Query(None, description="Optional shipment status filter"),
+    status: Optional[str] = Query(None, description="Optional tracking status filter (e.g., internal, in transit)"),
     cryolock_color: Optional[str] = Query(None, description="Optional cryolock color filter"),
     goblet_color: Optional[str] = Query(None, description="Optional goblet color filter"),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
@@ -353,7 +353,7 @@ def get_embryo_tracking(
     
     Optional filters:
     - branch_name: Filter records by branch/site name
-    - status: Filter by shipment status
+    - status: Filter by tracking status
     - cryolock_color: Filter by cryolock color
     - goblet_color: Filter by goblet color
     

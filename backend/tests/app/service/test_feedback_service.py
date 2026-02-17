@@ -1,8 +1,10 @@
 import pytest
-from unittest.mock import MagicMock, Mock, patch, mock_open
+from unittest.mock import MagicMock, Mock, patch
 from datetime import datetime, timezone
 import os
 import shutil
+import base64
+import json
 from sqlalchemy.exc import IntegrityError
 from fastapi import UploadFile
 
@@ -78,6 +80,7 @@ def mock_upload_file():
     file.size = 1024 * 1024  # 1 MB
     file.content_type = "application/pdf"
     file.file = MagicMock()
+    file.file.read.return_value = b"%PDF-test-content%"
     return file
 
 
@@ -113,11 +116,8 @@ def test_generate_ticket_id_existing_tickets(db_session):
 # ==========================================
 
 @patch('app.service.feedback_service.os.path.splitext')
-@patch('app.service.feedback_service.os.makedirs')
-@patch('app.service.feedback_service.shutil.copyfileobj')
-@patch('builtins.open', new_callable=mock_open)
 @patch('app.service.feedback_service.datetime')
-def test_save_attachment_success(mock_datetime, mock_file, mock_copy, mock_makedirs, mock_splitext, mock_upload_file):
+def test_save_attachment_success(mock_datetime, mock_splitext, mock_upload_file):
     """Test saving attachment successfully"""
     from datetime import datetime, timezone
     mock_splitext.return_value = ("test", ".pdf")
@@ -133,15 +133,19 @@ def test_save_attachment_success(mock_datetime, mock_file, mock_copy, mock_maked
     assert "20240101_120000_123" in result["stored_filename"]  # The timestamp is truncated to 3 digits
     assert result["stored_filename"].endswith("_test.pdf")
     assert "file_path" in result
-    assert result["file_size"] == 1024 * 1024
+    assert result["file_size"] == len(b"%PDF-test-content%")
     assert result["mime_type"] == "application/pdf"
-    mock_makedirs.assert_called_once()
-    mock_file.assert_called_once()
+    assert result["file_path"].startswith("base64_attachment:")
+
+    payload = json.loads(result["file_path"].replace("base64_attachment:", "", 1))
+    assert payload["stored_filename"] == result["stored_filename"]
+    assert base64.b64decode(payload["data"]) == b"%PDF-test-content%"
 
 
 def test_save_attachment_too_large(mock_upload_file):
     """Test saving attachment that is too large"""
-    mock_upload_file.size = (FEEDBACK_MAX_ATTACHMENT_SIZE_MB + 1) * 1024 * 1024
+    oversized_bytes = b"x" * ((FEEDBACK_MAX_ATTACHMENT_SIZE_MB + 1) * 1024 * 1024)
+    mock_upload_file.file.read.return_value = oversized_bytes
     
     with pytest.raises(FeedbackAttachmentTooLargeException):
         feedback_service.save_attachment(mock_upload_file, "TK-2024-01-001")
@@ -155,11 +159,9 @@ def test_save_attachment_invalid_extension(mock_upload_file):
         feedback_service.save_attachment(mock_upload_file, "TK-2024-01-001")
 
 
-@patch('app.service.feedback_service.os.makedirs')
-@patch('builtins.open', new_callable=mock_open)
-def test_save_attachment_save_failed(mock_file, mock_makedirs, mock_upload_file):
+def test_save_attachment_save_failed(mock_upload_file):
     """Test saving attachment when file save fails"""
-    mock_file.side_effect = IOError("Permission denied")
+    mock_upload_file.file.read.side_effect = IOError("Permission denied")
     
     with pytest.raises(FeedbackAttachmentSaveFailedException):
         feedback_service.save_attachment(mock_upload_file, "TK-2024-01-001")
