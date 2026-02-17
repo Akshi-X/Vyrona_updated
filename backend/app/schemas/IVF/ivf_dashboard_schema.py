@@ -18,7 +18,7 @@ class TotalEmbryosCryolocksResponse(BaseModel):
 
 class TotalContainersResponse(BaseModel):
     """Response for total containers metric"""
-    total_containers: int = Field(..., description="Total number of containers (cryolocks). Note: In ARC IVF API context, 'containers' refers to cryolocks, not canisters.")
+    total_containers: int = Field(..., description="Total number of tanks. Field name is kept as total_containers for backward compatibility.")
     last_updated: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     status: str = Field(default="success", description="Response status")
 

@@ -43,6 +43,8 @@ def get_tank_alerts(
         service = CriticalAlertService(db)
         result = service.get_tank_alerts_by_code(tank_code, branch_id=branch_id)
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -71,6 +73,8 @@ def get_hospital_alerts(
         service = CriticalAlertService(db)
         result = service.get_hospital_alerts(branch_id=branch_id, role=role, status=status)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting hospital alerts: {str(e)}")
 
@@ -173,6 +177,8 @@ def check_and_create_alerts(
             active_count=active_count,
             acknowledged_count=acknowledged_count
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

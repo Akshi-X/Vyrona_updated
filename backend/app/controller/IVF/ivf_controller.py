@@ -25,7 +25,7 @@ from app.constants.enums import CanisterStatus
 from app.service.IVF.arc_ivf_service import ARCIVFService
 from app.schemas.IVF.arc_ivf_schema import ARCIVFStorageResponse
 from app.utils.ivf_helpers import get_branch_filter_info
-from app.utils.user_helpers import is_hospital_department
+from app.utils.user_helpers import is_specific_department
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def _get_authenticated_user(request: Request):
 def _ensure_ivf_user(request: Request, *, arc_only: bool = False):
     """Validate IVF user access and return authenticated user."""
     user = _get_authenticated_user(request)
-    if not user.department or not is_hospital_department(user.department):
+    if not is_specific_department(user.department, "IVF"):
         detail = (
             "Access denied: This endpoint is for ARC IVF users only"
             if arc_only
@@ -180,6 +180,8 @@ def get_ivf_control_tower_map(
         service = IVFService(db)
         map_data = service.get_control_tower_map_locations(branch_id=branch_id)
         return IVFControlTowerResponse(**map_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting IVF control tower map data: {str(e)}")
 
@@ -319,6 +321,12 @@ def get_active_canisters(
 @router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
 def get_embryo_tracking(
     request: Request,
+    branch_name: Optional[str] = Query(None, description="Optional branch/site name filter"),
+    status: Optional[str] = Query(None, description="Optional shipment status filter"),
+    cryolock_color: Optional[str] = Query(None, description="Optional cryolock color filter"),
+    goblet_color: Optional[str] = Query(None, description="Optional goblet color filter"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=200, description="Number of records to fetch"),
     db: Session = Depends(get_db)
 ):
     """
@@ -341,6 +349,16 @@ def get_embryo_tracking(
     - Embryo Grading (User role only - comma-separated for multiple embryos in same cryolock)
     - Site Name (Manager/Admin roles only - branch name)
     - Status (Manager/Admin roles only - embryo status)
+    
+    Optional filters:
+    - branch_name: Filter records by branch/site name
+    - status: Filter by shipment status
+    - cryolock_color: Filter by cryolock color
+    - goblet_color: Filter by goblet color
+    
+    Lazy loading:
+    - Use offset/limit for infinite scrolling
+    - Response returns has_more and next_offset
     
     Response format (User role):
     {
@@ -386,8 +404,19 @@ def get_embryo_tracking(
         branch_id, role = get_branch_filter_info(request)
         
         service = IVFService(db)
-        tracking_data = service.get_embryo_tracking(branch_id=branch_id, user_role=role)
+        tracking_data = service.get_embryo_tracking(
+            branch_id=branch_id,
+            user_role=role,
+            branch_name=branch_name,
+            status=status,
+            cryolock_color=cryolock_color,
+            goblet_color=goblet_color,
+            offset=offset,
+            limit=limit
+        )
         return EmbryoTrackingResponse(**tracking_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting embryo tracking data: {str(e)}")
 
@@ -469,6 +498,8 @@ def check_tank_exists(
                 canister_status=None,
                 message=f"Tank {tank_code} does not exist" + (f" in your branch" if branch_id is not None else "")
             )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
 @router.get("/storage", response_model=ARCIVFStorageResponse)
@@ -843,6 +874,8 @@ def get_embryo_transfer_crylocks(
         crylocks_data = service.get_embryo_transfer_crylocks(branch_id=branch_id)
         
         return EmbryoTransferResponse(**crylocks_data)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting embryo transfer crylocks: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting embryo transfer crylocks: {str(e)}")
@@ -899,13 +932,23 @@ def get_in_transit_crylocks(
     }
     """
     try:
+        # Validate authenticated IVF user and derive hospital scope where needed
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
+
         # Get branch filter info for IVF department users
         branch_id, role = get_branch_filter_info(request)
         
         service = IVFService(db)
-        crylocks_data = service.get_in_transit_crylocks(branch_id=branch_id)
+        crylocks_data = service.get_in_transit_crylocks(
+            branch_id=branch_id,
+            role=role,
+            hospital_id=hospital_id
+        )
         
         return InTransitResponse(**crylocks_data)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")

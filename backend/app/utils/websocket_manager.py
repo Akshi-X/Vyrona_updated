@@ -160,19 +160,20 @@ class ConnectionManager:
         # At this point, we have tank_id_from_data, tank_code, and tank_branch_id resolved
         disconnected = []
         for connection_id, conn_data in list(self.active_connections.items()):
-            # Check if connection is subscribed to this tank (by tank_code - primary identifier)
+            # Check if connection is subscribed to this tank.
+            # Prefer tank_id matching first because tank_code is only unique within a branch.
             subscribed_tank_code = conn_data.get("tank_code")
             subscribed_tank_id = conn_data.get("tank_id")
             
-            # Match by tank_code (primary identifier for IVF tracking)
+            # Match by tank_id first (authoritative identifier)
             matches = False
-            if subscribed_tank_code is not None and tank_code is not None:
+            if subscribed_tank_id is not None and tank_id_from_data is not None:
+                if subscribed_tank_id == tank_id_from_data:
+                    matches = True
+            # Fallback: match by tank_code if tank_id isn't available
+            elif subscribed_tank_code is not None and tank_code is not None:
                 # Compare as strings
                 if str(subscribed_tank_code) == str(tank_code):
-                    matches = True
-            # Fallback: match by tank_id if tank_code not available
-            elif subscribed_tank_id is not None and tank_id_from_data is not None:
-                if subscribed_tank_id == tank_id_from_data:
                     matches = True
             
             if not matches:

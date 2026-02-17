@@ -240,6 +240,7 @@ class IVFService:
                 - branch_name: Branch name
                 - tank_id: Tank ID
             - total: Total number of embryo transfer crylocks
+            - message: Meaningful response message
         """
         try:
             # Query patient crylocks where embryo_transfer is True
@@ -291,22 +292,30 @@ class IVFService:
                 }
                 crylock_list.append(crylock_data)
             
+            total_count = len(crylock_list)
             return {
                 "data": crylock_list,
-                "total": len(crylock_list)
+                "total": total_count,
+                "message": "No embryo-transfer crylocks found" if total_count == 0 else "Embryo-transfer crylocks fetched successfully"
             }
             
         except Exception as e:
             logger.error(f"Error fetching embryo transfer crylocks: {str(e)}", exc_info=True)
             raise Exception(f"Error fetching embryo transfer crylocks: {str(e)}")
     
-    def get_in_transit_crylocks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_in_transit_crylocks(
+        self,
+        branch_id: Optional[int] = None,
+        role: Optional[str] = None,
+        hospital_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Get all crylocks where in_transit is True.
         
         Args:
             branch_id: Optional branch ID to filter by. If provided, only returns crylocks for that branch.
-                      If None, returns crylocks for all branches (Manager/Admin roles).
+            role: Optional user role ("User", "Manager", "Admin") for role-based scope.
+            hospital_id: Optional hospital ID. Used to scope Manager role to their own hospital.
         
         Returns:
             Dictionary containing:
@@ -323,6 +332,7 @@ class IVFService:
                 - tank_id: Tank ID
                 - shipment_details: Full shipment details object if available (from ivf_shipment table)
             - total: Total number of in-transit crylocks
+            - message: Meaningful response message
         """
         try:
             # Query patient crylocks where in_transit is True
@@ -345,9 +355,15 @@ class IVFService:
                 .filter(PatientCrylockInfo.in_transit == True)
             )
             
-            # Apply branch filter if provided (User role only)
+            # Apply branch filter if provided (User role)
             if branch_id is not None:
                 query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+
+            # Manager should only see branches from their own hospital.
+            # Admin can see all branches, so hospital filter is not applied for Admin.
+            role_normalized = role.title() if role else None
+            if role_normalized == "Manager" and hospital_id is not None:
+                query = query.filter(HospitalBranch.hospital_id == hospital_id)
             
             # Order by branch name, then HIS number, then cryolock number
             query = query.order_by(
@@ -430,9 +446,11 @@ class IVFService:
                 }
                 crylock_list.append(crylock_data)
             
+            total_count = len(crylock_list)
             return {
                 "data": crylock_list,
-                "total": len(crylock_list)
+                "total": total_count,
+                "message": "No in-transit crylocks found" if total_count == 0 else "In-transit crylocks fetched successfully"
             }
             
         except Exception as e:
@@ -521,7 +539,17 @@ class IVFService:
             # If there's an error calculating status, default to safe
             return "safe"
     
-    def get_embryo_tracking(self, branch_id: Optional[int] = None, user_role: Optional[str] = None) -> Dict[str, Any]:
+    def get_embryo_tracking(
+        self,
+        branch_id: Optional[int] = None,
+        user_role: Optional[str] = None,
+        branch_name: Optional[str] = None,
+        status: Optional[str] = None,
+        cryolock_color: Optional[str] = None,
+        goblet_color: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
         """
         Get embryo tracking data grouped by cryolock.
         Returns data in the format matching the table structure.
@@ -531,6 +559,12 @@ class IVFService:
                       - User role: Filter by their assigned branch (branch_id provided)
                       - Manager/Admin roles: No filtering (branch_id is None) - see all branches
             user_role: User's role ("User", "Manager", "Admin") to determine field visibility.
+            branch_name: Optional branch/site name filter.
+            status: Optional shipment status filter (created, in_transit, delivered, cancelled, failed).
+            cryolock_color: Optional cryolock color filter.
+            goblet_color: Optional goblet color filter.
+            offset: Number of records to skip (for lazy loading / infinite scroll).
+            limit: Number of records to fetch.
         
         Returns:
             Dictionary containing:
@@ -564,7 +598,7 @@ class IVFService:
                 .subquery()
             )
             
-            # Query PatientCrylockInfo with all related data and shipment descriptions in one query
+            # Query PatientCrylockInfo with all related data and latest shipment in one query
             # Join: PatientCrylockInfo -> Tank -> Branch -> (LEFT JOIN) Latest Shipment
             query = (
                 self.db.query(
@@ -578,7 +612,8 @@ class IVFService:
                     PatientCrylockInfo.date_of_vitrification,
                     PatientCrylockInfo.id,
                     HospitalBranch.branch_name,
-                    IVFShipment.description.label('shipment_description')
+                    IVFShipment.description.label('shipment_description'),
+                    IVFShipment.shipment_status.label('shipment_status')
                 )
                 .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
                 .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
@@ -600,19 +635,54 @@ class IVFService:
             if branch_id is not None:
                 query = query.filter(PatientCrylockInfo.branch_id == branch_id)
             
+            # Apply optional branch/site name filter
+            normalized_branch_name = branch_name.strip() if branch_name else None
+            if normalized_branch_name:
+                query = query.filter(
+                    func.lower(HospitalBranch.branch_name) == func.lower(normalized_branch_name)
+                )
+
+            # Apply optional status filter
+            normalized_status = status.strip() if status else None
+            if normalized_status:
+                query = query.filter(
+                    func.lower(func.coalesce(IVFShipment.shipment_status, "")) == func.lower(normalized_status)
+                )
+
+            # Apply optional cryolock color filter
+            normalized_cryolock_color = cryolock_color.strip() if cryolock_color else None
+            if normalized_cryolock_color:
+                query = query.filter(
+                    func.lower(func.coalesce(PatientCrylockInfo.crylock_color, "")) == func.lower(normalized_cryolock_color)
+                )
+
+            # Apply optional goblet color filter
+            normalized_goblet_color = goblet_color.strip() if goblet_color else None
+            if normalized_goblet_color:
+                query = query.filter(
+                    func.lower(func.coalesce(PatientCrylockInfo.goblet_color, "")) == func.lower(normalized_goblet_color)
+                )
+            
             # Exclude cryolocks that have been moved to embryo transfer
             query = query.filter(PatientCrylockInfo.embryo_transfer != True)
             
+            # Count total before lazy-load slice.
+            total_records = int(query.count() or 0)
+
             # Order by HIS number and cryolock number
             query = query.order_by(PatientCrylockInfo.his_number, PatientCrylockInfo.crylock_number)
-            
-            results = query.all()
+
+            # Apply lazy-load slice.
+            safe_offset = max(0, offset)
+            safe_limit = max(1, limit)
+            results = query.offset(safe_offset).limit(safe_limit).all()
             
             tracking_list = []
             
             for row in results:
                 # Get description from the joined query result
                 description = row.shipment_description if hasattr(row, 'shipment_description') else None
+                shipment_status = row.shipment_status if hasattr(row, 'shipment_status') else None
                 
                 tracking_data = {
                     "his_number": decrypt_sensitive_ivf_value(row.his_number) or "",
@@ -631,16 +701,22 @@ class IVFService:
                     # User role: Include embryo_grading (not available in current model, return empty)
                     tracking_data["embryo_grading"] = ""
                 else:
-                    # Manager/Admin roles: Include site_name and status (status not available in current model)
+                    # Manager/Admin roles: Include site_name and shipment status.
                     tracking_data["site_name"] = row.branch_name or ""
-                    tracking_data["status"] = ""  # Status field not available in PatientCrylockInfo model
+                    tracking_data["status"] = shipment_status or ""
                 
                 # Append the tracking data to the list
                 tracking_list.append(tracking_data)
             
+            has_more = (safe_offset + len(tracking_list)) < total_records
             return {
                 "data": tracking_list,
-                "total": len(tracking_list)
+                "total": total_records,
+                "offset": safe_offset,
+                "limit": safe_limit,
+                "has_more": has_more,
+                "next_offset": (safe_offset + safe_limit) if has_more else None,
+                "message": "No embryo tracking data found" if total_records == 0 else "Embryo tracking data fetched successfully"
             }
             
         except Exception as e:
