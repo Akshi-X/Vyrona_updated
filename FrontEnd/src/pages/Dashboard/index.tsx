@@ -886,7 +886,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Embryos
+                            Total Cryolocks
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfTotals
