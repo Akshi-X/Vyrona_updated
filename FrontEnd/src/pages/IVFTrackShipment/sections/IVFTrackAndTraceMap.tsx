@@ -285,12 +285,17 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
 
       // Create tooltip for source marker
       const sourceTooltipContent = `
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap;">
+        <style>
+          body { margin: 0; padding: 0; overflow: hidden !important; }
+          html { overflow: hidden !important; }
+        </style>
+        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
           Source Location
         </div>
       `;
       sourceInfoWindowRef.current = new window.google.maps.InfoWindow({
         content: sourceTooltipContent,
+        disableAutoPan: false,
       });
       sourceMarkerRef.current.addListener('mouseover', () => {
         if (sourceInfoWindowRef.current && sourceMarkerRef.current) {
@@ -324,12 +329,17 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
 
       // Create tooltip for destination marker
       const destinationTooltipContent = `
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap;">
+        <style>
+          body { margin: 0; padding: 0; overflow: hidden !important; }
+          html { overflow: hidden !important; }
+        </style>
+        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
           Destination Location
         </div>
       `;
       destinationInfoWindowRef.current = new window.google.maps.InfoWindow({
         content: destinationTooltipContent,
+        disableAutoPan: false,
       });
       destinationMarkerRef.current.addListener('mouseover', () => {
         if (destinationInfoWindowRef.current && destinationMarkerRef.current) {
@@ -362,12 +372,17 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
 
       // Create tooltip for current position marker
       const currentTooltipContent = `
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap;">
+        <style>
+          body { margin: 0; padding: 0; overflow: hidden !important; }
+          html { overflow: hidden !important; }
+        </style>
+        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
           Current Location
         </div>
       `;
       currentInfoWindowRef.current = new window.google.maps.InfoWindow({
         content: currentTooltipContent,
+        disableAutoPan: false,
       });
       markerRef.current.addListener('mouseover', () => {
         if (currentInfoWindowRef.current && markerRef.current) {
@@ -424,7 +439,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
           if (sourceToCurrentPath.length > 1) {
             sourceToCurrentPolylineRef.current = new window.google.maps.Polyline({
               path: sourceToCurrentPath,
-              geodesic: true,
+              geodesic: false,
               strokeColor: "#3b82f6",
               strokeOpacity: 1.0,
               strokeWeight: 3,
@@ -434,47 +449,24 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
         }
       }
       
-      // Create red polyline from current to destination
+      // Create red polyline from current to destination (straight line)
       if (currentPosition && destinationPosition && 
           (destinationPosition.lat !== currentPosition.lat || 
            destinationPosition.lng !== currentPosition.lng)) {
-        const currentToDestinationPath: google.maps.LatLngLiteral[] = [];
+        // Create a direct straight line from current to destination
+        const currentToDestinationPath: google.maps.LatLngLiteral[] = [
+          { lat: currentPosition.lat, lng: currentPosition.lng },
+          { lat: destinationPosition.lat, lng: destinationPosition.lng }
+        ];
         
-        // Add current position (only if it's not already the last point in blue line)
-        const isCurrentInPositions = currentIndex >= 0;
-        if (!isCurrentInPositions) {
-          currentToDestinationPath.push({ lat: currentPosition.lat, lng: currentPosition.lng });
-        }
-        
-        // Add positions after current if any
-        if (currentIndex >= 0 && currentIndex < positions.length - 1) {
-          for (let i = currentIndex + 1; i < positions.length; i++) {
-            currentToDestinationPath.push({ lat: positions[i].lat, lng: positions[i].lng });
-          }
-        }
-        
-        // Check if destination is different from last position to avoid duplication
-        const lastPos = currentToDestinationPath.length > 0 
-          ? currentToDestinationPath[currentToDestinationPath.length - 1]
-          : currentPosition;
-        const isDestinationDuplicate = lastPos &&
-          Math.abs(destinationPosition.lat - lastPos.lat) < 0.0001 && 
-          Math.abs(destinationPosition.lng - lastPos.lng) < 0.0001;
-        
-        if (!isDestinationDuplicate) {
-          currentToDestinationPath.push({ lat: destinationPosition.lat, lng: destinationPosition.lng });
-        }
-        
-        if (currentToDestinationPath.length > 1) {
-          currentToDestinationPolylineRef.current = new window.google.maps.Polyline({
-            path: currentToDestinationPath,
-            geodesic: true,
-            strokeColor: "#ef4444",
-            strokeOpacity: 1.0,
-            strokeWeight: 3,
-            map,
-          });
-        }
+        currentToDestinationPolylineRef.current = new window.google.maps.Polyline({
+          path: currentToDestinationPath,
+          geodesic: false,
+          strokeColor: "#ef4444",
+          strokeOpacity: 1.0,
+          strokeWeight: 3,
+          map,
+        });
       }
     }
     
@@ -482,7 +474,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
     if (positions.length > 1 && !currentPosition) {
       sourceToCurrentPolylineRef.current = new window.google.maps.Polyline({
         path: positions.map((p) => ({ lat: p.lat, lng: p.lng })),
-        geodesic: true,
+        geodesic: false,
         strokeColor: "#3b82f6",
         strokeOpacity: 1.0,
         strokeWeight: 3,
