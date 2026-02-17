@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Query, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
 import json
+import io
 
 from app.config import database
 from app.schemas.feedback_schema import (
@@ -13,7 +15,8 @@ from app.schemas.feedback_schema import (
 )
 from app.service.feedback_service import (
     create_feedback, add_comment, update_feedback_status,
-    get_feedback_by_id, get_feedback_comments,get_user_feedback,get_all_feedback
+    get_feedback_by_id, get_feedback_comments, get_user_feedback, get_all_feedback,
+    get_feedback_attachment_content
 )
 from app.dependencies.auth_dependencies import get_current_user
 from app.models import user_model
@@ -143,6 +146,29 @@ def get_feedback_by_id_endpoint(
     """Get detailed feedback by ID"""
     # Call service (all business logic there)
     return get_feedback_by_id(db=db, feedback_id=feedback_id)
+
+
+@router.get(
+    "/{feedback_id}/attachments/{attachment_id}/{filename}",
+    summary="Get feedback attachment content",
+    description="Stream attachment bytes restored from base64 payload stored in database."
+)
+def get_feedback_attachment_endpoint(
+    feedback_id: str,
+    attachment_id: int,
+    filename: str,
+    db: Session = Depends(database.get_db),
+    current_user: user_model.User = Depends(get_current_user)
+):
+    """Stream attachment content for view/download."""
+    _ = filename
+    attachment_data = get_feedback_attachment_content(db=db, feedback_id=feedback_id, attachment_id=attachment_id)
+
+    return StreamingResponse(
+        io.BytesIO(attachment_data["content"]),
+        media_type=attachment_data["mime_type"],
+        headers={"Content-Disposition": f'inline; filename="{attachment_data["filename"]}"'}
+    )
 
 
 @router.post("/{feedback_id}/comments", response_model=CommentCreateResponse, summary="Add comment to feedback", description="Add a new comment to an existing feedback ticket")

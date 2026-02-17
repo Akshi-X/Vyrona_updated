@@ -36,6 +36,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   const [canisterCheckLoading, setCanisterCheckLoading] = useState(false);
   const [canisterCheckMessage, setCanisterCheckMessage] = useState<string | null>(null);
   const [canisterCheckError, setCanisterCheckError] = useState<string | null>(null);
+  const [hasInTransitShipments, setHasInTransitShipments] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const branchDropdownRef = useRef<HTMLDivElement | null>(null);
   const branchMenuRef = useRef<HTMLDivElement | null>(null);
@@ -61,6 +62,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       setCanisterCheckMessage(null);
       setCanisterCheckError(null);
       setCanisterCheckLoading(false);
+      setHasInTransitShipments(null);
     }
   }, [isOpen]);
 
@@ -188,6 +190,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     // Clear previous messages when user types
     setCanisterCheckMessage(null);
     setCanisterCheckError(null);
+    setHasInTransitShipments(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -215,8 +218,10 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           // Tank doesn't exist
           setCanisterCheckError(response.message);
           setCanisterCheckMessage(null);
+          setHasInTransitShipments(null);
         } else if (response.has_in_transit_shipments) {
-          // Navigate to the page if has in-transit shipments
+          // Has in-transit shipments - set status and navigate
+          setHasInTransitShipments(true);
           if (isManager && selectedBranchId != null) {
             try {
               sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
@@ -224,7 +229,8 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           }
           onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
         } else {
-          // Show message if no in-transit shipments
+          // No in-transit shipments - set status and show message
+          setHasInTransitShipments(false);
           setCanisterCheckMessage(response.message);
           setCanisterCheckError(null);
         }
@@ -279,6 +285,10 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
               className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
                 canisterCheckError
                   ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                  : title === "Outbound Quality Tracking" && hasInTransitShipments === false
+                  ? 'border-orange-500 focus:ring-orange-500 focus:border-orange-500'
+                  : title === "Outbound Quality Tracking" && hasInTransitShipments === true
+                  ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
                   : canisterCheckMessage && !canisterCheckError
                   ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
                   : 'border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]'
@@ -311,6 +321,10 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           </div>
           {canisterCheckError ? (
             <p className="mt-2 text-sm text-red-600">{canisterCheckError}</p>
+          ) : title === "Outbound Quality Tracking" && hasInTransitShipments === false ? (
+            <p className="mt-2 text-sm text-orange-600 font-medium">{canisterCheckMessage || 'No in-transit shipments found'}</p>
+          ) : title === "Outbound Quality Tracking" && hasInTransitShipments === true ? (
+            <p className="mt-2 text-sm text-green-600 font-medium">In-transit shipments found. Redirecting...</p>
           ) : canisterCheckMessage && !canisterCheckError ? (
             <p className="mt-2 text-sm text-green-600">{canisterCheckMessage}</p>
           ) : error ? (

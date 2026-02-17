@@ -35,7 +35,7 @@ from app.constants.app_constants import (
     DEFAULT_SESSION_TIMEOUT_MINUTES
 )
 from app.constants.messages import SuccessMessages, ErrorMessages
-from app.config.config import settings, get_settings
+from app.config.config import settings
 from app.models.pharma_model import Pharma
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
@@ -88,15 +88,28 @@ def get_pharma_admin_email(pharma_id: int, db: Session) -> Optional[str]:
         return None
 
 
-def get_mygrape_admin_email() -> str:
+def get_mygrape_admin_email(db: Session) -> Optional[str]:
     """
-    Get the common MyGrape admin email for all pharma companies.
+    Get an active approved MyGrape admin email from the users table.
     
     Returns:
-        MyGrape admin email from configuration
+        MyGrape admin email if found, otherwise None
     """
-    settings_obj = get_settings()
-    return settings_obj.MYGRAPE_ADMIN_EMAIL
+    try:
+        mygrape_admin = db.query(user_model.User).filter(
+            user_model.User.role == 'Mygrape_admin',
+            user_model.User.approved_status == 'approved',
+            user_model.User.status == True
+        ).first()
+
+        if not mygrape_admin:
+            logger.warning("No active approved MyGrape admin found in users table")
+            return None
+
+        return mygrape_admin.email
+    except Exception as e:
+        logger.error(f"Error getting MyGrape admin email from DB: {str(e)}")
+        return None
 
 
 def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
