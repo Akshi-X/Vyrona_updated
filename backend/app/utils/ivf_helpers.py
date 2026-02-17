@@ -8,7 +8,7 @@ import hashlib
 import hmac
 import logging
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from cryptography.hazmat.primitives import padding  # pyright: ignore[reportMissingImports]
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes  # pyright: ignore[reportMissingImports]
 from sqlalchemy import func
@@ -18,7 +18,7 @@ from ..config.config import settings
 from ..models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ..models.IVF.tank_model import Tank
 from ..models.user_model import User
-from ..utils.user_helpers import is_hospital_department
+from ..utils.user_helpers import is_specific_department
 
 
 # Roles that should be filtered by branch (only User)
@@ -113,7 +113,7 @@ def get_branch_filter_info(request: Request, branch_id_override: Optional[int] =
         * If is_quality_tracking=True and branch_id_override is NOT provided: filter by their own branch_id
         * If is_quality_tracking=False (control tower, dashboard, etc.): no filtering - can see all branches
     - Admin: No filtering (return None for branch_id) - can see all branches (branch_id_override is ignored)
-    - Non-IVF users: No filtering (return None for branch_id)
+    - Non-IVF users: Access denied (HTTP 403)
     
     Args:
         request: FastAPI Request object with current_user in request.state
@@ -123,18 +123,20 @@ def get_branch_filter_info(request: Request, branch_id_override: Optional[int] =
     Returns:
         Tuple of (branch_id, role):
         - branch_id: Branch ID to filter by, or None if no filtering
-        - role: User's role, or None if not an IVF user
+        - role: User's role for IVF users
     """
     # Get current user from request state (injected by middleware)
     if not hasattr(request.state, "current_user"):
-        return None, None
+        raise HTTPException(status_code=401, detail="User not authenticated")
     
     user: User = request.state.current_user
     
-    # Check if user is from IVF department
-    if not is_hospital_department(user.department) if user.department else False:
-        # Not an IVF user - no branch filtering
-        return None, None
+    # Strict department isolation: only IVF users can access IVF endpoints.
+    if not is_specific_department(user.department, "IVF"):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This endpoint is for IVF users only"
+        )
     
     # Get user's role (enum value is already in title case: "Admin", "Manager", "User")
     role = user.role.value if hasattr(user.role, 'value') else str(user.role)
