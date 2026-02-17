@@ -163,6 +163,21 @@ class CanisterCheckResponse(BaseModel):
         from_attributes = True
 
 
+class TankInTransitCheckResponse(BaseModel):
+    """Schema for tank in-transit shipment check response."""
+    exists: bool = Field(..., description="Whether the tank exists")
+    tank_code: str = Field(..., description="Tank code that was checked")
+    tank_id: Optional[int] = Field(None, description="Tank ID if exists")
+    branch_id: Optional[int] = Field(None, description="Branch ID of the tank if exists")
+    branch_name: Optional[str] = Field(None, description="Branch name of the tank if exists")
+    has_in_transit_shipments: bool = Field(..., description="Whether this tank has any in-transit shipments")
+    in_transit_count: int = Field(..., description="Number of in-transit crylocks in this tank")
+    message: str = Field(..., description="Response message")
+
+    class Config:
+        from_attributes = True
+
+
 class CanisterResponse(CanisterBase):
     """Schema for canister response"""
     canister_id: int
@@ -500,6 +515,7 @@ class EmbryoTransferResponse(BaseModel):
     """Response schema for embryo transfer crylocks"""
     data: List[EmbryoTransferCrylockItem] = Field(..., description="List of embryo transfer crylocks")
     total: int = Field(..., description="Total number of embryo transfer crylocks")
+    message: str = Field(..., description="Response message")
     
     class Config:
         from_attributes = True
@@ -547,6 +563,7 @@ class InTransitResponse(BaseModel):
     """Response schema for in-transit crylocks"""
     data: List[InTransitCrylockItem] = Field(..., description="List of in-transit crylocks")
     total: int = Field(..., description="Total number of in-transit crylocks")
+    message: str = Field(..., description="Response message")
     
     class Config:
         from_attributes = True
@@ -556,6 +573,11 @@ class EmbryoTrackingResponse(BaseModel):
     """Schema for embryo tracking API response"""
     data: List[EmbryoTrackingItem] = Field(..., description="List of embryo tracking records")
     total: int = Field(..., description="Total number of records")
+    offset: int = Field(default=0, description="Number of records skipped")
+    limit: int = Field(default=100, description="Number of records fetched")
+    has_more: bool = Field(default=False, description="Whether more records are available")
+    next_offset: Optional[int] = Field(None, description="Offset to request next chunk, or null when no more records")
+    message: str = Field(default="Embryo tracking data fetched successfully", description="Response message")
     
     class Config:
         from_attributes = True

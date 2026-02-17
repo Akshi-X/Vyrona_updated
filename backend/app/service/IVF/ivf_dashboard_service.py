@@ -132,35 +132,34 @@ class IVFDashboardService:
     
     def get_total_containers(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
-        Get total number of containers (cryolocks).
+        Get total number of tanks.
         
         Metric 2: Total number of Containers (For all Sites)
         
-        Note: "Containers" in the ARC IVF API context refers to cryolocks, not canisters.
-        This matches the source API's totalNumberofContainers field which counts cryolocks.
+        Note: Endpoint name/response key is kept as "containers" for backward compatibility,
+        but the count is derived from IVF tanks.
         
         Args:
             branch_id: Optional branch ID to filter by
             role: User's role to determine filtering
             
         Returns:
-            Dictionary with total_containers count (cryolocks)
+            Dictionary with total_containers count (tanks)
         """
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Query PatientCrylockInfo for cryolocks (containers)
-        # Exclude cryolocks that have been moved to embryo transfer
-        cryolock_query = (
-            self.db.query(func.count(PatientCrylockInfo.id))
-            .filter(PatientCrylockInfo.embryo_transfer != True)
+        # Query active tanks and count by branch scope (if applicable)
+        tank_query = (
+            self.db.query(func.count(Tank.tank_id))
+            .filter(Tank.is_active == True)
         )
         
         # Apply branch filtering if needed
         if filter_branch_id is not None:
-            cryolock_query = cryolock_query.filter(PatientCrylockInfo.branch_id == filter_branch_id)
+            tank_query = tank_query.filter(Tank.branch_id == filter_branch_id)
         
-        total_containers = cryolock_query.scalar() or 0
+        total_containers = tank_query.scalar() or 0
         
         return {
             "total_containers": total_containers
