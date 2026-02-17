@@ -337,20 +337,31 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               
               if (hasCanisterId && hasTimestamp && hasTemperature) {
                 // Extract IVF field names - check multiple possible locations
-                const temp_internal = 
+                let temp_internal = 
                   data.temp_internal !== undefined ? data.temp_internal :
                   frequencyResults.temp_internal !== undefined ? frequencyResults.temp_internal :
                   data.temperature !== undefined ? data.temperature : null;
                 
-                const temp_external = 
+                let temp_external = 
                   data.temp_external !== undefined && data.temp_external !== null ? data.temp_external :
                   frequencyResults.temp_external !== undefined && frequencyResults.temp_external !== null ? frequencyResults.temp_external :
                   null;
                 
-                const shock = 
+                let shock = 
                   data.shock !== undefined ? data.shock :
                   frequencyResults.shock !== undefined ? frequencyResults.shock :
                   data.agitation !== undefined ? data.agitation : null;
+                
+                // Convert to numbers if they're strings
+                if (temp_internal !== null && typeof temp_internal !== 'number') {
+                  temp_internal = parseFloat(temp_internal);
+                }
+                if (temp_external !== null && typeof temp_external !== 'number') {
+                  temp_external = parseFloat(temp_external);
+                }
+                if (shock !== null && typeof shock !== 'number') {
+                  shock = parseFloat(shock);
+                }
                 
                 // Update battery percentage if available (use the most recent one)
                 if (data.battery_percentage !== undefined && data.battery_percentage !== null) {
@@ -358,13 +369,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 }
                 
                 // Only add if we have valid numeric values for required fields
-                if (temp_internal !== undefined && temp_internal !== null &&
-                    shock !== undefined && shock !== null) {
+                if (temp_internal !== null && !isNaN(temp_internal) &&
+                    shock !== null && !isNaN(shock)) {
                   const qualityData: DataPoint = {
                     timestamp: data.timestamp,
-                    temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
-                    temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                    shock: typeof shock === 'number' ? shock : parseFloat(shock),
+                    temp_internal: temp_internal,
+                    temp_external: temp_external !== null && !isNaN(temp_external) ? temp_external : null,
+                    shock: shock,
                   };
                   newDataPoints.push(qualityData);
                 }
@@ -486,73 +497,46 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     // Filter data points to only show last 1 hour
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
+    // Sort data points by timestamp (oldest first)
+    const sortedPoints = [...filteredDataPoints].sort((a, b) => {
+      const dateA = parseTimestamp(a.timestamp);
+      const dateB = parseTimestamp(b.timestamp);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
+    
     const palette = {
       temp_internal: '#8AB6F9',
       temp_external: '#4A90E2',
       shock: '#BDBDBD',
     } as const;
 
-    // Generate 6 interval labels (from 50 minutes ago to now, in 10-minute steps)
-    const intervalLabels: string[] = [];
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      const minutesAgo = i * INTERVAL_MINUTES;
-      intervalLabels.push(formatTimestampToInterval(minutesAgo));
-    }
-
-    // Group data points by interval index (0-5)
-    const intervalData: { [key: number]: DataPoint[] } = {};
-    filteredDataPoints.forEach((point) => {
-      const intervalIndex = getIntervalIndex(point.timestamp);
-      if (!intervalData[intervalIndex]) {
-        intervalData[intervalIndex] = [];
-      }
-      intervalData[intervalIndex].push(point);
+    // Generate unique labels for each data point - show actual time rounded to 5-minute intervals
+    const labels: string[] = sortedPoints.map((point) => {
+      const date = parseTimestamp(point.timestamp);
+      if (!date) return '';
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      const displayHours = hours % 12 || 12;
+      // Round to nearest 5 minutes for cleaner display (since data comes every 5 minutes)
+      const roundedMinutes = Math.floor(minutes / 5) * 5;
+      return `${displayHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
     });
 
-    // For each interval, get the latest data point (most recent within that interval)
-    const intervalValues: { [key: number]: { temp_internal: number; temp_external: number | null; shock: number } } = {};
-    Object.keys(intervalData).forEach((key) => {
-      const index = parseInt(key);
-      const points = intervalData[index];
-      if (points.length > 0) {
-        // Sort by timestamp and use the most recent point in that interval
-        const sortedPoints = points.sort((a, b) => {
-          const dateA = parseTimestamp(a.timestamp);
-          const dateB = parseTimestamp(b.timestamp);
-          if (!dateA || !dateB) return 0;
-          const timeA = dateA.getTime();
-          const timeB = dateB.getTime();
-          return timeB - timeA; // Most recent first
-        });
-        const latestPoint = sortedPoints[0];
-        intervalValues[index] = {
-          temp_internal: latestPoint.temp_internal,
-          temp_external: latestPoint.temp_external,
-          shock: latestPoint.shock,
-        };
-      }
-    });
-
-    // Create data arrays for each interval (0-5, where 0 is most recent)
-    const tempInternalData: (number | null)[] = [];
+    // Create data arrays with all points
+    const tempInternalData: number[] = [];
     const tempExternalData: (number | null)[] = [];
-    const shockData: (number | null)[] = [];
+    const shockData: number[] = [];
 
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      if (intervalValues[i]) {
-        tempInternalData.push(intervalValues[i].temp_internal);
-        tempExternalData.push(intervalValues[i].temp_external);
-        shockData.push(intervalValues[i].shock);
-      } else {
-        // No data for this interval, use null
-        tempInternalData.push(null);
-        tempExternalData.push(null);
-        shockData.push(null);
-      }
-    }
+    sortedPoints.forEach((point) => {
+      tempInternalData.push(point.temp_internal);
+      tempExternalData.push(point.temp_external);
+      shockData.push(point.shock);
+    });
 
     return {
-      labels: intervalLabels,
+      labels: labels,
       datasets: [
         {
           label: 'Temperature Internal (°C)',
@@ -567,7 +551,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          spanGaps: true, // Connect across null values
+          spanGaps: false,
         },
         {
           label: 'Temperature External (°C)',
@@ -582,8 +566,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          hidden: tempExternalData.every(v => v === null), // Hide if all values are null
-          spanGaps: true, // Connect across null values
+          hidden: tempExternalData.every(v => v === null),
+          spanGaps: false,
         },
         {
           label: 'Shock (G)',
@@ -598,7 +582,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          spanGaps: true, // Connect across null values
+          spanGaps: false,
         },
       ],
     };
@@ -686,9 +670,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             font: {
               size: 11,
             },
-            maxRotation: 0,
+            maxRotation: 45,
             minRotation: 0,
-            autoSkip: false,
+            autoSkip: true,
+            maxTicksLimit: 12,
             callback: function (_value: any, index: number) {
               const labels = (this as any).chart.data.labels as string[];
               return labels[index] || '';
