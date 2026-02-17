@@ -21,37 +21,37 @@ import { AuthRedirect } from '../components/AuthRedirect'
 
 // Wrapper components to ensure context is available
 const DashboardWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <Dashboard />
   </RoleBasedRoute>
 )
 
 const DatabaseWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <Database />
   </RoleBasedRoute>
 )
 
 const ControlTowerWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <ControlTower />
   </RoleBasedRoute>
 )
 
 const TrackPageWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <TrackPage />
   </RoleBasedRoute>
 )
 
 const IVFTrackShipmentWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <IVFTrackShipmentPage />
   </RoleBasedRoute>
 )
 
 const OutboundQualityTrackingWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
     <OutboundQualityTrackingPage />
   </RoleBasedRoute>
 )
