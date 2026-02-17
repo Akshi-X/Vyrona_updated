@@ -392,24 +392,6 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                     shock: shock,
                   };
                   newDataPoints.push(qualityData);
-                  // Debug logging
-                  console.log('Adding data point:', {
-                    timestamp: data.timestamp,
-                    temp_internal,
-                    shock,
-                    temp_external,
-                    parsed: parseTimestamp(data.timestamp)
-                  });
-                } else {
-                  console.warn('Skipping invalid data point:', {
-                    timestamp: data.timestamp,
-                    temp_internal,
-                    shock,
-                    temp_external,
-                    hasCanisterId,
-                    hasTimestamp,
-                    hasTemperature
-                  });
                 }
               }
             });
