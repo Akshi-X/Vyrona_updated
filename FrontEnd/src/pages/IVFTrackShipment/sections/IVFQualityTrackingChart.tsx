@@ -298,72 +298,108 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           if (!isMountedRef.current) {
             return;
           }
- 
+
           try {
-            const data: any = JSON.parse(event.data);
- 
+            const parsed: any = JSON.parse(event.data);
+
             // Check if this is a subscription confirmation
-            if (data.type === 'subscription_confirmed') {
+            if (parsed.type === 'subscription_confirmed') {
               return;
             }
- 
+
             // Check if this is an error message
-            if (data.type === 'error') {
-              setError(data.message || 'Unknown error');
+            if (parsed.type === 'error') {
+              setError(parsed.message || 'Unknown error');
               // Don't reconnect on authentication/authorization errors
-              if (data.message && (data.message.includes('token') || data.message.includes('Invalid canister'))) {
+              if (parsed.message && (parsed.message.includes('token') || parsed.message.includes('Invalid canister'))) {
                 reconnectAttemptsRef.current = maxReconnectAttempts;
               }
               return;
             }
- 
-            // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
-            // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
-            const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
-            const hasTimestamp = data.timestamp;
-            const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
-            
-            if (hasCanisterId && hasTimestamp && hasTemperature) {
-              // Extract IVF field names
-              const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
-              const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
-              const shock = data.shock !== undefined ? data.shock : data.agitation;
-              
-              // Update battery percentage if available
-              if (data.battery_percentage !== undefined && data.battery_percentage !== null) {
-                setBatteryPercentage(typeof data.battery_percentage === 'number' ? data.battery_percentage : parseFloat(data.battery_percentage));
-              }
-              
-              // Only add if we have valid numeric values for required fields
-              if (temp_internal !== undefined && temp_internal !== null &&
-                  shock !== undefined && shock !== null) {
-                const qualityData: DataPoint = {
-                  timestamp: data.timestamp,
-                  temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
-                  temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                  shock: typeof shock === 'number' ? shock : parseFloat(shock),
-                };
-                
-                // Mark that we've received data
-                setHasReceivedData(true);
-                
-                // Add new data point
-                setDataPoints((prev) => {
-                  const newPoints = [
-                    ...prev,
-                    qualityData,
-                  ];
 
-                  // Keep only last MAX_DATA_POINTS
-                  if (newPoints.length > MAX_DATA_POINTS) {
-                    return newPoints.slice(-MAX_DATA_POINTS);
-                  }
-                  return newPoints;
-                });
+            // Handle both single data point and array of data points (historical data)
+            const dataArray = Array.isArray(parsed) ? parsed : [parsed];
+            const newDataPoints: DataPoint[] = [];
+
+            dataArray.forEach((data: any) => {
+              // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
+              // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
+              // Data might be nested in frequency_results object
+              const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
+              const hasTimestamp = data.timestamp;
+              
+              // Check for temperature in multiple possible locations
+              const frequencyResults = data.frequency_results || {};
+              const hasTemperature = 
+                data.temperature !== undefined || 
+                data.temp_internal !== undefined ||
+                frequencyResults.temp_internal !== undefined;
+              
+              if (hasCanisterId && hasTimestamp && hasTemperature) {
+                // Extract IVF field names - check multiple possible locations
+                const temp_internal = 
+                  data.temp_internal !== undefined ? data.temp_internal :
+                  frequencyResults.temp_internal !== undefined ? frequencyResults.temp_internal :
+                  data.temperature !== undefined ? data.temperature : null;
+                
+                const temp_external = 
+                  data.temp_external !== undefined && data.temp_external !== null ? data.temp_external :
+                  frequencyResults.temp_external !== undefined && frequencyResults.temp_external !== null ? frequencyResults.temp_external :
+                  null;
+                
+                const shock = 
+                  data.shock !== undefined ? data.shock :
+                  frequencyResults.shock !== undefined ? frequencyResults.shock :
+                  data.agitation !== undefined ? data.agitation : null;
+                
+                // Update battery percentage if available (use the most recent one)
+                if (data.battery_percentage !== undefined && data.battery_percentage !== null) {
+                  setBatteryPercentage(typeof data.battery_percentage === 'number' ? data.battery_percentage : parseFloat(data.battery_percentage));
+                }
+                
+                // Only add if we have valid numeric values for required fields
+                if (temp_internal !== undefined && temp_internal !== null &&
+                    shock !== undefined && shock !== null) {
+                  const qualityData: DataPoint = {
+                    timestamp: data.timestamp,
+                    temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
+                    temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
+                    shock: typeof shock === 'number' ? shock : parseFloat(shock),
+                  };
+                  newDataPoints.push(qualityData);
+                }
               }
+            });
+
+            // Add all new data points at once, removing duplicates by timestamp
+            if (newDataPoints.length > 0) {
+              setHasReceivedData(true);
+              
+              setDataPoints((prev) => {
+                // Create a map of existing timestamps for quick lookup
+                const existingTimestamps = new Set(prev.map(p => p.timestamp));
+                
+                // Filter out duplicates and add new points
+                const uniqueNewPoints = newDataPoints.filter(p => !existingTimestamps.has(p.timestamp));
+                const combined = [...prev, ...uniqueNewPoints];
+
+                // Sort by timestamp (oldest first) and keep only last MAX_DATA_POINTS
+                const sorted = combined.sort((a, b) => {
+                  const dateA = parseTimestamp(a.timestamp);
+                  const dateB = parseTimestamp(b.timestamp);
+                  if (!dateA || !dateB) return 0;
+                  return dateA.getTime() - dateB.getTime();
+                });
+
+                if (sorted.length > MAX_DATA_POINTS) {
+                  return sorted.slice(-MAX_DATA_POINTS);
+                }
+                return sorted;
+              });
             }
           } catch (err) {
             // Error parsing WebSocket message
+            console.error('Error parsing WebSocket message:', err);
           }
         };
  
@@ -524,11 +560,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.temp_internal,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.temp_internal,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
           spanGaps: true, // Connect across null values
@@ -539,11 +575,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.temp_external,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.temp_external,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
           hidden: tempExternalData.every(v => v === null), // Hide if all values are null
@@ -555,11 +591,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.shock,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.shock,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
           spanGaps: true, // Connect across null values
