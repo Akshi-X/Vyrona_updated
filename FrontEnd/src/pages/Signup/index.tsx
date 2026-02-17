@@ -75,24 +75,24 @@ const Signup: React.FC = () => {
             try {
                 const hospitalInfo = await authService.getHospitalInfoByEmail(email);
                 setIsHospitalEmail(hospitalInfo.is_hospital_email);
-                
+
                 if (hospitalInfo.is_hospital_email) {
                     const hospitalNameValue = hospitalInfo.hospital_name || "";
                     setHospitalName(hospitalNameValue);
                     setBranchOptions(hospitalInfo.branches || []);
-                    
+
                     // Auto-fill organization field with hospital name
                     setOrganization(hospitalNameValue);
-                    
+
                     // Set department value from API response
                     const apiDepartments = hospitalInfo.departments || [];
                     const validDepartmentNames = ["IVF", "Oncology", "CGT"];
-                    
+
                     // Filter out invalid department names (like "public" which is hospital_type, not department)
-                    const validApiDepartments = apiDepartments.filter(dept => 
+                    const validApiDepartments = apiDepartments.filter(dept =>
                         validDepartmentNames.includes(dept)
                     );
-                    
+
                     // Set department value based on API response
                     if (validApiDepartments.length === 1) {
                         setDepartment(validApiDepartments[0]);
@@ -611,7 +611,7 @@ const Signup: React.FC = () => {
 
                             <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
                                 Having trouble Signing up? Contact <a href="#" className="text-[#6b1176] inline">
-                                    ITAdmin@myGrape.org
+                                    admin@mygrape.org
                                 </a>{" "} for help.
                             </p>
 

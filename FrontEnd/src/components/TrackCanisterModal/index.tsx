@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Modal from '../Modal';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/DarkContainerQualityTracking.svg';
 import { useAuth } from '../../contexts/AuthContext';
-import { ivfService, type IvfBranch, type CanisterCheckResponse } from '../../services/ivfService';
+import { ivfService, type IvfBranch, type CanisterCheckResponse, type TankInTransitCheckResponse } from '../../services/ivfService';
 
 interface TrackCanisterModalProps {
   isOpen: boolean;
@@ -196,19 +196,60 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     if (!trimmedCanisterId) return;
     if (isManager && !selectedBranchName) return;
     
-    // Check canister when Track button is clicked
-    const exists = await checkCanister(trimmedCanisterId);
+    // Check if this is for Outbound Quality Tracking
+    const isOutboundQualityTracking = title === "Outbound Quality Tracking";
     
-    // Only navigate if canister exists (exists === true)
-    if (exists === true) {
-      if (isManager && selectedBranchId != null) {
-        try {
-          sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
-        } catch {}
+    if (isOutboundQualityTracking) {
+      // For Outbound Quality Tracking, check in-transit status
+      setCanisterCheckLoading(true);
+      setCanisterCheckError(null);
+      setCanisterCheckMessage(null);
+      
+      try {
+        const response: TankInTransitCheckResponse = await ivfService.checkTankInTransitStatus(
+          trimmedCanisterId,
+          isManager ? selectedBranchId ?? undefined : undefined
+        );
+        
+        if (!response.exists) {
+          // Tank doesn't exist
+          setCanisterCheckError(response.message);
+          setCanisterCheckMessage(null);
+        } else if (response.has_in_transit_shipments) {
+          // Navigate to the page if has in-transit shipments
+          if (isManager && selectedBranchId != null) {
+            try {
+              sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
+            } catch {}
+          }
+          onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
+        } else {
+          // Show message if no in-transit shipments
+          setCanisterCheckMessage(response.message);
+          setCanisterCheckError(null);
+        }
+      } catch (e: any) {
+        const errorMessage = (e?.message as string) || 'Failed to check in-transit status';
+        setCanisterCheckError(errorMessage);
+        setCanisterCheckMessage(null);
+      } finally {
+        setCanisterCheckLoading(false);
       }
-      onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
+    } else {
+      // For other modals, use the existing checkCanister logic
+      const exists = await checkCanister(trimmedCanisterId);
+      
+      // Only navigate if canister exists (exists === true)
+      if (exists === true) {
+        if (isManager && selectedBranchId != null) {
+          try {
+            sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
+          } catch {}
+        }
+        onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
+      }
+      // If exists === false, error message is already set by checkCanister
     }
-    // If exists === false, error message is already set by checkCanister
   };
 
   return (

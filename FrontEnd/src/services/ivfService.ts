@@ -78,6 +78,17 @@ export interface CanisterCheckResponse {
   message: string;
 }
 
+export interface TankInTransitCheckResponse {
+  exists: boolean;
+  tank_code: string;
+  tank_id: number | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  has_in_transit_shipments: boolean;
+  in_transit_count: number;
+  message: string;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -238,6 +249,15 @@ export class IvfService extends BaseApiService {
       `/api/ivf/canisters/${encodeURIComponent(canisterId)}/check`,
       { method: 'GET' }
     );
+  }
+
+  async checkTankInTransitStatus(tankCode: string | number, branchId?: number | null): Promise<TankInTransitCheckResponse> {
+    let url = `/api/ivf/canisters/${encodeURIComponent(tankCode)}/in-transit-check`;
+    if (branchId != null) {
+      const sep = url.includes('?') ? '&' : '?';
+      url = `${url}${sep}branch_id=${encodeURIComponent(branchId)}`;
+    }
+    return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
   }
 
   async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
