@@ -77,39 +77,51 @@ const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
   if (points.length === 0) return points;
   
   const now = new Date().getTime();
-  const filtered = points.filter((point) => {
+  const validPoints = points.filter(p => parseTimestamp(p.timestamp) !== null);
+  
+  if (validPoints.length === 0) return points; // Return original if no valid timestamps
+  
+  // Calculate time range of all valid points
+  const timestamps = validPoints.map(p => {
+    const date = parseTimestamp(p.timestamp);
+    return date ? date.getTime() : null;
+  }).filter(t => t !== null) as number[];
+  
+  if (timestamps.length === 0) return points;
+  
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  const dataTimeRange = maxTime - minTime;
+  
+  // If all data is within 2 hours, show it all (even if some is older than 1 hour)
+  // This handles cases where we receive historical data
+  const filtered = validPoints.filter((point) => {
     try {
       const pointDate = parseTimestamp(point.timestamp);
       if (!pointDate) {
-        return false; // Exclude invalid timestamps
+        return false;
       }
       const pointTime = pointDate.getTime();
       const timeDiff = now - pointTime;
-      // Allow data within the last 1 hour, or data that's up to 10 minutes in the future (clock skew tolerance)
-      // Also allow data up to 2 hours old if it's the only data we have
-      const maxAge = points.length === 1 ? 2 * TIME_WINDOW_MS : TIME_WINDOW_MS;
-      return timeDiff >= -10 * 60 * 1000 && timeDiff <= maxAge;
+      
+      // Allow data within the last 1 hour
+      if (timeDiff >= -10 * 60 * 1000 && timeDiff <= TIME_WINDOW_MS) {
+        return true;
+      }
+      
+      // If all data points are within a 2-hour window, include them all
+      if (dataTimeRange <= 2 * TIME_WINDOW_MS && timeDiff <= 2 * TIME_WINDOW_MS) {
+        return true;
+      }
+      
+      return false;
     } catch {
-      return false; // Exclude invalid timestamps
+      return false;
     }
   });
   
-  // If filtering removed all points but we had valid points, return the most recent one
-  if (filtered.length === 0 && points.length > 0) {
-    const validPoints = points.filter(p => parseTimestamp(p.timestamp) !== null);
-    if (validPoints.length > 0) {
-      // Sort by timestamp and return the most recent
-      validPoints.sort((a, b) => {
-        const dateA = parseTimestamp(a.timestamp);
-        const dateB = parseTimestamp(b.timestamp);
-        if (!dateA || !dateB) return 0;
-        return dateB.getTime() - dateA.getTime();
-      });
-      return [validPoints[0]]; // Return at least one point to show the chart
-    }
-  }
-  
-  return filtered;
+  // If filtering removed all points, return all valid points (show what we have)
+  return filtered.length > 0 ? filtered : validPoints;
 };
 
 // Helper function to get interval index (0-5) for a timestamp within the 1-hour window
@@ -325,6 +337,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
               // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
               // Data might be nested in frequency_results object
+              // Also check for type field to ensure it's quality data
+              const isQualityData = data.type === 'ivf_quality' || data.type === undefined;
               const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
               const hasTimestamp = data.timestamp;
               
@@ -335,7 +349,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 data.temp_internal !== undefined ||
                 frequencyResults.temp_internal !== undefined;
               
-              if (hasCanisterId && hasTimestamp && hasTemperature) {
+              if (isQualityData && hasCanisterId && hasTimestamp && hasTemperature) {
                 // Extract IVF field names - check multiple possible locations
                 let temp_internal = 
                   data.temp_internal !== undefined ? data.temp_internal :
@@ -378,20 +392,46 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                     shock: shock,
                   };
                   newDataPoints.push(qualityData);
+                  // Debug logging
+                  console.log('Adding data point:', {
+                    timestamp: data.timestamp,
+                    temp_internal,
+                    shock,
+                    temp_external,
+                    parsed: parseTimestamp(data.timestamp)
+                  });
+                } else {
+                  console.warn('Skipping invalid data point:', {
+                    timestamp: data.timestamp,
+                    temp_internal,
+                    shock,
+                    temp_external,
+                    hasCanisterId,
+                    hasTimestamp,
+                    hasTemperature
+                  });
                 }
               }
             });
 
-            // Add all new data points at once, removing duplicates by timestamp
+            // Add all new data points at once, removing duplicates by timestamp and values
             if (newDataPoints.length > 0) {
               setHasReceivedData(true);
               
               setDataPoints((prev) => {
-                // Create a map of existing timestamps for quick lookup
-                const existingTimestamps = new Set(prev.map(p => p.timestamp));
+                // Create a set of existing data point signatures (timestamp + values) for duplicate detection
+                const existingSignatures = new Set(
+                  prev.map(p => `${p.timestamp}_${p.temp_internal}_${p.shock}_${p.temp_external}`)
+                );
                 
-                // Filter out duplicates and add new points
-                const uniqueNewPoints = newDataPoints.filter(p => !existingTimestamps.has(p.timestamp));
+                // Filter out exact duplicates (same timestamp AND same values)
+                const uniqueNewPoints = newDataPoints.filter(p => {
+                  const signature = `${p.timestamp}_${p.temp_internal}_${p.shock}_${p.temp_external}`;
+                  return !existingSignatures.has(signature);
+                });
+                
+                // If we have points with same timestamp but different values, keep them all
+                // This handles cases where multiple readings come at the same second
                 const combined = [...prev, ...uniqueNewPoints];
 
                 // Sort by timestamp (oldest first) and keep only last MAX_DATA_POINTS
@@ -399,9 +439,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                   const dateA = parseTimestamp(a.timestamp);
                   const dateB = parseTimestamp(b.timestamp);
                   if (!dateA || !dateB) return 0;
-                  return dateA.getTime() - dateB.getTime();
+                  const timeDiff = dateA.getTime() - dateB.getTime();
+                  // If timestamps are the same, maintain insertion order
+                  if (timeDiff === 0) return 0;
+                  return timeDiff;
                 });
 
+                // Keep the most recent MAX_DATA_POINTS
                 if (sorted.length > MAX_DATA_POINTS) {
                   return sorted.slice(-MAX_DATA_POINTS);
                 }
@@ -496,6 +540,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const chartData = useMemo(() => {
     // Filter data points to only show last 1 hour
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
+    
+    console.log('Chart data generation:', {
+      totalDataPoints: dataPoints.length,
+      filteredDataPoints: filteredDataPoints.length,
+      points: filteredDataPoints.map(p => ({ timestamp: p.timestamp, temp: p.temp_internal, shock: p.shock }))
+    });
     
     // Sort data points by timestamp (oldest first)
     const sortedPoints = [...filteredDataPoints].sort((a, b) => {
