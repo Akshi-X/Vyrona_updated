@@ -563,10 +563,23 @@ class QualityService:
             for record in telemetry_records:
                 raw_payload = record.telemetry_data if isinstance(record.telemetry_data, dict) else {}
                 payload = dict(raw_payload)
+                timestamp_value = (
+                    payload.get("timestamp")
+                    or payload.get("reading_timestamp")
+                    or (record.created_at.isoformat() if record.created_at else None)
+                )
                 payload.setdefault("type", "ivf_quality")
                 payload["tank_id"] = record.tank_id
+                payload["canister_id"] = record.tank_id
+                payload["tank_code"] = record.tank.tank_code if record.tank else payload.get("tank_code")
+                payload["canister_number"] = (
+                    payload.get("canister_number")
+                    or payload.get("tank_code")
+                    or (record.tank.tank_code if record.tank else None)
+                )
                 payload["device_id"] = payload.get("device_id") or record.device_id
                 payload["telemetry_data_id"] = record.id
+                payload["timestamp"] = timestamp_value
                 payload["created_at"] = (
                     record.created_at.isoformat() if record.created_at else payload.get("created_at")
                 )
