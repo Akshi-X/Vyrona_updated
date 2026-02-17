@@ -42,9 +42,6 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const sourceToCurrentPolylineRef = useRef<google.maps.Polyline | null>(null);
   const currentToDestinationPolylineRef = useRef<google.maps.Polyline | null>(null);
-  const sourceInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const destinationInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const currentInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
   const { isLoaded } = useGoogleMaps();
 
@@ -254,18 +251,6 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
       currentToDestinationPolylineRef.current.setMap(null);
       currentToDestinationPolylineRef.current = null;
     }
-    if (sourceInfoWindowRef.current) {
-      sourceInfoWindowRef.current.close();
-      sourceInfoWindowRef.current = null;
-    }
-    if (destinationInfoWindowRef.current) {
-      destinationInfoWindowRef.current.close();
-      destinationInfoWindowRef.current = null;
-    }
-    if (currentInfoWindowRef.current) {
-      currentInfoWindowRef.current.close();
-      currentInfoWindowRef.current = null;
-    }
 
     // Create source marker (blue)
     if (sourcePosition) {
@@ -281,31 +266,6 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
           strokeWeight: 3,
         },
         title: "Source",
-      });
-
-      // Create tooltip for source marker
-      const sourceTooltipContent = `
-        <style>
-          body { margin: 0; padding: 0; overflow: hidden !important; }
-          html { overflow: hidden !important; }
-        </style>
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
-          Source Location
-        </div>
-      `;
-      sourceInfoWindowRef.current = new window.google.maps.InfoWindow({
-        content: sourceTooltipContent,
-        disableAutoPan: false,
-      });
-      sourceMarkerRef.current.addListener('mouseover', () => {
-        if (sourceInfoWindowRef.current && sourceMarkerRef.current) {
-          sourceInfoWindowRef.current.open(map, sourceMarkerRef.current);
-        }
-      });
-      sourceMarkerRef.current.addListener('mouseout', () => {
-        if (sourceInfoWindowRef.current) {
-          sourceInfoWindowRef.current.close();
-        }
       });
     }
 
@@ -326,31 +286,6 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
         },
         title: "Destination",
       });
-
-      // Create tooltip for destination marker
-      const destinationTooltipContent = `
-        <style>
-          body { margin: 0; padding: 0; overflow: hidden !important; }
-          html { overflow: hidden !important; }
-        </style>
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
-          Destination Location
-        </div>
-      `;
-      destinationInfoWindowRef.current = new window.google.maps.InfoWindow({
-        content: destinationTooltipContent,
-        disableAutoPan: false,
-      });
-      destinationMarkerRef.current.addListener('mouseover', () => {
-        if (destinationInfoWindowRef.current && destinationMarkerRef.current) {
-          destinationInfoWindowRef.current.open(map, destinationMarkerRef.current);
-        }
-      });
-      destinationMarkerRef.current.addListener('mouseout', () => {
-        if (destinationInfoWindowRef.current) {
-          destinationInfoWindowRef.current.close();
-        }
-      });
     }
 
     // Create current position marker (green with arrow)
@@ -368,31 +303,6 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
           rotation: 0,
         },
         title: "Current Position",
-      });
-
-      // Create tooltip for current position marker
-      const currentTooltipContent = `
-        <style>
-          body { margin: 0; padding: 0; overflow: hidden !important; }
-          html { overflow: hidden !important; }
-        </style>
-        <div style="padding: 8px 12px; background: white; border: 1px solid #E7E1E1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600; color: black; font-size: 12px; white-space: nowrap; overflow: hidden; max-width: 200px; box-sizing: border-box;">
-          Current Location
-        </div>
-      `;
-      currentInfoWindowRef.current = new window.google.maps.InfoWindow({
-        content: currentTooltipContent,
-        disableAutoPan: false,
-      });
-      markerRef.current.addListener('mouseover', () => {
-        if (currentInfoWindowRef.current && markerRef.current) {
-          currentInfoWindowRef.current.open(map, markerRef.current);
-        }
-      });
-      markerRef.current.addListener('mouseout', () => {
-        if (currentInfoWindowRef.current) {
-          currentInfoWindowRef.current.close();
-        }
       });
     }
 
