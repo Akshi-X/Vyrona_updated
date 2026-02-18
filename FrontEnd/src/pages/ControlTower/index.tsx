@@ -720,10 +720,10 @@ const ControlTower = () => {
               {/* Active Routes/Canisters List */}
               <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${isIvfUser ? 'h-[544px]' : 'h-[460px]'}`}>
                 <h2 className="font-bold text-black text-base mb-2">
-                  {isIvfUser ? 'Active Canisters' : 'Active Routes'}
+                  {isIvfUser ? 'Active Containers' : 'Active Routes'}
                 </h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
-                  <div className="text-left">{isIvfUser ? 'Canisters #' : 'Routes ID'}</div>
+                  <div className="text-left">{isIvfUser ? 'Containers #' : 'Routes ID'}</div>
                   <div className="text-left">Status</div>
                   <div className="text-left">Date</div>
                 </div>
@@ -844,11 +844,11 @@ const ControlTower = () => {
                                     className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    Canister {canister.canisterId}
+                                    Container {canister.canisterId}
                                   </Link>
                                 ) : (
                                   <span className="text-[#6b1176] text-xs font-bold">
-                                    Canister {canister.canisterId}
+                                    Container {canister.canisterId}
                                   </span>
                                 )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (
@@ -864,7 +864,7 @@ const ControlTower = () => {
                         })
                       )}
                       {isIvfUser && (!filteredCanisters || filteredCanisters.length === 0) && !loadingCanisters && (
-                        <div className="p-4 text-xs text-gray-500">No active canisters found.</div>
+                        <div className="p-4 text-xs text-gray-500">No active containers found.</div>
                       )}
                       {isCgtUser && (!filteredRoutes || filteredRoutes.length === 0) && !loadingRoutes && (
                     <div className="p-4 text-xs text-gray-500">No active routes found.</div>

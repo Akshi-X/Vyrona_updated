@@ -30,9 +30,9 @@ interface DataPoint {
  
  
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
-const TIME_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-const INTERVAL_MINUTES = 60; // 1-hour intervals
-const INTERVALS_COUNT = 6; // 6 intervals for 6 hours (0, 1, 2, 3, 4, 5 hours ago)
+const TIME_WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+const INTERVAL_MINUTES = 10; // 10-minute intervals
+const INTERVALS_COUNT = 6; // 6 intervals for 1 hour (0, 10, 20, 30, 40, 50 minutes ago)
 
 // Helper function to parse timestamp string to Date
 const parseTimestamp = (timestamp: string): Date | null => {
@@ -72,73 +72,56 @@ const parseTimestamp = (timestamp: string): Date | null => {
   }
 };
 
-// Helper function to filter data points within the last 6 hours
+// Helper function to filter data points within the last 1 hour
 const filterDataByTimeWindow = (points: DataPoint[]): DataPoint[] => {
   if (points.length === 0) return points;
   
   const now = new Date().getTime();
-  const filtered = points.filter((point) => {
+  const validPoints = points.filter(p => parseTimestamp(p.timestamp) !== null);
+  
+  if (validPoints.length === 0) return points; // Return original if no valid timestamps
+  
+  // Calculate time range of all valid points
+  const timestamps = validPoints.map(p => {
+    const date = parseTimestamp(p.timestamp);
+    return date ? date.getTime() : null;
+  }).filter(t => t !== null) as number[];
+  
+  if (timestamps.length === 0) return points;
+  
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  const dataTimeRange = maxTime - minTime;
+  
+  // If all data is within 2 hours, show it all (even if some is older than 1 hour)
+  // This handles cases where we receive historical data
+  const filtered = validPoints.filter((point) => {
     try {
       const pointDate = parseTimestamp(point.timestamp);
       if (!pointDate) {
-        return false; // Exclude invalid timestamps
+        return false;
       }
       const pointTime = pointDate.getTime();
       const timeDiff = now - pointTime;
-      // Allow data within the last 6 hours, or data that's up to 10 minutes in the future (clock skew tolerance)
-      // Also allow data up to 12 hours old if it's the only data we have
-      const maxAge = points.length === 1 ? 2 * TIME_WINDOW_MS : TIME_WINDOW_MS;
-      return timeDiff >= -10 * 60 * 1000 && timeDiff <= maxAge;
+      
+      // Allow data within the last 1 hour
+      if (timeDiff >= -10 * 60 * 1000 && timeDiff <= TIME_WINDOW_MS) {
+        return true;
+      }
+      
+      // If all data points are within a 2-hour window, include them all
+      if (dataTimeRange <= 2 * TIME_WINDOW_MS && timeDiff <= 2 * TIME_WINDOW_MS) {
+        return true;
+      }
+      
+      return false;
     } catch {
-      return false; // Exclude invalid timestamps
+      return false;
     }
   });
   
-  // If filtering removed all points but we had valid points, return the most recent one
-  if (filtered.length === 0 && points.length > 0) {
-    const validPoints = points.filter(p => parseTimestamp(p.timestamp) !== null);
-    if (validPoints.length > 0) {
-      // Sort by timestamp and return the most recent
-      validPoints.sort((a, b) => {
-        const dateA = parseTimestamp(a.timestamp);
-        const dateB = parseTimestamp(b.timestamp);
-        if (!dateA || !dateB) return 0;
-        return dateB.getTime() - dateA.getTime();
-      });
-      return [validPoints[0]]; // Return at least one point to show the chart
-    }
-  }
-  
-  return filtered;
-};
-
-// Helper function to get interval index (0-5) for a timestamp within the 6-hour window
-const getIntervalIndex = (timestamp: string): number => {
-  try {
-    const now = new Date().getTime();
-    const pointDate = parseTimestamp(timestamp);
-    if (!pointDate) {
-      return 0;
-    }
-    const pointTime = pointDate.getTime();
-    const minutesAgo = Math.floor((now - pointTime) / (60 * 1000));
-    // Return index 0-5, where 0 is most recent (0-1 hour ago) and 5 is oldest (5-6 hours ago)
-    // Handle future timestamps by placing them in interval 0
-    const intervalIndex = minutesAgo < 0 ? 0 : Math.floor(minutesAgo / INTERVAL_MINUTES);
-    return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
-  } catch {
-    return 0;
-  }
-};
-
-// Format timestamp to show hour (for 1-hour intervals)
-const formatTimestampToInterval = (minutesAgo: number): string => {
-  const now = new Date();
-  const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
-  const hours = intervalTime.getHours();
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  const displayHours = hours % 12 || 12;
-  return `${displayHours}:00 ${ampm}`;
+  // If filtering removed all points, return all valid points (show what we have)
+  return filtered.length > 0 ? filtered : validPoints;
 };
  
 interface IVFQualityTrackingChartProps {
@@ -167,6 +150,20 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
+  };
+
+  const getManagerBranchOverride = (): string | undefined => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      if (!role.includes('manager')) return undefined;
+      const fromUrl = new URLSearchParams(window.location.search).get('branch_id_override')
+        || new URLSearchParams(window.location.search).get('branch_id')
+        || undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return fromUrl || fromSession || undefined;
+    } catch {
+      return undefined;
+    }
   };
  
   // Format timestamp for display
@@ -251,7 +248,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       try {
         isConnectingRef.current = true;
         const wsUrl = getWebSocketUrl();
-        const url = `${wsUrl}?token=${encodeURIComponent(authToken)}`;
+        const params = new URLSearchParams({ token: authToken });
+        const branchOverride = getManagerBranchOverride();
+        if (branchOverride) {
+          params.set('branch_id_override', branchOverride);
+        }
+        const url = `${wsUrl}?${params.toString()}`;
         const ws = new WebSocket(url);
  
         ws.onopen = () => {
@@ -276,72 +278,133 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           if (!isMountedRef.current) {
             return;
           }
- 
+
           try {
-            const data: any = JSON.parse(event.data);
- 
+            const parsed: any = JSON.parse(event.data);
+
             // Check if this is a subscription confirmation
-            if (data.type === 'subscription_confirmed') {
+            if (parsed.type === 'subscription_confirmed') {
               return;
             }
- 
+
             // Check if this is an error message
-            if (data.type === 'error') {
-              setError(data.message || 'Unknown error');
+            if (parsed.type === 'error') {
+              setError(parsed.message || 'Unknown error');
               // Don't reconnect on authentication/authorization errors
-              if (data.message && (data.message.includes('token') || data.message.includes('Invalid canister'))) {
+              if (parsed.message && (parsed.message.includes('token') || parsed.message.includes('Invalid canister'))) {
                 reconnectAttemptsRef.current = maxReconnectAttempts;
               }
               return;
             }
- 
-            // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
-            // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
-            const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
-            const hasTimestamp = data.timestamp;
-            const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
-            
-            if (hasCanisterId && hasTimestamp && hasTemperature) {
-              // Extract IVF field names
-              const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
-              const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
-              const shock = data.shock !== undefined ? data.shock : data.agitation;
-              
-              // Update battery percentage if available
-              if (data.battery_percentage !== undefined && data.battery_percentage !== null) {
-                setBatteryPercentage(typeof data.battery_percentage === 'number' ? data.battery_percentage : parseFloat(data.battery_percentage));
-              }
-              
-              // Only add if we have valid numeric values for required fields
-              if (temp_internal !== undefined && temp_internal !== null &&
-                  shock !== undefined && shock !== null) {
-                const qualityData: DataPoint = {
-                  timestamp: data.timestamp,
-                  temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
-                  temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                  shock: typeof shock === 'number' ? shock : parseFloat(shock),
-                };
-                
-                // Mark that we've received data
-                setHasReceivedData(true);
-                
-                // Add new data point
-                setDataPoints((prev) => {
-                  const newPoints = [
-                    ...prev,
-                    qualityData,
-                  ];
 
-                  // Keep only last MAX_DATA_POINTS
-                  if (newPoints.length > MAX_DATA_POINTS) {
-                    return newPoints.slice(-MAX_DATA_POINTS);
-                  }
-                  return newPoints;
-                });
+            // Handle both single data point and array of data points (historical data)
+            const dataArray = Array.isArray(parsed) ? parsed : [parsed];
+            const newDataPoints: DataPoint[] = [];
+
+            dataArray.forEach((data: any) => {
+              // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
+              // IVF data uses temp_internal, temp_external, shock (humidity may not be present)
+              // Data might be nested in frequency_results object
+              // Also check for type field to ensure it's quality data
+              const isQualityData = data.type === 'ivf_quality' || data.type === undefined;
+              const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
+              const hasTimestamp = data.timestamp;
+              
+              // Check for temperature in multiple possible locations
+              const frequencyResults = data.frequency_results || {};
+              const hasTemperature = 
+                data.temperature !== undefined || 
+                data.temp_internal !== undefined ||
+                frequencyResults.temp_internal !== undefined;
+              
+              if (isQualityData && hasCanisterId && hasTimestamp && hasTemperature) {
+                // Extract IVF field names - check multiple possible locations
+                let temp_internal = 
+                  data.temp_internal !== undefined ? data.temp_internal :
+                  frequencyResults.temp_internal !== undefined ? frequencyResults.temp_internal :
+                  data.temperature !== undefined ? data.temperature : null;
+                
+                let temp_external = 
+                  data.temp_external !== undefined && data.temp_external !== null ? data.temp_external :
+                  frequencyResults.temp_external !== undefined && frequencyResults.temp_external !== null ? frequencyResults.temp_external :
+                  null;
+                
+                let shock = 
+                  data.shock !== undefined ? data.shock :
+                  frequencyResults.shock !== undefined ? frequencyResults.shock :
+                  data.agitation !== undefined ? data.agitation : null;
+                
+                // Convert to numbers if they're strings
+                if (temp_internal !== null && typeof temp_internal !== 'number') {
+                  temp_internal = parseFloat(temp_internal);
+                }
+                if (temp_external !== null && typeof temp_external !== 'number') {
+                  temp_external = parseFloat(temp_external);
+                }
+                if (shock !== null && typeof shock !== 'number') {
+                  shock = parseFloat(shock);
+                }
+                
+                // Update battery percentage if available (use the most recent one)
+                if (data.battery_percentage !== undefined && data.battery_percentage !== null) {
+                  setBatteryPercentage(typeof data.battery_percentage === 'number' ? data.battery_percentage : parseFloat(data.battery_percentage));
+                }
+                
+                // Only add if we have valid numeric values for required fields
+                if (temp_internal !== null && !isNaN(temp_internal) &&
+                    shock !== null && !isNaN(shock)) {
+                  const qualityData: DataPoint = {
+                    timestamp: data.timestamp,
+                    temp_internal: temp_internal,
+                    temp_external: temp_external !== null && !isNaN(temp_external) ? temp_external : null,
+                    shock: shock,
+                  };
+                  newDataPoints.push(qualityData);
+                }
               }
+            });
+
+            // Add all new data points at once, removing duplicates by timestamp and values
+            if (newDataPoints.length > 0) {
+              setHasReceivedData(true);
+              
+              setDataPoints((prev) => {
+                // Create a set of existing data point signatures (timestamp + values) for duplicate detection
+                const existingSignatures = new Set(
+                  prev.map(p => `${p.timestamp}_${p.temp_internal}_${p.shock}_${p.temp_external}`)
+                );
+                
+                // Filter out exact duplicates (same timestamp AND same values)
+                const uniqueNewPoints = newDataPoints.filter(p => {
+                  const signature = `${p.timestamp}_${p.temp_internal}_${p.shock}_${p.temp_external}`;
+                  return !existingSignatures.has(signature);
+                });
+                
+                // If we have points with same timestamp but different values, keep them all
+                // This handles cases where multiple readings come at the same second
+                const combined = [...prev, ...uniqueNewPoints];
+
+                // Sort by timestamp (oldest first) and keep only last MAX_DATA_POINTS
+                const sorted = combined.sort((a, b) => {
+                  const dateA = parseTimestamp(a.timestamp);
+                  const dateB = parseTimestamp(b.timestamp);
+                  if (!dateA || !dateB) return 0;
+                  const timeDiff = dateA.getTime() - dateB.getTime();
+                  // If timestamps are the same, maintain insertion order
+                  if (timeDiff === 0) return 0;
+                  return timeDiff;
+                });
+
+                // Keep the most recent MAX_DATA_POINTS
+                if (sorted.length > MAX_DATA_POINTS) {
+                  return sorted.slice(-MAX_DATA_POINTS);
+                }
+                return sorted;
+              });
             }
           } catch (err) {
             // Error parsing WebSocket message
+            console.error('Error parsing WebSocket message:', err);
           }
         };
  
@@ -402,7 +465,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
  
     connectWebSocket();
 
-    // Periodic cleanup to remove old data points (older than 6 hours)
+    // Periodic cleanup to remove old data points (older than 1 hour)
     const cleanupInterval = setInterval(() => {
       if (isMountedRef.current) {
         setDataPoints((prev) => {
@@ -425,8 +488,22 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [canisterNumber, token]);
  
   const chartData = useMemo(() => {
-    // Filter data points to only show last 6 hours
+    // Filter data points to only show last 1 hour
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
+    
+    console.log('Chart data generation:', {
+      totalDataPoints: dataPoints.length,
+      filteredDataPoints: filteredDataPoints.length,
+      points: filteredDataPoints.map(p => ({ timestamp: p.timestamp, temp: p.temp_internal, shock: p.shock }))
+    });
+    
+    // Sort data points by timestamp (oldest first)
+    const sortedPoints = [...filteredDataPoints].sort((a, b) => {
+      const dateA = parseTimestamp(a.timestamp);
+      const dateB = parseTimestamp(b.timestamp);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
     
     const palette = {
       temp_internal: '#8AB6F9',
@@ -434,67 +511,32 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       shock: '#BDBDBD',
     } as const;
 
-    // Generate 6 interval labels (from 5 hours ago to now, in 1-hour steps)
-    const intervalLabels: string[] = [];
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      const minutesAgo = i * INTERVAL_MINUTES;
-      intervalLabels.push(formatTimestampToInterval(minutesAgo));
-    }
-
-    // Group data points by interval index (0-5)
-    const intervalData: { [key: number]: DataPoint[] } = {};
-    filteredDataPoints.forEach((point) => {
-      const intervalIndex = getIntervalIndex(point.timestamp);
-      if (!intervalData[intervalIndex]) {
-        intervalData[intervalIndex] = [];
-      }
-      intervalData[intervalIndex].push(point);
+    // Generate unique labels for each data point - show actual time rounded to 5-minute intervals
+    const labels: string[] = sortedPoints.map((point) => {
+      const date = parseTimestamp(point.timestamp);
+      if (!date) return '';
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      const displayHours = hours % 12 || 12;
+      // Round to nearest 5 minutes for cleaner display (since data comes every 5 minutes)
+      const roundedMinutes = Math.floor(minutes / 5) * 5;
+      return `${displayHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
     });
 
-    // For each interval, get the latest data point (most recent within that interval)
-    const intervalValues: { [key: number]: { temp_internal: number; temp_external: number | null; shock: number } } = {};
-    Object.keys(intervalData).forEach((key) => {
-      const index = parseInt(key);
-      const points = intervalData[index];
-      if (points.length > 0) {
-        // Sort by timestamp and use the most recent point in that interval
-        const sortedPoints = points.sort((a, b) => {
-          const dateA = parseTimestamp(a.timestamp);
-          const dateB = parseTimestamp(b.timestamp);
-          if (!dateA || !dateB) return 0;
-          const timeA = dateA.getTime();
-          const timeB = dateB.getTime();
-          return timeB - timeA; // Most recent first
-        });
-        const latestPoint = sortedPoints[0];
-        intervalValues[index] = {
-          temp_internal: latestPoint.temp_internal,
-          temp_external: latestPoint.temp_external,
-          shock: latestPoint.shock,
-        };
-      }
-    });
-
-    // Create data arrays for each interval (0-5, where 0 is most recent)
-    const tempInternalData: (number | null)[] = [];
+    // Create data arrays with all points
+    const tempInternalData: number[] = [];
     const tempExternalData: (number | null)[] = [];
-    const shockData: (number | null)[] = [];
+    const shockData: number[] = [];
 
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      if (intervalValues[i]) {
-        tempInternalData.push(intervalValues[i].temp_internal);
-        tempExternalData.push(intervalValues[i].temp_external);
-        shockData.push(intervalValues[i].shock);
-      } else {
-        // No data for this interval, use null
-        tempInternalData.push(null);
-        tempExternalData.push(null);
-        shockData.push(null);
-      }
-    }
+    sortedPoints.forEach((point) => {
+      tempInternalData.push(point.temp_internal);
+      tempExternalData.push(point.temp_external);
+      shockData.push(point.shock);
+    });
 
     return {
-      labels: intervalLabels,
+      labels: labels,
       datasets: [
         {
           label: 'Temperature Internal (°C)',
@@ -502,14 +544,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.temp_internal,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.temp_internal,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          spanGaps: true, // Connect across null values
+          spanGaps: false,
         },
         {
           label: 'Temperature External (°C)',
@@ -517,15 +559,15 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.temp_external,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.temp_external,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          hidden: tempExternalData.every(v => v === null), // Hide if all values are null
-          spanGaps: true, // Connect across null values
+          hidden: tempExternalData.every(v => v === null),
+          spanGaps: false,
         },
         {
           label: 'Shock (G)',
@@ -533,21 +575,21 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           borderColor: palette.shock,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           pointBackgroundColor: palette.shock,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.4,
           fill: false,
-          spanGaps: true, // Connect across null values
+          spanGaps: false,
         },
       ],
     };
   }, [dataPoints]);
  
   const chartOptions = useMemo(() => {
-    // Filter data points to only show last 6 hours (same as chartData)
+    // Filter data points to only show last 1 hour (same as chartData)
     const filteredDataPoints = filterDataByTimeWindow(dataPoints);
     
     return {
@@ -628,9 +670,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             font: {
               size: 11,
             },
-            maxRotation: 0,
+            maxRotation: 45,
             minRotation: 0,
-            autoSkip: false,
+            autoSkip: true,
+            maxTicksLimit: 12,
             callback: function (_value: any, index: number) {
               const labels = (this as any).chart.data.labels as string[];
               return labels[index] || '';

@@ -78,6 +78,19 @@ export interface CanisterCheckResponse {
   message: string;
 }
 
+export interface TankInTransitCheckResponse {
+  exists: boolean;
+  tank_code: string;
+  his_number?: string | null;
+  cryolock_number?: string | null;
+  tank_id: number | null;
+  branch_id: number | null;
+  branch_name: string | null;
+  has_in_transit_shipments: boolean;
+  in_transit_count: number;
+  message: string;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -144,6 +157,11 @@ interface RawEmbryoTrackingApiItem {
 interface RawEmbryoTrackingApiResponse {
   data: RawEmbryoTrackingApiItem[];
   total: number;
+  offset?: number;
+  limit?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+  message?: string;
 }
 
 // Type for canister tracking details API response (snake_case)
@@ -240,13 +258,64 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
-    const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
+  async checkTankInTransitStatus(
+    tankCode?: string | number,
+    branchId?: number | null,
+    hisNumber?: string | null,
+    cryolockNumber?: string | null
+  ): Promise<TankInTransitCheckResponse> {
+    // Use the new endpoint for HIS/Cryolock number lookup
+    if (hisNumber || cryolockNumber) {
+      const params = new URLSearchParams();
+      if (hisNumber) {
+        params.append('his_number', hisNumber);
+      }
+      if (cryolockNumber) {
+        params.append('cryolock_number', cryolockNumber);
+      }
+      if (branchId != null) {
+        params.append('branch_id', branchId.toString());
+      }
+      const queryString = params.toString();
+      const url = `/api/ivf/canisters/in-transit-check?${queryString}`;
+      return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
+    }
+    
+    // Fallback to old endpoint for tank code (backward compatibility)
+    if (tankCode) {
+      let url = `/api/ivf/canisters/${encodeURIComponent(tankCode)}/in-transit-check`;
+      if (branchId != null) {
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}branch_id=${encodeURIComponent(branchId)}`;
+      }
+      return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
+    }
+    
+    throw new Error('Either tankCode or (hisNumber/cryolockNumber) must be provided');
+  }
+
+  async getEmbryoTracking(offset: number = 0, limit: number = 100): Promise<EmbryoTrackingApiResponse> {
+    const params = new URLSearchParams();
+    if (offset > 0) {
+      params.append('offset', offset.toString());
+    }
+    if (limit !== 100) {
+      params.append('limit', limit.toString());
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/ivf/embryo_tracking?${queryString}` : '/api/ivf/embryo_tracking';
+    
+    const response = await this.request<RawEmbryoTrackingApiResponse>(url, {
       method: 'GET',
     });
     return {
       data: response.data.map(mapApiItemToTreatment),
       total: response.total,
+      offset: response.offset,
+      limit: response.limit,
+      has_more: response.has_more,
+      next_offset: response.next_offset,
+      message: response.message,
     };
   }
 

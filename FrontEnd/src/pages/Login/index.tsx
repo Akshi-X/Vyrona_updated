@@ -56,7 +56,7 @@ const Login: React.FC = () => {
                 navigate(fromPath, { replace: true });
                 return;
             }
-            
+
             // If user is Mygrape_admin, redirect to user-profile
             if (userRole?.toLowerCase() === 'mygrape_admin') {
                 navigate('/user-profile', { replace: true });
@@ -84,7 +84,7 @@ const Login: React.FC = () => {
             const fromPath = `${from.pathname ?? ""}${from.search ?? ""}${from.hash ?? ""}`;
             return <Navigate to={fromPath} replace />;
         }
-        
+
         if (userRole?.toLowerCase() === 'mygrape_admin') {
             return <Navigate to="/user-profile" replace />;
         }
@@ -127,9 +127,9 @@ const Login: React.FC = () => {
                 // Preserve original destination (if any) to return after OTP login
                 // Check multiple sources: state.fromPath, state.from object, and sessionStorage
                 const state = location.state as any;
-                
+
                 let fromPath: string | undefined = state?.fromPath;
-                
+
                 if (!fromPath) {
                     // Fallback 1: construct from 'from' object
                     const from = state?.from;
@@ -144,7 +144,7 @@ const Login: React.FC = () => {
                         }
                     }
                 }
-                
+
                 // Fallback 2: check sessionStorage
                 if (!fromPath) {
                     try {
@@ -158,7 +158,7 @@ const Login: React.FC = () => {
                         // Silently handle sessionStorage errors
                     }
                 }
-                
+
                 // Navigate to OTP page with preserved redirect path
                 navigate("/verify-otp", {
                     state: {
@@ -195,7 +195,7 @@ const Login: React.FC = () => {
                         alt="banner"
                     />
                 </div>
-                
+
                 <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
                     <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
                 </div>
@@ -226,7 +226,7 @@ const Login: React.FC = () => {
                     </p>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        
+
                         {/* Email Field */}
                         <div className="relative w-full my-4">
                             <input
@@ -321,8 +321,8 @@ const Login: React.FC = () => {
 
                 </div>
                 <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
-                    Having trouble logging in? Contact <a href="#" className="text-[#6b1176] inline">
-                        ITAdmin@myGrape.org
+                    Having trouble signing in? Contact <a href="#" className="text-[#6b1176] inline">
+                        admin@mygrape.org
                     </a>{" "} for help.
                 </p>
             </main>

@@ -9,14 +9,13 @@ from starlette.responses import FileResponse
 
 from app.config import database
 from app.models import user_model
-from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.service import user_service
 from app.service.login_service import handle_login
 from app.service.otp_service import verify_otp_and_create_token, resend_otp_to_user
 from app.service.password_reset_service import request_password_reset, reset_password
 from app.schemas import user_schema
-from app.utils.user_helpers import is_hospital_email, get_hospital_name_from_email
+from app.utils.user_helpers import get_hospital_by_email_domain
 from app.schemas.auth_schema import (
     LoginRequest, LoginResponse,
     VerifyOTPRequest, VerifyOTPSuccessResponse,
@@ -51,40 +50,12 @@ def get_hospital_info_by_email(email: str, db: Session = Depends(database.get_db
     Used by signup form to auto-populate fields when hospital email is detected.
     """
     email_lower = email.lower().strip()
-    is_hospital = is_hospital_email(email_lower)
-    
-    if not is_hospital:
+    hospital = get_hospital_by_email_domain(email_lower, db)
+
+    if not hospital:
         return user_schema.HospitalInfoByEmailResponse(
             is_hospital_email=False,
             hospital_name=None,
-            hospital_id=None,
-            hospital_type=None,
-            departments=[],
-            branches=[]
-        )
-    
-    # Get hospital name from email
-    hospital_name = get_hospital_name_from_email(email_lower)
-    
-    if not hospital_name:
-        return user_schema.HospitalInfoByEmailResponse(
-            is_hospital_email=True,
-            hospital_name=None,
-            hospital_id=None,
-            hospital_type=None,
-            departments=[],
-            branches=[]
-        )
-    
-    # Query hospital from database
-    hospital = db.query(Hospital).filter(
-        Hospital.hospital_name == hospital_name
-    ).first()
-    
-    if not hospital:
-        return user_schema.HospitalInfoByEmailResponse(
-            is_hospital_email=True,
-            hospital_name=hospital_name,
             hospital_id=None,
             hospital_type=None,
             departments=[],
