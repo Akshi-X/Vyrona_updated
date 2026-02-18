@@ -165,13 +165,11 @@ class CanisterCheckResponse(BaseModel):
 
 class TankInTransitCheckResponse(BaseModel):
     """Schema for tank in-transit shipment check response."""
-    exists: bool = Field(..., description="Whether the tank exists")
-    tank_code: str = Field(..., description="Tank code that was checked")
-    tank_id: Optional[int] = Field(None, description="Tank ID if exists")
-    branch_id: Optional[int] = Field(None, description="Branch ID of the tank if exists")
-    branch_name: Optional[str] = Field(None, description="Branch name of the tank if exists")
-    has_in_transit_shipments: bool = Field(..., description="Whether this tank has any in-transit shipments")
-    in_transit_count: int = Field(..., description="Number of in-transit crylocks in this tank")
+    exists: bool = Field(..., description="Whether matching cryolock records exist")
+    his_number: Optional[str] = Field(None, description="Matched HIS number (or input HIS number)")
+    cryolock_number: Optional[str] = Field(None, description="Matched Cryolock number (or input Cryolock number)")
+    has_in_transit_shipments: bool = Field(..., description="Whether this identifier has any in-transit shipments")
+    in_transit_count: int = Field(..., description="Number of in-transit crylocks for the identifier")
     message: str = Field(..., description="Response message")
 
     class Config:
