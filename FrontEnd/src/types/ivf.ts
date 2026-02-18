@@ -17,6 +17,11 @@ export interface IVFTreatment {
 export interface EmbryoTrackingApiResponse {
   data: IVFTreatment[];
   total: number;
+  offset?: number;
+  limit?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+  message?: string;
 }
 
 export interface TotalEmbryosCryolocksResponse {
