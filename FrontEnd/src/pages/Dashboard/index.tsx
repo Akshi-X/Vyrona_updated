@@ -109,6 +109,9 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfEmbryoTracking, setIvfEmbryoTracking] = useState<IVFTreatment[]>([]);
   const [loadingIvfEmbryoTracking, setLoadingIvfEmbryoTracking] = useState(false);
   const [ivfEmbryoTrackingError, setIvfEmbryoTrackingError] = useState<string | null>(null);
+  const [ivfEmbryoTrackingHasMore, setIvfEmbryoTrackingHasMore] = useState(false);
+  const [ivfEmbryoTrackingNextOffset, setIvfEmbryoTrackingNextOffset] = useState<number | null>(null);
+  const [loadingIvfEmbryoTrackingMore, setLoadingIvfEmbryoTrackingMore] = useState(false);
 
   // IVF total embryos/cryolocks metric (live API data)
   const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
@@ -369,12 +372,18 @@ export default function Dashboard({ }: DashboardProps) {
       setLoadingIvfEmbryoTracking(true);
       setIvfEmbryoTrackingError(null);
       try {
-        const response = await ivfService.getEmbryoTracking();
-        if (!cancelled) setIvfEmbryoTracking(response?.data || []);
+        const response = await ivfService.getEmbryoTracking(0, 100);
+        if (!cancelled) {
+          setIvfEmbryoTracking(response?.data || []);
+          setIvfEmbryoTrackingHasMore(response?.has_more || false);
+          setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
+        }
       } catch (e: any) {
         if (!cancelled) {
           setIvfEmbryoTracking([]);
           setIvfEmbryoTrackingError(e?.message || 'Failed to load embryo tracking data');
+          setIvfEmbryoTrackingHasMore(false);
+          setIvfEmbryoTrackingNextOffset(null);
         }
       } finally {
         if (!cancelled) setLoadingIvfEmbryoTracking(false);
@@ -386,6 +395,27 @@ export default function Dashboard({ }: DashboardProps) {
       cancelled = true;
     };
   }, [userDepartment, isAuthenticated]);
+
+  // Load more IVF embryo tracking data
+  const loadMoreIvfEmbryoTracking = async () => {
+    if (loadingIvfEmbryoTrackingMore || !ivfEmbryoTrackingHasMore || ivfEmbryoTrackingNextOffset === null) {
+      return;
+    }
+
+    setLoadingIvfEmbryoTrackingMore(true);
+    try {
+      const response = await ivfService.getEmbryoTracking(ivfEmbryoTrackingNextOffset, 100);
+      setIvfEmbryoTracking(prev => [...prev, ...(response?.data || [])]);
+      setIvfEmbryoTrackingHasMore(response?.has_more || false);
+      setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
+    } catch (e: any) {
+      // Don't show error for load more - just stop loading
+      setIvfEmbryoTrackingHasMore(false);
+      setIvfEmbryoTrackingNextOffset(null);
+    } finally {
+      setLoadingIvfEmbryoTrackingMore(false);
+    }
+  };
 
   // Fetch IVF totals (Total Embryos/Cryolocks) from API
   useEffect(() => {
@@ -886,7 +916,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Embryos
+                            Total Cryolocks
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfTotals
@@ -1257,7 +1287,12 @@ export default function Dashboard({ }: DashboardProps) {
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
                 ) : (
-                  <IVFOngoingTreatments treatments={ivfEmbryoTracking} />
+                  <IVFOngoingTreatments 
+                    treatments={ivfEmbryoTracking} 
+                    hasMore={ivfEmbryoTrackingHasMore}
+                    isLoadingMore={loadingIvfEmbryoTrackingMore}
+                    onLoadMore={loadMoreIvfEmbryoTracking}
+                  />
                 )}
                 </div>
               </section>

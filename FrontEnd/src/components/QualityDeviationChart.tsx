@@ -114,12 +114,18 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
     return Math.ceil(max / 100) * 100;
   }, [visibleMetrics, containers]);
 
+  // Check if top risk driver metric exists (used for height calculation and chart data)
+  const topRiskDriverMetric = useMemo(
+    () => visibleMetrics.find(
+      (m) => m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk')
+    ),
+    [visibleMetrics]
+  );
+  const hasTopRiskDriver = !!topRiskDriverMetric;
+
   const chartData = useMemo(
     () => {
-      // Separate top risk driver from other metrics
-      const topRiskDriverMetric = visibleMetrics.find(
-        (m) => m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk')
-      );
+      // Separate top risk driver from other metrics (using pre-calculated topRiskDriverMetric)
       const otherMetrics = visibleMetrics.filter(
         (m) => !(m.name.toLowerCase().includes('top risk driver') || m.name.toLowerCase().includes('top risk'))
       );
@@ -201,7 +207,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
         ],
       };
     },
-    [containers, visibleMetrics, maxValue]
+    [containers, visibleMetrics, maxValue, topRiskDriverMetric]
   );
 
   const legendItems = useMemo(
@@ -219,15 +225,38 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
     [visibleMetrics]
   );
 
+  // Calculate required chart height based on number of containers
+  // Each bar is 8px thick, with exactly 10px spacing between containers
+  // If top risk driver exists, each container has 2 bars (16px total)
+  const minChartHeight = useMemo(() => {
+    if (containers.length === 0) return 200;
+    const barHeight = hasTopRiskDriver ? 16 : 8; // 2 bars stacked or 1 bar
+    const spacingBetweenContainers = 10; // 10px spacing between each container
+    // Formula: (n-1) * spacing + n * barHeight
+    // For n containers: (n-1) spaces of 10px + n bars
+    const totalHeight = (containers.length - 1) * spacingBetweenContainers + containers.length * barHeight;
+    // Add padding for labels and margins
+    return Math.max(200, totalHeight + 40);
+  }, [containers.length, hasTopRiskDriver]);
+
+  // Max height for scrollable area (keeping some space for legend and title)
+  const maxScrollHeight = 250; // Adjust this value as needed
+
   const chartOptions = useMemo(
-    () => ({
-      indexAxis: 'y' as const,
-      responsive: true,
-      maintainAspectRatio: false,
-      categoryPercentage: 0.8, // Use 80% of category width
-      barPercentage: 1.0, // Bars fill their group completely
-      maxBarThickness: 8, // Fixed bar thickness
-      plugins: {
+    () => {
+      // Calculate categoryPercentage to achieve approximately 10px spacing
+      // Lower percentage = more spacing between categories
+      // With our height calculation, we ensure 10px spacing, so adjust categoryPercentage accordingly
+      const categoryPercentage = containers.length > 1 ? 0.5 : 0.8; // Lower value creates more spacing
+      
+      return {
+        indexAxis: 'y' as const,
+        responsive: true,
+        maintainAspectRatio: false,
+        categoryPercentage: categoryPercentage, // Adjusted to create more spacing
+        barPercentage: 1.0, // Bars fill their group completely
+        maxBarThickness: 8, // Fixed bar thickness
+        plugins: {
         legend: {
           display: false,
         },
@@ -284,8 +313,9 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
           },
         },
       },
-    }),
-    [maxValue]
+      };
+    },
+    [maxValue, containers.length]
   );
 
   return (
@@ -305,8 +335,15 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
           </div>
         ))}
       </div>
-      <div className="flex-1 min-h-0">
-        <Bar data={chartData} options={chartOptions} />
+      <div 
+        className="flex-1 min-h-0 overflow-y-auto"
+        style={{ 
+          maxHeight: `${maxScrollHeight}px`,
+        }}
+      >
+        <div style={{ height: `${minChartHeight}px` }}>
+          <Bar data={chartData} options={chartOptions} />
+        </div>
       </div>
     </div>
   );
