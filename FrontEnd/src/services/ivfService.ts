@@ -155,6 +155,11 @@ interface RawEmbryoTrackingApiItem {
 interface RawEmbryoTrackingApiResponse {
   data: RawEmbryoTrackingApiItem[];
   total: number;
+  offset?: number;
+  limit?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+  message?: string;
 }
 
 // Type for canister tracking details API response (snake_case)
@@ -260,13 +265,28 @@ export class IvfService extends BaseApiService {
     return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
   }
 
-  async getEmbryoTracking(): Promise<EmbryoTrackingApiResponse> {
-    const response = await this.request<RawEmbryoTrackingApiResponse>('/api/ivf/embryo_tracking', {
+  async getEmbryoTracking(offset: number = 0, limit: number = 100): Promise<EmbryoTrackingApiResponse> {
+    const params = new URLSearchParams();
+    if (offset > 0) {
+      params.append('offset', offset.toString());
+    }
+    if (limit !== 100) {
+      params.append('limit', limit.toString());
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/api/ivf/embryo_tracking?${queryString}` : '/api/ivf/embryo_tracking';
+    
+    const response = await this.request<RawEmbryoTrackingApiResponse>(url, {
       method: 'GET',
     });
     return {
       data: response.data.map(mapApiItemToTreatment),
       total: response.total,
+      offset: response.offset,
+      limit: response.limit,
+      has_more: response.has_more,
+      next_offset: response.next_offset,
+      message: response.message,
     };
   }
 
