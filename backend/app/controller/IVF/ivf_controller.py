@@ -505,23 +505,26 @@ def check_tank_exists(
         raise HTTPException(status_code=500, detail=f"Error checking tank existence: {str(e)}")
 
 
-@router.get("/canisters/{tank_code}/in-transit-check", response_model=TankInTransitCheckResponse)
+@router.get("/canisters/in-transit-check", response_model=TankInTransitCheckResponse)
 def check_tank_in_transit_status(
-    tank_code: str = Path(..., description="Tank code to check (e.g., 'T15')"),
-    branch_id: Optional[int] = Query(
+    his_number: Optional[str] = Query(
         None,
-        description="Optional branch ID override (Manager/Admin). User role always uses their own branch."
+        description="Optional HIS number to check shipment availability."
+    ),
+    cryolock_number: Optional[str] = Query(
+        None,
+        description="Optional Cryolock number to check shipment availability."
     ),
     request: Request = None,
     db: Session = Depends(get_db)
 ):
     """
-    Check whether a tank has any in-transit shipment records.
+    Check whether a HIS/Cryolock identifier has shipment records.
 
     Role-based access:
-    - User (IVF): Can check only their own branch tanks (branch_id override ignored).
-    - Manager (IVF): Can select a branch via branch_id (or defaults to their own branch).
-    - Admin: Can check tanks across branches; provide branch_id when same tank code exists in multiple branches.
+    - User (IVF): Can check only their own branch/location records.
+    - Manager (IVF): Can view records across branches in their hospital.
+    - Admin: Can check records across branches.
     """
     try:
         user = _ensure_ivf_user(request)
@@ -530,11 +533,11 @@ def check_tank_in_transit_status(
         role = user.role.value if hasattr(user.role, "value") else str(user.role)
         service = IVFService(db)
         result = service.check_tank_in_transit_status(
-            tank_code=tank_code,
             user_role=role,
             user_branch_id=user.branch_id,
             hospital_id=hospital_id,
-            selected_branch_id=branch_id
+            his_number=his_number,
+            cryolock_number=cryolock_number
         )
         return TankInTransitCheckResponse(**result)
     except ValueError as e:
