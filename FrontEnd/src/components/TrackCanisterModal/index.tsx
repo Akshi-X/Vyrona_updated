@@ -27,6 +27,8 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   const isManager = normalizedRole.includes('manager');
 
   const [canisterId, setCanisterId] = useState('');
+  const [hisNumber, setHisNumber] = useState('');
+  const [cryolockNumber, setCryolockNumber] = useState('');
   const [branches, setBranches] = useState<IvfBranch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError] = useState<string | null>(null);
@@ -52,6 +54,8 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       setTimeout(() => inputRef.current?.focus(), 0);
     } else {
       setCanisterId('');
+      setHisNumber('');
+      setCryolockNumber('');
       setBranches([]);
       setBranchesLoading(false);
       setBranchesError(null);
@@ -195,23 +199,29 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedCanisterId = canisterId.trim();
-    if (!trimmedCanisterId) return;
-    if (isManager && !selectedBranchName) return;
     
     // Check if this is for Outbound Quality Tracking
     const isOutboundQualityTracking = title === "Outbound Quality Tracking";
     
     if (isOutboundQualityTracking) {
-      // For Outbound Quality Tracking, check in-transit status
+      const trimmedHisNumber = hisNumber.trim();
+      const trimmedCryolockNumber = cryolockNumber.trim();
+      
+      // Only HIS # is required, Cryolock # is optional
+      if (!trimmedHisNumber) return;
+      
+      // For Outbound Quality Tracking, check in-transit status using HIS # and optional Cryolock #
       setCanisterCheckLoading(true);
       setCanisterCheckError(null);
       setCanisterCheckMessage(null);
       
       try {
+        // For Outbound Quality Tracking, use HIS # and optional Cryolock # to check in-transit status
         const response: TankInTransitCheckResponse = await ivfService.checkTankInTransitStatus(
-          trimmedCanisterId,
-          isManager ? selectedBranchId ?? undefined : undefined
+          undefined, // tankCode - not used for this flow
+          undefined, // branchId - not used for this flow
+          trimmedHisNumber,
+          trimmedCryolockNumber || undefined // Only send if provided
         );
         
         if (!response.exists) {
@@ -219,20 +229,33 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           setCanisterCheckError(response.message);
           setCanisterCheckMessage(null);
           setHasInTransitShipments(null);
-        } else if (response.has_in_transit_shipments) {
-          // Has in-transit shipments - set status and navigate
-          setHasInTransitShipments(true);
-          if (isManager && selectedBranchId != null) {
-            try {
-              sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
-            } catch {}
-          }
-          onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
         } else {
-          // No in-transit shipments - set status and show message
-          setHasInTransitShipments(false);
-          setCanisterCheckMessage(response.message);
-          setCanisterCheckError(null);
+          // Use tank_code from response for WebSocket subscription
+          const tankCode = response.tank_code;
+          
+          if (response.has_in_transit_shipments) {
+            // Has in-transit shipments - set status and navigate
+            setHasInTransitShipments(true);
+            // Navigate using tank_code for IoT WebSocket connection
+            if (tankCode) {
+              onTrack?.(tankCode, undefined);
+            } else {
+              // Fallback to his_number if tank_code is not available
+              onTrack?.(trimmedHisNumber, undefined);
+            }
+          } else {
+            // No in-transit shipments - still navigate to show quality tracking
+            setHasInTransitShipments(false);
+            setCanisterCheckMessage(response.message);
+            setCanisterCheckError(null);
+            // Navigate using tank_code for IoT WebSocket connection even if no shipments
+            if (tankCode) {
+              onTrack?.(tankCode, undefined);
+            } else {
+              // Fallback to his_number if tank_code is not available
+              onTrack?.(trimmedHisNumber, undefined);
+            }
+          }
         }
       } catch (e: any) {
         const errorMessage = (e?.message as string) || 'Failed to check in-transit status';
@@ -243,6 +266,10 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       }
     } else {
       // For other modals, use the existing checkCanister logic
+      const trimmedCanisterId = canisterId.trim();
+      if (!trimmedCanisterId) return;
+      if (isManager && !selectedBranchName) return;
+      
       const exists = await checkCanister(trimmedCanisterId);
       
       // Only navigate if canister exists (exists === true)
@@ -263,7 +290,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      description={isManager ? "Please enter the tank code and branch" : "Please enter the tank code"}
+      description={title === "Outbound Quality Tracking" ? "Please enter the HIS # (Cryolock # is optional)" : (isManager ? "Please enter the tank code and branch" : "Please enter the tank code")}
       icon={
         <img
           src={icon}
@@ -274,65 +301,92 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       containerClassName="w-[40%]"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={canisterId}
-              onChange={handleCanisterIdChange}
-              placeholder="e.g., 1"
-              className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
-                canisterCheckError
-                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                  : title === "Outbound Quality Tracking" && hasInTransitShipments === false
-                  ? 'border-orange-500 focus:ring-orange-500 focus:border-orange-500'
-                  : title === "Outbound Quality Tracking" && hasInTransitShipments === true
-                  ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
-                  : canisterCheckMessage && !canisterCheckError
-                  ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
-                  : 'border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]'
-              }`}
-            />
-            {canisterCheckLoading && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <svg
-                  className="animate-spin h-5 w-5 text-gray-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
+        {title === "Outbound Quality Tracking" ? (
+          <>
+            <div>
+              <input
+                ref={inputRef}
+                type="text"
+                value={hisNumber}
+                onChange={(e) => setHisNumber(e.target.value)}
+                placeholder="HIS #"
+                className="w-full px-4 py-3 rounded-md border border-[#650458] outline-none focus:ring-2 focus:ring-[#bd56af] focus:border-[#bd56af]"
+              />
+            </div>
+            <div>
+              <input
+                type="text"
+                value={cryolockNumber}
+                onChange={(e) => setCryolockNumber(e.target.value)}
+                placeholder="Cryolock # (Optional)"
+                className="w-full px-4 py-3 rounded-md border border-[#650458] outline-none focus:ring-2 focus:ring-[#bd56af] focus:border-[#bd56af]"
+              />
+            </div>
+            {canisterCheckError ? (
+              <p className="text-sm text-red-600">{canisterCheckError}</p>
+            ) : title === "Outbound Quality Tracking" && hasInTransitShipments === false ? (
+              <p className="text-sm text-orange-600 font-medium">{canisterCheckMessage || 'No in-transit shipments found'}</p>
+            ) : title === "Outbound Quality Tracking" && hasInTransitShipments === true ? (
+              <p className="text-sm text-green-600 font-medium">In-transit shipments found. Redirecting...</p>
+            ) : canisterCheckMessage && !canisterCheckError ? (
+              <p className="text-sm text-green-600">{canisterCheckMessage}</p>
+            ) : error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div>
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={canisterId}
+                  onChange={handleCanisterIdChange}
+                  placeholder="e.g., 1"
+                  className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
+                    canisterCheckError
+                      ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                      : canisterCheckMessage && !canisterCheckError
+                      ? 'border-green-500 focus:ring-green-500 focus:border-green-500'
+                      : 'border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]'
+                  }`}
+                />
+                {canisterCheckLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <svg
+                      className="animate-spin h-5 w-5 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {canisterCheckError ? (
-            <p className="mt-2 text-sm text-red-600">{canisterCheckError}</p>
-          ) : title === "Outbound Quality Tracking" && hasInTransitShipments === false ? (
-            <p className="mt-2 text-sm text-orange-600 font-medium">{canisterCheckMessage || 'No in-transit shipments found'}</p>
-          ) : title === "Outbound Quality Tracking" && hasInTransitShipments === true ? (
-            <p className="mt-2 text-sm text-green-600 font-medium">In-transit shipments found. Redirecting...</p>
-          ) : canisterCheckMessage && !canisterCheckError ? (
-            <p className="mt-2 text-sm text-green-600">{canisterCheckMessage}</p>
-          ) : error ? (
-            <p className="mt-2 text-sm text-red-600">{error}</p>
-          ) : null}
-        </div>
-        {isManager ? (
-          <div className="relative w-full" ref={branchDropdownRef}>
+              {canisterCheckError ? (
+                <p className="mt-2 text-sm text-red-600">{canisterCheckError}</p>
+              ) : canisterCheckMessage && !canisterCheckError ? (
+                <p className="mt-2 text-sm text-green-600">{canisterCheckMessage}</p>
+              ) : error ? (
+                <p className="mt-2 text-sm text-red-600">{error}</p>
+              ) : null}
+            </div>
+            {isManager ? (
+              <div className="relative w-full" ref={branchDropdownRef}>
             <div
               className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${
                 branchesError ? "border-red-500" : "border-gray-300"
@@ -379,9 +433,9 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
               <p className="text-xs text-red-500 mt-1">{branchesError}</p>
             ) : null}
           </div>
-        ) : null}
-        {isManager && isBranchDropdownOpen && branches.length > 0 && branchMenuStyle && typeof document !== 'undefined'
-          ? createPortal(
+            ) : null}
+            {isManager && isBranchDropdownOpen && branches.length > 0 && branchMenuStyle && typeof document !== 'undefined'
+              ? createPortal(
               <div
                 ref={branchMenuRef}
                 className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
@@ -413,7 +467,9 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
               </div>,
               document.body
             )
-          : null}
+              : null}
+          </>
+        )}
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -425,7 +481,11 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
           <button
             type="submit"
             className="px-5 py-2.5 rounded-md bg-[#650458] text-white hover:opacity-95 disabled:opacity-50"
-            disabled={!canisterId.trim() || (isManager && !selectedBranchName) || canisterCheckLoading}
+            disabled={
+              title === "Outbound Quality Tracking"
+                ? !hisNumber.trim() || canisterCheckLoading
+                : !canisterId.trim() || (isManager && !selectedBranchName) || canisterCheckLoading
+            }
           >
             Track
           </button>
