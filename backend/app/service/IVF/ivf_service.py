@@ -331,6 +331,7 @@ class IVFService:
             query = (
                 self.db.query(
                     PatientCrylockInfo.id,
+                    PatientCrylockInfo.tank_code,
                     PatientCrylockInfo.his_number,
                     PatientCrylockInfo.crylock_number
                 )
@@ -370,9 +371,11 @@ class IVFService:
                     query = query.filter(HospitalBranch.hospital_id == hospital_id)
 
             matching_cryolocks = query.all()
+
             if not matching_cryolocks:
                 return {
                     "exists": False,
+                    "tank_code": None,
                     "his_number": normalized_his_number or None,
                     "cryolock_number": normalized_cryolock_number or None,
                     "has_in_transit_shipments": False,
@@ -392,6 +395,9 @@ class IVFService:
                 for row in matching_cryolocks
                 if row.his_number
             }
+            unique_tank_codes = {
+                row.tank_code for row in matching_cryolocks if row.tank_code
+            }
             unique_cryolock_numbers = {
                 decrypt_sensitive_ivf_value(row.crylock_number)
                 for row in matching_cryolocks
@@ -401,6 +407,7 @@ class IVFService:
             has_shipments = cryolocks_with_shipments_count > 0
             return {
                 "exists": True,
+                "tank_code": next(iter(unique_tank_codes)) if len(unique_tank_codes) == 1 else None,
                 "his_number": (
                     next(iter(unique_his_numbers))
                     if len(unique_his_numbers) == 1

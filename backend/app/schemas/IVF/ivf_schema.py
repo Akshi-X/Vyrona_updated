@@ -166,6 +166,7 @@ class CanisterCheckResponse(BaseModel):
 class TankInTransitCheckResponse(BaseModel):
     """Schema for tank in-transit shipment check response."""
     exists: bool = Field(..., description="Whether matching cryolock records exist")
+    tank_code: Optional[str] = Field(None, description="Tank code mapped from matched cryolock record(s)")
     his_number: Optional[str] = Field(None, description="Matched HIS number (or input HIS number)")
     cryolock_number: Optional[str] = Field(None, description="Matched Cryolock number (or input Cryolock number)")
     has_in_transit_shipments: bool = Field(..., description="Whether this identifier has any in-transit shipments")
