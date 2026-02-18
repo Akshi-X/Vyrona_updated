@@ -81,6 +81,8 @@ export interface CanisterCheckResponse {
 export interface TankInTransitCheckResponse {
   exists: boolean;
   tank_code: string;
+  his_number?: string | null;
+  cryolock_number?: string | null;
   tank_id: number | null;
   branch_id: number | null;
   branch_name: string | null;
@@ -256,13 +258,40 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async checkTankInTransitStatus(tankCode: string | number, branchId?: number | null): Promise<TankInTransitCheckResponse> {
-    let url = `/api/ivf/canisters/${encodeURIComponent(tankCode)}/in-transit-check`;
-    if (branchId != null) {
-      const sep = url.includes('?') ? '&' : '?';
-      url = `${url}${sep}branch_id=${encodeURIComponent(branchId)}`;
+  async checkTankInTransitStatus(
+    tankCode?: string | number,
+    branchId?: number | null,
+    hisNumber?: string | null,
+    cryolockNumber?: string | null
+  ): Promise<TankInTransitCheckResponse> {
+    // Use the new endpoint for HIS/Cryolock number lookup
+    if (hisNumber || cryolockNumber) {
+      const params = new URLSearchParams();
+      if (hisNumber) {
+        params.append('his_number', hisNumber);
+      }
+      if (cryolockNumber) {
+        params.append('cryolock_number', cryolockNumber);
+      }
+      if (branchId != null) {
+        params.append('branch_id', branchId.toString());
+      }
+      const queryString = params.toString();
+      const url = `/api/ivf/canisters/in-transit-check?${queryString}`;
+      return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
     }
-    return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
+    
+    // Fallback to old endpoint for tank code (backward compatibility)
+    if (tankCode) {
+      let url = `/api/ivf/canisters/${encodeURIComponent(tankCode)}/in-transit-check`;
+      if (branchId != null) {
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}branch_id=${encodeURIComponent(branchId)}`;
+      }
+      return await this.request<TankInTransitCheckResponse>(url, { method: 'GET' });
+    }
+    
+    throw new Error('Either tankCode or (hisNumber/cryolockNumber) must be provided');
   }
 
   async getEmbryoTracking(offset: number = 0, limit: number = 100): Promise<EmbryoTrackingApiResponse> {
