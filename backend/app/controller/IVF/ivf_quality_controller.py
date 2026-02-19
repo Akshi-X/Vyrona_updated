@@ -137,7 +137,10 @@ def get_ln2_history(
 
 
 def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
-    """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket."""
+    """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket.
+    data may include: device_code (e.g. 'LN2-1'), device_id (alias, same value), timestamp,
+    evaporation_rate_kg_per_h, ln2_mass_kg, etc. device_id/device_code = Device.device_code (string).
+    """
     try:
         r = get_redis()
         payload = dict(data)
@@ -454,7 +457,8 @@ def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, lim
         item = {
             "tank_code": tank_code_str,
             "tank_id": tank_id,
-            "device_id": dev_code,
+            "device_code": dev_code,
+            "device_id": dev_code,  # backwards compat; value is device_code
             "timestamp": ts,
             "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
             "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,

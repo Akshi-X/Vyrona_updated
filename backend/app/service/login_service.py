@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from ..dependencies.auth_dependencies import validate_login_request
-from .otp_service import send_otp_to_user, send_otp_to_user_with_placeholder
+from .otp_service import send_otp_to_user
 from ..exceptions import OTPSendFailedException
 
 
@@ -41,16 +41,12 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
     # Business Logic: Generate and send OTP with remember_me preference
     try:
         otp = send_otp_to_user(db, str(user.user_id), user.email, remember_me)
+        
+        return {
+            "user_id": str(user.user_id),
+            "email": user.email,
+            "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
+        }
     except Exception as e:
-        # Failsafe: when SendGrid/email fails, use placeholder OTP so login still works
-        try:
-            otp = send_otp_to_user_with_placeholder(db, str(user.user_id), user.email, remember_me)
-        except Exception as fallback_err:
-            raise OTPSendFailedException(email=user.email, reason=str(fallback_err))
-
-    return {
-        "user_id": str(user.user_id),
-        "email": user.email,
-        "otp_expiry": None  # Frontend uses fixed 10-minute countdown to avoid timezone issues
-    }
+        raise OTPSendFailedException(email=user.email, reason=str(e))
 

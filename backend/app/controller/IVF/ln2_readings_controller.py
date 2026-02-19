@@ -69,6 +69,7 @@ def create_reading(
             dev = db.query(Device).filter(Device.id == reading.device_id).first()
             dev_code = dev.device_code if dev and dev.device_code else str(reading.device_id)
             push_data = {
+                "device_code": dev_code,  # device_code (e.g. "LN2-1"); device_id kept for backwards compat
                 "device_id": dev_code,
                 "timestamp": reading.reading_timestamp.isoformat() if reading.reading_timestamp else "",
                 "evaporation_rate_kg_per_h": float(reading.evaporation_rate_kg_per_h) if reading.evaporation_rate_kg_per_h is not None else None,
