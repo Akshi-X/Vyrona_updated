@@ -4,38 +4,65 @@ Helper functions for user type detection and validation
 from typing import Optional
 
 
-def is_hospital_email(email: str) -> bool:
+def extract_email_domain(email: str) -> Optional[str]:
     """
-    Check if email belongs to hospital domain.
-    
-    Hospital domains: @zucisystems.com, @mygrape.org
-    All other domains are considered pharma.
-    
-    Args:
-        email: Email address to check
-        
+    Extract normalized domain from an email address.
+
     Returns:
-        True if hospital email, False if pharma email
+        Lowercase domain (e.g., "mygrape.org") or None if invalid.
     """
-    email_lower = email.lower().strip()
-    return "@zucisystems.com" in email_lower or "@mygrape.org" in email_lower
+    if not email:
+        return None
+
+    email_lower = email.strip().lower()
+    if "@" not in email_lower:
+        return None
+
+    _, domain = email_lower.rsplit("@", 1)
+    domain = domain.strip()
+    return domain or None
 
 
-def get_hospital_name_from_email(email: str) -> Optional[str]:
+def normalize_domain_or_email(value: str) -> Optional[str]:
     """
-    Get hospital name from email domain.
-    
-    For @zucisystems.com or @mygrape.org emails, returns "ARC Fertility Hospitals"
-    For other emails, returns None (pharma users).
-    
-    Args:
-        email: Email address
-        
-    Returns:
-        Hospital name if hospital email, None otherwise
+    Normalize either a raw domain (mygrape.org) or an email (a@mygrape.org)
+    into a lowercase domain for consistent matching.
     """
-    if is_hospital_email(email):
-        return "ARC Fertility Hospitals"
+    if not value:
+        return None
+
+    candidate = value.strip().lower()
+    if not candidate:
+        return None
+
+    if "@" in candidate:
+        _, candidate = candidate.rsplit("@", 1)
+
+    candidate = candidate.strip()
+    return candidate or None
+
+
+def get_hospital_by_email_domain(email: str, db) -> Optional["Hospital"]:
+    """
+    Resolve a hospital using the email domain against hospitals.hospital_head_email.
+
+    The hospital_head_email column may contain either:
+    - a domain (e.g. mygrape.org), or
+    - an email address (e.g. head@mygrape.org).
+    """
+    # Local import avoids heavy model imports in code paths that only use pure helpers.
+    from app.models.IVF.hospital_model import Hospital
+
+    email_domain = extract_email_domain(email)
+    if not email_domain:
+        return None
+
+    hospitals = db.query(Hospital).filter(Hospital.hospital_head_email.isnot(None)).all()
+    for hospital in hospitals:
+        stored_domain = normalize_domain_or_email(hospital.hospital_head_email)
+        if stored_domain and stored_domain == email_domain:
+            return hospital
+
     return None
 
 
@@ -70,3 +97,12 @@ def is_hospital_department(department: str) -> bool:
     
     # Default: if department exists and not CGT, assume hospital
     return True
+
+
+def is_specific_department(department: str, expected_department: str) -> bool:
+    """
+    Check if user belongs to a specific department (case-insensitive exact match).
+    """
+    if not department or not expected_department:
+        return False
+    return department.strip().upper() == expected_department.strip().upper()

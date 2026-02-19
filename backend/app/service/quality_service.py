@@ -18,6 +18,7 @@ from app.models.patient_model import Patient
 from app.models.user_model import User
 from app.models.geolocation_model import Geolocation
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
+from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.tank_model import Tank
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
@@ -530,36 +531,67 @@ class QualityService:
             logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
             return []
 
-    def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
+    def get_tank_telemetry_history(self, tank_id: int, branch_id: Optional[int], limit: int = 12) -> List[dict]:
         """
-        Get last N LN2 readings for a tank from Redis (separate from quality history).
-        Uses key ln2_quality_history:{tank_id} to keep LN2 and tank quality data isolated.
+        Get last N telemetry records for an IVF tank from database.
 
         Args:
-            tank_id: Tank ID to get LN2 history for
-            limit: Number of messages to retrieve (default: 12)
+            tank_id: Tank ID to get telemetry history for
+            branch_id: Branch ID to scope records (None allows all branches)
+            limit: Number of records to retrieve (default: 12)
 
         Returns:
-            List of LN2 data dictionaries, oldest first (ascending order)
+            List of telemetry dictionaries, oldest first (ascending order)
         """
         try:
-            redis_client = get_redis()
-            history_key = f"ln2_quality_history:{tank_id}"
-            raw_history = redis_client.lrange(history_key, 0, limit - 1)
-            if not raw_history:
-                return []
-            history = []
-            for raw_data in raw_history:
-                try:
-                    data = json.loads(raw_data)
-                    history.append(data)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse LN2 Redis message for tank {tank_id}: {e}")
-                    continue
+            query = (
+                self.db.query(IVFTelemetryData)
+                .join(Tank, IVFTelemetryData.tank_id == Tank.tank_id)
+                .filter(IVFTelemetryData.tank_id == tank_id)
+            )
+
+            if branch_id is not None:
+                query = query.filter(Tank.branch_id == branch_id)
+
+            telemetry_records = (
+                query.order_by(IVFTelemetryData.created_at.desc(), IVFTelemetryData.id.desc())
+                .limit(limit)
+                .all()
+            )
+
+            history: List[dict] = []
+            for record in telemetry_records:
+                raw_payload = record.telemetry_data if isinstance(record.telemetry_data, dict) else {}
+                payload = dict(raw_payload)
+                timestamp_value = (
+                    payload.get("timestamp")
+                    or payload.get("reading_timestamp")
+                    or (record.created_at.isoformat() if record.created_at else None)
+                )
+                payload.setdefault("type", "ivf_quality")
+                payload["tank_id"] = record.tank_id
+                payload["canister_id"] = record.tank_id
+                payload["tank_code"] = record.tank.tank_code if record.tank else payload.get("tank_code")
+                payload["canister_number"] = (
+                    payload.get("canister_number")
+                    or payload.get("tank_code")
+                    or (record.tank.tank_code if record.tank else None)
+                )
+                payload["device_id"] = payload.get("device_id") or record.device_id
+                payload["telemetry_data_id"] = record.id
+                payload["timestamp"] = timestamp_value
+                payload["created_at"] = (
+                    record.created_at.isoformat() if record.created_at else payload.get("created_at")
+                )
+                history.append(payload)
+
+            # Return oldest first for websocket history replay consistency
             history.reverse()
             return history
         except Exception as e:
-            logger.error(f"Error retrieving LN2 Redis history for tank {tank_id}: {e}")
+            logger.error(
+                f"Error retrieving telemetry history for tank {tank_id}, branch {branch_id}: {e}"
+            )
             return []
     
     def get_tank_geolocation_history(self, tank_id: int, limit: int = 100) -> List[dict]:

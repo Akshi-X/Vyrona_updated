@@ -313,6 +313,7 @@ export default function OutboundQualityTrackingPage() {
                         return {
                             id: task.id.toString(),
                             patientId: task.patient_id || 'N/A',
+                            tankCode: task.tank_code || undefined,
                             canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name,
                             description: task.description || '',
@@ -331,6 +332,7 @@ export default function OutboundQualityTrackingPage() {
                         return {
                             id: task.id?.toString() || 'unknown',
                             patientId: task.patient_id || 'N/A',
+                            tankCode: task.tank_code || undefined,
                             canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name || 'Unknown Task',
                             description: task.description || '',

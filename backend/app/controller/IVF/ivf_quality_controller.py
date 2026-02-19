@@ -26,6 +26,8 @@ from app.models.IVF.device_model import Device
 from app.utils.user_helpers import is_hospital_department
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.dependencies.auth_dependencies import get_current_user
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from app.utils.user_helpers import is_specific_department
 from app.exceptions import InvalidTokenException
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,7 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 return
             
             # Verify user is from IVF department
-            if not user.department or not is_hospital_department(user.department):
+            if not is_specific_department(user.department, "IVF"):
                 logger.warning(f"User {user_id} is not from IVF department (department: {user.department})")
                 await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
                 return
@@ -321,6 +323,7 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                         message = json.loads(data)
                         
                         # Handle IVF tank subscription - accept tank_code (e.g., "T1", "T2")
+                        # Optional branch_id in message is Manager-only for branch+tank disambiguation.
                         if "tank_code" not in message or not message["tank_code"]:
                             await websocket.send_json({
                                 "type": "error",
@@ -329,27 +332,54 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             continue
                         
                         tank_code = message["tank_code"]
+                        selected_branch_id = message.get("branch_id")
                         logger.info(f"Received tank_code: {tank_code}")
+                        
+                        # Parse optional branch selection from the message.
+                        if selected_branch_id is not None:
+                            try:
+                                selected_branch_id = int(selected_branch_id)
+                            except (TypeError, ValueError):
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "message": "Invalid 'branch_id' in subscription message"
+                                })
+                                continue
                         
                         # Resolve tank_code to tank_id
                         try:
                             # Convert tank_code to string
                             tank_code_str = str(tank_code).strip()
                             
-                            # Find tank by tank_code and branch_id (for non-admin users)
-                            if role_normalized != "Admin" and branch_id is not None:
+                            # Determine effective branch for this subscription.
+                            # - User: always constrained to their authorized branch.
+                            # - Manager: can optionally scope by selected branch from message.
+                            # - Admin: message branch selection is ignored.
+                            effective_branch_id = branch_id
+                            if role_normalized == "Manager" and selected_branch_id is not None:
+                                effective_branch_id = selected_branch_id
+                            
+                            # Find tank by tank_code and effective branch when available.
+                            if effective_branch_id is not None:
                                 tank = db.query(Tank).filter(
                                     Tank.tank_code == tank_code_str,
-                                    Tank.branch_id == branch_id
+                                    Tank.branch_id == effective_branch_id
                                 ).first()
                             else:
-                                # Admin users can access any tank
-                                tank = db.query(Tank).filter(
+                                # Admin without branch selection can access any tank.
+                                # If the same tank_code exists in multiple branches, force explicit branch selection.
+                                matching_tanks = db.query(Tank).filter(
                                     Tank.tank_code == tank_code_str
-                                ).first()
+                                ).all()
+                                if len(matching_tanks) > 1:
+                                    raise Exception(
+                                        f"Multiple branches have tank code '{tank_code}'. Please send 'branch_id' in subscription message."
+                                    )
+                                tank = matching_tanks[0] if matching_tanks else None
                             
                             if not tank:
-                                raise Exception(f"Tank with code '{tank_code}' not found" + (f" in branch {branch_id}" if branch_id else ""))
+                                branch_hint = effective_branch_id if effective_branch_id is not None else branch_id
+                                raise Exception(f"Tank with code '{tank_code}' not found" + (f" in branch {branch_hint}" if branch_hint is not None else ""))
                             
                             tank_id = tank.tank_id
                             
@@ -363,10 +393,16 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                         
                         # Validate tank belongs to user's branch (if user is not admin)
                         try:
-                            # Admin users (branch_id is None) can access all tanks
-                            # User/Manager users must match branch
-                            if role_normalized != "Admin" and branch_id is not None:
-                                quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+                            # Admin users (branch_id is None) can access all tanks.
+                            # User/Manager users must match the effective branch used for this subscription.
+                            if role_normalized != "Admin" and effective_branch_id is not None:
+                                quality_service.validate_tank_belongs_to_branch(tank_id, effective_branch_id)
+                            
+                            # Keep branch scoping aligned with the subscribed tank so websocket broadcast
+                            # filtering sends data for the selected branch+tank combination.
+                            manager.active_connections[connection_id]["branch_id"] = (
+                                None if role_normalized == "Admin" else tank.branch_id
+                            )
                             
                             # Client is subscribing to a tank (IVF) - track by tank_code
                             # Store tank_code as string
@@ -375,8 +411,12 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                             # Store subscription using tank_code (primary identifier)
                             manager.set_tank_subscription(connection_id, tank_id, tank_code_for_sub)
                             
-                            # Get last 12 IVF quality logs from Redis for this tank
-                            ivf_history = quality_service.get_tank_redis_history(tank_id, limit=12)
+                            # Get last 12 IVF telemetry records from DB for this tank+branch scope
+                            ivf_history = quality_service.get_tank_telemetry_history(
+                                tank_id=tank_id,
+                                branch_id=tank.branch_id,
+                                limit=12
+                            )
                             
                             # Get IVF geolocation records from database (using tank_id)
                             ivf_geolocation_history = quality_service.get_tank_geolocation_history(tank_id, limit=100)
@@ -400,6 +440,11 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                                 "type": "subscription_confirmed",
                                 "tank_id": tank_id,
                                 "tank_code": tank_code,  # Include tank_code in response
+                                "branch_id": tank.branch_id,
+                                "device_data": {
+                                    "tive_device_id": tank.tive_device_id,
+                                    "tank_id_arc": tank.tank_id_arc
+                                },
                                 "history_count": len(ivf_history),
                                 "geolocation_count": len(ivf_geolocation_history)
                             })

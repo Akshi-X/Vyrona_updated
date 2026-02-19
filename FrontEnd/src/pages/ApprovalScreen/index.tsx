@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useSearchParams, Navigate, useNavigate } from "react-router-dom";
+import { useLocation, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
@@ -26,7 +26,6 @@ const ApprovalScreen: React.FC = () => {
 
   const apiService = new BaseApiService();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Allow context time to mount, but don't show an auth error if a cookie token exists
   useEffect(() => {
@@ -112,10 +111,7 @@ const ApprovalScreen: React.FC = () => {
         // Ignore error, user info will be stale but that's okay
       }
 
-      // Navigate to dashboard after 1 second
-      setTimeout(() => {
-        navigate("/dashboard", { replace: true });
-      }, 1000);
+      // Stay on the success page - no navigation to dashboard
     } catch (err: any) {
       if (err.message?.includes('401')) {
         setStatus("Session expired. Please login again.");

@@ -2,16 +2,90 @@
 Application Configuration
 Loaded from environment variables (.env file)
 """
- 
+
 from pydantic_settings import BaseSettings  # pyright: ignore[reportMissingImports]
+from pydantic import model_validator
 from typing import List, Optional, Dict, Any
 from functools import lru_cache
 from urllib.parse import quote_plus
 import json
 import os
 import logging
- 
- 
+import re
+
+# Try to import Azure Key Vault libraries (optional for local development)
+try:
+    from azure.identity import DefaultAzureCredential  # pyright: ignore[reportMissingImports]
+    from azure.keyvault.secrets import SecretClient  # pyright: ignore[reportMissingImports]
+    AZURE_KEYVAULT_AVAILABLE = True
+except ImportError:
+    AZURE_KEYVAULT_AVAILABLE = False
+    DefaultAzureCredential = None  # type: ignore
+    SecretClient = None  # type: ignore
+
+
+def resolve_keyvault_reference(value: str) -> str:
+    """
+    Resolve Azure Key Vault references in the format:
+    @Microsoft.KeyVault(SecretUri=https://vault.vault.azure.net/secrets/secret-name/)
+    
+    Returns the original value if it's not a Key Vault reference or if resolution fails.
+    """
+    if not isinstance(value, str) or not value.startswith('@Microsoft.KeyVault'):
+        return value
+    
+    if not AZURE_KEYVAULT_AVAILABLE:
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "Azure Key Vault libraries not available. "
+            "Key Vault reference will not be resolved. "
+            "Install azure-identity and azure-keyvault-secrets to enable resolution."
+        )
+        return value
+    
+    try:
+        # Pattern to match Key Vault references
+        # Format: @Microsoft.KeyVault(SecretUri=https://vault.vault.azure.net/secrets/secret-name/)
+        pattern = r'@Microsoft\.KeyVault\(SecretUri=(https://[^/]+/secrets/[^/]+)/?\)'
+        match = re.match(pattern, value)
+        
+        if not match:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Invalid Key Vault reference format: {value}")
+            return value
+        
+        vault_url = match.group(1)
+        # Extract secret name and vault base URL
+        parts = vault_url.split('/secrets/')
+        if len(parts) != 2:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Invalid Key Vault URL format: {vault_url}")
+            return value
+        
+        vault_base_url = parts[0]
+        secret_name = parts[1].rstrip('/')
+        
+        # Use DefaultAzureCredential to authenticate (works with managed identity, service principal, etc.)
+        credential = DefaultAzureCredential()
+        secret_client = SecretClient(vault_url=vault_base_url, credential=credential)
+        
+        # Get the secret value
+        secret = secret_client.get_secret(secret_name)
+        logger = logging.getLogger(__name__)
+        logger.info(f"Successfully resolved Key Vault reference for secret: {secret_name}")
+        return secret.value
+        
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(
+            f"Failed to resolve Key Vault reference '{value}': {str(e)}. "
+            "Using original value. This may cause validation errors."
+        )
+        # Return original value to allow the app to continue
+        # In production, you might want to raise an exception instead
+        return value
+
+
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
@@ -132,6 +206,23 @@ class Settings(BaseSettings):
             logger = logging.getLogger(__name__)
             logger.error(f"Error loading pharma admins: {str(e)}")
             return []
+    
+    @model_validator(mode='before')
+    @classmethod
+    def resolve_keyvault_refs(cls, data: Any) -> Any:
+        """
+        Resolve Azure Key Vault references in environment variables before validation.
+        This allows Pydantic to receive actual values instead of Key Vault reference strings.
+        """
+        if isinstance(data, dict):
+            resolved = {}
+            for key, value in data.items():
+                if isinstance(value, str) and value.startswith('@Microsoft.KeyVault'):
+                    resolved[key] = resolve_keyvault_reference(value)
+                else:
+                    resolved[key] = value
+            return resolved
+        return data
    
     def get_ivf_admins(self) -> List[Dict[str, Any]]:
         """
@@ -167,6 +258,7 @@ class Settings(BaseSettings):
             file_secret_settings,
         ):
             # Prioritize .env file, then environment variables
+            # Key Vault references are resolved by the model_validator
             return (
                 init_settings,
                 env_settings,

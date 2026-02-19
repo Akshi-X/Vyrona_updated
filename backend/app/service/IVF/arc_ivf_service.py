@@ -4,10 +4,13 @@ Handles integration with ARC IVF Storage API
 """
 import logging
 import os
+import time
 from typing import Dict, Optional, Any
 from datetime import datetime, date, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError
+from psycopg2.errors import DeadlockDetected
 from app.config.config import settings
 from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
@@ -23,6 +26,54 @@ try:
 except ImportError:
     HTTPX_AVAILABLE = False
     logger.warning("httpx not available. ARC IVF API calls will fail.")
+
+
+def retry_on_deadlock(max_retries=3, initial_delay=0.1, max_delay=2.0, backoff_factor=2.0):
+    """
+    Decorator to retry database operations on deadlock errors.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds before first retry
+        max_delay: Maximum delay in seconds between retries
+        backoff_factor: Multiplier for exponential backoff
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            delay = initial_delay
+            
+            while retries <= max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except OperationalError as e:
+                    # Check if it's a deadlock error
+                    if isinstance(e.orig, DeadlockDetected):
+                        if retries < max_retries:
+                            retries += 1
+                            logger.warning(
+                                f"Deadlock detected in {func.__name__}. "
+                                f"Retrying ({retries}/{max_retries}) after {delay:.2f}s delay..."
+                            )
+                            time.sleep(delay)
+                            delay = min(delay * backoff_factor, max_delay)
+                            continue
+                        else:
+                            logger.error(
+                                f"Deadlock detected in {func.__name__}. "
+                                f"Max retries ({max_retries}) exceeded."
+                            )
+                    # Re-raise if not a deadlock or max retries exceeded
+                    raise
+                except Exception as e:
+                    # Re-raise non-deadlock exceptions immediately
+                    raise
+            
+            # This should never be reached, but just in case
+            raise Exception(f"Failed after {max_retries} retries")
+        
+        return wrapper
+    return decorator
 
 
 class ARCIVFService:
@@ -42,6 +93,13 @@ class ARCIVFService:
             )
         else:
             self._http_client = None
+
+    def _create_http_client(self):
+        """Create an HTTP client with ARC API-friendly timeout/connection settings."""
+        return httpx.Client(
+            timeout=httpx.Timeout(60.0, connect=20.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
     
     def get_ivf_storage(self) -> Dict[str, Any]:
         """
@@ -75,10 +133,7 @@ class ARCIVFService:
         
         if not self._http_client:
             # Increased timeout: 60 seconds total, 20 seconds for connection
-            self._http_client = httpx.Client(
-                timeout=httpx.Timeout(60.0, connect=20.0),
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-            )
+            self._http_client = self._create_http_client()
         
         try:
             # Build API URL with TokenId query parameter
@@ -88,42 +143,77 @@ class ARCIVFService:
             }
             
             logger.info(f"Calling ARC IVF API: {url} with TokenId")
-            
-            # Make GET request
-            response = self._http_client.get(url, params=params)
-            
-            # Check response status
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check if API returned success or failure
-                status = data.get("status", "").upper()
-                error_code = data.get("errorCode")
-                storage_list = data.get("storageList", [])
-                
-                if status == "SUCCESS":
-                    logger.info(f"ARC IVF API call successful. Retrieved {len(storage_list)} storage items")
-                    return {
-                        "storageList": storage_list,
-                        "status": "SUCCESS",
-                        "errorCode": error_code
-                    }
-                else:
-                    # API returned failure status
-                    logger.warning(f"ARC IVF API returned failure status: {status}, errorCode: {error_code}")
+            max_retries = 3
+            initial_delay = 0.5
+            transient_http_statuses = {429, 500, 502, 503, 504}
+
+            for attempt in range(max_retries + 1):
+                try:
+                    # Ask server to close connection after response; reduces stale keep-alive failures.
+                    response = self._http_client.get(
+                        url,
+                        params=params,
+                        headers={"Connection": "close"}
+                    )
+
+                    # Retry transient upstream errors.
+                    if response.status_code in transient_http_statuses and attempt < max_retries:
+                        delay = initial_delay * (2 ** attempt)
+                        logger.warning(
+                            f"ARC IVF API transient HTTP {response.status_code} on attempt {attempt + 1}/{max_retries + 1}. "
+                            f"Retrying after {delay:.2f}s."
+                        )
+                        time.sleep(delay)
+                        continue
+
+                    # Check response status
+                    if response.status_code == 200:
+                        data = response.json()
+
+                        # Check if API returned success or failure
+                        status = data.get("status", "").upper()
+                        error_code = data.get("errorCode")
+                        storage_list = data.get("storageList", [])
+
+                        if status == "SUCCESS":
+                            logger.info(f"ARC IVF API call successful. Retrieved {len(storage_list)} storage items")
+                            return {
+                                "storageList": storage_list,
+                                "status": "SUCCESS",
+                                "errorCode": error_code
+                            }
+                        else:
+                            # API returned failure status
+                            logger.warning(f"ARC IVF API returned failure status: {status}, errorCode: {error_code}")
+                            return {
+                                "storageList": [],
+                                "status": "FAILURE",
+                                "errorCode": error_code or 412
+                            }
+
+                    # Non-transient HTTP error
+                    logger.error(f"ARC IVF API returned HTTP {response.status_code}: {response.text}")
                     return {
                         "storageList": [],
                         "status": "FAILURE",
-                        "errorCode": error_code or 412
+                        "errorCode": response.status_code
                     }
-            else:
-                # HTTP error
-                logger.error(f"ARC IVF API returned HTTP {response.status_code}: {response.text}")
-                return {
-                    "storageList": [],
-                    "status": "FAILURE",
-                    "errorCode": response.status_code
-                }
+                except (httpx.ConnectTimeout, httpx.TimeoutException, httpx.RequestError) as request_err:
+                    # Retry transport and timeout errors (including incomplete chunked read) with backoff.
+                    if attempt < max_retries:
+                        delay = initial_delay * (2 ** attempt)
+                        logger.warning(
+                            f"ARC IVF API transient request failure on attempt {attempt + 1}/{max_retries + 1}: {request_err}. "
+                            f"Retrying after {delay:.2f}s."
+                        )
+                        try:
+                            self._http_client.close()
+                        except Exception:
+                            pass
+                        self._http_client = self._create_http_client()
+                        time.sleep(delay)
+                        continue
+                    raise
         
         except httpx.ConnectTimeout as e:
             # Handle connection timeout specifically (more specific than TimeoutException)
@@ -310,7 +400,8 @@ class ARCIVFService:
         self,
         db: Session,
         api_data: Dict[str, Any],
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
+        rollback_on_error: bool = True
     ) -> Dict[str, Any]:
         """
         Save ARC IVF storage data to database using simplified patient_crylock_info structure.
@@ -438,32 +529,69 @@ class ARCIVFService:
             # Each branch can have T1, T2, etc. (e.g., Branch 1 (Tambaram) has T1, T2; Branch 5 has T1, T2, T3)
             tank = None
             if tank_code_to_use and branch:
-                # Find tank by tank_code and branch_id (unique constraint ensures one tank per code per branch)
-                tank = db.query(Tank).filter(
-                    Tank.tank_code == tank_code_to_use,
-                    Tank.branch_id == branch.branch_id
-                ).first()
+                # Use retry logic for tank operations to handle deadlocks
+                retries = 0
+                max_retries = 3
+                initial_delay = 0.1
+                max_delay = 1.0
+                backoff_factor = 2.0
+                delay = initial_delay
                 
-                if not tank:
-                    # Create new tank with tank_code (unique per branch)
-                    tank = Tank(
-                        branch_id=branch.branch_id,
-                        tank_code=tank_code_to_use,  # e.g., "T10", "T1", "T2"
-                        tank_id_arc=tank_id_str,  # Store ARC API tankID for reference
-                        is_active=True,
-                        created_by=created_by
-                    )
-                    db.add(tank)
-                    db.flush()
-                    logger.info(f"Created new tank: {tank.tank_id} - tank_code: {tank_code_to_use} (branch: {branch.branch_name}, tankID: {tank_id_str})")
-                else:
-                    # Update tank_id_arc if it's different or missing
-                    if tank_id_str and tank.tank_id_arc != tank_id_str:
-                        tank.tank_id_arc = tank_id_str
-                        tank.updated_by = created_by
-                        tank.updated_at = datetime.now(timezone.utc)
-                        db.flush()
-                        logger.debug(f"Updated tank {tank.tank_id} tank_id_arc to {tank_id_str}")
+                while retries <= max_retries:
+                    try:
+                        # Query with FOR UPDATE and consistent ordering to prevent deadlocks
+                        # Ordering by tank_id ensures all processes lock rows in the same order
+                        # This prevents circular wait conditions that cause deadlocks
+                        tank = db.query(Tank).filter(
+                            Tank.tank_code == tank_code_to_use,
+                            Tank.branch_id == branch.branch_id
+                        ).order_by(Tank.tank_id).with_for_update(nowait=False).first()
+                        
+                        if not tank:
+                            # Create new tank with tank_code (unique per branch)
+                            # Unique constraint will handle concurrent inserts gracefully
+                            tank = Tank(
+                                branch_id=branch.branch_id,
+                                tank_code=tank_code_to_use,  # e.g., "T10", "T1", "T2"
+                                tank_id_arc=tank_id_str,  # Store ARC API tankID for reference
+                                is_active=True,
+                                created_by=created_by
+                            )
+                            db.add(tank)
+                            db.flush()
+                            logger.info(f"Created new tank: {tank.tank_id} - tank_code: {tank_code_to_use} (branch: {branch.branch_name}, tankID: {tank_id_str})")
+                        else:
+                            # Update tank_id_arc if it's different or missing
+                            if tank_id_str and tank.tank_id_arc != tank_id_str:
+                                tank.tank_id_arc = tank_id_str
+                                tank.updated_by = created_by
+                                tank.updated_at = datetime.now(timezone.utc)
+                                db.flush()
+                                logger.debug(f"Updated tank {tank.tank_id} tank_id_arc to {tank_id_str}")
+                        
+                        break  # Success, exit retry loop
+                    except OperationalError as e:
+                        # Check if it's a deadlock error
+                        if isinstance(e.orig, DeadlockDetected):
+                            if retries < max_retries:
+                                retries += 1
+                                logger.warning(
+                                    f"Deadlock detected while updating tank (tank_code={tank_code_to_use}, branch_id={branch.branch_id}). "
+                                    f"Retrying ({retries}/{max_retries}) after {delay:.2f}s delay..."
+                                )
+                                db.rollback()  # Rollback the failed transaction
+                                time.sleep(delay)
+                                delay = min(delay * backoff_factor, max_delay)
+                                continue
+                            else:
+                                logger.error(
+                                    f"Deadlock detected while updating tank. Max retries ({max_retries}) exceeded."
+                                )
+                        # Re-raise if not a deadlock or max retries exceeded
+                        raise
+                    except Exception as e:
+                        # Re-raise non-deadlock exceptions immediately
+                        raise
             
             if not tank:
                 raise Exception(f"Cannot create patient_crylock_info without a tank. tank_code: {tank_code_to_use}, branch: {branch.branch_name if branch else 'N/A'}")
@@ -586,7 +714,8 @@ class ARCIVFService:
             }
             
         except Exception as e:
-            db.rollback()
+            if rollback_on_error:
+                db.rollback()
             # Log detailed error information
             error_details = {
                 "error": str(e),
@@ -609,7 +738,7 @@ class ARCIVFService:
                 f"HIS Number: {api_data.get('hisNumber')}, "
                 f"Site: {api_data.get('siteName')}, "
                 f"Cryolock: {api_data.get('cryolockNumber')}"
-            )
+            ) from e
     
     def __del__(self):
         """Cleanup HTTP client on deletion"""
