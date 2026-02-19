@@ -220,6 +220,7 @@ export default function TrackPage() {
       return {
         id: task.id.toString(),
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name,
         description: task.description || '',
         assigneeBy: task.created_by 
@@ -237,6 +238,7 @@ export default function TrackPage() {
       return {
         id: task.id?.toString() || 'unknown',
         patientId: task.patient_id || 'N/A',
+        tankCode: task.tank_code || undefined,
         taskName: task.task_name || 'Unknown Task',
         description: task.description || '',
         assigneeBy: 'Unknown',

@@ -5,6 +5,9 @@ import FilterDark from '../assets/FilterDark.svg';
 
 interface IVFOngoingTreatmentsProps {
   treatments: IVFTreatment[];
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 
@@ -28,7 +31,12 @@ const tableHeaders: TableHeader[] = [
   { label: "Status", hasFilter: true, filterKey: 'status' },
 ];
 
-export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) {
+export function IVFOngoingTreatments({ 
+  treatments, 
+  hasMore = false, 
+  isLoadingMore = false,
+  onLoadMore 
+}: IVFOngoingTreatmentsProps) {
   const [gobletColorFilter, setGobletColorFilter] = useState<string>('all');
   const [cryolockColorFilter, setCryolockColorFilter] = useState<string>('all');
   const [siteNameFilter, setSiteNameFilter] = useState<string>('all');
@@ -39,6 +47,7 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
   const cryolockColorDropdownRef = useRef<HTMLDivElement>(null);
   const siteNameDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Extract unique values for filters
   const uniqueValues = useMemo(() => {
@@ -81,6 +90,28 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Handle infinite scroll
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer || !onLoadMore) return;
+
+    const handleScroll = () => {
+      // Don't load if already loading or no more data
+      if (isLoadingMore || !hasMore) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      // Load more when user scrolls within 100px of the bottom
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        onLoadMore();
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   const getFilteredTreatments = () => {
     return treatments.filter(treatment => {
@@ -143,7 +174,10 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
 
   return (
     <div className="rounded-2xl overflow-hidden h-[320px] flex flex-col">
-      <div className="flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+      >
         <table className="min-w-max w-full">
             <thead className="sticky top-0 z-10">
              <tr className="bg-[#FDF4FF]">
@@ -180,7 +214,7 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
                            </button>
                            
                            {isDropdownOpen && (
-                             <div className={`absolute top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg font-normal shadow-lg overflow-hidden ${
+                             <div className={`absolute top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg font-normal shadow-lg max-h-[200px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 ${
                                filterKey === 'status' ? 'right-0' : 'left-0'
                              } ${
                                filterKey === 'gobletColor' || filterKey === 'cryolockColor' ? 'w-[150px]' : 'w-[140px]'
@@ -252,28 +286,39 @@ export function IVFOngoingTreatments({ treatments }: IVFOngoingTreatmentsProps) 
                 );
               }
 
-              return filteredTreatments.map((treatment, index) => (
-                <tr
-                  key={index}
-                  className="border-b border-[#F3E0FF] bg-white transition-colors  whitespace-nowrap"
-                >
-                  <td className="px-4 py-3 text-xs">{treatment.hisNumber || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.cryolockNum || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.canisterNum || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.tankCode || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.caneCode || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
-                  <td className="px-4 py-3 text-xs max-w-[200px]">
-                    <div className="truncate" title={treatment.description || undefined}>
-                      {treatment.description || '-'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
-                  <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
-                </tr>
-              ));
+              return (
+                <>
+                  {filteredTreatments.map((treatment, index) => (
+                    <tr
+                      key={`${treatment.hisNumber}-${treatment.cryolockNum}-${index}`}
+                      className="border-b border-[#F3E0FF] bg-white transition-colors  whitespace-nowrap"
+                    >
+                      <td className="px-4 py-3 text-xs">{treatment.hisNumber || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.cryolockNum || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.canisterNum || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.tankCode || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.caneCode || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
+                      <td className="px-4 py-3 text-xs max-w-[200px]">
+                        <div className="truncate" title={treatment.description || undefined}>
+                          {treatment.description || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
+                    </tr>
+                  ))}
+                  {isLoadingMore && (
+                    <tr className="bg-white">
+                      <td colSpan={11} className="px-4 py-3 text-center text-gray-500 text-xs">
+                        Loading more data...
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
             })()}
           </tbody>
         </table>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { GoogleMap, OverlayView } from "@react-google-maps/api";
+import { GoogleMap } from "@react-google-maps/api";
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
 import { useGoogleMaps } from '../../../contexts/GoogleMapsProvider';
@@ -40,7 +40,8 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
   const markerRef = useRef<google.maps.Marker | null>(null);
   const sourceMarkerRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
-  const pathPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const sourceToCurrentPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const currentToDestinationPolylineRef = useRef<google.maps.Polyline | null>(null);
 
   const { isLoaded } = useGoogleMaps();
 
@@ -49,6 +50,20 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     const wsUrl = baseUrl.replace(/^http/, 'ws');
     return `${wsUrl}/api/ivf/quality/ws`;
+  };
+
+  const getManagerBranchOverride = (): string | undefined => {
+    try {
+      const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
+      if (!role.includes('manager')) return undefined;
+      const fromUrl = new URLSearchParams(window.location.search).get('branch_id_override')
+        || new URLSearchParams(window.location.search).get('branch_id')
+        || undefined;
+      const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
+      return fromUrl || fromSession || undefined;
+    } catch {
+      return undefined;
+    }
   };
 
   // Connect to WebSocket and handle geolocation data
@@ -60,7 +75,12 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
     if (!authToken) return;
 
     try {
-      const ws = new WebSocket(`${getWebSocketUrl()}?token=${encodeURIComponent(authToken)}`);
+      const params = new URLSearchParams({ token: authToken });
+      const branchOverride = getManagerBranchOverride();
+      if (branchOverride) {
+        params.set('branch_id_override', branchOverride);
+      }
+      const ws = new WebSocket(`${getWebSocketUrl()}?${params.toString()}`);
 
       ws.onopen = () => {
         setIsConnected(true);
@@ -223,9 +243,13 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
       destinationMarkerRef.current.setMap(null);
       destinationMarkerRef.current = null;
     }
-    if (pathPolylineRef.current) {
-      pathPolylineRef.current.setMap(null);
-      pathPolylineRef.current = null;
+    if (sourceToCurrentPolylineRef.current) {
+      sourceToCurrentPolylineRef.current.setMap(null);
+      sourceToCurrentPolylineRef.current = null;
+    }
+    if (currentToDestinationPolylineRef.current) {
+      currentToDestinationPolylineRef.current.setMap(null);
+      currentToDestinationPolylineRef.current = null;
     }
 
     // Create source marker (blue)
@@ -282,11 +306,85 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
       });
     }
 
-    // Create path polyline
-    if (positions.length > 1) {
-      pathPolylineRef.current = new window.google.maps.Polyline({
+    // Create path polylines: source to current (blue) and current to destination (red)
+    if (positions.length > 0) {
+      // Find the index of current position in positions array
+      const currentIndex = currentPosition ? positions.findIndex(
+        (p) => 
+          Math.abs(p.lat - currentPosition.lat) < 0.0001 && 
+          Math.abs(p.lng - currentPosition.lng) < 0.0001
+      ) : -1;
+      
+      // Create blue polyline from source to current
+      if (currentPosition) {
+        const sourceToCurrentPath: google.maps.LatLngLiteral[] = [];
+        
+        // Determine starting point: use sourcePosition if available, otherwise first position
+        const startPoint = sourcePosition || (positions.length > 0 ? positions[0] : null);
+        
+        if (startPoint) {
+          // Check if startPoint is the same as first position to avoid duplication
+          const isStartPointInPositions = positions.length > 0 && 
+            Math.abs(startPoint.lat - positions[0].lat) < 0.0001 && 
+            Math.abs(startPoint.lng - positions[0].lng) < 0.0001;
+          
+          if (!isStartPointInPositions) {
+            sourceToCurrentPath.push({ lat: startPoint.lat, lng: startPoint.lng });
+          }
+          
+          // Add all positions up to and including current
+          if (currentIndex >= 0) {
+            // Add positions from start to current
+            for (let i = 0; i <= currentIndex; i++) {
+              sourceToCurrentPath.push({ lat: positions[i].lat, lng: positions[i].lng });
+            }
+          } else {
+            // If current is not in positions array, add all positions then current
+            positions.forEach((p) => {
+              sourceToCurrentPath.push({ lat: p.lat, lng: p.lng });
+            });
+            sourceToCurrentPath.push({ lat: currentPosition.lat, lng: currentPosition.lng });
+          }
+          
+          if (sourceToCurrentPath.length > 1) {
+            sourceToCurrentPolylineRef.current = new window.google.maps.Polyline({
+              path: sourceToCurrentPath,
+              geodesic: false,
+              strokeColor: "#3b82f6",
+              strokeOpacity: 1.0,
+              strokeWeight: 3,
+              map,
+            });
+          }
+        }
+      }
+      
+      // Create red polyline from current to destination (straight line)
+      if (currentPosition && destinationPosition && 
+          (destinationPosition.lat !== currentPosition.lat || 
+           destinationPosition.lng !== currentPosition.lng)) {
+        // Create a direct straight line from current to destination
+        const currentToDestinationPath: google.maps.LatLngLiteral[] = [
+          { lat: currentPosition.lat, lng: currentPosition.lng },
+          { lat: destinationPosition.lat, lng: destinationPosition.lng }
+        ];
+        
+        currentToDestinationPolylineRef.current = new window.google.maps.Polyline({
+          path: currentToDestinationPath,
+          geodesic: false,
+          strokeColor: "#ef4444",
+          strokeOpacity: 1.0,
+          strokeWeight: 3,
+          map,
+        });
+      }
+    }
+    
+    // Fallback: if no current position but we have positions, show all in blue
+    if (positions.length > 1 && !currentPosition) {
+      sourceToCurrentPolylineRef.current = new window.google.maps.Polyline({
         path: positions.map((p) => ({ lat: p.lat, lng: p.lng })),
-        geodesic: true,
+        geodesic: false,
         strokeColor: "#3b82f6",
         strokeOpacity: 1.0,
         strokeWeight: 3,
@@ -376,18 +474,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
           }}
           onLoad={handleMapLoad}
           onUnmount={handleMapUnmount}
-        >
-          {currentPosition && (
-            <OverlayView
-              position={currentPosition}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-            >
-              <div className="bg-white px-2 py-1 rounded shadow-md text-xs font-medium text-gray-700">
-                Current Location
-              </div>
-            </OverlayView>
-          )}
-        </GoogleMap>
+        />
       </div>
 
       {positions.length === 0 && (

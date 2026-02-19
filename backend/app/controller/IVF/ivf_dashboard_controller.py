@@ -70,6 +70,8 @@ def get_total_embryos_cryolocks(
         result = service.get_total_embryos_cryolocks(branch_id=branch_id, role=role)
         
         return TotalEmbryosCryolocksResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting total embryos/cryolocks: {str(e)}")
 
@@ -80,12 +82,12 @@ def get_total_containers(
     db: Session = Depends(get_db)
 ):
     """
-    Get total number of containers (cryolocks).
+    Get total number of tanks.
     
     Metric 2: Total number of Containers (For all Sites)
     
-    Note: "Containers" in the ARC IVF API context refers to cryolocks, not canisters.
-    This matches the source API's totalNumberofContainers field.
+    Note: endpoint name stays as "containers" for backward compatibility,
+    but the value now represents tank count.
     
     Role-based access:
     - Manager (IVF): See metrics across all sites
@@ -99,6 +101,8 @@ def get_total_containers(
         result = service.get_total_containers(branch_id=branch_id, role=role)
         
         return TotalContainersResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting total containers: {str(e)}")
 
@@ -129,6 +133,8 @@ def get_quality_deviations_flagged(
         result = service.get_quality_deviations_flagged(branch_id=branch_id, role=role)
         
         return QualityDeviationsFlaggedResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting quality deviations: {str(e)}")
 
@@ -161,6 +167,8 @@ def get_top_deviation_driver(
         result = service.get_top_deviation_driver(branch_id=branch_id, role=role)
         
         return TopDeviationDriverResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting top deviation driver: {str(e)}")
 
@@ -192,6 +200,8 @@ def get_outbound_shipments(
         result = service.get_outbound_shipments(branch_id=branch_id, role=role)
         
         return OutboundShipmentsResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting outbound shipments: {str(e)}")
 
@@ -222,6 +232,8 @@ def get_deviations_graph(
         result = service.get_deviations_graph(branch_id=branch_id, role=role)
         
         return DeviationsGraphResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting deviations graph: {str(e)}")
 
@@ -251,5 +263,7 @@ def get_total_deviations(
         result = service.get_total_deviations(branch_id=branch_id, role=role)
         
         return TotalDeviationsResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting total deviations: {str(e)}")

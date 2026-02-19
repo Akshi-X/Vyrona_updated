@@ -35,13 +35,12 @@ from app.constants.app_constants import (
     DEFAULT_SESSION_TIMEOUT_MINUTES
 )
 from app.constants.messages import SuccessMessages, ErrorMessages
-from app.config.config import settings, get_settings
+from app.config.config import settings
 from app.models.pharma_model import Pharma
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.utils.user_helpers import (
-    is_hospital_email,
-    get_hospital_name_from_email,
+    get_hospital_by_email_domain,
     is_hospital_department
 )
 from app.utils.utils import normalize_role_to_title_case
@@ -89,15 +88,28 @@ def get_pharma_admin_email(pharma_id: int, db: Session) -> Optional[str]:
         return None
 
 
-def get_mygrape_admin_email() -> str:
+def get_mygrape_admin_email(db: Session) -> Optional[str]:
     """
-    Get the common MyGrape admin email for all pharma companies.
+    Get an active approved MyGrape admin email from the users table.
     
     Returns:
-        MyGrape admin email from configuration
+        MyGrape admin email if found, otherwise None
     """
-    settings_obj = get_settings()
-    return settings_obj.MYGRAPE_ADMIN_EMAIL
+    try:
+        mygrape_admin = db.query(user_model.User).filter(
+            user_model.User.role == 'Mygrape_admin',
+            user_model.User.approved_status == 'approved',
+            user_model.User.status == True
+        ).first()
+
+        if not mygrape_admin:
+            logger.warning("No active approved MyGrape admin found in users table")
+            return None
+
+        return mygrape_admin.email
+    except Exception as e:
+        logger.error(f"Error getting MyGrape admin email from DB: {str(e)}")
+        return None
 
 
 def get_company_manager_email(pharma_id: int, db: Session) -> Optional[str]:
@@ -127,9 +139,9 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     """
     Register a new user with proper transaction handling (supports both pharma and hospital).
     
-    Uses email domain detection:
-    - @zucisystems.com or @mygrape.org = hospital (department: IVF, Oncology, etc.)
-    - Other domains = pharma (department: CGT, etc.)
+    Uses DB-driven email domain detection from hospitals.hospital_head_email:
+    - Matching domain = hospital flow (department: IVF, Oncology, etc.)
+    - Non-matching domain = pharma flow (department: CGT, etc.)
     
     If email sending fails, user record is rolled back to prevent orphaned accounts.
     Validation already done in dependency.
@@ -140,9 +152,10 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # Generate custom user ID (USR-XXXXXX format) - same format for both types
     user_id = utils.generate_user_id()
     
-    # Detect user type from email domain
+    # Detect user type from DB-driven email-domain mapping
     email_lower = request.email.lower().strip()
-    is_hospital = is_hospital_email(email_lower)
+    domain_hospital = get_hospital_by_email_domain(email_lower, db)
+    is_hospital = domain_hospital is not None
     
     # Initialize variables
     pharma_id = None
@@ -156,6 +169,14 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # PHARMA REGISTRATION LOGIC (EXISTING - NO CHANGES)
     # ============================================
     if not is_hospital:
+        if not request.company_name:
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Company name required",
+                custom_message="company_name is required for pharma users",
+                status_code=400
+            )
+
         # Check if pharma exists
         existing_pharma = db.query(Pharma).filter(Pharma.pharma_name == request.company_name).first()
         
@@ -198,29 +219,31 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
     # HOSPITAL REGISTRATION LOGIC (NEW)
     # ============================================
     else:  # is_hospital == True
-        # Auto-detect hospital name from email if not provided
-        hospital_name = request.hospital_name or get_hospital_name_from_email(email_lower)
-        
-        if not hospital_name:
+        hospital = domain_hospital
+        hospital_name = hospital.hospital_name
+
+        if not department:
             raise DatabaseQueryException(
                 operation="user registration",
-                reason="Hospital name required",
-                custom_message="Hospital name is required for hospital users",
+                reason="Department required",
+                custom_message="department is required for hospital users",
                 status_code=400
             )
-        
-        # Validate hospital exists
-        hospital = db.query(Hospital).filter(
-            Hospital.hospital_name == hospital_name
-        ).first()
-        
-        if not hospital:
-            logger.error(f"Hospital '{hospital_name}' not found")
+
+        if not request.branch_name:
             raise DatabaseQueryException(
                 operation="user registration",
-                reason="Hospital not found",
-                custom_message=f"Hospital '{hospital_name}' not found",
-                status_code=404
+                reason="Branch required",
+                custom_message="branch_name is required for hospital users",
+                status_code=400
+            )
+
+        if request.hospital_name and request.hospital_name.strip().lower() != hospital_name.strip().lower():
+            raise DatabaseQueryException(
+                operation="user registration",
+                reason="Hospital mismatch",
+                custom_message="hospital_name does not match email domain",
+                status_code=400
             )
         
         hospital_id = hospital.hospital_id
@@ -720,16 +743,35 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         UserListResponse with users from current user's company
     """
     try:
-        # Query all approved and active users FROM SAME PHARMA (multi-tenant filtering)
-        users = db.query(User).filter(
+        # Scope users based on tenant type:
+        # - Hospital users (IVF/Oncology): same hospital (+ same department when available)
+        # - Pharma users (CGT): same pharma
+        # This prevents cross-tenant leakage (e.g., MyGrape admin users in IVF mentions).
+        base_query = db.query(User).filter(
             User.approved_status == 'approved',
-            User.status == True,
-            User.pharma_id == current_user.pharma_id  # ✅ FILTER BY PHARMA
-        ).all()
-        
-        # Get company names from pharma table
-        pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
-        company_name = pharma.pharma_name if pharma else None
+            User.status == True
+        )
+
+        company_name = None
+        if current_user.hospital_id is not None:
+            users_query = base_query.filter(
+                User.hospital_id == current_user.hospital_id
+            )
+
+            if current_user.department:
+                users_query = users_query.filter(
+                    User.department.ilike(current_user.department)
+                )
+
+            users = users_query.all()
+        else:
+            users = base_query.filter(
+                User.pharma_id == current_user.pharma_id
+            ).all()
+
+            # Get company names from pharma table (pharma users only)
+            pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
+            company_name = pharma.pharma_name if pharma else None
         
         # Convert to UserListItem
         user_items = [

@@ -12,6 +12,7 @@ export interface MyTask {
   id: string;
   patientId: string;
   canisterNumber?: string;
+  tankCode?: string;
   assigneeId?: string; // user_id (stored for update calls)
   taskName: string;
   description: string;
@@ -423,7 +424,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
       title={
         variant === 'track' ? 'My Tasks (Track & Trace)' :
         variant === 'ivf' ? 'My Tasks (Container Quality Tracking)' :
-        'My Tasks (Dashboard)'
+        'My Tasks'
       }
       description="Manage and track your assigned tasks"
       icon={
@@ -551,12 +552,12 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           <col style={{ width: 'auto', minWidth: '120px' }} />
           {/* Status */}
           <col style={{ width: 'auto', minWidth: '120px' }} />
-          {variant === 'track' && <col style={{ width: '80px', minWidth: '80px' }} />}
+          {(variant === 'track' || variant === 'ivf') && <col style={{ width: '80px', minWidth: '80px' }} />}
         </colgroup>
         <thead className="bg-[#fdeeff]">
           <tr className="border-b border-[#eeeeee]">
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
-              {isIvfVariant ? 'Canister ID' : 'Patient ID'}
+               Tank Code
             </th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Task Name</th>
             <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">Description</th>
@@ -761,7 +762,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </div>
               </div>
             </th>
-            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>
+            {(variant === 'track' || variant === 'ivf') && (
+              <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">Actions</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -966,7 +969,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
           )}
           {visibleTasks.length === 0 && !showInputRow && (
             <tr>
-              <td colSpan={9} className="bg-white p-[15px] text-center text-gray-500 text-sm">
+              <td colSpan={(variant === 'track' || variant === 'ivf') ? 9 : 8} className="bg-white p-[15px] text-center text-gray-500 text-sm">
                 No tasks match the current filters
               </td>
             </tr>
@@ -982,7 +985,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
               <tr key={task.id} className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? 'bg-gray-50' : ''}`}>
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
                   <div className="font-mono truncate">
-                    {isIvfVariant ? (task.canisterNumber || 'N/A') : task.patientId}
+                    {task.tankCode || (isIvfVariant ? (task.canisterNumber || 'N/A') : task.patientId)}
                   </div>
               </td>
               <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
@@ -1137,7 +1140,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                 </span>
                   )}
               </td>
-              {variant === 'track' && (
+              {(variant === 'track' || variant === 'ivf') && (
                 <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right sticky" style={{ zIndex: 1010 }}>
                   {canEdit && (
                   <>
