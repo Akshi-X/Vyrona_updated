@@ -396,7 +396,8 @@ def seed_ln2_and_quality_data(db, branch, tanks):
             db.flush()
             # Push to Redis so LN2 Readings card shows data immediately
             item = {
-                "device_id": dev_code,
+                "device_code": dev_code,
+                "device_id": dev_code,  # backwards compat; value is device_code
                 "timestamp": ts.isoformat(),
                 "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h),
                 "ln2_mass_kg": float(r.ln2_mass_kg),

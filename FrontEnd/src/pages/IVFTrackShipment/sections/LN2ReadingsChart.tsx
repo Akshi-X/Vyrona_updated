@@ -28,10 +28,7 @@ interface Ln2DataPoint {
   ln2_mass_kg: number | null;
 }
 
-const MAX_DATA_POINTS = 30;
-const TIME_WINDOW_MS = 6 * 60 * 60 * 1000;
-const INTERVAL_MINUTES = 60;
-const INTERVALS_COUNT = 6;
+const MAX_DATA_POINTS = 200;
 
 const parseTimestamp = (timestamp: string): Date | null => {
   try {
@@ -47,51 +44,19 @@ const parseTimestamp = (timestamp: string): Date | null => {
   }
 };
 
-const filterDataByTimeWindow = (points: Ln2DataPoint[]): Ln2DataPoint[] => {
-  if (points.length === 0) return points;
-  const now = new Date().getTime();
-  const filtered = points.filter((point) => {
-    const pointDate = parseTimestamp(point.timestamp);
-    if (!pointDate) return false;
-    const timeDiff = now - pointDate.getTime();
-    const maxAge = points.length === 1 ? 2 * TIME_WINDOW_MS : TIME_WINDOW_MS;
-    return timeDiff >= -10 * 60 * 1000 && timeDiff <= maxAge;
-  });
-  if (filtered.length === 0 && points.length > 0) {
-    const validPoints = points.filter((p) => parseTimestamp(p.timestamp) !== null);
-    if (validPoints.length > 0) {
-      validPoints.sort((a, b) => {
-        const dateA = parseTimestamp(a.timestamp);
-        const dateB = parseTimestamp(b.timestamp);
-        if (!dateA || !dateB) return 0;
-        return dateB.getTime() - dateA.getTime();
-      });
-      return [validPoints[0]];
-    }
-  }
-  return filtered;
-};
-
-const getIntervalIndex = (timestamp: string): number => {
-  try {
-    const now = new Date().getTime();
-    const pointDate = parseTimestamp(timestamp);
-    if (!pointDate) return 0;
-    const minutesAgo = Math.floor((now - pointDate.getTime()) / (60 * 1000));
-    const intervalIndex = minutesAgo < 0 ? 0 : Math.floor(minutesAgo / INTERVAL_MINUTES);
-    return Math.max(0, Math.min(INTERVALS_COUNT - 1, intervalIndex));
-  } catch {
-    return 0;
-  }
-};
-
-const formatTimestampToInterval = (minutesAgo: number): string => {
-  const now = new Date();
-  const intervalTime = new Date(now.getTime() - minutesAgo * 60 * 1000);
-  const hours = intervalTime.getHours();
+/** Format timestamp for x-axis - date on first row, time on second row */
+const formatTimestampLabel = (timestamp: string): string => {
+  const d = parseTimestamp(timestamp);
+  if (!d) return '';
+  const hours = d.getHours();
+  const mins = d.getMinutes();
   const ampm = hours >= 12 ? 'pm' : 'am';
   const displayHours = hours % 12 || 12;
-  return `${displayHours}:00 ${ampm}`;
+  const timeStr = `${displayHours}:${mins.toString().padStart(2, '0')} ${ampm}`;
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const dateStr = `${month}/${day}`;
+  return `${dateStr}\n${timeStr}`;
 };
 
 interface LN2ReadingsChartProps {
@@ -158,7 +123,7 @@ export default function LN2ReadingsChart({ canisterNumber }: LN2ReadingsChartPro
           combined.sort(
             (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
           );
-          return combined.slice(-MAX_DATA_POINTS);
+          return combined.length > MAX_DATA_POINTS ? combined.slice(-MAX_DATA_POINTS) : combined;
         });
         setHasReceivedData(true);
       }
@@ -273,95 +238,47 @@ export default function LN2ReadingsChart({ canisterNumber }: LN2ReadingsChartPro
 
     connectWebSocket();
 
-    const cleanupInterval = setInterval(() => {
-      if (isMountedRef.current) {
-        setDataPoints((prev) => {
-          const filtered = filterDataByTimeWindow(prev);
-          return filtered.length !== prev.length ? filtered : prev;
-        });
-      }
-    }, 60000);
-
     return () => {
       isMountedRef.current = false;
-      clearInterval(cleanupInterval);
       closeWebSocket();
     };
   }, [canisterNumber, token]);
 
   const chartData = useMemo(() => {
-    const filteredDataPoints = filterDataByTimeWindow(dataPoints);
+    const sorted = [...dataPoints].sort((a, b) => {
+      const ta = parseTimestamp(a.timestamp)?.getTime() ?? 0;
+      const tb = parseTimestamp(b.timestamp)?.getTime() ?? 0;
+      return ta - tb;
+    });
+    const labels = sorted.map((p) => formatTimestampLabel(p.timestamp));
     const palette = { ln2_mass_kg: '#4A90E2', evaporation_rate_kg_per_h: '#E2A84A' } as const;
 
-    const intervalLabels: string[] = [];
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      intervalLabels.push(formatTimestampToInterval(i * INTERVAL_MINUTES));
-    }
-
-    const intervalData: { [key: number]: Ln2DataPoint[] } = {};
-    filteredDataPoints.forEach((point) => {
-      const idx = getIntervalIndex(point.timestamp);
-      if (!intervalData[idx]) intervalData[idx] = [];
-      intervalData[idx].push(point);
-    });
-
-    const intervalValues: { [key: number]: { ln2_mass_kg: number | null; evaporation_rate_kg_per_h: number | null } } = {};
-    Object.keys(intervalData).forEach((key) => {
-      const index = parseInt(key);
-      const points = intervalData[index];
-      if (points.length > 0) {
-        const sorted = [...points].sort((a, b) => {
-          const dateA = parseTimestamp(a.timestamp);
-          const dateB = parseTimestamp(b.timestamp);
-          if (!dateA || !dateB) return 0;
-          return dateB.getTime() - dateA.getTime();
-        });
-        const latest = sorted[0];
-        intervalValues[index] = {
-          ln2_mass_kg: latest.ln2_mass_kg,
-          evaporation_rate_kg_per_h: latest.evaporation_rate_kg_per_h,
-        };
-      }
-    });
-
-    const ln2MassData: (number | null)[] = [];
-    const evapRateData: (number | null)[] = [];
-    for (let i = INTERVALS_COUNT - 1; i >= 0; i--) {
-      if (intervalValues[i]) {
-        ln2MassData.push(intervalValues[i].ln2_mass_kg);
-        evapRateData.push(intervalValues[i].evaporation_rate_kg_per_h);
-      } else {
-        ln2MassData.push(null);
-        evapRateData.push(null);
-      }
-    }
-
     return {
-      labels: intervalLabels,
+      labels,
       datasets: [
         {
           label: 'LN2 Mass (kg)',
-          data: ln2MassData,
+          data: sorted.map((p) => p.ln2_mass_kg),
           borderColor: palette.ln2_mass_kg,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          tension: 0.4,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          tension: 0.2,
           fill: false,
           spanGaps: true,
         },
         {
           label: 'Evaporation Rate (kg/h)',
-          data: evapRateData,
+          data: sorted.map((p) => p.evaporation_rate_kg_per_h),
           borderColor: palette.evaporation_rate_kg_per_h,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          tension: 0.4,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          tension: 0.2,
           fill: false,
-          hidden: evapRateData.every((v) => v === null),
+          hidden: sorted.every((p) => p.evaporation_rate_kg_per_h == null),
           spanGaps: true,
         },
       ],
@@ -385,18 +302,25 @@ export default function LN2ReadingsChart({ canisterNumber }: LN2ReadingsChartPro
           cornerRadius: 6,
         },
       },
-      layout: { padding: { top: 0, right: 8, bottom: 0, left: 0 } },
+      layout: { padding: { top: 0, right: 8, bottom: 8, left: 0 } },
       interaction: { mode: 'index' as const, intersect: false },
       scales: {
         x: {
           grid: { display: true, color: 'rgba(0,0,0,0.06)', borderDash: [2, 6] },
-          ticks: { color: '#4B4B4B', font: { size: 11 }, maxRotation: 0, minRotation: 0 },
+          ticks: {
+            color: '#4B4B4B',
+            font: { size: 11 },
+            maxRotation: 45,
+            minRotation: 0,
+            // Flexible: few points = show all labels; many points = auto-skip to fit
+            maxTicksLimit: dataPoints.length <= 15 ? dataPoints.length : Math.min(20, Math.ceil(dataPoints.length / 2)),
+          },
           border: { display: false },
         },
         y: {
           beginAtZero: true,
           suggestedMax: (() => {
-            const vals = filterDataByTimeWindow(dataPoints).flatMap((p) =>
+            const vals = dataPoints.flatMap((p) =>
               [p.ln2_mass_kg, p.evaporation_rate_kg_per_h].filter((v) => v != null)
             ) as number[];
             if (vals.length === 0) return 100;
@@ -433,7 +357,7 @@ export default function LN2ReadingsChart({ canisterNumber }: LN2ReadingsChartPro
       )}
 
       <div className="h-[380px]">
-        {filterDataByTimeWindow(dataPoints).length === 0 ? (
+        {dataPoints.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
             {!isConnected || wsRef.current?.readyState !== WebSocket.OPEN
               ? 'Connecting...'
