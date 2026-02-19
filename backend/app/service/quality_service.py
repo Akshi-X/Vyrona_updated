@@ -531,6 +531,38 @@ class QualityService:
             logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
             return []
 
+    def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
+        """
+        Get last N LN2 readings for a tank from Redis (separate from quality history).
+        Uses key ln2_quality_history:{tank_id} to keep LN2 and tank quality data isolated.
+
+        Args:
+            tank_id: Tank ID to get LN2 history for
+            limit: Number of messages to retrieve (default: 12)
+
+        Returns:
+            List of LN2 data dictionaries, oldest first (ascending order)
+        """
+        try:
+            redis_client = get_redis()
+            history_key = f"ln2_quality_history:{tank_id}"
+            raw_history = redis_client.lrange(history_key, 0, limit - 1)
+            if not raw_history:
+                return []
+            history = []
+            for raw_data in raw_history:
+                try:
+                    data = json.loads(raw_data)
+                    history.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse LN2 Redis message for tank {tank_id}: {e}")
+                    continue
+            history.reverse()
+            return history
+        except Exception as e:
+            logger.error(f"Error retrieving LN2 Redis history for tank {tank_id}: {e}")
+            return []
+
     def get_tank_telemetry_history(self, tank_id: int, branch_id: Optional[int], limit: int = 12) -> List[dict]:
         """
         Get last N telemetry records for an IVF tank from database.
