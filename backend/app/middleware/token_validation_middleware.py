@@ -47,7 +47,9 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
         # WebSocket endpoints handle their own authentication after connection is accepted
         upgrade_header = request.headers.get("Upgrade", "").lower()
         connection_header = request.headers.get("Connection", "").lower()
-        if upgrade_header == "websocket" and "upgrade" in connection_header:
+        is_websocket_upgrade = upgrade_header == "websocket" and "upgrade" in connection_header
+        is_ws_path = path.rstrip("/").endswith("/ws")
+        if is_websocket_upgrade or is_ws_path:
             return await call_next(request)
         
         # Skip token validation for public endpoints

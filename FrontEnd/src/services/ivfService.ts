@@ -258,6 +258,53 @@ export class IvfService extends BaseApiService {
     );
   }
 
+  /**
+   * Get LN2 readings history for a tank (evaporation_rate_kg_per_h, ln2_mass_kg).
+   * Used for initial load in LN2 Readings card before ln2-ws WebSocket connects.
+   */
+  async getLn2History(tankCode: string, limit = 30): Promise<{
+    tank_code: string;
+    tank_id: number;
+    history: Array<{
+      tank_code?: string;
+      tank_id?: number;
+      device_id?: string;
+      timestamp: string;
+      evaporation_rate_kg_per_h: number | null;
+      ln2_mass_kg: number | null;
+      ln2_level?: number | null;
+      ln2_evaporation_rate?: number | null;
+    }>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/ln2-history?limit=${limit}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Get quality tracking history for a tank (temp_internal, temp_external, shock).
+   * Used for initial load in Quality Tracking chart before WebSocket connects.
+   */
+  async getQualityHistory(tankCode: string, limit = 30): Promise<{
+    tank_code: string;
+    tank_id: number;
+    history: Array<{
+      tank_code?: string;
+      tank_id?: number;
+      timestamp: string;
+      temp_internal: number;
+      temp_external: number | null;
+      shock: number;
+      battery_percentage?: number;
+    }>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/history?limit=${limit}`,
+      { method: 'GET' }
+    );
+  }
+
   async checkTankInTransitStatus(
     tankCode?: string | number,
     branchId?: number | null,
@@ -304,6 +351,7 @@ export class IvfService extends BaseApiService {
     }
     const queryString = params.toString();
     const url = queryString ? `/api/ivf/embryo_tracking?${queryString}` : '/api/ivf/embryo_tracking';
+    
     
     const response = await this.request<RawEmbryoTrackingApiResponse>(url, {
       method: 'GET',
