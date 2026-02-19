@@ -67,6 +67,7 @@ def init_db():
         task_model,
         chat_model,
         chat_read_status,
+        chat_read_status_canister,
         chat_message_tag,
         telemetry_model,
         quality_log_model,
@@ -79,7 +80,13 @@ def init_db():
         tank_model,
         canister_ln2_log_model,
         patient_crylock_info_model,
-        critical_alert_model
+        critical_alert_model,
+    )
+    from ..models.IVF import (
+        device_model,
+        ln2_iot_device_model,
+        ln2_readings_model,
+        ln2_iot_raw_data_model,
     )
     
     # Note: IVF schema separation has been removed

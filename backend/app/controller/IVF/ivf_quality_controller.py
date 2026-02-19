@@ -6,18 +6,26 @@ Separate from CGT quality monitoring to maintain isolation
 import asyncio
 import json
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
-from typing import Optional
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path
+from typing import Optional, List
 from sqlalchemy.orm import Session
 
-from app.service.redis_service import get_redis
+from app.service.redis_service import get_redis, get_ln2_pubsub
 from app.service.quality_service import QualityService
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
 from app.config.database import get_db, SessionLocal
+from app.service.quality_service import push_ivf_quality_to_redis
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
+from app.models.IVF.ln2_readings_model import Ln2Reading
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+from app.models.IVF.device_model import Device
+from app.utils.user_helpers import is_hospital_department
+from app.utils.ivf_helpers import get_branch_filter_info
+from app.dependencies.auth_dependencies import get_current_user
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.utils.user_helpers import is_specific_department
 from app.exceptions import InvalidTokenException
@@ -31,6 +39,162 @@ from app.controller import quality_controller
 
 # Use the same connection manager instance as CGT for shared Redis listener
 manager = quality_controller.manager
+
+# Separate connection manager for LN2 readings WebSocket (do not disturb legacy quality/ws)
+ln2_manager = ConnectionManager()
+
+
+@router.get("/tanks/{tank_code}/history")
+def get_quality_history(
+    tank_code: str = Path(..., description="Tank code (e.g., T30)"),
+    limit: int = Query(30, ge=1, le=100),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get quality tracking history for a tank. Used for initial UI load before WebSocket connects.
+    Returns data from Redis or ln2_iot_raw_data fallback.
+    """
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    history = quality_service.get_tank_redis_history(tank_id, limit=limit)
+
+    if not history:
+        raw_records = (
+            db.query(Ln2IotRawData)
+            .filter(Ln2IotRawData.tank_id == tank_id)
+            .order_by(Ln2IotRawData.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        for rec in reversed(raw_records):
+            p = rec.payload or {}
+            if p.get("temp_internal") is not None and p.get("shock") is not None:
+                ts = rec.created_at.isoformat() if rec.created_at else (p.get("timestamp") or "")
+                hist_item = {
+                    "tank_code": tank_code_str,
+                    "tank_id": tank_id,
+                    "timestamp": ts,
+                    "temp_internal": float(p.get("temp_internal")),
+                    "temp_external": float(p["temp_external"]) if p.get("temp_external") is not None else None,
+                    "shock": float(p.get("shock")),
+                }
+                if p.get("battery_percentage") is not None:
+                    hist_item["battery_percentage"] = float(p["battery_percentage"])
+                push_ivf_quality_to_redis(tank_id, tank_code_str, hist_item, publish=False)
+                history.append(hist_item)
+
+    return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
+
+
+@router.get("/tanks/{tank_code}/ln2-history")
+def get_ln2_history(
+    tank_code: str = Path(..., description="Tank code (e.g., T30)"),
+    limit: int = Query(30, ge=1, le=100),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get LN2 readings history for a tank. Used for initial UI load before ln2-ws connects.
+    Returns evaporation_rate_kg_per_h, ln2_mass_kg (Redis first, then DB fallback).
+    """
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    # Redis first, then DB fallback
+    history = _get_ln2_history_for_tank(db, tank_id, tank_code_str, limit=limit)
+    return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
+
+
+def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
+    """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket.
+    data may include: device_code (e.g. 'LN2-1'), device_id (alias, same value), timestamp,
+    evaporation_rate_kg_per_h, ln2_mass_kg, etc. device_id/device_code = Device.device_code (string).
+    """
+    try:
+        r = get_redis()
+        payload = dict(data)
+        payload["tank_id"] = tank_id
+        payload["tank_code"] = tank_code
+        msg = json.dumps(payload)
+        history_key = f"ln2_quality_history:{tank_id}"
+        r.lpush(history_key, msg)
+        r.ltrim(history_key, 0, 29)
+        if publish:
+            r.publish("ln2_readings_channel", msg)
+        logger.debug(f"Pushed LN2 reading to Redis for tank {tank_code} (id={tank_id})")
+    except Exception as e:
+        logger.warning(f"Failed to push LN2 reading to Redis: {e}")
+
+
+async def ln2_redis_listener():
+    """Listen for LN2 readings from Redis and broadcast to ln2-ws clients."""
+    loop = asyncio.get_event_loop()
+    pubsub = None
+    while True:
+        try:
+            if pubsub is None:
+                try:
+                    pubsub = get_ln2_pubsub()
+                    logger.info("LN2 Redis listener started")
+                except Exception as e:
+                    logger.error(f"Error connecting to LN2 Redis: {e}. Retrying in 5 seconds...")
+                    await asyncio.sleep(5)
+                    continue
+
+            message = await loop.run_in_executor(
+                None,
+                lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True),
+            )
+            if message and message.get("type") == "message":
+                try:
+                    data = json.loads(message["data"])
+                    db = SessionLocal()
+                    try:
+                        await ln2_manager.broadcast(data, db)
+                    finally:
+                        db.close()
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse LN2 message: {e}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting LN2 message: {e}")
+        except Exception as e:
+            logger.error(f"Error in ln2_redis_listener: {e}")
+            pubsub = None
+            await asyncio.sleep(5)
+
 
 @router.websocket("/ws")
 async def ivf_websocket_endpoint(websocket: WebSocket):
@@ -303,3 +467,149 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"IVF WebSocket error: {e}")
         manager.disconnect_by_websocket(websocket)
+
+
+def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, limit: int = 12) -> list:
+    """Get LN2 readings history for a tank (Redis first via get_ln2_redis_history, then DB fallback)."""
+    quality_service = QualityService(db)
+    history = quality_service.get_ln2_redis_history(tank_id, limit=limit)
+    if history:
+        return history
+    # Fallback: ln2_readings by device_id (devices.id)
+    tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+    if not tank:
+        return []
+    device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
+    if tank.tive_device_id:
+        dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
+        if dev and dev.id not in device_ids:
+            device_ids.append(dev.id)
+    if not device_ids:
+        return []
+    from sqlalchemy import or_, desc
+    readings = (
+        db.query(Ln2Reading)
+        .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
+        .order_by(desc(Ln2Reading.reading_timestamp))
+        .limit(limit)
+        .all()
+    )
+    history = []
+    for r in reversed(readings):
+        ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
+        dev = db.query(Device).filter(Device.id == r.device_id).first()
+        dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
+        item = {
+            "tank_code": tank_code_str,
+            "tank_id": tank_id,
+            "device_code": dev_code,
+            "device_id": dev_code,  # backwards compat; value is device_code
+            "timestamp": ts,
+            "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
+            "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
+            "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
+            "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
+            "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
+            "sensor_status": r.sensor_status,
+            "lid_state": r.lid_state,
+            "refill_detected": r.refill_detected,
+            "quality_status": r.quality_status,
+        }
+        push_ln2_reading_to_redis(tank_id, tank_code_str, item, publish=False)
+        history.append(item)
+    return history
+
+
+@router.websocket("/ln2-ws")
+async def ivf_ln2_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time LN2 readings monitoring.
+    Separate from quality /ws to avoid disturbing legacy code.
+    Requires: ?token=<jwt_token>. Subscribe with: {"tank_code": "T30"}.
+    """
+    connection_id = None
+    try:
+        await websocket.accept()
+        logger.info(f"IVF LN2 WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
+
+        query_params = dict(websocket.query_params)
+        token = query_params.get("token")
+        if not token:
+            await websocket.close(code=1008, reason="Authentication required: No token provided")
+            return
+
+        try:
+            auth_info = verify_websocket_token(token)
+            user_id = auth_info["user_id"]
+        except InvalidTokenException as e:
+            await websocket.close(code=1008, reason=f"Invalid token: {str(e)}")
+            return
+        except Exception as e:
+            await websocket.close(code=1008, reason=f"Token verification failed: {str(e)}")
+            return
+
+        db_temp = SessionLocal()
+        try:
+            user = db_temp.query(User).filter(User.user_id == user_id).first()
+            if not user:
+                await websocket.close(code=1008, reason="User not found")
+                return
+            if not user.department or not is_hospital_department(user.department):
+                await websocket.close(code=1008, reason="Access denied: IVF users only")
+                return
+            role = user.role.value if hasattr(user.role, "value") else str(user.role)
+            branch_id = user.branch_id if role != "Admin" else None
+        finally:
+            db_temp.close()
+
+        connection_id = await ln2_manager.connect(websocket)
+        ln2_manager.active_connections[connection_id]["branch_id"] = branch_id
+        ln2_manager.active_connections[connection_id]["role"] = role
+
+        db = SessionLocal()
+        try:
+            quality_service = QualityService(db)
+            while True:
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                    try:
+                        message = json.loads(data)
+                        if "tank_code" not in message or not message["tank_code"]:
+                            await websocket.send_json({"type": "error", "message": "Subscription must contain 'tank_code'"})
+                            continue
+                        tank_code = message["tank_code"]
+                        tank_code_str = str(tank_code).strip()
+
+                        if role != "Admin" and branch_id is not None:
+                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str, Tank.branch_id == branch_id).first()
+                        else:
+                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str).first()
+                        if not tank:
+                            await websocket.send_json({"type": "error", "message": f"Tank '{tank_code}' not found"})
+                            continue
+                        tank_id = tank.tank_id
+                        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+
+                        ln2_manager.set_tank_subscription(connection_id, tank_id, tank_code_str)
+                        ln2_history = _get_ln2_history_for_tank(db, tank_id, tank_code_str, limit=12)
+
+                        for h in ln2_history:
+                            await websocket.send_json(h)
+                        await websocket.send_json({
+                            "type": "subscription_confirmed",
+                            "tank_id": tank_id,
+                            "tank_code": tank_code,
+                            "history_count": len(ln2_history),
+                        })
+                    except json.JSONDecodeError:
+                        pass
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            db.close()
+    except WebSocketDisconnect:
+        ln2_manager.disconnect_by_websocket(websocket)
+        logger.info(f"IVF LN2 WebSocket disconnected: {connection_id}")
+    except Exception as e:
+        logger.error(f"IVF LN2 WebSocket error: {e}")
+        ln2_manager.disconnect_by_websocket(websocket)

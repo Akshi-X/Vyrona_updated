@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Global Redis client and pubsub instances
 _redis_client: Optional[redis.Redis] = None
 _pubsub: Optional[redis.client.PubSub] = None
+_ln2_pubsub: Optional[redis.client.PubSub] = None  # Separate pubsub for LN2 readings (do not disturb quality channel)
 
 
 def get_redis() -> redis.Redis:
@@ -50,6 +51,9 @@ def get_redis() -> redis.Redis:
                     connection_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
                 logger.info(f"SSL/TLS enabled for Redis connection")
             
+            # Add username (Redis Labs / Redis 6+ ACL) if provided
+            if settings.REDIS_USERNAME:
+                connection_params["username"] = settings.REDIS_USERNAME
             # Add password if provided
             if settings.REDIS_PASSWORD:
                 connection_params["password"] = settings.REDIS_PASSWORD
@@ -92,14 +96,35 @@ def get_pubsub() -> redis.client.PubSub:
     return _pubsub
 
 
+def get_ln2_pubsub() -> redis.client.PubSub:
+    """Get or create Redis pubsub for LN2 readings channel (separate from quality channels)."""
+    global _ln2_pubsub
+    if _ln2_pubsub is None:
+        try:
+            r = get_redis()
+            _ln2_pubsub = r.pubsub()
+            _ln2_pubsub.subscribe("ln2_readings_channel")
+            logger.info("Redis pub/sub subscription established for ln2_readings_channel")
+        except Exception as e:
+            logger.error(f"Failed to create LN2 pub/sub connection: {e}")
+            raise
+    return _ln2_pubsub
+
+
 def reset_redis_connection():
     """Reset Redis connections (useful for reconnection)"""
-    global _redis_client, _pubsub
+    global _redis_client, _pubsub, _ln2_pubsub
     if _pubsub:
         try:
             _pubsub.close()
         except Exception:
             pass
+    if _ln2_pubsub:
+        try:
+            _ln2_pubsub.close()
+        except Exception:
+            pass
     _pubsub = None
+    _ln2_pubsub = None
     _redis_client = None
 
