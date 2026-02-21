@@ -20,6 +20,7 @@ This guide provides step-by-step instructions to set up the entire MyGrape devel
 10. [Verification & Testing](#verification--testing)
 11. [Troubleshooting](#troubleshooting)
 12. [Development Workflow](#development-workflow)
+13. [Shared Models (Monorepo)](#-shared-models-monorepo)
 
 ---
 
@@ -90,7 +91,7 @@ The MyGrape project consists of three main components:
 ### Project Structure
 
 ```
-mygrape/
+dashboard-service/
 ├── backend/              # FastAPI backend application
 │   ├── app/              # Application code
 │   ├── migration/        # Database migrations (Alembic)
@@ -103,6 +104,17 @@ mygrape/
 │   ├── src/              # Source code
 │   ├── package.json      # Node dependencies
 │   └── vite.config.ts    # Vite configuration
+│
+├── telemetry-service/    # Azure Functions (IoT telemetry processing)
+│   ├── TelemetryHook/    # Main Azure Function
+│   ├── shared/           # Function-internal utilities (database, publisher logic)
+│   ├── config.py         # Settings (Pydantic BaseSettings + Azure Key Vault)
+│   └── host.json         # Azure Functions host configuration
+│
+├── shared/               # Shared pip package (mgscale-shared)
+│   ├── pyproject.toml    # Package definition - install with: pip install -e ./shared
+│   └── backend/
+│       └── models/       # SQLAlchemy models shared across backend & telemetry-service
 │
 └── publisher/            # Quality data publisher service
     ├── publisher.py      # Main publisher script
@@ -1176,6 +1188,7 @@ Use this checklist to verify your setup:
 - [ ] Redis 6.x or 7.x installed and running
 - [ ] Database `mygrape` created
 - [ ] Backend dependencies installed (`poetry install`)
+- [ ] Shared package installed in backend and telemetry-service (`pip install -e ./shared`)
 - [ ] Frontend dependencies installed (`npm install`)
 - [ ] Backend `.env` file created and configured
 - [ ] Publisher `.publisher.env` file created and configured
@@ -1207,6 +1220,304 @@ If you've completed all the steps above, you should have:
 - Check the project README files for more information
 
 **Happy Coding! 🚀**
+
+---
+
+## 🔗 Shared Models (Monorepo)
+
+The `shared/` directory is a pip-installable Python package (`mgscale-shared`) that contains SQLAlchemy models used by both `backend` and `telemetry-service`. This is the single source of truth for any database table that both services need to read or write — no more duplicating DDL or raw SQL in the Azure Function.
+
+---
+
+### Package Structure
+
+```
+shared/
+├── pyproject.toml                          # Package definition (name: mgscale-shared)
+├── __init__.py
+└── backend/
+    ├── __init__.py
+    └── models/
+        ├── base.py                         # Single shared Base = declarative_base()
+        ├── __init__.py                     # Exports Base + all shared models
+        └── ..._model.py                    # Any model file (just like models inside /backend/app/models)
+```
+
+**Rule:** Every file under `shared/backend/models/` imports `Base` from `shared/backend/models/base.py`. Never use a locally-defined `Base` for a shared model.
+
+---
+
+### Installing the Shared Package
+
+Run this once inside each service's virtual environment. The `-e` flag means editable — changes to `shared/` are picked up immediately without reinstalling. Anyway while installing the dependencies inside backend or telemetry-service this is already installed as the entried are added to `pyproject.toml` and `requirements.txt`
+
+```bash
+# From the repo root
+
+# Backend (inside Poetry shell)
+cd backend
+poetry shell
+pip install -e ../shared
+
+# Telemetry-service (inside its own venv)
+cd telemetry-service
+pip install -e ../shared
+```
+
+How the installs are placed in other service's dependency file:
+
+**`backend/pyproject.toml`** — add to `[project].dependencies`:
+```toml
+"mgscale-shared @ {root:uri}/../shared"
+```
+`{root:uri}` is Poetry's placeholder — it resolves to the absolute file URI of the
+project root at install time. Do **not** use `file://./shared`; relative file URIs are
+not supported and will cause a *"non-local file URIs are not supported"* error.
+
+**`telemetry-service/requirements.txt`** — add:
+```
+-e ../shared
+```
+
+---
+
+### How It Works: One `Base` for All Shared Models
+
+`shared/backend/models/base.py` holds the single `declarative_base()` instance:
+
+```python
+# shared/backend/models/base.py
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+```
+
+All shared models import from this file. SQLAlchemy tracks every model that inherits from this `Base` in the same `MetaData` object, so `Base.metadata.create_all(engine)` creates every shared table in one call.
+
+The backend's existing `backend/app/config/database.py` defines its own local `Base` for backend-only models. You maintain both:
+
+| Base | Used for | `create_all` call |
+|------|----------|-------------------|
+| `shared.backend.models.base.Base` | Tables shared across services | `SharedBase.metadata.create_all(engine)` |
+| `backend.app.config.database.Base` | Backend-only tables | `LocalBase.metadata.create_all(engine)` |
+
+---
+
+### Adding a New Shared Model
+
+1. **Create the model file** — import `Base` from `.base` (or `..base` for sub-packages):
+
+    ```python
+    # shared/backend/models/quality_log_model.py
+    from datetime import datetime, timezone
+    from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Index
+    from sqlalchemy.orm import relationship
+    from .base import Base
+
+
+    class QualityLog(Base):
+        """Shared quality log — written by telemetry-service, read by backend."""
+        __tablename__ = "quality_log"
+
+        id                 = Column(Integer, primary_key=True, autoincrement=True)
+        telemetry_data_id  = Column(Integer, ForeignKey("telemetry_data.id", ondelete="CASCADE"),
+                                    nullable=False, index=True)
+        patient_id         = Column(String, ForeignKey("patient.id", ondelete="CASCADE"),
+                                    nullable=False, index=True)
+        temperature        = Column(Float, nullable=False)
+        humidity           = Column(Float, nullable=False)
+        agitation          = Column(Float, nullable=False)
+        quality_loss       = Column(Float, nullable=True)
+        is_temp_loss       = Column(Boolean, default=False, nullable=False)
+        is_humidity_loss   = Column(Boolean, default=False, nullable=False)
+        is_agitation_loss  = Column(Boolean, default=False, nullable=False)
+        reading_timestamp  = Column(DateTime, nullable=False, index=True)
+        created_at         = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+        __table_args__ = (
+            Index("idx_quality_log_patient_ts", "patient_id", "reading_timestamp"),
+        )
+    ```
+
+2. **Export it** in `shared/backend/models/__init__.py`:
+
+    ```python
+    from .base import Base
+    from .telemetry_model import TelemetryData
+    from .quality_log_model import QualityLog          # add this
+    from .ivf import IVFTelemetryData
+
+    __all__ = ["Base", "TelemetryData", "QualityLog", "IVFTelemetryData"]
+    ```
+
+3. Both services see the new model immediately — no reinstall needed (editable install).
+
+---
+
+### Usage in Backend
+
+#### 1. Initialize shared tables alongside local tables (`backend/app/config/database.py`)
+
+```python
+# backend/app/config/database.py
+from sqlalchemy.orm import declarative_base
+from shared.backend.models import Base as SharedBase   # mgscale-shared
+
+Base = declarative_base()   # local/backend-only models keep using this
+
+
+def init_db():
+    # Import all local models so their metadata is registered
+    from ..models import user_model, patient_model, shipment_model  # etc.
+
+    # Create backend-only tables
+    Base.metadata.create_all(bind=engine)
+
+    # Create shared tables (telemetry_data, ivf_telemetry_data, quality_log, …)
+    SharedBase.metadata.create_all(bind=engine)
+```
+
+#### 2. Query a shared model in a service layer
+
+```python
+# backend/app/service/telemetry_service.py
+from sqlalchemy.orm import Session
+from shared.backend.models import TelemetryData   # mgscale-shared
+
+
+def get_telemetry_for_shipment(db: Session, shipment_id: str) -> list[TelemetryData]:
+    return (
+        db.query(TelemetryData)
+        .filter(TelemetryData.shipment_id == shipment_id)
+        .order_by(TelemetryData.created_at.desc())
+        .all()
+    )
+```
+
+#### 3. Use in a FastAPI route
+
+```python
+# backend/app/controller/telemetry_controller.py
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.config.database import get_db
+from shared.backend.models import TelemetryData
+
+router = APIRouter()
+
+
+@router.get("/telemetry/{shipment_id}")
+def read_telemetry(shipment_id: str, db: Session = Depends(get_db)):
+    rows = db.query(TelemetryData).filter(
+        TelemetryData.shipment_id == shipment_id
+    ).all()
+    return [{"id": r.id, "data": r.telemetry_data, "at": r.created_at} for r in rows]
+```
+
+---
+
+### Usage in Telemetry-Service (Azure Function)
+
+#### 1. Replace raw DDL with ORM-based table creation (`telemetry-service/shared/database.py`)
+
+```python
+# telemetry-service/shared/database.py  (existing file — update ensure_tables_exist)
+from shared.backend.models import Base as SharedBase   # mgscale-shared
+
+
+def ensure_tables_exist():
+    """Create all shared tables idempotently (replaces hand-written DDL strings)."""
+    engine = get_engine()
+    SharedBase.metadata.create_all(bind=engine)
+    logger.info("Shared tables verified/created via ORM")
+```
+
+Then in `TelemetryHook/__init__.py` replace the `ensure_telemetry_table_exists()` call:
+
+```python
+from shared.database import ensure_tables_exist   # updated function
+
+def initialize():
+    global _initialized
+    if not _initialized:
+        config.validate()
+        ensure_tables_exist()          # creates all shared tables via ORM
+        _initialized = True
+```
+
+#### 2. Insert telemetry data using the ORM model
+
+```python
+# telemetry-service/shared/publisher_logic.py
+from shared.backend.models import TelemetryData, IVFTelemetryData   # mgscale-shared
+from shared.database import get_session
+
+
+def insert_telemetry_data(shipment_id: str, payload: dict) -> int:
+    """Insert a raw CGT telemetry payload and return its new id."""
+    SessionLocal = get_session()
+    with SessionLocal() as db:
+        record = TelemetryData(
+            shipment_id=shipment_id,
+            telemetry_data=payload,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record.id
+
+
+def insert_ivf_telemetry_data(tank_id: int, device_id: str, payload: dict) -> int:
+    """Insert a raw IVF telemetry payload and return its new id."""
+    SessionLocal = get_session()
+    with SessionLocal() as db:
+        record = IVFTelemetryData(
+            tank_id=tank_id,
+            device_id=device_id,
+            telemetry_data=payload,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record.id
+```
+
+---
+
+### Alembic Migrations with Shared Models
+
+Alembic's `env.py` must see all model metadata — both local and shared. Update `backend/migration/env.py`:
+
+```python
+# backend/migration/env.py
+from app.config.database import Base as LocalBase
+from shared.backend.models import Base as SharedBase   # mgscale-shared
+
+# Merge both metadata sets so autogenerate sees every table
+from sqlalchemy import MetaData
+target_metadata = [LocalBase.metadata, SharedBase.metadata]
+```
+
+Then generate and apply migrations as usual:
+
+```bash
+cd backend
+poetry run alembic revision --autogenerate -m "add shared quality_log model"
+poetry run alembic upgrade head
+```
+
+---
+
+### Quick Reference
+
+| Task | Command |
+|------|---------|
+| Install shared package (backend) | `cd backend && pip install -e ../shared` |
+| Install shared package (telemetry-service) | `cd telemetry-service && pip install -e ../shared` |
+| Import a shared model | `from shared.backend.models import TelemetryData` |
+| Import shared Base only | `from shared.backend.models import Base` |
+| Create shared tables via ORM | `Base.metadata.create_all(bind=engine)` |
+| Add a new shared model | Create file → export in `shared/backend/models/__init__.py` |
 
 ---
 
