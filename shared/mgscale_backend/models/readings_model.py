@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
@@ -12,38 +11,32 @@ class Readings(Base):
     Read by backend for dashboards, history views, and alert evaluation.
 
     Table: readings
+
+    Note on cross-Base FK columns: hospital_id, branch_id, device_id, and tank_id
+    reference tables registered under the local backend Base (different SQLAlchemy
+    MetaData). Declaring ForeignKey() on these columns causes a NoReferencedTableError
+    at create_all time because SharedBase.metadata cannot resolve tables from the local
+    Base. These columns are plain Integer — referential integrity for them is enforced
+    via database-level constraints added by the local Base's create_all / migrations.
+    kpi_config_id references kpi_config which is in SharedBase — ForeignKey is safe there.
     """
     __tablename__ = "readings"
 
     # Primary Key
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
-    # Foreign Keys — scope the reading to its origin
-    hospital_id = Column(
-        Integer,
-        ForeignKey("hospitals.hospital_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    branch_id = Column(
-        Integer,
-        ForeignKey("hospital_branches.branch_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    # Cross-Base FK columns — plain Integer; FK constraints live in local Base / migrations
+    hospital_id = Column(Integer, nullable=False, index=True)
+    branch_id = Column(Integer, nullable=False, index=True)
     device_id = Column(
         Integer,
-        ForeignKey("devices.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
         comment="Device that produced this reading (nullable: reading may arrive before device record exists)",
     )
-    tank_id = Column(
-        Integer,
-        ForeignKey("tanks.tank_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    tank_id = Column(Integer, nullable=False, index=True)
+
+    # Intra-SharedBase FK — safe to declare ForeignKey
     kpi_config_id = Column(
         Integer,
         ForeignKey("kpi_config.id", ondelete="CASCADE"),
@@ -77,12 +70,12 @@ class Readings(Base):
         comment="True if kpi_value violates the min/max bounds in kpi_config",
     )
 
-    # Relationships
-    hospital = relationship("Hospital", backref="readings")
-    branch = relationship("HospitalBranch", backref="readings")
-    device = relationship("Device", backref="readings")
-    tank = relationship("Tank", backref="readings")
+    # Relationship to KpiConfig (intra-SharedBase — safe to declare)
     kpi_config = relationship("KpiConfig", back_populates="readings")
+
+    # Note: relationships to Hospital, HospitalBranch, Device, Tank are intentionally
+    # omitted. Those classes live in the local backend Base (different mapper registry).
+    # Access them via plain FK queries: db.query(Tank).filter(Tank.tank_id == r.tank_id)
 
     # Composite indexes for the most common query patterns
     __table_args__ = (

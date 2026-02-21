@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Index
 from sqlalchemy.orm import relationship
 
 from .base import Base
@@ -11,31 +11,23 @@ class KpiConfig(Base):
     when evaluating incoming readings.
 
     Table: kpi_config
+
+    Note on cross-Base FK columns: hospital_id, branch_id, and tank_id reference
+    tables registered under the local backend Base (different SQLAlchemy MetaData).
+    Declaring ForeignKey() on these columns causes a NoReferencedTableError at
+    create_all time because SharedBase.metadata cannot resolve tables from the local
+    Base. These columns are plain Integer — referential integrity for them is enforced
+    via database-level constraints added by the local Base's create_all / migrations.
     """
     __tablename__ = "kpi_config"
 
     # Primary Key
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
-    # Foreign Keys
-    hospital_id = Column(
-        Integer,
-        ForeignKey("hospitals.hospital_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    branch_id = Column(
-        Integer,
-        ForeignKey("hospital_branches.branch_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    tank_id = Column(
-        Integer,
-        ForeignKey("tanks.tank_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    # Cross-Base FK columns — plain Integer; FK constraints live in local Base / migrations
+    hospital_id = Column(Integer, nullable=False, index=True)
+    branch_id = Column(Integer, nullable=False, index=True)
+    tank_id = Column(Integer, nullable=False, index=True)
 
     # KPI definition
     kpi_name = Column(String(255), nullable=False, comment="Name of the KPI being monitored (e.g. 'temperature', 'ln2_level')")
@@ -51,11 +43,12 @@ class KpiConfig(Base):
     # Active flag — inactive configs are ignored by telemetry-service
     status = Column(Boolean, nullable=False, default=True, comment="True = active, False = disabled")
 
-    # Relationships
-    hospital = relationship("Hospital", backref="kpi_configs")
-    branch = relationship("HospitalBranch", backref="kpi_configs")
-    tank = relationship("Tank", backref="kpi_configs")
+    # Relationship to Readings (intra-SharedBase — safe to declare)
     readings = relationship("Readings", back_populates="kpi_config", cascade="all, delete-orphan")
+
+    # Note: relationships to Hospital, HospitalBranch, Tank are intentionally omitted.
+    # Those classes live in the local backend Base (different mapper registry).
+    # Access them via plain FK queries: db.query(Tank).filter(Tank.tank_id == kpi.tank_id)
 
     # Composite index — common query: all active KPIs for a given tank
     __table_args__ = (
