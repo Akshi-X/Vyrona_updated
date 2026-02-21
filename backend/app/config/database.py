@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
-from shared.backend.models import Base as SharedBase
+from mgscale_backend.models import Base as SharedBase
 from sqlalchemy.orm import sessionmaker
 import logging
 
@@ -90,10 +90,10 @@ def init_db():
         ln2_iot_raw_data_model,
     )
 
-    # Import shared telemetry models
-    from shared.backend.models import (
-        kpi_config_model,
-        readings_model,
+    # Import shared models so SQLAlchemy registers them with SharedBase.metadata
+    from mgscale_backend.models import (
+        KpiConfig,
+        Readings,
     )
     
     # Note: IVF schema separation has been removed
