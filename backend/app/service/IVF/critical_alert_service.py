@@ -818,6 +818,47 @@ class CriticalAlertService:
                     "severity": severity.value
                 })
             
+            # Check LN2 Alert
+            if quality_log_data.get("alert_type") == "LN2_MONITORING":
+                # Handle LN2-specific violations
+                if quality_log_data.get("excessive_evaporation"):
+                    violations_to_check.append({
+                        "type": "ln2_evaporation",
+                        "alert_type": AlertType.DEVIATION_ALERT.value,
+                        "source": AlertSource.KPI.value,
+                        "message": f"Excessive LN2 evaporation detected: {quality_log_data.get('evaporation_rate', 'N/A')} kg/h",
+                        "severity": AlertSeverity.HIGH.value
+                    })
+                
+                if quality_log_data.get("lid_open_beyond_threshold"):
+                    violations_to_check.append({
+                        "type": "ln2_lid_open",
+                        "alert_type": AlertType.DEVIATION_ALERT.value,
+                        "source": AlertSource.KPI.value,
+                        "message": f"LN2 tank lid open beyond threshold (>30 minutes). Current state: {quality_log_data.get('lid_state', 'N/A')}",
+                        "severity": AlertSeverity.MEDIUM.value
+                    })
+                
+                if quality_log_data.get("sensor_fault"):
+                    violations_to_check.append({
+                        "type": "ln2_sensor_fault",
+                        "alert_type": AlertType.DEVIATION_ALERT.value,
+                        "source": AlertSource.KPI.value,
+                        "message": f"LN2 sensor fault detected. Sensor status: {quality_log_data.get('sensor_status', 'UNKNOWN')}",
+                        "severity": AlertSeverity.HIGH.value
+                    })
+                
+                # Check LN2 level warning
+                ln2_level_pct = quality_log_data.get("ln2_level_pct")
+                if ln2_level_pct is not None and ln2_level_pct < 20.0:
+                    violations_to_check.append({
+                        "type": "ln2_low_level",
+                        "alert_type": AlertType.QUALITY_ALERT.value,
+                        "source": AlertSource.QUALITY.value,
+                        "message": f"LN2 level critically low: {ln2_level_pct}%",
+                        "severity": AlertSeverity.HIGH.value if ln2_level_pct < 10.0 else AlertSeverity.MEDIUM.value
+                    })
+
             # Check quality loss
             quality_loss = quality_log_data.get("quality_loss", 0.0) or 0.0
             if quality_loss > 0:

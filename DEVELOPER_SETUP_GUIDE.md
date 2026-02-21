@@ -380,7 +380,7 @@ SECRET_KEY=your-secret-key-minimum-32-characters-long-generate-random-string
 ADMIN_EMAIL=admin@example.com
 # SendGrid Configuration
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-email@example.com
+SENDER_EMAIL=your-email@example.com
 
 # ============================================
 # Admin Account Configuration
@@ -990,7 +990,7 @@ poetry install
 ```bash
 # Check .env file:
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-verified-email@example.com
+SENDER_EMAIL=your-verified-email@example.com
 ```
 
 #### 7. CORS Errors in Browser
