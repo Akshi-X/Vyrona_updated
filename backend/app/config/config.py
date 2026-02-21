@@ -110,7 +110,22 @@ class Settings(BaseSettings):
     MYGRAPE_ADMIN_PASSWORD: str
     # SendGrid (Optional - for enhanced email delivery)
     SENDGRID_API_KEY: Optional[str] = None
-    SENDGRID_FROM_EMAIL: Optional[str] = None
+    SENDER_EMAIL: Optional[str] = None
+    # SMTP Configuration 
+    """
+    For gmail, you can use the following settings:
+        MTP Server: smtp.gmail.com
+        Username: Your full Gmail address (e.g., example@gmail.com)
+        Password: Your Gmail password or App Password (recommended)
+        Port (TLS): 587
+        Authentication Required: Yes
+        TLS/SSL Required: Yes 
+    """
+    SMTP_SERVER: Optional[str] = None  # e.g., "smtp.gmail.com"
+    SMTP_PORT: Optional[int] = None  # e.g., 587 for TLS
+    SMTP_USERNAME: Optional[str] = None  # e.g., "
+    SMTP_PASSWORD: Optional[str] = None  # e.g., "your-app-password-here"
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -154,6 +169,8 @@ class Settings(BaseSettings):
     IOT_CLIENT_ID: str
     IOT_CLIENT_SECRET: str
     IOT_ACCOUNT_ID: str
+    # Internal Service-to-Service API Key (Required for telemetry-service calls)
+    INTERNAL_API_KEY: Optional[str] = None  # Shared secret for service-to-service authentication
     # ARC IVF API Configuration (Optional - set in .env)
     ARC_API_TOKEN: Optional[str] = None  # Token ID for ARC IVF Storage API authentication
     ARC_IVF_TOKEN_ID: Optional[str] = None  # Alias for ARC_API_TOKEN (for backward compatibility)

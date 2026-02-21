@@ -534,7 +534,8 @@ class QualityService:
     def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
         """
         Get last N LN2 readings for a tank from Redis (separate from quality history).
-        Uses key ln2_quality_history:{tank_id} to keep LN2 and tank quality data isolated.
+        Checks ln2_quality_history:{tank_id} first, then falls back to
+        ln2_quality_history:{device_code} for data written before the key-fix.
 
         Args:
             tank_id: Tank ID to get LN2 history for
@@ -545,8 +546,29 @@ class QualityService:
         """
         try:
             redis_client = get_redis()
+
+            # Try primary key (tank_id based)
             history_key = f"ln2_quality_history:{tank_id}"
             raw_history = redis_client.lrange(history_key, 0, limit - 1)
+
+            # Fallback: check device_code based keys (written by old telemetry code)
+            if not raw_history:
+                from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+                from app.models.IVF.device_model import Device
+                device_rows = (
+                    self.db.query(Device.device_code)
+                    .join(Ln2IotDevice, Ln2IotDevice.device_id == Device.id)
+                    .filter(Ln2IotDevice.tank_id == tank_id)
+                    .distinct()
+                    .all()
+                )
+                for (dev_code,) in device_rows:
+                    fallback_key = f"ln2_quality_history:{dev_code}"
+                    raw_history = redis_client.lrange(fallback_key, 0, limit - 1)
+                    if raw_history:
+                        logger.info(f"Found LN2 history under legacy key {fallback_key} for tank {tank_id}")
+                        break
+
             if not raw_history:
                 return []
             history = []

@@ -49,6 +49,9 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
     # Quality loss email decision endpoint (email buttons)
     ("PUT", "/api/quality/loss/decision"),
+    # Internal service-to-service alert endpoints (authenticated via X-Internal-Api-Key)
+    ("POST", "/api/internal/alerts/send-immediate"),
+    ("POST", "/api/internal/alerts/check-and-create"),
 }
 
 

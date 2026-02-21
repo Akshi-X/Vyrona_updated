@@ -470,54 +470,79 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
 
 
 def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, limit: int = 12) -> list:
-    """Get LN2 readings history for a tank (Redis first via get_ln2_redis_history, then DB fallback)."""
+    """Get LN2 readings history for a tank.
+
+    Strategy: fetch from both Redis and DB, merge, deduplicate by timestamp,
+    and return the most recent *limit* entries so that cached Redis entries
+    don't shadow richer DB rows (or vice-versa).
+    """
     quality_service = QualityService(db)
-    history = quality_service.get_ln2_redis_history(tank_id, limit=limit)
-    if history:
-        return history
-    # Fallback: ln2_readings by device_id (devices.id)
+    redis_history = quality_service.get_ln2_redis_history(tank_id, limit=limit)
+
+    # Always query DB as well so we never lose data when Redis has a stale subset
+    db_history = []
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
-    if not tank:
-        return []
-    device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
-    if tank.tive_device_id:
-        dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
-        if dev and dev.id not in device_ids:
-            device_ids.append(dev.id)
-    if not device_ids:
-        return []
-    from sqlalchemy import or_, desc
-    readings = (
-        db.query(Ln2Reading)
-        .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
-        .order_by(desc(Ln2Reading.reading_timestamp))
-        .limit(limit)
-        .all()
-    )
-    history = []
-    for r in reversed(readings):
-        ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
-        dev = db.query(Device).filter(Device.id == r.device_id).first()
-        dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
-        item = {
-            "tank_code": tank_code_str,
-            "tank_id": tank_id,
-            "device_code": dev_code,
-            "device_id": dev_code,  # backwards compat; value is device_code
-            "timestamp": ts,
-            "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
-            "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
-            "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
-            "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
-            "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
-            "sensor_status": r.sensor_status,
-            "lid_state": r.lid_state,
-            "refill_detected": r.refill_detected,
-            "quality_status": r.quality_status,
-        }
-        push_ln2_reading_to_redis(tank_id, tank_code_str, item, publish=False)
-        history.append(item)
-    return history
+    if tank:
+        device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
+        if tank.tive_device_id:
+            dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
+            if dev and dev.id not in device_ids:
+                device_ids.append(dev.id)
+        if device_ids:
+            from sqlalchemy import or_, desc
+            readings = (
+                db.query(Ln2Reading)
+                .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
+                .order_by(desc(Ln2Reading.reading_timestamp))
+                .limit(limit)
+                .all()
+            )
+            for r in reversed(readings):
+                ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
+                dev = db.query(Device).filter(Device.id == r.device_id).first()
+                dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
+                item = {
+                    "tank_code": tank_code_str,
+                    "tank_id": tank_id,
+                    "device_code": dev_code,
+                    "device_id": dev_code,
+                    "timestamp": ts,
+                    "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
+                    "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
+                    "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
+                    "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
+                    "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
+                    "sensor_status": r.sensor_status,
+                    "lid_state": r.lid_state,
+                    "refill_detected": r.refill_detected,
+                    "quality_status": r.quality_status,
+                }
+                db_history.append(item)
+
+    # Merge: DB rows preferred (richer columns) then Redis-only entries
+    seen_ts = set()
+    merged: list = []
+    for item in db_history:
+        ts = item.get("timestamp", "")
+        if ts not in seen_ts:
+            seen_ts.add(ts)
+            merged.append(item)
+    for item in redis_history:
+        ts = item.get("timestamp", "")
+        if ts not in seen_ts:
+            seen_ts.add(ts)
+            merged.append(item)
+
+    # Sort ascending by timestamp and take last *limit*
+    merged.sort(key=lambda x: x.get("timestamp", ""))
+    merged = merged[-limit:]
+
+    # Backfill Redis cache so next call is fast
+    if merged and not redis_history:
+        for item in merged:
+            push_ln2_reading_to_redis(tank_id, tank_code_str, item, publish=False)
+
+    return merged
 
 
 @router.websocket("/ln2-ws")

@@ -335,7 +335,7 @@ Required and optional variables (see `backend/.env.example` and `backend/app/con
 | ALLOWED_ORIGINS | Yes | CORS origins (comma or *). |
 | IOT_CLIENT_ID, IOT_CLIENT_SECRET, IOT_ACCOUNT_ID | Yes | IoT provider (e.g. Tive). |
 | REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD | No | Defaults: localhost, 6379, 0, None. |
-| SENDGRID_API_KEY, SENDGRID_FROM_EMAIL | No | SendGrid. |
+| SENDGRID_API_KEY, SENDER_EMAIL | No | SendGrid. |
 | WEATHER_API_KEY, GOOGLE_MAPS_API_KEY, FLIGHTRADAR24_API_KEY | No | External APIs. |
 | ENVIRONMENT, DEBUG, HOST, PORT, RELOAD | No | App and server settings. |
 
@@ -377,7 +377,7 @@ Database URL is built from DB_* and SSL is enforced in code; for Neon use the co
 |-------------|--------|----------------|
 | **PostgreSQL** | Primary DB | DB_* in .env; Neon/Azure supported with SSL. |
 | **Redis** | Cache, session, pub/sub (quality) | REDIS_* in .env. |
-| **SendGrid** | Transactional email | SENDGRID_API_KEY, SENDGRID_FROM_EMAIL. |
+| **SendGrid** | Transactional email | SENDGRID_API_KEY, SENDER_EMAIL. |
 | **World Bank LPI** | Lane risk (timeliness, overall) | LPI_* URLs in config; optional. |
 | **WeatherAPI.com** | Weather for lane risk | WEATHER_API_KEY. |
 | **Google Maps** | Geocoding / maps | GOOGLE_MAPS_API_KEY (backend/frontend). |
