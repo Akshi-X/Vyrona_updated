@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 _redis_client: Optional[redis.Redis] = None
 _pubsub: Optional[redis.client.PubSub] = None
 _ln2_pubsub: Optional[redis.client.PubSub] = None  # Separate pubsub for LN2 readings (do not disturb quality channel)
+_tank_kpi_pubsub: Optional[redis.client.PubSub] = None  # Tank KPI readings for Quality Tracking tabbed graph
 
 
 def get_redis() -> redis.Redis:
@@ -111,23 +112,25 @@ def get_ln2_pubsub() -> redis.client.PubSub:
             raise
     return _ln2_pubsub
 
-def get_kpi_pubsub() -> redis.client.PubSub:
-    """Get or create Redis pubsub for KPI readings channel (separate from quality channels)."""
-    global _kpi_pubsub
-    if _kpi_pubsub is None:
+
+def get_tank_kpi_pubsub() -> redis.client.PubSub:
+    """Get or create Redis pubsub for tank KPI readings (Quality Tracking live graph)."""
+    global _tank_kpi_pubsub
+    if _tank_kpi_pubsub is None:
         try:
             r = get_redis()
-            _kpi_pubsub = r.pubsub()
-            _kpi_pubsub.subscribe(KpiConstants.KPI_REALTIME_PUBSUB_CHANNEL)
-            logger.info(f"Redis pub/sub subscription established for {KpiConstants.KPI_REALTIME_PUBSUB_CHANNEL}")
+            _tank_kpi_pubsub = r.pubsub()
+            _tank_kpi_pubsub.subscribe("tank_kpi_readings_channel")
+            logger.info("Redis pub/sub subscription established for tank_kpi_readings_channel")
         except Exception as e:
-            logger.error(f"Failed to create KPI pub/sub connection: {e}")
+            logger.error(f"Failed to create tank KPI pub/sub connection: {e}")
             raise
-    return _kpi_pubsub
+    return _tank_kpi_pubsub
+
 
 def reset_redis_connection():
     """Reset Redis connections (useful for reconnection)"""
-    global _redis_client, _pubsub, _ln2_pubsub, _kpi_pubsub
+    global _redis_client, _pubsub, _ln2_pubsub, _tank_kpi_pubsub
     if _pubsub:
         try:
             _pubsub.close()
@@ -138,12 +141,13 @@ def reset_redis_connection():
             _ln2_pubsub.close()
         except Exception:
             pass
-    if _kpi_pubsub:
+    if _tank_kpi_pubsub:
         try:
-            _kpi_pubsub.close()
+            _tank_kpi_pubsub.close()
         except Exception:
             pass
     _pubsub = None
     _ln2_pubsub = None
+    _tank_kpi_pubsub = None
     _redis_client = None
 

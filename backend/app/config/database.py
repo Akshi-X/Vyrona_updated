@@ -1,8 +1,12 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
-from mgscale_backend.models import Base as SharedBase
 from sqlalchemy.orm import sessionmaker
 import logging
+
+try:
+    from mgscale_backend.models import Base as SharedBase
+except ModuleNotFoundError:
+    SharedBase = None  # shared package (mgscale_shared) not installed
 
 from .config import settings
 from ..constants.app_constants import DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT, DB_POOL_RECYCLE, DB_ECHO
@@ -16,7 +20,7 @@ DATABASE_URL = settings.database_url
 engine = create_engine(
     DATABASE_URL, 
     pool_pre_ping=True, 
-    echo=DB_ECHO,
+    echo=DB_ECHO,   
     pool_size=DB_POOL_SIZE,
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
@@ -88,13 +92,16 @@ def init_db():
         ln2_iot_device_model,
         ln2_readings_model,
         ln2_iot_raw_data_model,
+        tank_kpi_reading_model,
     )
 
-    # Import shared models so SQLAlchemy registers them with SharedBase.metadata
-    from mgscale_backend.models import (
-        KpiConfig,
-        Readings,
-    )
+    # Import shared models so SQLAlchemy registers them with SharedBase.metadata (if shared package is installed)
+    if SharedBase is not None:
+        from mgscale_backend.models import (
+            KpiConfig,
+            Readings,
+        )
+        SharedBase.metadata.create_all(bind=engine)
     
     # Note: IVF schema separation has been removed
     # All tables (including IVF tables) are now in public schema
@@ -103,4 +110,3 @@ def init_db():
     
     # Create all tables in public schema
     Base.metadata.create_all(bind=engine)
-    SharedBase.metadata.create_all(bind=engine)

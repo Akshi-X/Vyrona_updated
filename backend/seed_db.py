@@ -27,7 +27,8 @@ from app.models.IVF.device_model import Device
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
-from app.service.quality_service import push_ivf_quality_to_redis
+from app.models.IVF.tank_kpi_reading_model import TankKpiReading
+from app.service.quality_service import push_ivf_quality_to_redis, push_tank_kpi_to_redis
 from app.controller.IVF.ivf_quality_controller import push_ln2_reading_to_redis
 from sqlalchemy import text
 from app.constants.enums import PatientStage as PatientStageEnum, RouteStatus
@@ -338,6 +339,8 @@ def seed_ivf_data(db):
 
     # LN2 tables + Quality Tracking seed for T30
     seed_ln2_and_quality_data(db, branch, tanks)
+    # Tank KPI readings for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.)
+    seed_tank_kpi_readings(db, tanks)
     # TIVE-TEST-001 test device, tank, ln2_iot_device
     seed_tive_test_data(db, branch)
 
@@ -436,6 +439,47 @@ def seed_ln2_and_quality_data(db, branch, tanks):
     except Exception as e:
         db.rollback()
         logger.info(f"  Skipped LN2 seed: {e}")
+
+
+def seed_tank_kpi_readings(db, tanks):
+    """Seed 5 tank KPI readings per tank for Quality Tracking (past data). Seeds for all tanks (T10, T20, T30). WebSocket sends these last 5 on subscribe."""
+    if not tanks:
+        return
+    base_dt = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+    # 5 readings at 12:00, 12:15, 12:30, 12:45, 13:00 (lid_status & shock: 0/1)
+    readings = [
+        {"timestamp": base_dt, "kpis": [{"name": "temp_external", "value": 25.2, "unit": "°C"}, {"name": "temp_internal", "value": -201.3, "unit": "°C"}, {"name": "ln2_level", "value": 72, "unit": "%"}, {"name": "evaporation_rate", "value": 0.27, "unit": "kg/day"}, {"name": "battery_level", "value": 92, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=15), "kpis": [{"name": "temp_external", "value": 25.8, "unit": "°C"}, {"name": "temp_internal", "value": -200.6, "unit": "°C"}, {"name": "ln2_level", "value": 70, "unit": "%"}, {"name": "evaporation_rate", "value": 0.28, "unit": "kg/day"}, {"name": "battery_level", "value": 90, "unit": "%"}, {"name": "lid_status", "value": 0, "unit": ""}, {"name": "shock", "value": 1, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=30), "kpis": [{"name": "temp_external", "value": 25.9, "unit": "°C"}, {"name": "temp_internal", "value": -200.2, "unit": "°C"}, {"name": "ln2_level", "value": 68, "unit": "%"}, {"name": "evaporation_rate", "value": 0.29, "unit": "kg/day"}, {"name": "battery_level", "value": 89, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=45), "kpis": [{"name": "temp_external", "value": 26.1, "unit": "°C"}, {"name": "temp_internal", "value": -199.8, "unit": "°C"}, {"name": "ln2_level", "value": 64, "unit": "%"}, {"name": "evaporation_rate", "value": 0.30, "unit": "kg/day"}, {"name": "battery_level", "value": 87, "unit": "%"}, {"name": "lid_status", "value": 0, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(hours=1), "kpis": [{"name": "temp_external", "value": 26.3, "unit": "°C"}, {"name": "temp_internal", "value": -199.5, "unit": "°C"}, {"name": "ln2_level", "value": 62, "unit": "%"}, {"name": "evaporation_rate", "value": 0.31, "unit": "kg/day"}, {"name": "battery_level", "value": 85, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 1, "unit": ""}]},
+    ]
+    created = 0
+    for tank in tanks:
+        tank_id = tank.tank_id
+        tank_code = tank.tank_code or f"T{tank_id}"
+        try:
+            existing = db.query(TankKpiReading).filter(TankKpiReading.tank_id == tank_id).count()
+            if existing >= 5:
+                continue
+            for r in readings:
+                row = TankKpiReading(tank_id=tank_id, tank_code=tank_code, timestamp=r["timestamp"], kpis=r["kpis"])
+                db.add(row)
+                db.flush()
+                payload = {"timestamp": r["timestamp"].isoformat(), "kpis": r["kpis"]}
+                push_tank_kpi_to_redis(tank_id, tank_code, payload, publish=False)
+            created += len(readings)
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"  Tank KPI seed failed for {tank_code}: {e}")
+            break
+    try:
+        db.commit()
+        if created:
+            logger.info(f"  Created 5 tank KPI readings each for {created // len(readings)} tank(s)")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"  Tank KPI seed commit failed: {e}")
 
 
 def seed_tive_test_data(db, branch):
