@@ -74,6 +74,11 @@ class ConnectionManager:
                 self.active_connections[connection_id]["tank_code"] = str(tank_code)
             logger.info(f"Connection {connection_id} subscribed to tank_id {tank_id} (tank_code: {tank_code})")
     
+    def set_tank_id_subscription(self, connection_id: str, tank_id: int):
+        """Set which tank this connection is subscribed to (IVF) - tracks by tank_id (integer)"""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id]["tank_id"] = tank_id
+            logger.info(f"Connection {connection_id} subscribed to tank_id {tank_id}")
 
     async def broadcast(self, data: dict, db):
         """
