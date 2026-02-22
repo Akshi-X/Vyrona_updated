@@ -6,12 +6,12 @@ Separate from CGT quality monitoring to maintain isolation
 import asyncio
 import json
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path, Body
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
-from app.service.redis_service import get_redis, get_ln2_pubsub
-from app.service.quality_service import QualityService
+from app.service.redis_service import get_redis, get_ln2_pubsub, get_tank_kpi_pubsub
+from app.service.quality_service import QualityService, push_tank_kpi_to_redis
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
@@ -19,6 +19,7 @@ from app.config.database import get_db, SessionLocal
 from app.service.quality_service import push_ivf_quality_to_redis
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.tank_kpi_reading_model import TankKpiReading
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
@@ -138,6 +139,90 @@ def get_ln2_history(
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
 
 
+@router.get("/tanks/{tank_code}/kpi-history")
+def get_tank_kpi_history(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    limit: int = Query(50, ge=1, le=200),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI readings history for Quality Tracking tabbed graph (past data)."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    # Prefer Redis (live buffer), then DB
+    history = quality_service.get_tank_kpi_redis_history(tank_id, limit=limit)
+    if not history:
+        history = quality_service.get_tank_kpi_history(tank_id, limit=limit)
+    # Derive KPI config (tabs) from DB/Redis data: unique (name, unit) in order of first appearance
+    seen = {}
+    kpi_config = []
+    for entry in history:
+        for k in (entry.get("kpis") or []):
+            name = (k.get("name") or "").strip()
+            if name and name not in seen:
+                seen[name] = True
+                kpi_config.append({"name": name, "unit": k.get("unit") or ""})
+    return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history, "kpi_config": kpi_config}
+
+
+@router.post("/tanks/{tank_code}/kpi-readings")
+def append_tank_kpi_reading(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Append a KPI snapshot (store in DB and push to Redis for live graph). Body: { tank_id?, tank_code?, timestamp, kpis: [{ name, value, unit }] }."""
+    from datetime import datetime, timezone
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    if not body or "kpis" not in body:
+        raise HTTPException(status_code=400, detail="Body must include 'kpis' array")
+    ts = body.get("timestamp")
+    if not ts:
+        raise HTTPException(status_code=400, detail="Body must include 'timestamp'")
+    if isinstance(ts, str):
+        ts = ts.replace("Z", "+00:00")
+        try:
+            ts = datetime.fromisoformat(ts)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
+    kpis = list(body["kpis"]) if isinstance(body["kpis"], list) else []
+    row = TankKpiReading(tank_id=tank_id, tank_code=tank_code_str, timestamp=ts, kpis=kpis)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    payload = {"timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts), "kpis": kpis}
+    push_tank_kpi_to_redis(tank_id, tank_code_str, payload, publish=True)
+    return {"tank_id": tank_id, "tank_code": tank_code_str, "id": row.id, "timestamp": payload["timestamp"]}
+
+
 def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
     """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket.
     data may include: device_code (e.g. 'LN2-1'), device_id (alias, same value), timestamp,
@@ -192,6 +277,52 @@ async def ln2_redis_listener():
                     logger.error(f"Error broadcasting LN2 message: {e}")
         except Exception as e:
             logger.error(f"Error in ln2_redis_listener: {e}")
+            pubsub = None
+            await asyncio.sleep(5)
+
+
+async def tank_kpi_redis_listener():
+    """Listen for tank KPI readings from Redis and broadcast to IVF quality WS clients (Quality Tracking live graph)."""
+    from app.service.redis_service import get_tank_kpi_pubsub
+    loop = asyncio.get_event_loop()
+    pubsub = None
+    while True:
+        try:
+            if pubsub is None:
+                try:
+                    pubsub = get_tank_kpi_pubsub()
+                    logger.info("Tank KPI Redis listener started")
+                except Exception as e:
+                    logger.error(f"Error connecting to tank KPI Redis: {e}. Retrying in 5 seconds...")
+                    await asyncio.sleep(5)
+                    continue
+            message = await loop.run_in_executor(
+                None,
+                lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True),
+            )
+            if message and message.get("type") == "message":
+                try:
+                    raw = message.get("data")
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8")
+                    data = json.loads(raw)
+                    logger.debug(f"Tank KPI Redis message received: tank_code={data.get('tank_code')}, tank_id={data.get('tank_id')}")
+                    db = SessionLocal()
+                    try:
+                        await manager.broadcast(data, db)
+                        # Also broadcast to /api/kpi/ws clients (Quality Tracking chart)
+                        from app.controller.kpi_controller import kpi_manager
+                        n = len(kpi_manager.active_connections)
+                        await kpi_manager.broadcast(data, db)
+                        logger.debug(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
+                    finally:
+                        db.close()
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse tank KPI message: {e}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error in tank_kpi_redis_listener: {e}")
             pubsub = None
             await asyncio.sleep(5)
 

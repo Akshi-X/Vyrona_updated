@@ -385,9 +385,25 @@ def get_all_users(
     """
     # Call service (business logic in service layer)
     result = user_service.get_all_users(db=db, current_user=current_user)
-    
     # Return DTO (result is already UserListResponse)
     return result
+
+
+# ---------------------------
+# Get pending approvals (Admin / Pharma_admin only)
+# ---------------------------
+@router.get("/users/pending-approvals", response_model=UserListResponse)
+def get_pending_approvals(
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get list of users with pending approval status (same company/hospital as current user).
+
+    Protected endpoint. Admin or Pharma_admin role required (same as approve/reject).
+    Used by Dashboard and ApprovalScreen to show pending approval list.
+    """
+    return user_service.get_pending_approvals(db=db, current_user=current_user)
 
 
 # ---------------------------

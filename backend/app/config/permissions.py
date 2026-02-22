@@ -70,6 +70,7 @@ ADMIN_ONLY_ENDPOINTS: Set[EndpointPermission] = {
 # ============================================
 PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/user/{user_id}"),     # View user details
+    ("GET", "/api/users/pending-approvals"),  # List pending approvals (dashboard / approval screen)
     ("POST", "/api/user/approve"),      # Approve user
     ("POST", "/api/user/reject"),       # Reject user
     # Allow pharma admins to fully manage tasks
