@@ -79,12 +79,12 @@ class ConnectionManager:
         """
         Broadcast data to connections subscribed to this patient (CGT) or tank (IVF).
         Handles both CGT (patient_id) and IVF (tank_id/tank_code/device_code) messages.
-        
-        For IVF messages, supports multiple identifiers:
-        - tank_code: Direct tank code (e.g., "T1", "T2")
-        - tank_id: Direct tank ID
-        - device_id / device_code: Device code (e.g., "LN2-1", "TIVE-TEST-001") - resolves via
-          Tank.tive_device_id (Tive) or Device.device_code -> Ln2IotDevice -> tank (LN2)
+
+        For IVF messages, supports:
+        - tank_code: Tank code (e.g. "T30", "T1")
+        - tank_id: Tank ID
+        - device_code / device_id: Device code (e.g. "LN2-1", "TIVE-TEST-001");
+          resolved via Tank.tive_device_id or Device.device_code -> Ln2IotDevice -> tank.
         """
         if not self.active_connections:
             return
@@ -120,24 +120,25 @@ class ConnectionManager:
             for conn_id in disconnected:
                 self.disconnect(conn_id)
         
-        # Handle IVF messages (tank_id, tank_code, or device_code)
+        # Handle IVF messages (tank_id, tank_code, or device_code/device_id)
         tank_code = data.get("tank_code")
         tank_id_from_data = data.get("tank_id")
-        # device_id in payload is actually device_code (e.g., "LN2-1"); accept both keys
+        # Payload may send device_code (e.g. "LN2-1") as device_code or device_id
         device_code = data.get("device_code") or data.get("device_id")
-        
+        if device_code is not None:
+            device_code = str(device_code).strip() or None
+
         # Resolve to tank_id, tank_code, and tank_branch_id
         tank = None
         tank_branch_id = None
-        
+
         # Priority: device_code > tank_code > tank_id
         if device_code and not tank_code and not tank_id_from_data:
-            val = str(device_code)
-            # 1) Tive: Tank.tive_device_id stores device_code (e.g., "TIVE-TEST-001")
-            tank = db.query(Tank).filter(Tank.tive_device_id == val).first()
+            # 1) Tive: Tank.tive_device_id stores device code (e.g. "TIVE-TEST-001")
+            tank = db.query(Tank).filter(Tank.tive_device_id == device_code).first()
             if not tank:
-                # 2) LN2: Device.device_code (e.g., "LN2-1") -> Ln2IotDevice -> tank
-                dev = db.query(Device).filter(Device.device_code == val).first()
+                # 2) LN2: Device.device_code (e.g. "LN2-1") -> Ln2IotDevice -> tank
+                dev = db.query(Device).filter(Device.device_code == device_code).first()
                 if dev:
                     ln2_dev = db.query(Ln2IotDevice).filter(Ln2IotDevice.device_id == dev.id).first()
                     if ln2_dev:
@@ -146,10 +147,10 @@ class ConnectionManager:
                 tank_id_from_data = tank.tank_id
                 tank_code = tank.tank_code
                 tank_branch_id = tank.branch_id
-                logger.debug(f"Resolved device_code {val} to tank_code {tank_code} (tank_id: {tank_id_from_data})")
+                logger.debug(f"Resolved device_code {device_code!r} to tank_code {tank_code} (tank_id: {tank_id_from_data})")
             else:
-                logger.warning(f"No tank found for device_code: {val}")
-                return  # Tank not found
+                logger.warning(f"No tank found for device_code: {device_code!r}")
+                return  # Tank not found for this device
         elif tank_code:
             # Look up tank by tank_code
             tank = db.query(Tank).filter(Tank.tank_code == str(tank_code)).first()

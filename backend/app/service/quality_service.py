@@ -20,6 +20,7 @@ from app.models.geolocation_model import Geolocation
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.tank_kpi_reading_model import TankKpiReading
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
@@ -531,6 +532,52 @@ class QualityService:
             logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
             return []
 
+    def get_tank_kpi_history(self, tank_id: int, limit: int = 50) -> List[dict]:
+        """
+        Get KPI readings history for a tank from DB (for Quality Tracking tabbed graph).
+        Returns list of { tank_id, tank_code, timestamp, kpis } oldest first.
+        """
+        try:
+            rows = (
+                self.db.query(TankKpiReading)
+                .filter(TankKpiReading.tank_id == tank_id)
+                .order_by(TankKpiReading.timestamp.asc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "tank_id": r.tank_id,
+                    "tank_code": r.tank_code,
+                    "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+                    "kpis": r.kpis or [],
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Error retrieving tank KPI history for tank {tank_id}: {e}")
+            return []
+
+    def get_tank_kpi_redis_history(self, tank_id: int, limit: int = 30) -> List[dict]:
+        """Get last N tank KPI readings from Redis (same shape as DB)."""
+        try:
+            r = get_redis()
+            key = f"tank_kpi_history:{tank_id}"
+            raw = r.lrange(key, 0, limit - 1)
+            if not raw:
+                return []
+            out = []
+            for item in raw:
+                try:
+                    out.append(json.loads(item))
+                except json.JSONDecodeError:
+                    continue
+            out.reverse()
+            return out
+        except Exception as e:
+            logger.error(f"Error retrieving tank KPI Redis history for tank {tank_id}: {e}")
+            return []
+
     def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
         """
         Get last N LN2 readings for a tank from Redis (separate from quality history).
@@ -829,4 +876,26 @@ def push_ivf_quality_to_redis(tank_id: int, tank_code: str, data: dict, publish:
         logger.debug(f"Pushed IVF quality to Redis for tank {tank_code} (id={tank_id})")
     except Exception as e:
         logger.warning(f"Failed to push IVF quality to Redis: {e}")
+
+
+def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish: bool = True) -> None:
+    """
+    Push tank KPI snapshot to Redis (history list + optionally publish for live Quality Tracking graph).
+    payload must include: timestamp, kpis (list of { name, value, unit }).
+    """
+    try:
+        r = get_redis()
+        data = dict(payload)
+        data["tank_id"] = tank_id
+        data["tank_code"] = tank_code
+        data["type"] = "tank_kpi"
+        msg = json.dumps(data)
+        history_key = f"tank_kpi_history:{tank_id}"
+        r.lpush(history_key, msg)
+        r.ltrim(history_key, 0, 49)
+        if publish:
+            r.publish("tank_kpi_readings_channel", msg)
+        logger.debug(f"Pushed tank KPI to Redis for tank {tank_code} (id={tank_id})")
+    except Exception as e:
+        logger.warning(f"Failed to push tank KPI to Redis: {e}")
 

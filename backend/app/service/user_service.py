@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from datetime import datetime, timezone
@@ -41,9 +42,10 @@ from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.utils.user_helpers import (
     get_hospital_by_email_domain,
-    is_hospital_department
+    is_hospital_department,
 )
 from app.utils.utils import normalize_role_to_title_case
+from app.constants.enums import ApprovalStatus
 import traceback
 
 # Configure logger
@@ -381,7 +383,7 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
             role=request.role,
             company=company_name,
             recipient_email=recipient_email
-        )
+        ) # TODO:DevlopmentUncomment
         logger.info("Approval email sent successfully")
         
         # Email sent successfully, NOW commit the entire transaction (user + pharma)
@@ -793,6 +795,100 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         )
     except Exception as e:
         raise DatabaseQueryException(operation="list users", reason=str(e))
+
+
+def _resolve_hospital_id_from_branch(db: Session, user: User) -> Optional[int]:
+    """
+    Resolve hospital_id from user.branch_id when user.hospital_id is null.
+    Only used by get_pending_approvals for hospital users (e.g. token has no hospital_id).
+    Does not modify any state; get_all_users and other callers are unchanged.
+    """
+    if user.branch_id is None:
+        return None
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user.branch_id).first()
+    return branch.hospital_id if branch is not None else None
+
+
+def get_pending_approvals(db: Session, current_user: User) -> UserListResponse:
+    """
+    Get list of users with pending approval status from the same company/hospital.
+
+    Same multi-tenant filtering as get_all_users but filters by approved_status == 'pending'.
+    Only Admin and Pharma_admin (and hospital Admin) can call this; used for approval screen and dashboard.
+    Returns only users whose approved_status is strictly 'pending' (never approved/rejected).
+    """
+    try:
+        # Explicitly filter only pending: compare with enum and value for DB compatibility
+        pending_value = ApprovalStatus.PENDING.value  # "pending"
+        base_query = db.query(User).filter(
+            User.approved_status == pending_value
+        )
+
+        company_name = None
+        # Hospital path: keep existing behavior when hospital_id is set (same as get_all_users)
+        if current_user.hospital_id is not None:
+            users_query = base_query.filter(
+                User.hospital_id == current_user.hospital_id
+            )
+            if current_user.department:
+                users_query = users_query.filter(
+                    User.department.ilike(current_user.department)
+                )
+            users = users_query.all()
+        # Hospital user with hospital_id null but branch_id set (e.g. JWT has no hospital_id)
+        else:
+            effective_hospital_id = _resolve_hospital_id_from_branch(db, current_user)
+            if effective_hospital_id is not None:
+                branch_ids_in_hospital = db.query(HospitalBranch.branch_id).filter(
+                    HospitalBranch.hospital_id == effective_hospital_id
+                )
+                users_query = base_query.filter(
+                    or_(
+                        User.hospital_id == effective_hospital_id,
+                        User.branch_id.in_(branch_ids_in_hospital),
+                    )
+                )
+                if current_user.department:
+                    users_query = users_query.filter(
+                        User.department.ilike(current_user.department)
+                    )
+                users = users_query.all()
+            else:
+                # Pharma path: unchanged
+                users = base_query.filter(
+                    User.pharma_id == current_user.pharma_id
+                ).all()
+                pharma = db.query(Pharma).filter(Pharma.id == current_user.pharma_id).first()
+                company_name = pharma.pharma_name if pharma else None
+
+        # Only include users that are still pending (defensive: in case of enum/DB mismatch)
+        def _is_pending(u: User) -> bool:
+            status = getattr(u, "approved_status", None)
+            if status is None:
+                return False
+            return (status == ApprovalStatus.PENDING or
+                    (getattr(status, "value", status)) == pending_value)
+
+        pending_only = [u for u in users if _is_pending(u)]
+        user_items = [
+            UserListItem(
+                user_id=user.user_id,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                email=user.email,
+                role=normalize_role_to_title_case(user.role),
+                pharma_id=user.pharma_id,
+                company_name=company_name
+            )
+            for user in pending_only
+        ]
+
+        return UserListResponse(
+            total_users=len(user_items),
+            users=user_items
+        )
+    except Exception as e:
+        raise DatabaseQueryException(operation="list pending approvals", reason=str(e))
 
 
 def update_user_name(
