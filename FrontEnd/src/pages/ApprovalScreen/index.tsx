@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useSearchParams, Navigate } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
 import { userService } from "../../services/userService";
-import type { UserProfileDto } from "../../services/userService";
-import MyGrapeLogo from "../../assets/mGScale.svg";
-import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
+import type { UserProfileDto, UserListItem } from "../../services/userService";
 
 const ApprovalScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const registrationId = searchParams.get("registration_id");
+  const navigate = useNavigate();
   const { token: authToken, isAuthenticated, logout } = useAuth();
   const cookieToken = authUtils.getToken();
 
@@ -24,6 +23,11 @@ const ApprovalScreen: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
 
+  // When no registration_id: list of pending approvals (for approvers)
+  const [pendingList, setPendingList] = useState<UserListItem[]>([]);
+  const [pendingListLoading, setPendingListLoading] = useState(false);
+  const [pendingListError, setPendingListError] = useState<string | null>(null);
+
   const apiService = new BaseApiService();
   const location = useLocation();
 
@@ -32,18 +36,14 @@ const ApprovalScreen: React.FC = () => {
     setFetching(false);
   }, [isAuthenticated]);
 
-  // Fetch user information
+  // Fetch user information when registration_id is present
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        // Get user ID from URL registration_id parameter
         if (!registrationId) {
-          setStatus("Registration ID not found in URL");
           setUserLoading(false);
           return;
         }
-
-        // Fetch user details from API
         const userData = await userService.getUserById(registrationId);
         setUserInfo(userData);
       } catch (error: any) {
@@ -53,10 +53,36 @@ const ApprovalScreen: React.FC = () => {
       }
     };
 
-    if (!fetching) {
+    if (!fetching && registrationId) {
       fetchUserInfo();
+    } else if (!fetching && !registrationId) {
+      setUserLoading(false);
     }
   }, [fetching, registrationId]);
+
+  // When no registration_id: fetch pending approvals list (for approvers)
+  useEffect(() => {
+    if (registrationId) return;
+    if (!isAuthenticated && !cookieToken) return;
+    let cancelled = false;
+    const load = async () => {
+      setPendingListLoading(true);
+      setPendingListError(null);
+      try {
+        const res = await userService.getPendingApprovals();
+        if (!cancelled) setPendingList(res?.users ?? []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setPendingList([]);
+          setPendingListError(e?.message || "Failed to load pending approvals");
+        }
+      } finally {
+        if (!cancelled) setPendingListLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [registrationId, isAuthenticated, cookieToken]);
 
 
   // Show confirmation modal
@@ -126,7 +152,7 @@ const ApprovalScreen: React.FC = () => {
     }
   };
 
-  if (fetching || userLoading) {
+  if (fetching || (registrationId && userLoading)) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-600">
         Loading...
@@ -134,12 +160,46 @@ const ApprovalScreen: React.FC = () => {
     );
   }
 
+  // No registration_id: show pending approvals list (or redirect to login)
   if (!registrationId) {
+    if (!isAuthenticated && !cookieToken) {
+      const approvalPath = `${location.pathname}${location.search}${location.hash || ""}`;
+      try {
+        sessionStorage.setItem("approval_redirect_path", approvalPath);
+      } catch {}
+      return <Navigate to="/login" replace state={{ from: { pathname: location.pathname, search: location.search, hash: location.hash }, fromPath: approvalPath }} />;
+    }
+
     return (
-      <div className="flex items-center justify-center h-screen text-gray-600">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Invalid Request</h2>
-          <p>No registration ID provided. Please access this page through a valid approval link.</p>
+      <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
+        <div className="w-full max-w-[28rem]">
+          <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">Pending approvals</h2>
+          <p className="text-gray-500 mb-6">Select a user to review and approve or reject their registration.</p>
+          {pendingListLoading ? (
+            <p className="text-gray-500">Loading...</p>
+          ) : pendingListError ? (
+            <p className="text-red-600">{pendingListError}</p>
+          ) : pendingList.length === 0 ? (
+            <p className="text-gray-500">No pending approvals.</p>
+          ) : (
+            <ul className="space-y-2">
+              {pendingList.map((u) => (
+                <li key={u.user_id} className="flex items-center justify-between gap-4 py-3 px-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <span className="text-gray-800">
+                    {u.first_name} {u.last_name}
+                    {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/approval?registration_id=${encodeURIComponent(u.user_id)}`)}
+                    className="py-2 px-4 bg-[#8b2a96] text-white rounded-md font-medium hover:bg-[#7a247e] transition"
+                  >
+                    Review
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     );
@@ -203,40 +263,7 @@ const ApprovalScreen: React.FC = () => {
         </div>
       )}
 
-      <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
-        {/* Left Section */}
-        <aside
-          className="w-[35%] h-screen flex flex-col justify-between text-white relative overflow-hidden 
-             bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
-             rounded-tr-[40px] rounded-br-[40px]"
-        >
-          {/* Background Banner Image */}
-          <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
-            <img
-              src={MyGrapeBanner}
-              className="w-full h-auto max-h-full object-contain"
-              alt="banner"
-            />
-          </div>
-
-          <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
-            <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
-          </div>
-
-          <div className="flex-1 relative z-0"></div>
-
-          <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
-            <h2 className="text-2xl font-bold leading-snug mt-8">
-              <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
-              One Smart Solution At a Time
-            </h2>
-            <p className="mt-1 font-[12px] text-white">
-              Because every patient is someone's everything.
-            </p>
-          </div>
-        </aside>
-        {/* Right Section */}
-        <main className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
           <div className="w-full max-w-[28rem]">
             {(() => {
               const isAlreadyProcessed = userInfo &&
@@ -366,6 +393,13 @@ const ApprovalScreen: React.FC = () => {
                       {status && (
                         <p className="text-center text-gray-800 font-medium mb-4">{status}</p>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => navigate("/approval")}
+                        className="py-2 px-4 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium hover:bg-[#E8D4F0] transition"
+                      >
+                        Go back to list
+                      </button>
                     </div>
                   );
                 }
@@ -374,7 +408,6 @@ const ApprovalScreen: React.FC = () => {
               })()}
             </div>
           </div>
-        </main>
       </div>
     </>
   );
