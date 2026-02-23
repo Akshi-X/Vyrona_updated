@@ -11,7 +11,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.service.redis_service import get_redis, get_ln2_pubsub, get_tank_kpi_pubsub
-from app.service.quality_service import QualityService, push_tank_kpi_to_redis
+from app.service.quality_service import QualityService, push_tank_kpi_to_redis, append_tank_kpi_snapshot_to_db
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
@@ -19,7 +19,7 @@ from app.config.database import get_db, SessionLocal
 from app.service.quality_service import push_ivf_quality_to_redis
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
-from app.models.IVF.tank_kpi_reading_model import TankKpiReading
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
@@ -139,6 +139,30 @@ def get_ln2_history(
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
 
 
+@router.get("/tanks/{tank_code}/kpi-config")
+def get_tank_kpi_config(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI limits config for the tank (nested kpi_limits for frontend visualization)."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank.tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return quality_service.get_tank_kpi_config(tank.tank_id, tank_code_str)
+
+
 @router.get("/tanks/{tank_code}/kpi-history")
 def get_tank_kpi_history(
     tank_code: str = Path(..., description="Tank code (e.g., T15)"),
@@ -162,7 +186,7 @@ def get_tank_kpi_history(
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
-    # Prefer Redis (live buffer), then DB
+    # Prefer Redis (live buffer), then DB (readings table)
     history = quality_service.get_tank_kpi_redis_history(tank_id, limit=limit)
     if not history:
         history = quality_service.get_tank_kpi_history(tank_id, limit=limit)
@@ -214,13 +238,193 @@ def append_tank_kpi_reading(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid timestamp format")
     kpis = list(body["kpis"]) if isinstance(body["kpis"], list) else []
-    row = TankKpiReading(tank_id=tank_id, tank_code=tank_code_str, timestamp=ts, kpis=kpis)
-    db.add(row)
+    append_tank_kpi_snapshot_to_db(db, tank_id, tank_code_str, ts, kpis)
     db.commit()
-    db.refresh(row)
     payload = {"timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts), "kpis": kpis}
-    push_tank_kpi_to_redis(tank_id, tank_code_str, payload, publish=True)
-    return {"tank_id": tank_id, "tank_code": tank_code_str, "id": row.id, "timestamp": payload["timestamp"]}
+    return {"tank_id": tank_id, "tank_code": tank_code_str, "timestamp": payload["timestamp"]}
+
+
+def _require_alert_setting_role(current_user: User) -> None:
+    """Raise 403 if user is not IVF Manager or Admin (for Alert Setting CRUD)."""
+    if not is_specific_department(getattr(current_user, "department", None) or "", "IVF"):
+        raise HTTPException(status_code=403, detail="Access denied: Alert Setting is for IVF users only")
+    role = (getattr(current_user, "role", None) or "").strip()
+    if hasattr(role, "value"):
+        role = role.value
+    role = (role or "").lower()
+    if role not in ("manager", "admin"):
+        raise HTTPException(status_code=403, detail="Access denied: Alert Setting requires Manager or Admin role")
+
+
+@router.get("/kpi-config/list")
+def list_kpi_config(
+    tank_id: int = Query(..., description="Tank ID to list KPI config for"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all KPI config rows for a tank (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    rows = quality_service.list_kpi_config_by_tank(tank_id)
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    hospital_id = branch.hospital_id if branch else None
+    return {
+        "tank_id": tank_id,
+        "tank_code": tank.tank_code or "",
+        "branch_id": tank.branch_id,
+        "hospital_id": hospital_id,
+        "config": rows,
+    }
+
+
+@router.post("/kpi-config")
+def create_kpi_config(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Create a KPI config row (Alert Setting). Manager and Admin only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
+    for k in required:
+        if k not in body:
+            raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
+    try:
+        hospital_id = int(body["hospital_id"])
+        branch_id_val = int(body["branch_id"])
+        tank_id = int(body["tank_id"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id must be integers")
+    if branch_id is not None and branch_id_val != branch_id:
+        raise HTTPException(status_code=403, detail="Cannot create config for another branch")
+    quality_service = QualityService(db)
+    row = quality_service.create_kpi_config(
+        hospital_id=hospital_id,
+        branch_id=branch_id_val,
+        tank_id=tank_id,
+        kpi_name=str(body["kpi_name"]),
+        alert_name=body.get("alert_name"),
+        min_val=body.get("min") if body.get("min") is not None else None,
+        max_val=body.get("max") if body.get("max") is not None else None,
+        unit=body.get("unit"),
+        alert_type=body.get("alert_type"),
+        status=body.get("status", True),
+    )
+    db.commit()
+    return {
+        "id": row.id,
+        "hospital_id": row.hospital_id,
+        "branch_id": row.branch_id,
+        "tank_id": row.tank_id,
+        "kpi_name": row.kpi_name,
+        "alert_name": row.alert_name,
+        "min": float(row.min) if row.min is not None else None,
+        "max": float(row.max) if row.max is not None else None,
+        "unit": row.unit,
+        "alert_type": row.alert_type,
+        "status": bool(row.status),
+    }
+
+
+@router.post("/kpi-config/bulk")
+def bulk_upsert_kpi_config(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Bulk upsert KPI config to multiple tanks (Alert Setting).
+    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type? }).
+    For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
+    Manager and Admin only.
+    """
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    tank_ids = body.get("tank_ids")
+    configs = body.get("configs")
+    if not isinstance(tank_ids, list) or not tank_ids:
+        raise HTTPException(status_code=400, detail="tank_ids must be a non-empty list")
+    if not isinstance(configs, list):
+        raise HTTPException(status_code=400, detail="configs must be a list")
+    try:
+        tank_ids = [int(t) for t in tank_ids]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="tank_ids must be integers")
+    quality_service = QualityService(db)
+    result = quality_service.bulk_upsert_kpi_config(tank_ids=tank_ids, configs=configs, branch_id=branch_id)
+    db.commit()
+    return result
+
+
+@router.put("/kpi-config/{config_id}")
+def update_kpi_config(
+    config_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Update a KPI config row (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    quality_service = QualityService(db)
+    row = quality_service.update_kpi_config(
+        config_id=config_id,
+        branch_id=branch_id,
+        kpi_name=body.get("kpi_name"),
+        alert_name=body.get("alert_name"),
+        min_val=body.get("min") if body.get("min") is not None else None,
+        max_val=body.get("max") if body.get("max") is not None else None,
+        unit=body.get("unit"),
+        alert_type=body.get("alert_type"),
+        status=body.get("status"),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    db.commit()
+    return {
+        "id": row.id,
+        "hospital_id": row.hospital_id,
+        "branch_id": row.branch_id,
+        "tank_id": row.tank_id,
+        "kpi_name": row.kpi_name,
+        "alert_name": row.alert_name,
+        "min": float(row.min) if row.min is not None else None,
+        "max": float(row.max) if row.max is not None else None,
+        "unit": row.unit,
+        "alert_type": row.alert_type,
+        "status": bool(row.status),
+    }
+
+
+@router.delete("/kpi-config/{config_id}")
+def delete_kpi_config(
+    config_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a KPI config row (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    quality_service = QualityService(db)
+    ok = quality_service.delete_kpi_config(config_id, branch_id=branch_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    db.commit()
+    return {"deleted": True, "id": config_id}
 
 
 def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:

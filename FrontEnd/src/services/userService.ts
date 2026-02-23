@@ -199,6 +199,16 @@ export class UserService extends BaseApiService {
       method: 'GET',
     });
   }
+
+  /**
+   * Get list of users pending approval (Admin / Pharma_admin only).
+   * Used by Dashboard and ApprovalScreen to show pending approval list.
+   */
+  async getPendingApprovals(): Promise<UserListResponse> {
+    return await this.request<UserListResponse>('/api/users/pending-approvals', {
+      method: 'GET',
+    });
+  }
 }
 
 // Export singleton instance

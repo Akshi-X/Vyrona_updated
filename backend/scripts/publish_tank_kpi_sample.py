@@ -14,8 +14,8 @@ Usage:
   python scripts/publish_tank_kpi_sample.py
   python scripts/publish_tank_kpi_sample.py 1 T30
 
-Redis CLI one-liner (same payload shape, includes lid_status & shock 0/1):
-  redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","timestamp":"2026-02-22T13:00:00Z","kpis":[{"name":"temp_external","value":26.5,"unit":"°C"},{"name":"temp_internal","value":-199.2,"unit":"°C"},{"name":"ln2_level","value":62,"unit":"%"},{"name":"evaporation_rate","value":0.31,"unit":"kg/day"},{"name":"battery_level","value":85,"unit":"%"},{"name":"lid_status","value":1,"unit":""},{"name":"shock","value":0,"unit":""}]}'
+Redis CLI one-liner (same payload shape; l1/l2 are config-only, not in readings):
+  redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","timestamp":"2026-02-22T13:00:00Z","kpis":[{"name":"temp_external","value":26.5,"unit":"°C"},{"name":"temp_internal","value":-199.2,"unit":"°C"},{"name":"ln2_level","value":62,"unit":"%"},{"name":"evaporation_rate","value":0.31,"unit":"kg/h"},{"name":"battery_level","value":85,"unit":"%"},{"name":"lid_status","value":1,"unit":""},{"name":"shock","value":0,"unit":""}]}'
 """
 
 import json
@@ -48,7 +48,7 @@ def main() -> None:
             {"name": "temp_external", "value": 26.5, "unit": "°C"},
             {"name": "temp_internal", "value": -199.2, "unit": "°C"},
             {"name": "ln2_level", "value": 62, "unit": "%"},
-            {"name": "evaporation_rate", "value": 0.31, "unit": "kg/day"},
+            {"name": "evaporation_rate", "value": 0.31, "unit": "kg/h"},
             {"name": "battery_level", "value": 85, "unit": "%"},
             {"name": "lid_status", "value": 1, "unit": ""},
             {"name": "shock", "value": 0, "unit": ""},

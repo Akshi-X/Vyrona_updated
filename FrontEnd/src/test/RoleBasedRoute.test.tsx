@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { RoleBasedRoute } from '../components/RoleBasedRoute'
 import { AuthProvider } from '../contexts/AuthContext'
@@ -22,20 +21,10 @@ vi.mock('../services/authService', () => ({
   },
 }))
 
-// Mock window.history.back
-const mockHistoryBack = vi.fn()
-Object.defineProperty(window, 'history', {
-  value: {
-    back: mockHistoryBack,
-  },
-  writable: true,
-})
-
 describe('RoleBasedRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
-    mockHistoryBack.mockClear()
   })
 
   describe('Loading State', () => {
@@ -118,7 +107,7 @@ describe('RoleBasedRoute', () => {
       })
     })
 
-    it('shows access denied when user role is not in allowedRoles', async () => {
+    it('redirects to dashboard when user role is not in allowedRoles', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue('test-token')
       localStorage.setItem('user_role', 'guest')
 
@@ -133,13 +122,12 @@ describe('RoleBasedRoute', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('Access Denied')).toBeInTheDocument()
-        expect(screen.getByText("You don't have permission to access this page.")).toBeInTheDocument()
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
         expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
       })
     })
 
-    it('shows access denied when user role is in restrictedRoles', async () => {
+    it('redirects when user role is in restrictedRoles', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue('test-token')
       localStorage.setItem('user_role', 'guest')
 
@@ -154,7 +142,7 @@ describe('RoleBasedRoute', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('Access Denied')).toBeInTheDocument()
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
         expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
       })
     })
@@ -178,7 +166,7 @@ describe('RoleBasedRoute', () => {
       })
     })
 
-    it('prioritizes restrictedRoles over allowedRoles', async () => {
+    it('prioritizes restrictedRoles over allowedRoles (redirects)', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue('test-token')
       localStorage.setItem('user_role', 'guest')
 
@@ -196,13 +184,14 @@ describe('RoleBasedRoute', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('Access Denied')).toBeInTheDocument()
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
+        expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
       })
     })
   })
 
-  describe('Access Denied UI', () => {
-    it('shows access denied message with go back button', async () => {
+  describe('Redirect when access not allowed', () => {
+    it('redirects instead of showing access denied (no Access Denied UI)', async () => {
       ;(authUtils.authUtils.getToken as any).mockReturnValue('test-token')
       localStorage.setItem('user_role', 'guest')
 
@@ -217,30 +206,10 @@ describe('RoleBasedRoute', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('Access Denied')).toBeInTheDocument()
-        expect(screen.getByText('Go Back')).toBeInTheDocument()
-      })
-    })
-
-    it('calls window.history.back when go back button is clicked', async () => {
-      const user = userEvent.setup()
-      ;(authUtils.authUtils.getToken as any).mockReturnValue('test-token')
-      localStorage.setItem('user_role', 'guest')
-
-      render(
-        <MemoryRouter>
-          <AuthProvider>
-            <RoleBasedRoute allowedRoles={['admin']}>
-              <div>Protected Content</div>
-            </RoleBasedRoute>
-          </AuthProvider>
-        </MemoryRouter>
-      )
-
-      await waitFor(async () => {
-        const goBackButton = screen.getByText('Go Back')
-        await user.click(goBackButton)
-        expect(mockHistoryBack).toHaveBeenCalledTimes(1)
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
+        expect(screen.queryByText("You don't have permission to access this page.")).not.toBeInTheDocument()
+        expect(screen.queryByText('Go Back')).not.toBeInTheDocument()
+        expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
       })
     })
   })

@@ -12,34 +12,34 @@
 # Database (required)
 # -----------------------------------------------------------------------------
 # Production: db-user, db-password, db-host, db-port, db-name
-DB_USER=
-DB_PASSWORD=
-DB_HOST=
+DB_USER=neondb_owner
+DB_PASSWORD=npg_PQoimYK17Wuk
+DB_HOST=ep-raspy-wind-a1azlcrx-pooler.ap-southeast-1.aws.neon.tech
 DB_PORT=5432
-DB_NAME=
+DB_NAME=mygrape
 
 # -----------------------------------------------------------------------------
 # Security (required)
 # -----------------------------------------------------------------------------
 # Production: secret-key
-SECRET_KEY=
+SECRET_KEY=your-super-secret-key-min-32-characters-long
 
 # -----------------------------------------------------------------------------
 # Admin & MyGrape (required)
 # -----------------------------------------------------------------------------
 # Production: admin-email, admin-default-password, mygrape-admin-email, mygrape-admin-password
-ADMIN_EMAIL=
-ADMIN_DEFAULT_PASSWORD=
-MYGRAPE_ADMIN_EMAIL=
-MYGRAPE_ADMIN_PASSWORD=
+ADMIN_EMAIL=admin@example.com
+ADMIN_DEFAULT_PASSWORD=your-admin-default-password
+MYGRAPE_ADMIN_EMAIL=mygrape-admin@example.com
+MYGRAPE_ADMIN_PASSWORD=your-mygrape-admin-password
 
 # -----------------------------------------------------------------------------
 # URLs & CORS (required)
 # -----------------------------------------------------------------------------
 # Production: frontend-url, backend-url, allowed-origins
-FRONTEND_URL=
-BACKEND_URL=
-ALLOWED_ORIGINS=
+FRONTEND_URL=http://localhost:5173
+BACKEND_URL=http://localhost:8000
+ALLOWED_ORIGINS=*
 
 # -----------------------------------------------------------------------------
 # Server
@@ -55,16 +55,16 @@ RELOAD=true
 # IoT (required)
 # -----------------------------------------------------------------------------
 # Production: iot-client-id, iot-client-secret, iot-account-id
-IOT_CLIENT_ID=
-IOT_CLIENT_SECRET=
-IOT_ACCOUNT_ID=
+IOT_CLIENT_ID=dev-placeholder
+IOT_CLIENT_SECRET=dev-placeholder
+IOT_ACCOUNT_ID=dev-placeholder
 
 # -----------------------------------------------------------------------------
 # Email – SendGrid (optional; used if set)
 # -----------------------------------------------------------------------------
 # Production: sendgrid-api-key, sendgrid-from-email
-SENDGRID_API_KEY=
-SENDGRID_FROM_EMAIL=
+SENDGRID_API_KEY=SSG.GLvCKYDRQxKJdcKyGWk7gw.C4352hZxXRxEwPjnU6HdTtx_oT2q3Lr4_7fE0cE2sd8
+SENDGRID_FROM_EMAIL=sivaaquaris.007@gmail.com
 
 # -----------------------------------------------------------------------------
 # Email – SMTP / sender (optional; if used by your deployment)
@@ -74,21 +74,21 @@ SENDER_EMAIL=
 SENDER_PASSWORD=
 SMTP_SERVER=
 SMTP_PORT=
-EMAIL_SERVICE=
+EMAIL_SERVICE=sendgrid
 
 # -----------------------------------------------------------------------------
 # Redis (optional; has defaults)
 # -----------------------------------------------------------------------------
 # Production: redis-host, redis-port, redis-db, redis-password, redis-ssl,
 #            redis-socket-connect-timeout, redis-socket-timeout
-REDIS_HOST=localhost
-REDIS_PORT=6380
+REDIS_HOST=redis-12115.crce276.ap-south-1-3.ec2.cloud.redislabs.com
+REDIS_PORT=12115
 REDIS_DB=0
-REDIS_USERNAME=
-REDIS_PASSWORD=
+REDIS_USERNAME=default
+REDIS_PASSWORD=kpBlZdKS79tccYdJaBUp2W2nuUKomXgp
+REDIS_SSL=false
 REDIS_SOCKET_CONNECT_TIMEOUT=10
 REDIS_SOCKET_TIMEOUT=10
-REDIS_SSL=true
 REDIS_SSL_CERT_REQS=required
 
 # -----------------------------------------------------------------------------

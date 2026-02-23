@@ -7,7 +7,6 @@ import logging
 from typing import Optional
 
 from app.config.config import settings
-from backend.app.constants.kpi_constants import KpiConstants
 
 logger = logging.getLogger(__name__)
 
