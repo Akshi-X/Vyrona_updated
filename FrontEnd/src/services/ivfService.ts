@@ -5,6 +5,26 @@ import type {
   IVFTreatment,
 } from '../types/ivf.ts';
 
+export interface EmbryoTrackingFiltersResponse {
+  site_names: string[];
+  statuses: string[];
+  goblet_colors: string[];
+  crylock_colors: string[];
+  /** Total records (unfiltered) for "filtered / total" display */
+  total?: number;
+  site_name_counts?: Record<string, number>;
+  status_counts?: Record<string, number>;
+  goblet_color_counts?: Record<string, number>;
+  crylock_color_counts?: Record<string, number>;
+}
+
+export interface EmbryoTrackingFilters {
+  branch_name?: string | null;
+  status?: string | null;
+  cryolock_color?: string | null;
+  goblet_color?: string | null;
+}
+
 export interface TotalEmbryosCryolocksResponse {
   total_embryos: number;
   total_cryolocks: number;
@@ -469,21 +489,50 @@ export class IvfService extends BaseApiService {
     throw new Error('Either tankCode or (hisNumber/cryolockNumber) must be provided');
   }
 
-  async getEmbryoTracking(offset: number = 0, limit: number = 100): Promise<EmbryoTrackingApiResponse> {
+  /**
+   * Get filter options and counts. Pass currentFilterValues to get counts conditioned on
+   * already-selected filters (e.g. status counts within selected site).
+   */
+  async getEmbryoTrackingFilters(currentFilterValues?: {
+    siteName?: string;
+    status?: string;
+    gobletColor?: string;
+    crylockColor?: string;
+  }): Promise<EmbryoTrackingFiltersResponse> {
     const params = new URLSearchParams();
-    if (offset > 0) {
-      params.append('offset', offset.toString());
+    if (currentFilterValues?.siteName && currentFilterValues.siteName !== 'all') {
+      params.append('branch_name', currentFilterValues.siteName);
     }
-    if (limit !== 100) {
-      params.append('limit', limit.toString());
+    if (currentFilterValues?.status && currentFilterValues.status !== 'all') {
+      params.append('status', currentFilterValues.status);
+    }
+    if (currentFilterValues?.gobletColor && currentFilterValues.gobletColor !== 'all') {
+      params.append('goblet_color', currentFilterValues.gobletColor);
+    }
+    if (currentFilterValues?.crylockColor && currentFilterValues.crylockColor !== 'all') {
+      params.append('crylock_color', currentFilterValues.crylockColor);
     }
     const queryString = params.toString();
+    const url = queryString ? `/api/ivf/embryo_tracking/filters?${queryString}` : '/api/ivf/embryo_tracking/filters';
+    return await this.request<EmbryoTrackingFiltersResponse>(url, { method: 'GET' });
+  }
+
+  async getEmbryoTracking(
+    offset: number = 0,
+    limit: number = 50,
+    filters?: EmbryoTrackingFilters
+  ): Promise<EmbryoTrackingApiResponse> {
+    const params = new URLSearchParams();
+    if (offset > 0) params.append('offset', offset.toString());
+    if (limit !== 50) params.append('limit', limit.toString());
+    if (filters?.branch_name) params.append('branch_name', filters.branch_name);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.cryolock_color) params.append('cryolock_color', filters.cryolock_color);
+    if (filters?.goblet_color) params.append('goblet_color', filters.goblet_color);
+    const queryString = params.toString();
     const url = queryString ? `/api/ivf/embryo_tracking?${queryString}` : '/api/ivf/embryo_tracking';
-    
-    
-    const response = await this.request<RawEmbryoTrackingApiResponse>(url, {
-      method: 'GET',
-    });
+
+    const response = await this.request<RawEmbryoTrackingApiResponse>(url, { method: 'GET' });
     return {
       data: response.data.map(mapApiItemToTreatment),
       total: response.total,

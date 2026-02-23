@@ -771,26 +771,31 @@ class QualityService:
     def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
         """
         Get KPI readings history from readings table: group by timestamp, build kpis array.
+        Includes readings for any kpi_config of this tank; one value per kpi_name per timestamp (first by config id).
         Returns list of { tank_id, tank_code, timestamp, kpis } oldest first.
         """
         try:
             rows = (
                 self.db.query(Readings.timestamp, Readings.kpi_value, KpiConfig.kpi_name, KpiConfig.unit)
                 .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
-                .filter(Readings.tank_id == tank_id, KpiConfig.alert_name.is_(None))
-                .order_by(Readings.timestamp.asc())
+                .filter(Readings.tank_id == tank_id)
+                .order_by(Readings.timestamp.asc(), KpiConfig.id.asc())
                 .all()
             )
             by_ts = {}
+            seen_per_ts = {}
             for ts, value, kpi_name, unit in rows:
                 key = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
                 if key not in by_ts:
                     by_ts[key] = {"timestamp": key, "kpis": []}
-                by_ts[key]["kpis"].append({
-                    "name": kpi_name,
-                    "value": float(value) if value is not None else 0,
-                    "unit": unit or "",
-                })
+                    seen_per_ts[key] = set()
+                if kpi_name not in seen_per_ts[key]:
+                    seen_per_ts[key].add(kpi_name)
+                    by_ts[key]["kpis"].append({
+                        "name": kpi_name,
+                        "value": float(value) if value is not None else 0,
+                        "unit": unit or "",
+                    })
             out = [{"tank_id": tank_id, "tank_code": tank_code, "timestamp": t["timestamp"], "kpis": t["kpis"]} for t in by_ts.values()]
             out.sort(key=lambda x: x["timestamp"])
             return out[-limit:] if limit else out
