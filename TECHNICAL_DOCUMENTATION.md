@@ -170,6 +170,15 @@ All REST APIs are under **`/api`** (`API_PREFIX` in `app_constants.py`). Routers
 - **Env**: Tests can override config (e.g. `DB_NAME=pytest`) via `tests/__init__.py` or env.  
 - Run: `poetry run pytest` from `backend/`.
 
+### 3.6 Quality Tracking – Tank KPI live graph (Redis)
+
+- **Channel**: `tank_kpi_readings_channel`. The IVF quality WebSocket subscribes and broadcasts to clients; the frontend Quality Tracking card shows live data when it receives `type === "tank_kpi"`.
+- **Payload** (JSON): `type`, `tank_id`, `tank_code`, `timestamp` (ISO), `kpis` (array of `{ name, value, unit }`). KPIs: `temp_external`, `temp_internal`, `ln2_level`, `evaporation_rate`, `battery_level`.
+- **Publish sample** (from `backend/` with `REDIS_URL` in env):  
+  `python scripts/publish_tank_kpi_sample.py [tank_id] [tank_code]`  
+  Or via redis-cli:  
+  `redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","timestamp":"2026-02-22T13:00:00Z","kpis":[{"name":"temp_external","value":26.5,"unit":"°C"},{"name":"temp_internal","value":-199.2,"unit":"°C"},{"name":"ln2_level","value":62,"unit":"%"},{"name":"evaporation_rate","value":0.31,"unit":"kg/day"},{"name":"battery_level","value":85,"unit":"%"}]}'`
+
 ---
 
 ## 4. Frontend

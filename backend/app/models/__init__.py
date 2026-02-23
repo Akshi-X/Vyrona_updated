@@ -20,3 +20,5 @@ from .chat_read_status_canister import ChatReadStatusCanister
 from .telemetry_model import TelemetryData
 from .quality_log_model import QualityLog
 from .geolocation_model import Geolocation
+from .kpi_config_model import KpiConfig
+from .readings_model import Readings

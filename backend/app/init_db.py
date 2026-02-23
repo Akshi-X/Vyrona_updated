@@ -63,6 +63,18 @@ def _migrate_ln2_iot_raw_data_device_id(db):
         logger.warning(f"ln2_iot_raw_data device_id migration skipped: {e}")
 
 
+def _drop_legacy_tables(db):
+    """Drop old tables that have been replaced (e.g. tank_kpi_readings -> kpi_config + readings)."""
+    try:
+        insp = sa_inspect(db.get_bind())
+        tables = insp.get_table_names()
+        if "tank_kpi_readings" in tables:
+            db.execute(text("DROP TABLE IF EXISTS tank_kpi_readings CASCADE"))
+            logger.info("Dropped legacy table: tank_kpi_readings")
+    except Exception as e:
+        logger.warning(f"Drop legacy tables skipped: {e}")
+
+
 def sync_ivf_schema():
     """
     Add missing columns to IVF tables for older databases.
@@ -70,6 +82,7 @@ def sync_ivf_schema():
     """
     db = SessionLocal()
     try:
+        _drop_legacy_tables(db)
         # ivf_quality_log: tank_id, telemetry_data_id for deviations graph
         db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS tank_id INTEGER REFERENCES tanks(tank_id) ON DELETE CASCADE"))
         db.execute(text("ALTER TABLE ivf_quality_log ADD COLUMN IF NOT EXISTS telemetry_data_id INTEGER REFERENCES ivf_telemetry_data(id) ON DELETE CASCADE"))
@@ -131,6 +144,9 @@ def sync_ivf_schema():
         db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_minutes INTEGER"))
         db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS window_min_points INTEGER"))
         db.execute(text("ALTER TABLE ln2_iot_devices ADD COLUMN IF NOT EXISTS consecutive_windows_for_state INTEGER"))
+        # kpi_config: columns for limits/units (unit, alert_type may be missing on older DBs)
+        db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS unit VARCHAR(64)"))
+        db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS alert_type VARCHAR(100)"))
         db.commit()
         logger.info("IVF schema sync completed")
     except Exception as e:
