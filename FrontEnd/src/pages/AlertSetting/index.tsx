@@ -4,6 +4,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import { ivfService, type IvfBranch, type KpiConfigRow, type KpiConfigPayload } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
+import DeviceThermostatIcon from '@mui/icons-material/DeviceThermostat';
+import ThermostatAutoIcon from '@mui/icons-material/ThermostatAuto';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import BoltIcon from '@mui/icons-material/Bolt';
+import BatteryChargingFullIcon from '@mui/icons-material/BatteryChargingFull';
+import SensorDoorIcon from '@mui/icons-material/SensorDoor';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 interface ContainerRow {
   tank_id: number;
@@ -13,6 +21,83 @@ interface ContainerRow {
   status: string;
   date: string;
 }
+
+enum KPI_NAMES {
+  IVF_TEMPERATURE_INTERNAL = "temp_internal",
+  IVF_TEMPERATURE_EXTERNAL = "temp_external",
+  IVF_LN2_LEVEL = "ln2_level",
+  IVF_LN2_EVAPORATION_RATE = "ln2_evaporation_rate",
+  IVF_SHOCK = "shock",
+  IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage",
+  IVF_LN2_LID_STATE = "ln2_lid_state"
+}
+
+// KPI metadata configuration with icons, labels, and descriptions
+interface KpiMetadata {
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  unit?: string;
+}
+
+const KPI_METADATA: Record<string, KpiMetadata> = {
+  [KPI_NAMES.IVF_TEMPERATURE_INTERNAL]: {
+    label: 'Internal Temperature',
+    description: 'Monitor the internal tank temperature for safe storage conditions',
+    icon: <DeviceThermostatIcon sx={{ fontSize: 24 }} />,
+    unit: '°C',
+  },
+  [KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]: {
+    label: 'External Temperature',
+    description: 'Track ambient temperature around the storage container',
+    icon: <ThermostatAutoIcon sx={{ fontSize: 24 }} />,
+    unit: '°C',
+  },
+  [KPI_NAMES.IVF_LN2_LEVEL]: {
+    label: 'LN2 Level',
+    description: 'Liquid nitrogen level monitoring for cryogenic safety',
+    icon: <WaterDropIcon sx={{ fontSize: 24 }} />,
+    unit: '%',
+  },
+  [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]: {
+    label: 'Evaporation Rate',
+    description: 'Track LN2 evaporation rate to predict refill schedules',
+    icon: <TrendingUpIcon sx={{ fontSize: 24 }} />,
+    unit: '%/day',
+  },
+  [KPI_NAMES.IVF_SHOCK]: {
+    label: 'Shock Detection',
+    description: 'Alert for physical impacts or sudden movements',
+    icon: <BoltIcon sx={{ fontSize: 24 }} />,
+    unit: 'g',
+  },
+  [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]: {
+    label: 'Battery Level',
+    description: 'Monitor device battery to ensure continuous tracking',
+    icon: <BatteryChargingFullIcon sx={{ fontSize: 24 }} />,
+    unit: '%',
+  },
+  [KPI_NAMES.IVF_LN2_LID_STATE]: {
+    label: 'Lid State',
+    description: 'Monitor container lid open/close status for security',
+    icon: <SensorDoorIcon sx={{ fontSize: 24 }} />,
+  },
+};
+
+// Default metadata for unknown KPIs
+const DEFAULT_KPI_METADATA: KpiMetadata = {
+  label: 'Custom Alert',
+  description: 'Custom monitoring parameter',
+  icon: <InfoOutlinedIcon sx={{ fontSize: 24 }} />,
+};
+
+// Helper to get KPI metadata
+const getKpiMetadata = (kpiName: string): KpiMetadata => {
+  return KPI_METADATA[kpiName] || DEFAULT_KPI_METADATA;
+};
+
+// All KPI names as an array for multi-container selection
+const ALL_KPI_NAMES = Object.values(KPI_NAMES);
 
 export default function AlertSetting() {
   const { isAuthenticated, logout } = useAuth();
@@ -45,6 +130,8 @@ export default function AlertSetting() {
 
   /** Inline edit draft for KPI table: min, max, alert_type per config id */
   const [draftConfig, setDraftConfig] = useState<Record<number, { min?: number | null; max?: number | null; alert_type?: string | null }>>({});
+  /** Multi-container draft: keyed by kpi_name instead of id */
+  const [multiDraftConfig, setMultiDraftConfig] = useState<Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>({});
   const [saveAllLoading, setSaveAllLoading] = useState(false);
 
   const handleLogout = () => {
@@ -284,27 +371,53 @@ export default function AlertSetting() {
     });
   };
 
+  // Multi-container draft helpers (keyed by kpi_name)
+  const getMultiDraft = (kpiName: string) => multiDraftConfig[kpiName] ?? {};
+  const setMultiDraft = (kpiName: string, patch: { min?: number | null; max?: number | null; alert_type?: string | null }) => {
+    setMultiDraftConfig((prev) => {
+      const next = { ...prev };
+      const current = next[kpiName] ?? {};
+      const merged = { ...current, ...patch };
+      if (Object.keys(merged).length === 0) delete next[kpiName];
+      else next[kpiName] = merged;
+      return next;
+    });
+  };
+
   const handleSaveAll = async () => {
-    const multi = selectedContainers.length > 1;
-    if (multi) {
-      if (configList.length === 0) return;
+    const useMultiFlow = selectedContainers.length > 1 || configList.length === 0;
+    if (useMultiFlow) {
+      // For multi-container OR single container with no existing config: use multiDraftConfig to build configs for all KPIs that have values
+      const configsToApply = ALL_KPI_NAMES
+        .map((kpiName) => {
+          const d = getMultiDraft(kpiName);
+          const metadata = getKpiMetadata(kpiName);
+          // Only include if at least one value is set
+          if (d.min !== undefined || d.max !== undefined || d.alert_type !== undefined) {
+            return {
+              kpi_name: kpiName,
+              alert_name: metadata.label,
+              min: d.min ?? null,
+              max: d.max ?? null,
+              unit: metadata.unit ?? null,
+              alert_type: d.alert_type ?? null,
+            };
+          }
+          return null;
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null);
+
+      if (configsToApply.length === 0) return;
+
       const tankIds = selectedContainers.map((c) => c.tank_id);
-      const effectiveConfigs = configList.map((r) => {
-        const d = getDraft(r.id);
-        return {
-          kpi_name: r.kpi_name,
-          alert_name: r.alert_name ?? null,
-          min: d.min !== undefined ? d.min : r.min,
-          max: d.max !== undefined ? d.max : r.max,
-          unit: r.unit ?? null,
-          alert_type: d.alert_type !== undefined ? d.alert_type : r.alert_type,
-        };
-      });
       setSaveAllLoading(true);
       try {
-        await ivfService.bulkUpsertKpiConfig(tankIds, effectiveConfigs);
-        setDraftConfig({});
-        if (primaryContainer) {
+        await ivfService.bulkUpsertKpiConfig(tankIds, configsToApply);
+        setMultiDraftConfig({});
+        // For multi-container, deselect all. For single container, reload config.
+        if (selectedContainers.length > 1) {
+          setSelectedContainers([]);
+        } else if (primaryContainer) {
           const res = await ivfService.getKpiConfigList(primaryContainer.tank_id);
           setConfigList(res?.config ?? []);
         }
@@ -415,7 +528,24 @@ export default function AlertSetting() {
 
             {/* Active Containers card */}
             <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
-              <h2 className="font-bold text-black text-base mb-2">Active Containers</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-bold text-black text-base">Active Containers</h2>
+                {containers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedContainers.length === containers.length) {
+                        setSelectedContainers([]);
+                      } else {
+                        setSelectedContainers([...containers]);
+                      }
+                    }}
+                    className="text-xs font-medium text-[#6b1176] hover:text-[#8a2a95] transition-colors px-2 py-1 rounded hover:bg-[#F7ECFF]"
+                  >
+                    {selectedContainers.length === containers.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-2 items-center">
                 <div className="text-left">Containers #</div>
                 <div className="flex justify-center" />
@@ -472,105 +602,351 @@ export default function AlertSetting() {
             </div>
           </div>
 
-          {/* Right: KPI config table (Control Tower style) */}
+          {/* Right: KPI config cards */}
           <section className="flex-1 flex flex-col bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-hidden">
-            <h2 className="font-bold text-black text-base mb-2">
-              KPI Config {primaryContainer ? `— ${primaryContainer.canisterId}` : ''}
+            <h2 className="font-bold text-black text-base mb-4">
+              Alert Configuration {selectedContainers.length > 1 ? `— ${selectedContainers.length} Containers Selected` : primaryContainer ? `— Container ${primaryContainer.canisterId}` : ''}
             </h2>
+            <p className="text-sm text-gray-600 mb-6">
+              {selectedContainers.length > 1 
+                ? 'Configure alert thresholds to apply to all selected containers. Enter values and save to apply the same configuration to all.'
+                : configList.length === 0 && !configLoading
+                  ? 'This container has no configuration yet. Setting the values below will add the configuration.'
+                  : 'Configure alert thresholds for the selected container. Set minimum and maximum values to receive notifications when conditions are met.'
+              }
+            </p>
             {!primaryContainer ? (
-              <p className="text-xs text-gray-500">Select one or more containers. KPI config is shown for the first selected.</p>
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <svg className="w-16 h-16 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 12h6M9 16h6" strokeLinecap="round" />
+                  </svg>
+                  <p className="text-sm">Select one or more containers to configure alerts</p>
+                </div>
+              </div>
             ) : (
               <>
                 {configError && (
-                  <div className="text-xs text-red-600 mb-2">{configError}</div>
+                  <div className="text-xs text-red-600 mb-3 p-2 bg-red-50 rounded">{configError}</div>
                 )}
                 {configLoading ? (
-                  <div className="text-xs text-gray-500">Loading config...</div>
-                ) : (
-                  <div className="flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border border-[#E7E1E1]">
-                    <div className="grid grid-cols-[minmax(140px,1fr)_80px_80px_140px] pl-3 pr-3 py-2.5 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3 items-center">
-                      <div className="text-left">KPI Name</div>
-                      <div className="text-left">Min</div>
-                      <div className="text-left">Max</div>
-                      <div className="text-left">Type</div>
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center text-gray-400">
+                      <div className="animate-spin w-8 h-8 border-2 border-[#6b1176] border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p className="text-sm">Loading configuration...</p>
                     </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                     <div
-                      className="flex-1 overflow-y-auto overflow-x-hidden divide-y divide-gray-100"
+                      className="flex-1 overflow-y-auto space-y-3 pr-1"
                       style={{ scrollbarWidth: 'thin' }}
                     >
-                      {configList.map((r) => {
-                        const d = getDraft(r.id);
-                        const minVal = d.min !== undefined ? d.min : r.min;
-                        const maxVal = d.max !== undefined ? d.max : r.max;
-                        const typeVal = d.alert_type !== undefined ? d.alert_type : r.alert_type;
-                        return (
-                          <div
-                            key={r.id}
-                            className="grid grid-cols-[minmax(140px,1fr)_80px_80px_140px] pl-3 pr-3 py-2 items-center gap-3 text-xs hover:bg-gray-50/80"
-                          >
-                            <div className="text-left text-[#6b1176] font-medium truncate">{getDisplayName(r)}</div>
-                            <div className="text-left">
-                              <input
-                                type="number"
-                                step="any"
-                                value={minVal != null ? minVal : ''}
-                                onChange={(e) => {
-                                  const v = e.target.value === '' ? null : Number(e.target.value);
-                                  setDraft(r.id, { min: v });
-                                }}
-                                placeholder="Min"
-                                className="w-full border border-[#E7E1E1] rounded px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent"
-                              />
+                      {/* Multi-container mode OR single container with no config: show all KPI types with empty values */}
+                      {selectedContainers.length > 1 || configList.length === 0 ? (
+                        ALL_KPI_NAMES.map((kpiName) => {
+                          const d = getMultiDraft(kpiName);
+                          const minVal = d.min ?? null;
+                          const maxVal = d.max ?? null;
+                          const typeVal = d.alert_type ?? null;
+                          const metadata = getKpiMetadata(kpiName);
+                          const isAlertEnabled = typeVal && typeVal !== '';
+                          const isCritical = typeVal === 'critical';
+
+                          return (
+                            <div
+                              key={kpiName}
+                              className={`relative rounded-xl border-2 p-4 transition-all duration-200 ${
+                                isAlertEnabled
+                                  ? isCritical
+                                    ? 'border-red-200 bg-gradient-to-r from-red-50/50 to-white'
+                                    : 'border-[#E7D4F0] bg-gradient-to-r from-[#F7ECFF]/50 to-white'
+                                  : 'border-gray-200 bg-gray-50/30'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div
+                                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transform ${
+                                    isAlertEnabled
+                                      ? isCritical
+                                        ? 'bg-red-100 text-red-600'
+                                        : 'bg-[#F2E4FF] text-[#6b1176]'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}
+                                >
+                                  {metadata.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <h3 className={`font-semibold text-sm ${isAlertEnabled ? 'text-gray-900' : 'text-gray-500'}`}>
+                                        {metadata.label}
+                                      </h3>
+                                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                                        {metadata.description}
+                                      </p>
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                      {isAlertEnabled ? (
+                                        <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
+                                          isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
+                                        }`}>
+                                          <svg
+                                            className={`w-5 h-5 ${isCritical ? 'text-red-600' : 'text-[#6b1176]'}`}
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                          >
+                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                                          </svg>
+                                          <span className="mx-2 text-xs">
+                                            {isCritical ? "Email Alert" : "Soft Alert"}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
+                                          <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                                          </svg>
+                                          <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-3">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={minVal != null ? minVal : ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value === '' ? null : Number(e.target.value);
+                                          setMultiDraft(kpiName, { min: v });
+                                        }}
+                                        placeholder="Min"
+                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                      />
+                                      {metadata.unit && (
+                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={maxVal != null ? maxVal : ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value === '' ? null : Number(e.target.value);
+                                          setMultiDraft(kpiName, { max: v });
+                                        }}
+                                        placeholder="Max"
+                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                      />
+                                      {metadata.unit && (
+                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                      )}
+                                    </div>
+                                    <select
+                                      value={typeVal ?? ''}
+                                      onChange={(e) => {
+                                        const v = e.target.value === '' ? null : e.target.value;
+                                        setMultiDraft(kpiName, { alert_type: v });
+                                      }}
+                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
+                                        isAlertEnabled
+                                          ? isCritical
+                                            ? 'border-red-200 bg-red-50 text-red-700'
+                                            : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                          : 'border-gray-200 bg-white text-gray-500'
+                                      }`}
+                                    >
+                                      {alertTypeOptions.map((opt) => (
+                                        <option key={opt.label} value={opt.value ?? ''}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-left">
-                              <input
-                                type="number"
-                                step="any"
-                                value={maxVal != null ? maxVal : ''}
-                                onChange={(e) => {
-                                  const v = e.target.value === '' ? null : Number(e.target.value);
-                                  setDraft(r.id, { max: v });
-                                }}
-                                placeholder="Max"
-                                className="w-full border border-[#E7E1E1] rounded px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent"
-                              />
+                          );
+                        })
+                      ) : (
+                        /* Single container mode: show existing config */
+                        configList.map((r) => {
+                          const d = getDraft(r.id);
+                          const minVal = d.min !== undefined ? d.min : r.min;
+                          const maxVal = d.max !== undefined ? d.max : r.max;
+                          const typeVal = d.alert_type !== undefined ? d.alert_type : r.alert_type;
+                          const metadata = getKpiMetadata(r.kpi_name);
+                          const displayLabel = r.alert_name?.trim() ? r.alert_name : metadata.label;
+                          const isAlertEnabled = typeVal && typeVal !== '';
+                          const isCritical = typeVal === 'critical';
+
+                          return (
+                            <div
+                              key={r.id}
+                              className={`relative rounded-xl border-2 p-4 transition-all duration-200 ${
+                                isAlertEnabled
+                                  ? isCritical
+                                    ? 'border-red-200 bg-gradient-to-r from-red-50/50 to-white'
+                                    : 'border-[#E7D4F0] bg-gradient-to-r from-[#F7ECFF]/50 to-white'
+                                  : 'border-gray-200 bg-gray-50/30'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                {/* Icon */}
+                                <div
+                                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transform ${
+                                    isAlertEnabled
+                                      ? isCritical
+                                        ? 'bg-red-100 text-red-600'
+                                        : 'bg-[#F2E4FF] text-[#6b1176]'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}
+                                >
+                                    {metadata.icon}
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <h3 className={`font-semibold text-sm ${isAlertEnabled ? 'text-gray-900' : 'text-gray-500'}`}>
+                                        {displayLabel}
+                                      </h3>
+                                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                                        {metadata.description}
+                                      </p>
+                                    </div>
+
+                                    {/* Alert Toggle Icon */}
+                                    <div className="flex-shrink-0">
+                                      {isAlertEnabled ? (
+                                        <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
+                                          isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
+                                        }`}>
+                                          <svg
+                                            className={`w-5 h-5 ${isCritical ? 'text-red-600' : 'text-[#6b1176]'}`}
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                          >
+                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                                          </svg>
+                                          <span className="mx-2">
+                                            {isCritical ? "Email Alert Enabled" : ""}
+                                          </span> 
+                                        </div>
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
+                                          <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                                          </svg>
+                                          <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Inputs Row */}
+                                  <div className="flex items-center gap-3 mt-3">
+                                    {/* Min Input */}
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={minVal != null ? minVal : ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value === '' ? null : Number(e.target.value);
+                                          setDraft(r.id, { min: v });
+                                        }}
+                                        placeholder="Min"
+                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                      />
+                                      {metadata.unit && (
+                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                      )}
+                                    </div>
+
+                                    {/* Max Input */}
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={maxVal != null ? maxVal : ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value === '' ? null : Number(e.target.value);
+                                          setDraft(r.id, { max: v });
+                                        }}
+                                        placeholder="Max"
+                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                      />
+                                      {metadata.unit && (
+                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                      )}
+                                    </div>
+
+                                    {/* Alert Type Select */}
+                                    <select
+                                      value={typeVal ?? ''}
+                                      onChange={(e) => {
+                                        const v = e.target.value === '' ? null : e.target.value;
+                                        setDraft(r.id, { alert_type: v });
+                                      }}
+                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
+                                        isAlertEnabled
+                                          ? isCritical
+                                            ? 'border-red-200 bg-red-50 text-red-700'
+                                            : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                          : 'border-gray-200 bg-white text-gray-500'
+                                      }`}
+                                    >
+                                      {alertTypeOptions.map((opt) => (
+                                        <option key={opt.label} value={opt.value ?? ''}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-left">
-                              <select
-                                value={typeVal ?? ''}
-                                onChange={(e) => {
-                                  const v = e.target.value === '' ? null : e.target.value;
-                                  setDraft(r.id, { alert_type: v });
-                                }}
-                                className="w-full border border-[#E7E1E1] rounded px-2 py-1.5 text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                              >
-                                {alertTypeOptions.map((opt) => (
-                                  <option key={opt.label} value={opt.value ?? ''}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      )}
                     </div>
-                    {configList.length === 0 && !configLoading && (
-                      <div className="p-4 text-xs text-gray-500">No KPI config for this container.</div>
-                    )}
-                    <div className="mt-4 shrink-0 flex justify-end">
+                    <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex justify-end">
                       <button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={
                           saveAllLoading ||
-                          (selectedContainers.length > 1
-                            ? configList.length === 0
+                          (selectedContainers.length > 1 || configList.length === 0
+                            ? Object.keys(multiDraftConfig).length === 0
                             : Object.keys(draftConfig).length === 0)
                         }
-                        className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        {saveAllLoading ? 'Saving...' : 'Save'}
+                        {saveAllLoading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                              <path d="M17 21v-8H7v8M7 3v5h8" />
+                            </svg>
+                            Save Changes
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
