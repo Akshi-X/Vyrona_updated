@@ -1,13 +1,42 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { IVFTreatment } from '../types/ivf.ts';
 import FilterLight from '../assets/FilterLight.svg';
 import FilterDark from '../assets/FilterDark.svg';
 
-interface IVFOngoingTreatmentsProps {
+export interface EmbryoTrackingFilterOptions {
+  site_names: string[];
+  statuses: string[];
+  goblet_colors: string[];
+  crylock_colors: string[];
+  total?: number;
+  site_name_counts?: Record<string, number>;
+  status_counts?: Record<string, number>;
+  goblet_color_counts?: Record<string, number>;
+  crylock_color_counts?: Record<string, number>;
+}
+
+export interface EmbryoTrackingFilterValues {
+  siteName: string;
+  status: string;
+  gobletColor: string;
+  crylockColor: string;
+}
+
+export interface IVFOngoingTreatmentsProps {
   treatments: IVFTreatment[];
   hasMore?: boolean;
+  isLoading?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  filterOptions?: EmbryoTrackingFilterOptions;
+  filterValues?: EmbryoTrackingFilterValues;
+  onFilterChange?: (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => void;
+  /** Total matching current filters (for "filtered / total" display) */
+  filteredTotal?: number | null;
+  /** Total without filters (from filters API) */
+  totalUnfiltered?: number;
+  /** Called when user clicks "Clear filter" to reset all filters */
+  onClearFilters?: () => void;
 }
 
 
@@ -31,45 +60,53 @@ const tableHeaders: TableHeader[] = [
   { label: "Status", hasFilter: true, filterKey: 'status' },
 ];
 
-export function IVFOngoingTreatments({ 
-  treatments, 
-  hasMore = false, 
+const defaultFilterOptions: EmbryoTrackingFilterOptions = {
+  site_names: [],
+  statuses: [],
+  goblet_colors: [],
+  crylock_colors: [],
+};
+
+const defaultFilterValues: EmbryoTrackingFilterValues = {
+  siteName: 'all',
+  status: 'all',
+  gobletColor: 'all',
+  crylockColor: 'all',
+};
+
+export function IVFOngoingTreatments({
+  treatments,
+  hasMore = false,
+  isLoading = false,
   isLoadingMore = false,
-  onLoadMore 
+  onLoadMore,
+  filterOptions = defaultFilterOptions,
+  filterValues = defaultFilterValues,
+  onFilterChange,
+  filteredTotal = null,
+  totalUnfiltered,
+  onClearFilters,
 }: IVFOngoingTreatmentsProps) {
-  const [gobletColorFilter, setGobletColorFilter] = useState<string>('all');
-  const [cryolockColorFilter, setCryolockColorFilter] = useState<string>('all');
-  const [siteNameFilter, setSiteNameFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  
+
+  const hasActiveFilter =
+    filterValues.siteName !== 'all' ||
+    filterValues.status !== 'all' ||
+    filterValues.gobletColor !== 'all' ||
+    filterValues.crylockColor !== 'all';
+
+  const countLabel =
+    hasActiveFilter && filteredTotal != null
+      ? `Filtered Cryolock Count: ${filteredTotal}`
+      : totalUnfiltered != null
+        ? `Cryolock Count: ${totalUnfiltered}`
+        : null;
+
   const gobletColorDropdownRef = useRef<HTMLDivElement>(null);
   const cryolockColorDropdownRef = useRef<HTMLDivElement>(null);
   const siteNameDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Extract unique values for filters
-  const uniqueValues = useMemo(() => {
-    const gobletColors = new Set<string>();
-    const cryolockColors = new Set<string>();
-    const siteNames = new Set<string>();
-    const statuses = new Set<string>();
-
-    treatments.forEach(treatment => {
-      if (treatment.gobletColor) gobletColors.add(treatment.gobletColor);
-      if (treatment.cryolockColor) cryolockColors.add(treatment.cryolockColor);
-      if (treatment.siteName) siteNames.add(treatment.siteName);
-      if (treatment.status) statuses.add(treatment.status);
-    });
-
-    return {
-      gobletColors: Array.from(gobletColors).sort(),
-      cryolockColors: Array.from(cryolockColors).sort(),
-      siteNames: Array.from(siteNames).sort(),
-      statuses: Array.from(statuses).sort(),
-    };
-  }, [treatments]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -113,52 +150,40 @@ export function IVFOngoingTreatments({
     };
   }, [hasMore, isLoadingMore, onLoadMore]);
 
-  const getFilteredTreatments = () => {
-    return treatments.filter(treatment => {
-      if (gobletColorFilter !== 'all' && treatment.gobletColor !== gobletColorFilter) {
-        return false;
-      }
-      if (cryolockColorFilter !== 'all' && treatment.cryolockColor !== cryolockColorFilter) {
-        return false;
-      }
-      if (siteNameFilter !== 'all' && treatment.siteName !== siteNameFilter) {
-        return false;
-      }
-      if (statusFilter !== 'all' && treatment.status !== statusFilter) {
-        return false;
-      }
-      return true;
-    });
-  };
-
-  const filteredTreatments = getFilteredTreatments();
-
+  // Filter values/options from props (backend-level filtering; no client-side filtering)
   const getFilterValue = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
-      case 'gobletColor': return gobletColorFilter;
-      case 'cryolockColor': return cryolockColorFilter;
-      case 'siteName': return siteNameFilter;
-      case 'status': return statusFilter;
+      case 'gobletColor': return filterValues.gobletColor;
+      case 'cryolockColor': return filterValues.crylockColor;
+      case 'siteName': return filterValues.siteName;
+      case 'status': return filterValues.status;
       default: return 'all';
     }
   };
 
   const setFilterValue = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status', value: string) => {
-    switch (filterKey) {
-      case 'gobletColor': setGobletColorFilter(value); break;
-      case 'cryolockColor': setCryolockColorFilter(value); break;
-      case 'siteName': setSiteNameFilter(value); break;
-      case 'status': setStatusFilter(value); break;
-    }
+    onFilterChange?.(filterKey, value);
   };
 
   const getFilterOptions = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
-      case 'gobletColor': return uniqueValues.gobletColors;
-      case 'cryolockColor': return uniqueValues.cryolockColors;
-      case 'siteName': return uniqueValues.siteNames;
-      case 'status': return uniqueValues.statuses;
+      case 'gobletColor': return filterOptions.goblet_colors ?? [];
+      case 'cryolockColor': return filterOptions.crylock_colors ?? [];
+      case 'siteName': return filterOptions.site_names ?? [];
+      case 'status': return filterOptions.statuses ?? [];
       default: return [];
+    }
+  };
+
+  const getFilterCount = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status', option: string): number | null => {
+    // "All" = count with current other filters applied (so it updates when e.g. Site is selected)
+    if (option === 'all') return filterOptions.total ?? totalUnfiltered ?? null;
+    switch (filterKey) {
+      case 'gobletColor': return filterOptions.goblet_color_counts?.[option] ?? null;
+      case 'cryolockColor': return filterOptions.crylock_color_counts?.[option] ?? null;
+      case 'siteName': return filterOptions.site_name_counts?.[option] ?? null;
+      case 'status': return filterOptions.status_counts?.[option] ?? null;
+      default: return null;
     }
   };
 
@@ -173,8 +198,24 @@ export function IVFOngoingTreatments({
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden h-[320px] flex flex-col">
-      <div 
+    <div className="rounded-2xl  h-[320px] flex flex-col">
+      {countLabel != null && (
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-xs text-gray-600">
+            <span className="font-medium text-[#6B1176]">{countLabel}</span>
+          </p>
+          {hasActiveFilter && onClearFilters && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="text-xs font-medium text-[#6B1176] hover:underline shrink-0"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
+      <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
@@ -196,20 +237,20 @@ export function IVFOngoingTreatments({
                      {header.hasFilter && filterKey ? (
                        <div className="flex items-center gap-2 relative" ref={dropdownRef}>
                          <span className="whitespace-nowrap">{header.label}</span>
-                         <div className="relative">
+                         <div className="relative flex items-center gap-1">
                            <button
                              type="button"
                              onClick={(e) => {
                                e.stopPropagation();
                                setOpenDropdown(isDropdownOpen ? null : filterKey);
                              }}
-                             className="text-xs p-1.5 transition-all duration-200 hover:opacity-80"
+                             className="text-xs p-1.5 transition-all duration-200 hover:opacity-80 flex items-center"
                              title={currentFilterValue === 'all' ? `All ${header.label}` : `Filtered: ${currentFilterValue}`}
                            >
                              <img 
                                src={currentFilterValue === 'all' ? FilterLight : FilterDark}
                                alt="Filter"
-                               className="w-[14px] h-[14px]"
+                               className="w-[14px] h-[14px] shrink-0"
                              />
                            </button>
                            
@@ -231,6 +272,9 @@ export function IVFOngoingTreatments({
                                  }`}
                                >
                                  All {header.label}
+                                 {getFilterCount(filterKey, 'all') != null && (
+                                   <span className="ml-1 opacity-80">({getFilterCount(filterKey, 'all')})</span>
+                                 )}
                                </button>
                                {filterOptions.map((option) => (
                                  <button
@@ -246,6 +290,9 @@ export function IVFOngoingTreatments({
                                    }`}
                                  >
                                    <span className="truncate">{option}</span>
+                                   {getFilterCount(filterKey, option) != null && (
+                                     <span className="ml-1 opacity-80">({getFilterCount(filterKey, option)})</span>
+                                   )}
                                  </button>
                                ))}
                              </div>
@@ -262,11 +309,16 @@ export function IVFOngoingTreatments({
           </thead>
           <tbody>
             {(() => {
-              const hasData = treatments.length > 0;
-              const hasFilteredData = filteredTreatments.length > 0;
-              const isFiltered = gobletColorFilter !== 'all' || cryolockColorFilter !== 'all' || siteNameFilter !== 'all' || statusFilter !== 'all';
-
-              if (!hasData) {
+              if (isLoading) {
+                return (
+                  <tr className="bg-white">
+                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
+                      Loading...
+                    </td>
+                  </tr>
+                );
+              }
+              if (treatments.length === 0) {
                 return (
                   <tr className="bg-white">
                     <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
@@ -275,20 +327,9 @@ export function IVFOngoingTreatments({
                   </tr>
                 );
               }
-
-              if (!hasFilteredData && isFiltered) {
-                return (
-                  <tr className="bg-white">
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
-                      No data found for the selected filters
-                    </td>
-                  </tr>
-                );
-              }
-
               return (
                 <>
-                  {filteredTreatments.map((treatment, index) => (
+                  {treatments.map((treatment, index) => (
                     <tr
                       key={`${treatment.hisNumber}-${treatment.cryolockNum}-${index}`}
                       className="border-b border-[#F3E0FF] bg-white transition-colors  whitespace-nowrap"

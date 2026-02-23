@@ -1,6 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
@@ -112,6 +112,28 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfEmbryoTrackingHasMore, setIvfEmbryoTrackingHasMore] = useState(false);
   const [ivfEmbryoTrackingNextOffset, setIvfEmbryoTrackingNextOffset] = useState<number | null>(null);
   const [loadingIvfEmbryoTrackingMore, setLoadingIvfEmbryoTrackingMore] = useState(false);
+  // Filter options from separate API; filter values applied to table API (backend-level)
+  const [ivfEmbryoTrackingFilterOptions, setIvfEmbryoTrackingFilterOptions] = useState<{
+    site_names: string[];
+    statuses: string[];
+    goblet_colors: string[];
+    crylock_colors: string[];
+    total?: number;
+    site_name_counts?: Record<string, number>;
+    status_counts?: Record<string, number>;
+    goblet_color_counts?: Record<string, number>;
+    crylock_color_counts?: Record<string, number>;
+  }>({ site_names: [], statuses: [], goblet_colors: [], crylock_colors: [] });
+  /** Total matching current filters (from embryo_tracking API) */
+  const [ivfEmbryoTrackingFilteredTotal, setIvfEmbryoTrackingFilteredTotal] = useState<number | null>(null);
+  /** Total with no filters (for "filtered / total" denominator); set when filters are all "all" */
+  const [ivfEmbryoTrackingTotalUnfiltered, setIvfEmbryoTrackingTotalUnfiltered] = useState<number | undefined>(undefined);
+  const [ivfEmbryoTrackingFilterValues, setIvfEmbryoTrackingFilterValues] = useState<{
+    siteName: string;
+    status: string;
+    gobletColor: string;
+    crylockColor: string;
+  }>({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
 
   // IVF total embryos/cryolocks metric (live API data)
   const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
@@ -367,7 +389,54 @@ export default function Dashboard({ }: DashboardProps) {
     }
   }, [isAuthenticated]);
 
-  // Fetch IVF embryo tracking (ongoing treatments) from API
+  // Fetch IVF embryo tracking filter options; refetch when filter values change so counts reflect current selection
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+    let cancelled = false;
+    ivfService.getEmbryoTrackingFilters(ivfEmbryoTrackingFilterValues)
+      .then((res) => {
+        if (!cancelled) {
+          setIvfEmbryoTrackingFilterOptions({
+            site_names: res?.site_names ?? [],
+            statuses: res?.statuses ?? [],
+            goblet_colors: res?.goblet_colors ?? [],
+            crylock_colors: res?.crylock_colors ?? [],
+            total: res?.total,
+            site_name_counts: res?.site_name_counts,
+            status_counts: res?.status_counts,
+            goblet_color_counts: res?.goblet_color_counts,
+            crylock_color_counts: res?.crylock_color_counts,
+          });
+          const noFilters =
+            ivfEmbryoTrackingFilterValues.siteName === 'all' &&
+            ivfEmbryoTrackingFilterValues.status === 'all' &&
+            ivfEmbryoTrackingFilterValues.gobletColor === 'all' &&
+            ivfEmbryoTrackingFilterValues.crylockColor === 'all';
+          if (noFilters && res?.total != null) {
+            setIvfEmbryoTrackingTotalUnfiltered(res.total);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIvfEmbryoTrackingFilterOptions({ site_names: [], statuses: [], goblet_colors: [], crylock_colors: [] });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [userDepartment, isAuthenticated, ivfEmbryoTrackingFilterValues.siteName, ivfEmbryoTrackingFilterValues.status, ivfEmbryoTrackingFilterValues.gobletColor, ivfEmbryoTrackingFilterValues.crylockColor]);
+
+  // Build API filter params from current filter values (backend-level)
+  const embryoTrackingApiFilters = useMemo(() => {
+    const f: { branch_name?: string; status?: string; cryolock_color?: string; goblet_color?: string } = {};
+    if (ivfEmbryoTrackingFilterValues.siteName && ivfEmbryoTrackingFilterValues.siteName !== 'all') f.branch_name = ivfEmbryoTrackingFilterValues.siteName;
+    if (ivfEmbryoTrackingFilterValues.status && ivfEmbryoTrackingFilterValues.status !== 'all') f.status = ivfEmbryoTrackingFilterValues.status;
+    if (ivfEmbryoTrackingFilterValues.gobletColor && ivfEmbryoTrackingFilterValues.gobletColor !== 'all') f.goblet_color = ivfEmbryoTrackingFilterValues.gobletColor;
+    if (ivfEmbryoTrackingFilterValues.crylockColor && ivfEmbryoTrackingFilterValues.crylockColor !== 'all') f.cryolock_color = ivfEmbryoTrackingFilterValues.crylockColor;
+    return f;
+  }, [ivfEmbryoTrackingFilterValues]);
+
+  // Fetch IVF embryo tracking table (with backend filters); refetch when filters change
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
     if (!shouldFetch) return;
@@ -377,15 +446,17 @@ export default function Dashboard({ }: DashboardProps) {
       setLoadingIvfEmbryoTracking(true);
       setIvfEmbryoTrackingError(null);
       try {
-        const response = await ivfService.getEmbryoTracking(0, 100);
+        const response = await ivfService.getEmbryoTracking(0, 50, embryoTrackingApiFilters);
         if (!cancelled) {
           setIvfEmbryoTracking(response?.data || []);
+          setIvfEmbryoTrackingFilteredTotal(response?.total ?? null);
           setIvfEmbryoTrackingHasMore(response?.has_more || false);
           setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
         }
       } catch (e: any) {
         if (!cancelled) {
           setIvfEmbryoTracking([]);
+          setIvfEmbryoTrackingFilteredTotal(null);
           setIvfEmbryoTrackingError(e?.message || 'Failed to load embryo tracking data');
           setIvfEmbryoTrackingHasMore(false);
           setIvfEmbryoTrackingNextOffset(null);
@@ -396,30 +467,32 @@ export default function Dashboard({ }: DashboardProps) {
     };
 
     fetchEmbryoTracking();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
+    return () => { cancelled = true; };
+  }, [userDepartment, isAuthenticated, embryoTrackingApiFilters]);
 
-  // Load more IVF embryo tracking data
+  // Load more IVF embryo tracking data (same backend filters)
   const loadMoreIvfEmbryoTracking = async () => {
-    if (loadingIvfEmbryoTrackingMore || !ivfEmbryoTrackingHasMore || ivfEmbryoTrackingNextOffset === null) {
-      return;
-    }
-
+    if (loadingIvfEmbryoTrackingMore || !ivfEmbryoTrackingHasMore || ivfEmbryoTrackingNextOffset === null) return;
     setLoadingIvfEmbryoTrackingMore(true);
     try {
-      const response = await ivfService.getEmbryoTracking(ivfEmbryoTrackingNextOffset, 100);
+      const response = await ivfService.getEmbryoTracking(ivfEmbryoTrackingNextOffset, 50, embryoTrackingApiFilters);
       setIvfEmbryoTracking(prev => [...prev, ...(response?.data || [])]);
       setIvfEmbryoTrackingHasMore(response?.has_more || false);
       setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
-    } catch (e: any) {
-      // Don't show error for load more - just stop loading
+    } catch {
       setIvfEmbryoTrackingHasMore(false);
       setIvfEmbryoTrackingNextOffset(null);
     } finally {
       setLoadingIvfEmbryoTrackingMore(false);
     }
+  };
+
+  const handleIvfEmbryoTrackingFilterChange = (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => {
+    setIvfEmbryoTrackingFilterValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleIvfEmbryoTrackingClearFilters = () => {
+    setIvfEmbryoTrackingFilterValues({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
   };
 
   // Fetch IVF totals (Total Embryos/Cryolocks) from API
@@ -1350,11 +1423,18 @@ export default function Dashboard({ }: DashboardProps) {
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
                 ) : (
-                  <IVFOngoingTreatments 
-                    treatments={ivfEmbryoTracking} 
+                  <IVFOngoingTreatments
+                    treatments={ivfEmbryoTracking}
                     hasMore={ivfEmbryoTrackingHasMore}
+                    isLoading={loadingIvfEmbryoTracking}
                     isLoadingMore={loadingIvfEmbryoTrackingMore}
                     onLoadMore={loadMoreIvfEmbryoTracking}
+                    filterOptions={ivfEmbryoTrackingFilterOptions}
+                    filterValues={ivfEmbryoTrackingFilterValues}
+                    onFilterChange={handleIvfEmbryoTrackingFilterChange}
+                    onClearFilters={handleIvfEmbryoTrackingClearFilters}
+                    filteredTotal={ivfEmbryoTrackingFilteredTotal}
+                    totalUnfiltered={ivfEmbryoTrackingTotalUnfiltered ?? ivfEmbryoTrackingFilterOptions.total}
                   />
                 )}
                 </div>

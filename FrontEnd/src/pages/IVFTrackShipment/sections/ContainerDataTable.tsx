@@ -22,7 +22,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [totalContainers, setTotalContainers] = useState<number>(0);
-  const [availableSlots, setAvailableSlots] = useState<number>(0);
 
   useEffect(() => {
     if (!canisterNumber) {
@@ -40,13 +39,11 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
         if (!cancelled) {
           setRows(response?.data || []);
           setTotalContainers(response?.total || 0);
-          setAvailableSlots(response?.available_slots || 0);
         }
       } catch (e: any) {
         if (!cancelled) {
           setRows([]);
           setTotalContainers(0);
-          setAvailableSlots(0);
           setError(e?.message || 'Failed to load container data');
         }
       } finally {
@@ -175,12 +172,8 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
         <h3 className="font-semibold text-black text-[16px]">Container Data</h3>
         <div className="flex items-center gap-4">
           <div className="text-black text-sm">
-            <span className="font-medium">Total Canisters: </span>
+            <span className="font-medium">Total Cryolock: </span>
             <span className="font-semibold">{totalContainers}</span>
-          </div>
-          <div className="text-black text-sm">
-            <span className="font-medium">Available slots: </span>
-            <span className="font-semibold">{availableSlots}</span>
           </div>
           {saveError && (
             <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
@@ -353,7 +346,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
           setRows(response?.data || []);
           setTotalContainers(response?.total || 0);
-          setAvailableSlots(response?.available_slots || 0);
           setIsMoveModalOpen(false);
           setSelectedRow(null);
         }}
@@ -372,7 +364,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
           setRows(response?.data || []);
           setTotalContainers(response?.total || 0);
-          setAvailableSlots(response?.available_slots || 0);
           setIsMoveModalOpen(false);
           setSelectedRow(null);
         }}

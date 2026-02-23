@@ -227,14 +227,14 @@ def seed_ivf_data(db):
         tanks = db.query(Tank).filter(Tank.branch_id == branch.branch_id).all()
         logger.info(f"  Created {len(tanks)} tanks")
 
-    # PatientCrylockInfo (cryolocks / embryos)
+    # PatientCrylockInfo (cryolocks / embryos) – initial 8 + bulk for Site Level Information testing
     existing_crylocks = (
         db.query(PatientCrylockInfo)
         .filter(PatientCrylockInfo.branch_id == branch.branch_id)
         .count()
     )
     if existing_crylocks >= 8:
-        logger.info(f"  Skipping cryolocks (already {existing_crylocks} exist)")
+        logger.info(f"  Skipping initial cryolocks (already {existing_crylocks} exist)")
     else:
         tank_list = tanks[:2]
         tank_ids = [t.tank_id for t in tank_list]
@@ -546,28 +546,13 @@ def seed_kpi_config(db, tanks):
         raise
 
 
-def seed_kpi_readings(db, tanks):
-    """Seed readings for T30 only (PostgreSQL only; no Redis). Requires KpiConfig for T30 to exist."""
+def seed_kpi_readings(db, tanks=None):
+    """Seed 5 snapshots of readings for T30 only. Uses existing KpiConfig for T30 (does not touch config or other tanks)."""
     if not tanks:
         tanks = db.query(Tank).all()
     t30_list = [t for t in tanks if (t.tank_code or "").strip().upper() == "T30"]
     if not t30_list:
         t30_list = db.query(Tank).filter(Tank.tank_code == "T30").all()
-    non_t30_ids = [t.tank_id for t in tanks if (t.tank_code or "").strip().upper() != "T30"]
-    if non_t30_ids:
-        try:
-            db.query(Readings).filter(Readings.tank_id.in_(non_t30_ids)).delete(synchronize_session=False)
-            db.flush()
-            try:
-                r = get_redis()
-                for tid in non_t30_ids:
-                    r.delete(f"tank_kpi_history:{tid}")
-            except Exception as re:
-                logger.warning(f"  Redis clear for non-T30 tanks skipped: {re}")
-            logger.info(f"  Cleared readings (and Redis) for non-T30 tanks (ids: {non_t30_ids})")
-        except Exception as e:
-            logger.warning(f"  Clear non-T30 readings skipped: {e}")
-            db.rollback()
     if not t30_list:
         logger.warning("  No T30 tank found; skipping KPI readings seed")
         return
@@ -591,14 +576,17 @@ def seed_kpi_readings(db, tanks):
             continue
         hospital_id = branch.hospital_id
         branch_id = tank.branch_id
-        config_by_name = {
-            c.kpi_name: c.id
-            for c in db.query(KpiConfig).filter(
-                KpiConfig.tank_id == tank_id,
-                KpiConfig.status == True,
-                KpiConfig.alert_name.is_(None),
-            ).all()
-        }
+        # One config_id per kpi_name (first by id) so we can attach readings; works with alert_name null or set
+        config_rows = (
+            db.query(KpiConfig)
+            .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
+            .order_by(KpiConfig.kpi_name, KpiConfig.id)
+            .all()
+        )
+        config_by_name = {}
+        for c in config_rows:
+            if c.kpi_name not in config_by_name:
+                config_by_name[c.kpi_name] = c.id
         if not config_by_name:
             logger.warning(f"  No KPI config for {tank_code}; run seed_kpi_config first. Skipping readings.")
             continue
