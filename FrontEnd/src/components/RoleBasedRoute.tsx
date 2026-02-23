@@ -7,14 +7,16 @@ interface RoleBasedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
   restrictedRoles?: string[];
-  restrictIVFAdmin?: boolean; // New prop to restrict IVF Admin users
+  restrictIVFAdmin?: boolean; // Redirect IVF Admin to approval screen on certain routes
+  requireControlTower?: boolean; // If true, IVF User (H.User) is redirected to dashboard – no Control Tower access
 }
 
 export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ 
   children, 
   allowedRoles, 
   restrictedRoles,
-  restrictIVFAdmin = false
+  restrictIVFAdmin = false,
+  requireControlTower = false
 }) => {
   const { isAuthenticated, isLoading, userRole } = useAuth();
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
@@ -74,59 +76,25 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  // Check if user is IVF Admin (IVF department + Admin role) and access should be restricted
+  // IVF Admin on restricted page → redirect to approval screen (pending list)
   const isIVFAdmin = userDepartment === 'IVF' && userRole?.toLowerCase() === 'admin';
   if (restrictIVFAdmin && isIVFAdmin) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-4">
-            You don't have permission to access this page.
-          </p>
-        </div>
-      </div>
-    );
+    return <Navigate to="/approval" replace />;
   }
 
-  // Check if user role is in restricted roles
+  // Restricted role (e.g. mygrape_admin) → redirect to user profile
   if (restrictedRoles && userRole && restrictedRoles.includes(userRole)) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-4">
-            You don't have permission to access this page.
-          </p>
-          <button 
-            onClick={() => window.history.back()}
-            className="px-4 py-2 bg-[#6b1176] text-white rounded-md hover:bg-[#8b2a96] transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
+    return <Navigate to="/user-profile" replace />;
   }
 
-  // Check if user role is in allowed roles (if specified)
+  // Control Tower: IVF User (H.User) has no access – redirect to dashboard
+  if (requireControlTower && userDepartment === 'IVF' && userRole === 'User') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Role not in allowed roles → redirect to dashboard
   if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600 mb-4">
-            You don't have permission to access this page.
-          </p>
-          <button 
-            onClick={() => window.history.back()}
-            className="px-4 py-2 bg-[#6b1176] text-white rounded-md hover:bg-[#8b2a96] transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Render content if access is allowed

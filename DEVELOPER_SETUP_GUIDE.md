@@ -1223,311 +1223,38 @@ If you've completed all the steps above, you should have:
 
 ---
 
-## 🔗 Shared Models (Monorepo)
+## 🔗 KPI Models (KpiConfig & Readings)
 
-The `shared/` directory is a pip-installable Python package (`mgscale_shared`) that contains SQLAlchemy models used by both `backend` and `telemetry-service`. This is the single source of truth for any database table that both services need to read or write.
+KPI config and readings models live in the main backend models package and use the same `Base` as all other backend models.
 
 | Term | Value |
-|---|---|
-| Distribution name (pip) | `mgscale_shared` |
-| Importable namespace | `mgscale_backend` |
-| Source directory | `shared/mgscale_backend/` |
+|------|--------|
+| Source directory | `backend/app/models/` |
+| Import in backend | `from app.models import KpiConfig, Readings` |
 
 ---
 
-### Package Structure
+### Model files
 
-```
-shared/
-├── .gitignore
-├── pyproject.toml                              # name = "mgscale_shared"
-├── __init__.py
-└── mgscale_backend/                            # importable as: mgscale_backend
-    ├── __init__.py
-    └── models/
-        ├── base.py                             # Single shared Base = declarative_base()
-        ├── __init__.py                         # Exports Base + all shared models
-        ├── kpi_config_model.py                 # KpiConfig
-        └── readings_model.py                   # Readings
-```
+- **KpiConfig** — `backend/app/models/kpi_config_model.py` (tank KPI limits: min/max, units, ln2_level l1/l2/critical).
+- **Readings** — `backend/app/models/readings_model.py` (individual KPI readings per timestamp; snapshots = multiple rows with same timestamp).
 
-**Rule:** Every model file imports `Base` from `.base`. Never use a locally-defined `Base` for a shared model.
+Both are exported from `backend/app/models/__init__.py` and imported in `init_db()` so their tables are created with the rest of the schema.
 
 ---
 
-### Installing the Shared Package
-
-The package is declared as an editable (`develop = true`) path dependency in `backend/pyproject.toml` under `[tool.poetry.dependencies]`, so `poetry install` handles it automatically.
-
-```toml
-# backend/pyproject.toml
-[tool.poetry.dependencies]
-mgscale_shared = {path = "../shared", develop = true}
-```
-
-`develop = true` installs it like `pip install -e` — Python reads source files directly from `shared/` on every import. Changes to `shared/` are live immediately with no reinstall needed.
-
-**For telemetry-service** — add to `requirements.txt`:
-```
--e ../shared
-```
-
-#### Force-reinstall (if the venv has a stale cached copy)
-
-```bash
-# From backend/
-poetry run pip uninstall mgscale-shared mgscale_shared -y && poetry run pip install -e ../shared
-```
-
-Verify it points to source (not site-packages):
-```bash
-poetry run python -c "import mgscale_backend.models; print(mgscale_backend.models.__file__)"
-# Expected: .../dashboard-service/shared/mgscale_backend/models/__init__.py
-```
-
----
-
-### How It Works: One `Base` for All Shared Models
-
-`shared/mgscale_backend/models/base.py` holds the single `declarative_base()` instance:
+### Usage
 
 ```python
-# shared/mgscale_backend/models/base.py
-from sqlalchemy.orm import declarative_base
+from app.models import KpiConfig, Readings
 
-Base = declarative_base()
-```
-
-SQLAlchemy tracks every model that inherits from this `Base` in the same `MetaData` object, so `SharedBase.metadata.create_all(engine)` creates every shared table in one call.
-
-The backend's `backend/app/config/database.py` keeps its own local `Base` for backend-only models. Both are called in `init_db()`:
-
-| Base | Used for | `create_all` call |
-|------|----------|-------------------|
-| `mgscale_backend.models.base.Base` | Tables shared across services | `SharedBase.metadata.create_all(engine)` |
-| `backend.app.config.database.Base` | Backend-only tables | `Base.metadata.create_all(engine)` |
-
----
-
-### Current Shared Models
-
-#### `KpiConfig` — KPI thresholds per tank
-
-```python
-# shared/mgscale_backend/models/kpi_config_model.py
-from mgscale_backend.models.base import Base   # when importing from outside the package
-
-class KpiConfig(Base):
-    __tablename__ = "kpi_config"
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    hospital_id = Column(Integer, ForeignKey("hospitals.hospital_id", ondelete="CASCADE"), ...)
-    branch_id   = Column(Integer, ForeignKey("hospital_branches.branch_id", ondelete="CASCADE"), ...)
-    tank_id     = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), ...)
-    kpi_name    = Column(String(255), nullable=False)
-    alert_name  = Column(String(255), nullable=True)
-    min         = Column(Numeric(10, 4), nullable=True)
-    max         = Column(Numeric(10, 4), nullable=True)
-    alert_type  = Column(String(100), nullable=True)
-    status      = Column(Boolean, nullable=False, default=True)
-```
-
-#### `Readings` — individual sensor readings
-
-```python
-# shared/mgscale_backend/models/readings_model.py
-class Readings(Base):
-    __tablename__ = "readings"
-    id                   = Column(Integer, primary_key=True, autoincrement=True)
-    hospital_id          = Column(Integer, ForeignKey("hospitals.hospital_id", ondelete="CASCADE"), ...)
-    branch_id            = Column(Integer, ForeignKey("hospital_branches.branch_id", ondelete="CASCADE"), ...)
-    device_id            = Column(Integer, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, ...)
-    tank_id              = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), ...)
-    kpi_config_id        = Column(Integer, ForeignKey("kpi_config.id", ondelete="CASCADE"), ...)
-    kpi_value            = Column(Numeric(10, 4), nullable=False)
-    timestamp            = Column(DateTime(timezone=True), nullable=False)
-    deviation_alert_sent = Column(Boolean, nullable=False, default=False)
-    deviation            = Column(Boolean, nullable=False, default=False)
-```
-
----
-
-### Adding a New Shared Model
-
-1. **Create the model file** in `shared/mgscale_backend/models/`:
-
-    ```python
-    # shared/mgscale_backend/models/alert_model.py
-    from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-    from datetime import datetime, timezone
-    from .base import Base   # always relative import within the package
-
-    class Alert(Base):
-        __tablename__ = "alerts"
-        id          = Column(Integer, primary_key=True, autoincrement=True)
-        tank_id     = Column(Integer, ForeignKey("tanks.tank_id", ondelete="CASCADE"), nullable=False)
-        message     = Column(String(500), nullable=False)
-        resolved    = Column(Boolean, default=False, nullable=False)
-        created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    ```
-
-2. **Export it** in `shared/mgscale_backend/models/__init__.py`:
-
-    ```python
-    from .base import Base
-    from .kpi_config_model import KpiConfig
-    from .readings_model import Readings
-    from .alert_model import Alert           # add this
-
-    __all__ = ["Base", "KpiConfig", "Readings", "Alert"]
-    ```
-
-3. **Register it** in `backend/app/config/database.py` `init_db()`:
-
-    ```python
-    from mgscale_backend.models import KpiConfig, Readings, Alert   # add Alert
-    ```
-
-Both services see the new model immediately — no reinstall needed with editable install.
-
----
-
-### Usage in Backend
-
-#### `backend/app/config/database.py`
-
-```python
-from mgscale_backend.models import Base as SharedBase
-
-def init_db():
-    # ... import all local models ...
-
-    # Import shared models to register them with SharedBase.metadata
-    from mgscale_backend.models import KpiConfig, Readings
-
-    Base.metadata.create_all(bind=engine)        # backend-only tables
-    SharedBase.metadata.create_all(bind=engine)  # shared tables
-```
-
-#### Query in a service layer
-
-```python
-from sqlalchemy.orm import Session
-from mgscale_backend.models import KpiConfig, Readings
-
-def get_active_kpis_for_tank(db: Session, tank_id: int) -> list[KpiConfig]:
+# Query example
+def get_tank_kpi_config(db: Session, tank_id: int):
     return db.query(KpiConfig).filter(
         KpiConfig.tank_id == tank_id,
         KpiConfig.status == True,
     ).all()
-
-def get_readings_with_deviation(db: Session, tank_id: int) -> list[Readings]:
-    return db.query(Readings).filter(
-        Readings.tank_id == tank_id,
-        Readings.deviation == True,
-        Readings.deviation_alert_sent == False,
-    ).all()
 ```
-
-#### FastAPI route
-
-```python
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from app.config.database import get_db
-from mgscale_backend.models import KpiConfig
-
-router = APIRouter()
-
-@router.get("/kpi-config/{tank_id}")
-def list_kpi_configs(tank_id: int, db: Session = Depends(get_db)):
-    configs = db.query(KpiConfig).filter(
-        KpiConfig.tank_id == tank_id,
-        KpiConfig.status == True,
-    ).all()
-    return configs
-```
-
----
-
-### Usage in Telemetry-Service (Azure Function)
-
-Install the package inside the telemetry-service venv:
-```bash
-cd telemetry-service
-pip install -e ../shared
-```
-
-#### Table creation (`telemetry-service/shared/database.py`)
-
-```python
-from mgscale_backend.models import Base as SharedBase
-
-def ensure_tables_exist():
-    engine = get_engine()
-    SharedBase.metadata.create_all(bind=engine)
-    logger.info("Shared tables verified/created via ORM")
-```
-
-#### Insert a reading
-
-```python
-from mgscale_backend.models import Readings
-from shared.database import get_session
-
-def insert_reading(tank_id: int, kpi_config_id: int, value: float,
-                   timestamp, hospital_id: int, branch_id: int) -> int:
-    SessionLocal = get_session()
-    with SessionLocal() as db:
-        record = Readings(
-            hospital_id=hospital_id,
-            branch_id=branch_id,
-            tank_id=tank_id,
-            kpi_config_id=kpi_config_id,
-            kpi_value=value,
-            timestamp=timestamp,
-        )
-        db.add(record)
-        db.commit()
-        db.refresh(record)
-        return record.id
-```
-
----
-
-### Alembic Migrations with Shared Models
-
-Update `backend/migration/env.py` so Alembic sees both local and shared metadata:
-
-```python
-from app.config.database import Base as LocalBase
-from mgscale_backend.models import Base as SharedBase
-
-target_metadata = [LocalBase.metadata, SharedBase.metadata]
-```
-
-Then generate and apply:
-
-```bash
-cd backend
-poetry run alembic revision --autogenerate -m "add kpi_config and readings tables"
-poetry run alembic upgrade head
-```
-
----
-
-### Quick Reference
-
-| Task | Command / Value |
-|------|---------|
-| Distribution name | `mgscale_shared` |
-| Importable namespace | `mgscale_backend` |
-| Install (backend, editable) | `poetry run pip install -e ../shared` |
-| Install (telemetry-service) | `pip install -e ../shared` |
-| Force-reinstall stale venv | `poetry run pip uninstall mgscale-shared mgscale_shared -y && poetry run pip install -e ../shared` |
-| Import a shared model | `from mgscale_backend.models import KpiConfig, Readings` |
-| Import shared Base | `from mgscale_backend.models import Base` |
-| Create shared tables | `Base.metadata.create_all(bind=engine)` |
-| Add a new model | Create file → export in `shared/mgscale_backend/models/__init__.py` → import in `init_db()` |
 
 ---
 

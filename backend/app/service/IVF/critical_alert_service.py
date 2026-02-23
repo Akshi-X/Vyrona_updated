@@ -27,10 +27,7 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
     HospitalAlertsResponse
 )
-from mgscale_backend.models import (
-            KpiConfig,
-            Readings,
-        )
+from ...models import KpiConfig, Readings
 from ...service.email_service import send_email
 from ...config.config import settings
 from pathlib import Path
@@ -381,16 +378,17 @@ class CriticalAlertService:
         deviations = self.db.query(Readings).filter(
             Readings.tank_id == tank_id,
             Readings.deviation == True,
-            Readings.alert_id.isnull()
-        )
+            Readings.deviation_alert_sent == False,
+        ).all()
 
         alerts_created = []
 
-        if deviations:
-            for deviation in deviations:
-                kpi_config = self.db.query(KpiConfig).filter(
-                    KpiConfig.id == deviation.kpi_config_id,
-                )
+        for deviation in deviations:
+            kpi_config = self.db.query(KpiConfig).filter(
+                KpiConfig.id == deviation.kpi_config_id,
+            ).first()
+            if not kpi_config:
+                continue
 
                 alert = self._create_alert(
                         tank_id=tank_id,

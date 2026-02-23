@@ -140,10 +140,10 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                             "tank_code": tank_code_str,
                             "branch_id": tank.branch_id,
                         })
-                        # Send last 5 seeded/historical KPI readings so client can show them immediately
-                        history = quality_service.get_tank_kpi_redis_history(tank.tank_id, limit=5)
+                        # Send last 5 KPI readings from database (readings table); Redis is for live updates only
+                        history = quality_service.get_tank_kpi_history(tank.tank_id, limit=5)
                         if not history:
-                            history = quality_service.get_tank_kpi_history(tank.tank_id, limit=5)
+                            history = quality_service.get_tank_kpi_redis_history(tank.tank_id, limit=5)
                         for item in history:
                             payload = {
                                 "type": "tank_kpi",

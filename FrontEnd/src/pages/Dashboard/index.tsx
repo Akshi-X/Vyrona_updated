@@ -145,6 +145,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
+  // Pending approvals (Admin / Pharma_admin only)
+  const [pendingApprovals, setPendingApprovals] = useState<Array<{ user_id: string; first_name: string; last_name: string; email: string; role: string }>>([]);
+  const [loadingPendingApprovals, setLoadingPendingApprovals] = useState(false);
+  const [pendingApprovalsError, setPendingApprovalsError] = useState<string | null>(null);
+
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
     containers: string[];
@@ -660,6 +665,30 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated, userRole]);
 
+  // Fetch pending approvals for Admin / Pharma_admin (show list on dashboard)
+  const canApproveUsers = normalizedRole === 'admin' || normalizedRole === 'pharma_admin';
+  useEffect(() => {
+    if (!isAuthenticated || !canApproveUsers) return;
+    let cancelled = false;
+    const fetchPending = async () => {
+      setLoadingPendingApprovals(true);
+      setPendingApprovalsError(null);
+      try {
+        const res = await userService.getPendingApprovals();
+        if (!cancelled) setPendingApprovals(res?.users ?? []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setPendingApprovals([]);
+          setPendingApprovalsError(e?.message || 'Failed to load pending approvals');
+        }
+      } finally {
+        if (!cancelled) setLoadingPendingApprovals(false);
+      }
+    };
+    fetchPending();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, canApproveUsers]);
+
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
     try {
@@ -897,6 +926,40 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {/* Pending approvals list (Admin / Pharma_admin only) */}
+          {canApproveUsers && (
+            <section className="w-full">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
+                <h2 className="font-semibold text-black text-base mb-3">Pending approvals</h2>
+                {loadingPendingApprovals ? (
+                  <p className="text-gray-500 text-sm">Loading...</p>
+                ) : pendingApprovalsError ? (
+                  <p className="text-red-600 text-sm">{pendingApprovalsError}</p>
+                ) : pendingApprovals.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No pending approvals.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {pendingApprovals.map((u) => (
+                      <li key={u.user_id} className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
+                        <span className="text-gray-800 text-sm">
+                          {u.first_name} {u.last_name}
+                          {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/approval?registration_id=${encodeURIComponent(u.user_id)}`)}
+                          className="text-[#6b1176] font-medium text-sm hover:underline whitespace-nowrap"
+                        >
+                          Review
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
+
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>

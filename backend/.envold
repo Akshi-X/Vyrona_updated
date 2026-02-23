@@ -1,0 +1,56 @@
+# Copy this file to .env and set the values (e.g. cp .env.example .env)
+# Database Credentials
+DB_USER=neondb_owner
+DB_PASSWORD=npg_PQoimYK17Wuk
+DB_HOST=ep-raspy-wind-a1azlcrx-pooler.ap-southeast-1.aws.neon.tech
+DB_PORT=5432
+DB_NAME=mygrape
+
+# JWT Secret Key (min 32 characters)
+SECRET_KEY=your-super-secret-key-min-32-characters-long
+
+# Admin / MyGrape (required for app to start)
+ADMIN_EMAIL=admin@example.com
+ADMIN_DEFAULT_PASSWORD=your-admin-default-password
+MYGRAPE_ADMIN_EMAIL=mygrape-admin@example.com
+MYGRAPE_ADMIN_PASSWORD=your-mygrape-admin-password
+
+# Email/SMTP (optional)
+SENDER_EMAIL=your-email@gmail.com
+SENDER_PASSWORD=your-app-password-here
+
+# Application Environment
+ENVIRONMENT=development
+DEBUG=true
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+RELOAD=true
+
+# URLs (required)
+FRONTEND_URL=http://localhost:5173
+BACKEND_URL=http://localhost:8000
+
+# CORS (required, use * for dev or comma-separated origins)
+ALLOWED_ORIGINS=*
+
+# SMTP Server (optional)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+
+# IoT / Tive API (required for app startup - use placeholder if not using IoT features)
+IOT_CLIENT_ID=dev-placeholder
+IOT_CLIENT_SECRET=dev-placeholder
+IOT_ACCOUNT_ID=dev-placeholder
+
+# Redis (Redis Labs)
+REDIS_HOST=redis-12115.crce276.ap-south-1-3.ec2.cloud.redislabs.com
+REDIS_PORT=12115
+REDIS_USERNAME=default
+REDIS_PASSWORD=kpBlZdKS79tccYdJaBUp2W2nuUKomXgp
+REDIS_SSL=false
+
+EMAIL_SERVICE=sendgrid
+SENDGRID_API_KEY=SSG.GLvCKYDRQxKJdcKyGWk7gw.C4352hZxXRxEwPjnU6HdTtx_oT2q3Lr4_7fE0cE2sd8
+SENDGRID_FROM_EMAIL=sivaaquaris.007@gmail.com

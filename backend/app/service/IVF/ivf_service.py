@@ -196,6 +196,7 @@ class IVFService:
                     branches_dict[branch_id_val]["branch_name"] = branch_name_val or "Unknown"
                 
                 tank_data = {
+                    "tank_id": tank.tank_id,
                     "tank_code": tank.tank_code or "",
                     "updated_at": tank.updated_at or tank.created_at,
                     "status": tank.status

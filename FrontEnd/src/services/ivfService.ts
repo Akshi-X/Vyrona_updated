@@ -91,6 +91,35 @@ export interface TankInTransitCheckResponse {
   message: string;
 }
 
+/** Single KPI config row (Alert Setting list/CRUD). */
+export interface KpiConfigRow {
+  id: number;
+  hospital_id: number;
+  branch_id: number;
+  tank_id: number;
+  kpi_name: string;
+  alert_name: string | null;
+  min: number | null;
+  max: number | null;
+  unit: string | null;
+  alert_type: string | null;
+  status: boolean;
+}
+
+/** Payload for create/update KPI config. */
+export interface KpiConfigPayload {
+  hospital_id: number;
+  branch_id: number;
+  tank_id: number;
+  kpi_name: string;
+  alert_name?: string | null;
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
+  alert_type?: string | null;
+  status?: boolean;
+}
+
 export interface DeviationsGraphDataItem {
   site_id?: number;
   site_name?: string;
@@ -303,6 +332,105 @@ export class IvfService extends BaseApiService {
       `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/history?limit=${limit}`,
       { method: 'GET' }
     );
+  }
+
+  /**
+   * Get tank KPI limits config for visualization (min/max, ln2 l1/l2/critical, units).
+   * Use for reference lines and thresholds; readings come from WebSocket / kpi-history.
+   */
+  async getTankKpiConfig(tankCode: string): Promise<{
+    tank_id: number;
+    tank_code: string;
+    kpi_limits: Record<
+      string,
+      {
+        min?: number;
+        max?: number;
+        unit?: string;
+        l1?: { min?: number; description?: string };
+        l2?: { min?: number; max?: number; alert_type?: string };
+        critical?: { max?: number; alert_type?: string };
+      }
+    >;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-config`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
+   */
+  async getKpiHistory(tankCode: string, limit = 50): Promise<{
+    tank_code: string;
+    tank_id: number;
+    history: Array<{
+      tank_id: number;
+      tank_code: string;
+      timestamp: string;
+      kpis: Array<{ name: string; value: number; unit: string }>;
+    }>;
+    /** KPI tabs derived from DB (unique name + unit in order of first appearance). */
+    kpi_config?: Array<{ name: string; unit: string }>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-history?limit=${limit}`,
+      { method: 'GET' }
+    );
+  }
+
+  /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
+  async getKpiConfigList(tankId: number): Promise<{
+    tank_id: number;
+    tank_code: string;
+    branch_id: number;
+    hospital_id: number | null;
+    config: Array<KpiConfigRow>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
+      { method: 'GET' }
+    );
+  }
+
+  async createKpiConfig(payload: KpiConfigPayload): Promise<KpiConfigRow> {
+    return await this.request('/api/ivf/quality/kpi-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateKpiConfig(configId: number, payload: Partial<KpiConfigPayload>): Promise<KpiConfigRow> {
+    return await this.request(`/api/ivf/quality/kpi-config/${configId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteKpiConfig(configId: number): Promise<{ deleted: boolean; id: number }> {
+    return await this.request(`/api/ivf/quality/kpi-config/${configId}`, { method: 'DELETE' });
+  }
+
+  /** Bulk upsert KPI config to multiple tanks. For each tank, update existing rows (by kpi_name + alert_name) or create. */
+  async bulkUpsertKpiConfig(
+    tankIds: number[],
+    configs: Array<{
+      kpi_name: string;
+      alert_name?: string | null;
+      min?: number | null;
+      max?: number | null;
+      unit?: string | null;
+      alert_type?: string | null;
+    }>
+  ): Promise<{ updated: number; created: number }> {
+    return await this.request('/api/ivf/quality/kpi-config/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tank_ids: tankIds, configs }),
+    });
   }
 
   async checkTankInTransitStatus(
