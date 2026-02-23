@@ -402,6 +402,9 @@ class CriticalAlertService:
                         triggered_by=AlertTriggeredBy.SYSTEM
                     )
                 
+                if kpi_config.alert_type == "critical_alert":
+                    self._send_alert_email(alert)
+                
                 deviation.alert_id = alert.id
 
                 alerts_created.append(alert)
