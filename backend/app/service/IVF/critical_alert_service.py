@@ -27,6 +27,10 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
     HospitalAlertsResponse
 )
+from mgscale_backend.models import (
+            KpiConfig,
+            Readings,
+        )
 from ...service.email_service import send_email
 from ...config.config import settings
 from pathlib import Path
@@ -365,6 +369,45 @@ class CriticalAlertService:
             else:
                 # Re-raise if it's a different integrity error
                 raise
+    
+    def check_and_create_alert_for_kpi_deviations(
+        self,
+        tank_id: Optional[int] = None,
+    )-> list[dict]:
+        """
+        Check the readings table to see if there is any deviation and create alert not create.
+        """
+
+        deviations = self.db.query(Readings).filter(
+            Readings.tank_id == tank_id,
+            Readings.deviation == True,
+            Readings.alert_id.isnull()
+        )
+
+        alerts_created = []
+
+        if deviations:
+            for deviation in deviations:
+                kpi_config = self.db.query(KpiConfig).filter(
+                    KpiConfig.id == deviation.kpi_config_id,
+                )
+
+                alert = self._create_alert(
+                        tank_id=tank_id,
+                        alert_type=AlertType.DEVIATION_ALERT,
+                        source=AlertSource.KPI,
+                        severity=AlertSeverity.LOW if kpi_config.alert_type == "soft_alert" else AlertSeverity.HIGH,
+                        message=f'{kpi_config.alert_name} is deviated at {deviation.value}.',
+                        occurred_at=deviation.timestamp,
+                        triggered_by=AlertTriggeredBy.SYSTEM
+                    )
+                
+                deviation.alert_id = alert.id
+
+                alerts_created.append(alert)
+        self.db.commit()
+
+        return alerts_created
     
     def check_and_create_alerts(
         self,

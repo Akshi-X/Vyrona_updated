@@ -56,6 +56,7 @@ class Readings(Base):
     )
 
     # Alert state
+    alert_id = Column(Integer, index=True, nullable=True, comment="Alert object created for the deviation")
     deviation_alert_sent = Column(
         Boolean,
         nullable=False,
