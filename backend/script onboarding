@@ -1,0 +1,123 @@
+Highlighted domain need to be changed when the time of onboarding (hospital insert)
+INSERT INTO public. Hospitals (hospital_id, hospital_name, hospital_type, hospital_head_email, created_at, updated_at, created_by, updated_by) VALUES(1, 'myGrape Test', 'IVF', '@mygrape.org', '2026-02-13 13:38:08.359', '2026-02-13 13:38:08.359', 'system', 'system');
+Hospital branch insert script
+INSERT INTO public.hospital_branches (branch_id, hospital_id, branch_name, district_name, state_name, country_name, area, pincode, latitude, longitude, created_at, updated_at, created_by, updated_by) VALUES(1, 2, 'Tambaram', 'Chennai', 'Tamil Nadu', 'India', 'myGrape Fertility Hospitals, 12, Grand Southern Trunk Rd, West Tambaram, Irumbuliyur', '600045', 12.9193105, 80.1088591, '2026-02-06 20:36:52.961', '2026-02-09 13:56:05.780', NULL, NULL);
+Admin onboarding insert script 
+INSERT INTO public. Users (
+    user_id,
+     first_name,
+    last_name,
+    email,
+    password_hash,
+    "role",
+    pharma_id,
+    branch_id,
+    department,
+    hospital_id,
+    status,
+    approved_status,
+    approved_by,
+    approved_on,
+    is_locked,
+    lock_expiry,
+    login_attempts,
+    last_password_changed,
+    last_password_reset_request,
+    password_reset_count,
+    session_timeout,
+    last_login,
+    created_by,
+    updated_by,
+    created_at,
+    updated_at
+) VALUES (
+    'USR-8EB47A',  -- Generated user_id (USR-XXXXXX format)
+    'Sooriya',  -- first_name
+    'S',  -- last_name
+    'sooriya@mygrape.org',  -- email should match the domain @mygrape.com
+    '$2b$12$QAmhwVVCe74pohvorHQO8uPBNNEYS5epOfhhiwIizCk7VbQ3To6Xa',  -- password_hash for '1q2w3e4r5t'
+    'Manager',  -- role (must match enum value)
+    NULL,  -- pharma_id (NULL for hospital users)
+    20,  -- branch_id 
+    'IVF',  -- department
+    2, -- hospital_id
+    -- (SELECT hospital_id FROM public.hospitals WHERE hospital_name = 'myGrape Test' LIMIT 1),  -- hospital_id (fetched dynamically)
+    true,  -- status (active)
+    'approved',  -- approved_status (must match enum value: 'pending', 'approved', 'rejected')
+    NULL,  -- approved_by (can be set to a user_id if needed)
+    NULL,  -- approved_on (can be set to current timestamp if needed)
+    false,  -- is_locked
+    NULL,  -- lock_expiry
+    0,  -- login_attempts
+    CURRENT_TIMESTAMP,  -- last_password_changed
+    NULL,  -- last_password_reset_request
+    0,  -- password_reset_count
+    120,  -- session_timeout (ADMIN_SESSION_TIMEOUT_MINUTES = 120 minutes)
+    NULL,  -- last_login
+    'system',  -- created_by
+    'system',  -- updated_by
+    CURRENT_TIMESTAMP,  -- created_at
+    CURRENT_TIMESTAMP  -- updated_at
+);
+ 
+4. update the address details after ARC data fetch
+ 
+WITH branch_updates (
+    branch_name,
+    district_name,
+    state_name,
+    country_name,
+    area,
+    pincode,
+    latitude,
+    longitude
+) AS (
+    VALUES
+        ('Coimbatore', 'Coimbatore', 'Tamil Nadu', 'India', 'Avinashi Rd, Lakshmi Mills Junction', '641037', 11.0127502, 76.9858686),
+        ('Egmore', 'Chennai', 'Tamil Nadu', 'India', '19, CASA Major Rd, Sulaiman Zackria Avenue, Egmore', '600008', 13.069505, 80.255197),
+        ('Ambattur', 'Chennai', 'Tamil Nadu', 'India', 'D-22, Madras Thiruvallur High Rd, Old Ambattur', '600053', 13.1019063, 80.1604882),
+        ('Perambur', 'Chennai', 'Tamil Nadu', 'India', '22/2, ESI Hospital Road, Junction, near Peravallur, Perambur', '600011', 13.1160255, 80.2327931),
+        ('Tirunelveli', 'Tirunelveli', 'Tamil Nadu', 'India', 'S Bypass Rd, Melapalayam', '627005', 8.730702, 77.7184835),
+        ('Madurai', 'Madurai', 'Tamil Nadu', 'India', 'Sivagangai Main Rd, Managiri', '625020', 9.9265025, 78.1446682),
+        ('Ariyur', 'Ariyur', 'Puducherry', 'India', 'Villupuram Main Rd, Ariyur', '605102', 11.9620821, 79.6968841),
+        ('Vellore', 'Vellore', 'Tamil Nadu', 'India', '102/283, New Bridge Rd, Thottapalayam', '632004', 12.9335125, 79.1387705),
+        ('Salem', 'Salem', 'Tamil Nadu', 'India', 'Global Medical Center, Jagir Ammapalayam', '636302', 11.6869755, 78.1187089),
+        ('Trichy', 'Tiruchirappalli', 'Tamil Nadu', 'India', 'EVR Rd, Thillai Nagar', '620017', 10.8120816, 78.6791803),
+        ('Kumbakonam', 'Kumbakonam', 'Tamil Nadu', 'India', 'John Selvaraj Nagar Rd', '612001', 11.0625164, 79.4023132),
+        ('Kolkata', 'Kolkata', 'West Bengal', 'India', 'Eastern Metropolitan Bypass, Kasba', '700039', 22.5186046, 88.3993699),
+        ('Hyderabad', 'Hyderabad', 'Telangana', 'India', 'Old Mumbai Hwy, Gachibowli', '500032', 17.4394351, 78.3620235),
+        ('Nellore', 'Nellore', 'Andhra Pradesh', 'India', 'Grand Trunk Road, Dargamitta', '524003', 14.433914, 79.968437),
+        ('Tambaram', 'Chennai', 'Tamil Nadu', 'India', 'ARC Fertility Hospitals, 13, Grand Southern Trunk Rd, West Tambaram, Irumbuliyur', '600045', 12.9193105, 80.1088591),
+        ('Bangalore', 'Bangalore', 'Karnataka', 'India', '80 Feet Rd, Koramangala', '560034', 12.9898385, 77.6087951),
+        ('Kochin', 'Kochi', 'Kerala', 'India', 'KNS Towers, Mamangalam, Palarivattom', '682025', 10.0112263, 76.3027264),
+        ('Perungudi', 'Chennai', 'Tamil Nadu', 'India', '114, Corporation Rd, Seevaram, Perungudi', '600096', 13.0034, 80.2588)
+),
+target_hospital AS (
+    SELECT hospital_id
+    FROM hospitals
+    WHERE hospital_name = 'ARC Fertility Hospitals'
+    LIMIT 1
+)
+UPDATE hospital_branches hb
+SET
+    district_name = bu.district_name,
+    state_name    = bu.state_name,
+    country_name  = bu.country_name,
+    area          = bu.area,
+    pincode       = bu.pincode,
+    latitude      = bu.latitude,
+    longitude     = bu.longitude,
+    updated_at    = NOW()
+FROM branch_updates bu, target_hospital th
+WHERE hb.hospital_id = th.hospital_id
+  AND hb.branch_name ILIKE bu.branch_name;
+ 
+ 
+5 . Updating the tank table device details (for tank monitoring)
+ 
+UPDATE tanks t
+SET tive_device_id = 'J712149'
+FROM hospital_branches hb
+WHERE t.branch_id = hb.branch_id
+  AND LOWER(TRIM(hb.branch_name)) = LOWER(TRIM('Egmore'))
+  AND t.tank_code = 'T14';
