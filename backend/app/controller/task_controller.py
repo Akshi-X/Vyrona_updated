@@ -183,7 +183,7 @@ def get_canister_tasks(
 
 
 # ---------------------------
-# 4. Update Task (Full Update - Manager/Pharma Admin)
+# 4. Update Task (Full Update - Creator or Assignee)
 # ---------------------------
 @router.put("/tasks/{task_id}", response_model=UpdateTaskResponse)
 def update_task(
@@ -193,21 +193,21 @@ def update_task(
     db: Session = Depends(database.get_db)
 ):
     """
-    Update a task (full update). Only the manager or pharma_admin who created the task can do this.
+    Update a task. Creator can update all fields, assignee can only update status.
     
-    Protected endpoint. Only creator can edit.
+    Protected endpoint. Creator or assignee can edit.
     
     Path Parameters:
     - task_id: ID of the task to update
     
     Request Body (all fields optional):
-    - task_name: Updated task name
-    - description: Updated description
-    - assignee_id: New assignee user ID
-    - patient_id: New patient ID
-    - due_date: Updated due date
-    - priority: Updated priority
-    - status: Updated status
+    - task_name: Updated task name (creator only)
+    - description: Updated description (creator only)
+    - assignee_id: New assignee user ID (creator only)
+    - patient_id: New patient ID (creator only)
+    - due_date: Updated due date (creator only)
+    - priority: Updated priority (creator only)
+    - status: Updated status (creator or assignee)
     """
     # Call service (business logic in service layer)
     result = task_service.update_task(

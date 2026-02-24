@@ -34,6 +34,8 @@ from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
+from ...models.readings_model import Readings
+from ...models.kpi_config_model import KpiConfig
 from ...utils.ivf_helpers import (
     decrypt_sensitive_ivf_value,
     encrypt_sensitive_ivf_value,
@@ -1885,4 +1887,271 @@ class QualityTrackingService:
             branch_id=branch_id,
             tank_code=tank_code  # Pass tank_code for metadata display
             )
+
+    def export_readings_deviations_excel(
+        self,
+        tank_id: int,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch_id: Optional[int] = None,
+        tank_code: Optional[str] = None
+    ) -> Response:
+        """
+        Export deviations from the readings table combined with KPI config to Excel format.
+        
+        Args:
+            tank_id: Tank ID to export deviations for
+            year: Year for the report (e.g., 2024). If not provided, uses current year.
+            month: Month for the report (1-12). If not provided, exports entire year.
+            branch_id: Optional branch ID for filtering
+            tank_code: Optional tank code for display
+            
+        Returns:
+            FastAPI Response with Excel file containing readings deviations
+            
+        Raises:
+            AppException: If export fails or tank not found
+        """
+        try:
+            # Use current year if year not provided
+            current_date = datetime.now()
+            if year is None:
+                year = current_date.year
+            
+            # Validate year
+            if not (2000 <= year <= 2100):
+                raise AppException(
+                    message="Year must be between 2000 and 2100",
+                    error_code=ErrorMessages.INVALID_INPUT,
+                    status_code=HTTPStatus.BAD_REQUEST
+                )
+            
+            # Validate month if provided
+            if month is not None:
+                if not (1 <= month <= 12):
+                    raise AppException(
+                        message="Month must be between 1 and 12",
+                        error_code=ErrorMessages.INVALID_INPUT,
+                        status_code=HTTPStatus.BAD_REQUEST
+                    )
+            
+            # Get tank information
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
+                raise AppException(
+                    message=f"Tank with ID {tank_id} not found",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+            
+            display_tank_code = tank_code or tank.tank_code or f"Tank-{tank_id}"
+            
+            # Calculate date range based on whether month is provided
+            if month is not None:
+                # Export specific month
+                start_datetime = datetime(year, month, 1, 0, 0, 0)
+                if month == 12:
+                    end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                else:
+                    end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+                date_range_str = f"{year}-{month:02d}"
+                # Format month-year for metadata
+                month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                date_range_display = f"{month_names[month]}-{year}"
+            else:
+                # Export entire year
+                start_datetime = datetime(year, 1, 1, 0, 0, 0)
+                end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                date_range_str = str(year)
+                date_range_display = str(year)
+            
+            # Query readings with deviations joined with KPI config
+            deviations_query = (
+                self.db.query(
+                    Readings,
+                    KpiConfig,
+                    Tank.tank_code,
+                    HospitalBranch.branch_name
+                )
+                .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+                .join(Tank, Readings.tank_id == Tank.tank_id)
+                .join(HospitalBranch, Readings.branch_id == HospitalBranch.branch_id)
+                .filter(
+                    Readings.tank_id == tank_id,
+                    Readings.deviation == True,
+                    Readings.timestamp >= start_datetime,
+                    Readings.timestamp < end_datetime,
+                    KpiConfig.status == True
+                )
+            )
+            
+            if branch_id is not None:
+                deviations_query = deviations_query.filter(Readings.branch_id == branch_id)
+            
+            deviations_query = deviations_query.order_by(Readings.timestamp)
+            
+            deviations_results = deviations_query.all()
+            
+            # Prepare deviations data
+            deviations_data = []
+            for reading, kpi_config, tank_code_val, branch_name in deviations_results:
+                # Check if value is outside min/max range
+                kpi_value = float(reading.kpi_value) if reading.kpi_value is not None else None
+                kpi_min = float(kpi_config.min) if kpi_config.min is not None else None
+                kpi_max = float(kpi_config.max) if kpi_config.max is not None else None
+                
+                # Determine violation type
+                violation_type = ""
+                if kpi_value is not None:
+                    if kpi_min is not None and kpi_value < kpi_min:
+                        violation_type = "Below Min"
+                    elif kpi_max is not None and kpi_value > kpi_max:
+                        violation_type = "Above Max"
+                    else:
+                        violation_type = "Threshold Breach"
+                
+                deviations_data.append({
+                    "Date": reading.timestamp.strftime("%Y-%m-%d") if reading.timestamp else "",
+                    "Time": reading.timestamp.strftime("%H:%M:%S") if reading.timestamp else "",
+                    "Tank Code": tank_code_val or "",
+                    "Branch Name": branch_name or "",
+                    "Device ID": str(reading.device_id) if reading.device_id else "",
+                    "KPI Name": kpi_config.kpi_name or "",
+                    "Alert Name": kpi_config.alert_name or "Value",
+                    "KPI Value": f"{kpi_value:.4f}" if kpi_value is not None else "",
+                    "Unit": kpi_config.unit or "",
+                    "Min Threshold": f"{kpi_min:.4f}" if kpi_min is not None else "",
+                    "Max Threshold": f"{kpi_max:.4f}" if kpi_max is not None else "",
+                    "Violation Type": violation_type,
+                    "Alert Type": kpi_config.alert_type or "",
+                    "Alert Sent": "Yes" if reading.deviation_alert_sent else "No"
+                })
+            
+            # Create DataFrame
+            deviations_df = pd.DataFrame(deviations_data)
+            
+            # Ensure sheet is created even if empty
+            if deviations_df.empty:
+                deviations_df = pd.DataFrame(columns=[
+                    "Date", "Time", "Tank Code", "Branch Name", "Device ID",
+                    "KPI Name", "Alert Name", "KPI Value", "Unit",
+                    "Min Threshold", "Max Threshold", "Violation Type",
+                    "Alert Type", "Alert Sent"
+                ])
+            
+            # Create Excel file in memory
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # Write metadata
+                metadata_data = [
+                    ["Tank Code", display_tank_code],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Total Deviations", str(len(deviations_data))]
+                ]
+                metadata_df = pd.DataFrame(metadata_data)
+                metadata_df.to_excel(writer, sheet_name='Readings Deviations', index=False, header=False, startrow=0)
+                
+                # Write deviations data starting from row 5
+                deviations_df.to_excel(writer, sheet_name='Readings Deviations', index=False, startrow=4)
+                
+                # Format sheet
+                worksheet = writer.sheets['Readings Deviations']
+                if Font and PatternFill and Alignment:
+                    brand_purple = "6B1176"
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                    
+                    for row_idx in range(1, 4):
+                        for col_idx, cell in enumerate(worksheet[row_idx]):
+                            if col_idx == 0:
+                                cell.font = metadata_label_font
+                            else:
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    # Only format header row if there are columns
+                    if len(deviations_df.columns) > 0:
+                        for cell in worksheet[5]:
+                            cell.fill = data_header_fill
+                            cell.font = data_header_font
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+                # Auto-adjust column widths
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            output.seek(0)
+            excel_content = output.read()
+            output.close()
+            
+            # Generate filename
+            if month is not None:
+                filename = f"readings_deviations_{display_tank_code}_{year}_{month:02d}.xlsx"
+            else:
+                filename = f"readings_deviations_{display_tank_code}_{year}.xlsx"
+            
+            # Create response
+            response = Response(
+                content=excel_content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
+            
+            logger.info(
+                f"Exported readings deviations for tank {display_tank_code} ({date_range_str}): "
+                f"{len(deviations_data)} deviations"
+            )
+            
+            return response
+            
+        except AppException:
+            raise
+        except Exception as e:
+            logger.error(f"Error exporting readings deviations: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to export readings deviations: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+
+    def export_readings_deviations_excel_for_tank(
+        self,
+        tank_id: int,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch_id: Optional[int] = None
+    ) -> Response:
+        """Export readings deviations to Excel format for a specific tank."""
+        # Get tank information for metadata
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise AppException(
+                message=f"Tank with ID {tank_id} not found",
+                error_code=ErrorMessages.NOT_FOUND,
+                status_code=HTTPStatus.NOT_FOUND
+            )
+        tank_code = tank.tank_code or f"Tank-{tank_id}"
+        
+        return self.export_readings_deviations_excel(
+            tank_id=tank_id,
+            year=year,
+            month=month,
+            branch_id=branch_id,
+            tank_code=tank_code
+        )
     

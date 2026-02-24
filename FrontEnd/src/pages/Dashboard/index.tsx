@@ -1242,8 +1242,8 @@ export default function Dashboard({ }: DashboardProps) {
                   <section>
                     <div className="flex gap-6 mt-11">
                       {/* Container Quality Tracking */}
-                      <div 
-                        className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                          <div 
+                            className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
                         onClick={() => {
                           setShowTrackCanister(true);
                           setCanisterError(undefined);
@@ -1298,13 +1298,13 @@ export default function Dashboard({ }: DashboardProps) {
 
                       {/* Outbound Quality Tracking */}
                       <div 
-                        className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        className="flex-1 bg-[#6B1176] rounded-lg  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
                           setShowOutboundQualityTracking(true);
                         }}
                       >
                         {/* Background Graphic - Subtle Icon */}
-                        <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
+                        <div className="absolute bottom-0  hover:bg-[#7a1a88] right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
                           <img
                             className="w-24 h-24"
                             alt="Outbound Quality Tracking background"
@@ -1348,7 +1348,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Incubator Quality Tracking */}
-                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden">
+                      <div className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5">
                         {/* Background Graphic - Subtle Icon */}
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
                           <img

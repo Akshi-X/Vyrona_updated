@@ -793,7 +793,7 @@ export class IvfService extends BaseApiService {
     year?: number,
     month?: number
   ): Promise<void> {
-    const url = `${this.getBaseUrl()}/api/quality-tracking/tanks/${tank_code}/combined-report/export-excel`;
+    const url = `${this.getBaseUrl()}/api/quality-tracking/tanks/${tank_code}/readings-deviations/export-excel`;
     const params = new URLSearchParams();
     const branchId = this.getEffectiveBranchId();
     if (branchId) {
