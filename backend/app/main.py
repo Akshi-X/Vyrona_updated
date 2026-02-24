@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller, iot_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller, iot_controller, kpi_controller
 from app.controller.IVF import ivf_controller, ivf_dashboard_controller, quality_tracking_controller, ivf_quality_controller, critical_alert_controller, internal_alert_controller
 
 from app.config.database import init_db as create_tables
@@ -191,6 +191,7 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
+app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
