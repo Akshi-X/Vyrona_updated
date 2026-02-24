@@ -1073,4 +1073,3 @@ class IVFService:
                 "total": 0,
                 "site_name_counts": {}, "status_counts": {}, "goblet_color_counts": {}, "crylock_color_counts": {},
             }
-

@@ -32,7 +32,7 @@ from app.service.quality_service import push_ivf_quality_to_redis
 from app.service.redis_service import get_redis
 from app.controller.IVF.ivf_quality_controller import push_ln2_reading_to_redis
 from sqlalchemy import text
-from app.constants.enums import PatientStage as PatientStageEnum, RouteStatus
+from app.constants.enums import CanisterStatus, PatientStage as PatientStageEnum, RouteStatus
 from app.utils.patient_utils import generate_patient_id
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -212,20 +212,35 @@ def seed_ivf_data(db):
 
     logger.info(f"Seeding IVF data for {hospital.hospital_name} - {branch.branch_name}")
 
-    # Tanks
+    # Tanks – seed with full details (tank_code, capacity, status, tank_id_arc, tive_device_id)
     tanks = db.query(Tank).filter(Tank.branch_id == branch.branch_id).all()
-    if len(tanks) < 3:
-        for i in range(1, 4):
-            tank = Tank(
-                branch_id=branch.branch_id,
-                tank_code=f"T{i}0",
-                capacity_liters=100.0,
-                is_active=True,
-            )
-            db.add(tank)
+    tank_details = [
+        {"tank_code": "T10", "capacity_liters": 100.0, "status": CanisterStatus.SAFE, "tank_id_arc": "5471", "tive_device_id": "J712149"},
+        {"tank_code": "T20", "capacity_liters": 180.0, "status": CanisterStatus.SAFE, "tank_id_arc": "5472", "tive_device_id": "J712150"},
+        {"tank_code": "T30", "capacity_liters": 100.0, "status": CanisterStatus.SAFE, "tank_id_arc": "5473", "tive_device_id": "J712151"},
+        {"tank_code": "T40", "capacity_liters": 250.0, "status": CanisterStatus.RISK, "tank_id_arc": "5474", "tive_device_id": "J712152"},
+        {"tank_code": "T50", "capacity_liters": 180.0, "status": CanisterStatus.SAFE, "tank_id_arc": "5475", "tive_device_id": None},
+    ]
+    existing_codes = {t.tank_code for t in tanks}
+    added = 0
+    for d in tank_details:
+        if d["tank_code"] in existing_codes:
+            continue
+        tank = Tank(
+            branch_id=branch.branch_id,
+            tank_code=d["tank_code"],
+            tank_id_arc=d["tank_id_arc"],
+            capacity_liters=d["capacity_liters"],
+            is_active=True,
+            status=d["status"],
+            tive_device_id=d.get("tive_device_id"),
+        )
+        db.add(tank)
+        added += 1
+    if added:
         db.commit()
         tanks = db.query(Tank).filter(Tank.branch_id == branch.branch_id).all()
-        logger.info(f"  Created {len(tanks)} tanks")
+        logger.info(f"  Created {added} tanks (total {len(tanks)} tanks)")
 
     # PatientCrylockInfo (cryolocks / embryos) – initial 8 + bulk for Site Level Information testing
     existing_crylocks = (
