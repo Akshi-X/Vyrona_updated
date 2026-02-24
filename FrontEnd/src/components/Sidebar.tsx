@@ -73,13 +73,13 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     }
   }, [isAuthenticated]);
 
-  // Base navigation items (Dashboard, Database, Control Tower, Pending approvals, Alert Setting)
+  // Base navigation items (Dashboard, Database, Control Tower, Pending approvals, Alert Configuration)
   const allNavigationItems = [
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
     { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
     { icon: DatabaseIconWhite, label: "Pending approvals", path: "/approval" },
-    { icon: DatabaseIconWhite, label: "Alert Setting", path: "/alert-setting" }
+    { icon: DatabaseIconWhite, label: "Alert Configuration", path: "/alert-setting" }
   ];
 
   // Filter nav by role/department: Database hidden for IVF; Control Tower hidden for IVF User; Pending approvals only for Admin/Pharma_admin; Alert Setting only for IVF Manager/Admin
@@ -89,7 +89,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
       const isApprover = userRole === "Admin" || userRole === "Pharma_admin";
       return isApprover;
     }
-    if (item.label === "Alert Setting") {
+    if (item.label === "Alert Configuration") {
       return isIVF && (userRole === "Manager" || userRole === "Admin");
     }
     if (isIVF && item.label === "Database") {
@@ -150,7 +150,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             if (item.label === "Control Tower") {
               return isActive ? ControlTowerIconDark : ControlTowerIconWhite;
             }
-            if (item.label === "Pending approvals" || item.label === "Alert Setting") {
+            if (item.label === "Pending approvals" || item.label === "Alert Configuration") {
               return isActive ? DatabaseIconDark : DatabaseIconWhite;
             }
             return item.icon;
