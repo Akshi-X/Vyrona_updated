@@ -192,11 +192,15 @@ def get_canister_tracking_details(
     Returns tracking details for all canisters within the specified tank.
     """
     try:
-        branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
+        branch_id, role = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
+        user_role = current_user.role.value if current_user.role else None
+        # Manager/Admin: no branch restriction — pass branch_id=None so they can view any tank
+        effective_branch_id = None if (role in ("Manager", "Admin")) else branch_id
         quality_tracking_service = QualityTrackingService(db)
         return quality_tracking_service.get_tank_tracking_details(
             tank_code=tank_code,
-            branch_id=branch_id
+            branch_id=effective_branch_id,
+            user_role=user_role
         )
     except HTTPException:
         raise
