@@ -170,6 +170,15 @@ All REST APIs are under **`/api`** (`API_PREFIX` in `app_constants.py`). Routers
 - **Env**: Tests can override config (e.g. `DB_NAME=pytest`) via `tests/__init__.py` or env.  
 - Run: `poetry run pytest` from `backend/`.
 
+### 3.6 Quality Tracking – Tank KPI live graph (Redis)
+
+- **Channel**: `tank_kpi_readings_channel`. The IVF quality WebSocket subscribes and broadcasts to clients; the frontend Quality Tracking card shows live data when it receives `type === "tank_kpi"`.
+- **Payload** (JSON): `type`, `tank_id`, `tank_code`, `timestamp` (ISO), `kpis` (array of `{ name, value, unit }`). KPIs: `temp_external`, `temp_internal`, `ln2_level`, `evaporation_rate`, `battery_level`.
+- **Publish sample** (from `backend/` with `REDIS_URL` in env):  
+  `python scripts/publish_tank_kpi_sample.py [tank_id] [tank_code]`  
+  Or via redis-cli:  
+  `redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","timestamp":"2026-02-22T13:00:00Z","kpis":[{"name":"temp_external","value":26.5,"unit":"°C"},{"name":"temp_internal","value":-199.2,"unit":"°C"},{"name":"ln2_level","value":62,"unit":"%"},{"name":"evaporation_rate","value":0.31,"unit":"kg/day"},{"name":"battery_level","value":85,"unit":"%"}]}'`
+
 ---
 
 ## 4. Frontend
@@ -335,7 +344,7 @@ Required and optional variables (see `backend/.env.example` and `backend/app/con
 | ALLOWED_ORIGINS | Yes | CORS origins (comma or *). |
 | IOT_CLIENT_ID, IOT_CLIENT_SECRET, IOT_ACCOUNT_ID | Yes | IoT provider (e.g. Tive). |
 | REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD | No | Defaults: localhost, 6379, 0, None. |
-| SENDGRID_API_KEY, SENDGRID_FROM_EMAIL | No | SendGrid. |
+| SENDGRID_API_KEY, SENDER_EMAIL | No | SendGrid. |
 | WEATHER_API_KEY, GOOGLE_MAPS_API_KEY, FLIGHTRADAR24_API_KEY | No | External APIs. |
 | ENVIRONMENT, DEBUG, HOST, PORT, RELOAD | No | App and server settings. |
 
@@ -377,7 +386,7 @@ Database URL is built from DB_* and SSL is enforced in code; for Neon use the co
 |-------------|--------|----------------|
 | **PostgreSQL** | Primary DB | DB_* in .env; Neon/Azure supported with SSL. |
 | **Redis** | Cache, session, pub/sub (quality) | REDIS_* in .env. |
-| **SendGrid** | Transactional email | SENDGRID_API_KEY, SENDGRID_FROM_EMAIL. |
+| **SendGrid** | Transactional email | SENDGRID_API_KEY, SENDER_EMAIL. |
 | **World Bank LPI** | Lane risk (timeliness, overall) | LPI_* URLs in config; optional. |
 | **WeatherAPI.com** | Weather for lane risk | WEATHER_API_KEY. |
 | **Google Maps** | Geocoding / maps | GOOGLE_MAPS_API_KEY (backend/frontend). |

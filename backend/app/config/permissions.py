@@ -49,6 +49,9 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/quality/test"),  # Test endpoint for debugging
     # Quality loss email decision endpoint (email buttons)
     ("PUT", "/api/quality/loss/decision"),
+    # Internal service-to-service alert endpoints (authenticated via X-Internal-Api-Key)
+    ("POST", "/api/internal/alerts/send-immediate"),
+    ("POST", "/api/internal/alerts/check-and-create"),
 }
 
 
@@ -67,6 +70,7 @@ ADMIN_ONLY_ENDPOINTS: Set[EndpointPermission] = {
 # ============================================
 PHARMA_ADMIN_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/user/{user_id}"),     # View user details
+    ("GET", "/api/users/pending-approvals"),  # List pending approvals (dashboard / approval screen)
     ("POST", "/api/user/approve"),      # Approve user
     ("POST", "/api/user/reject"),       # Reject user
     # Allow pharma admins to fully manage tasks

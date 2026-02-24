@@ -27,7 +27,9 @@ from app.models.IVF.device_model import Device
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
+from app.models import KpiConfig, Readings
 from app.service.quality_service import push_ivf_quality_to_redis
+from app.service.redis_service import get_redis
 from app.controller.IVF.ivf_quality_controller import push_ln2_reading_to_redis
 from sqlalchemy import text
 from app.constants.enums import PatientStage as PatientStageEnum, RouteStatus
@@ -225,14 +227,14 @@ def seed_ivf_data(db):
         tanks = db.query(Tank).filter(Tank.branch_id == branch.branch_id).all()
         logger.info(f"  Created {len(tanks)} tanks")
 
-    # PatientCrylockInfo (cryolocks / embryos)
+    # PatientCrylockInfo (cryolocks / embryos) – initial 8 + bulk for Site Level Information testing
     existing_crylocks = (
         db.query(PatientCrylockInfo)
         .filter(PatientCrylockInfo.branch_id == branch.branch_id)
         .count()
     )
     if existing_crylocks >= 8:
-        logger.info(f"  Skipping cryolocks (already {existing_crylocks} exist)")
+        logger.info(f"  Skipping initial cryolocks (already {existing_crylocks} exist)")
     else:
         tank_list = tanks[:2]
         tank_ids = [t.tank_id for t in tank_list]
@@ -338,6 +340,8 @@ def seed_ivf_data(db):
 
     # LN2 tables + Quality Tracking seed for T30
     seed_ln2_and_quality_data(db, branch, tanks)
+    # KPI config (limits) + readings for Quality Tracking; config for visualization, readings from DB/socket
+    seed_kpi_config_and_readings(db, tanks)
     # TIVE-TEST-001 test device, tank, ln2_iot_device
     seed_tive_test_data(db, branch)
 
@@ -438,6 +442,209 @@ def seed_ln2_and_quality_data(db, branch, tanks):
         logger.info(f"  Skipped LN2 seed: {e}")
 
 
+def clear_all_kpi_config(db):
+    """Delete all rows from kpi_config. Use before re-seeding to avoid duplicates."""
+    try:
+        deleted = db.query(KpiConfig).delete(synchronize_session=False)
+        db.commit()
+        logger.info(f"  Cleared all KPI config ({deleted} row(s))")
+        return deleted
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"  Clear all KPI config failed: {e}")
+        raise
+
+
+def seed_kpi_config(db, tanks):
+    """Seed preset KPI config (8 rows per tank) for any tank that has no config yet."""
+    if not tanks:
+        tanks = db.query(Tank).all()
+    if not tanks:
+        logger.warning("  No tanks found; skipping KPI config seed")
+        return
+    created = 0
+    for tank in tanks:
+        tank_id = tank.tank_id
+        tank_code = tank.tank_code or f"T{tank_id}"
+        branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+        if not branch:
+            logger.warning(f"  KPI config seed: no branch for tank {tank_code}; skipping")
+            continue
+        hospital_id = branch.hospital_id
+        branch_id = tank.branch_id
+        try:
+            existing = db.query(KpiConfig).filter(KpiConfig.tank_id == tank_id).count()
+            if existing > 0:
+                logger.info(f"  KPI config for {tank_code} already exists; skipping")
+                continue
+            def _kpi_config_kwargs(alert_name=None, min_v=None, max_v=None, unit=None, alert_type=None):
+                """Build KpiConfig kwargs with only non-null values."""
+                kwargs = {
+                    "hospital_id": hospital_id,
+                    "branch_id": branch_id,
+                    "tank_id": tank_id,
+                    "status": True,
+                }
+                if alert_name is not None:
+                    kwargs["alert_name"] = alert_name
+                if min_v is not None:
+                    kwargs["min"] = min_v
+                if max_v is not None:
+                    kwargs["max"] = max_v
+                if unit is not None and str(unit).strip() != "":
+                    kwargs["unit"] = unit
+                if alert_type is not None:
+                    kwargs["alert_type"] = alert_type
+                return kwargs
+
+            logger.info(f"  Seeding KPI config for {tank_code} (tank_id={tank_id})...")
+            # Preset rows matching KPI config UI (kpi_name, alert_name display, min, max, alert_type)
+            # Value configs (for readings)
+            for kpi_name, alert_name, min_v, max_v, unit in [
+                ("temp_external", "External Temperature", 20, 30, "°C"),
+                ("temp_internal", "Internal Temperature", -220, -195, "°C"),
+                ("evaporation_rate", "Evaporation Rate", 0.2, 0.5, "kg/h"),
+            ]:
+                kwargs = _kpi_config_kwargs(alert_name=alert_name, min_v=min_v, max_v=max_v, unit=unit)
+                kwargs["kpi_name"] = kpi_name
+                db.add(KpiConfig(**kwargs))
+            # ln2_level: L1 below 60 = soft, L2 below 30 = critical
+            for alert_name, min_v, max_v, alert_type in [
+                ("LN2 L1", None, 60, "soft"),
+                ("LN2 L2", None, 30, "critical"),
+            ]:
+                kwargs = _kpi_config_kwargs(alert_name=alert_name, max_v=max_v, alert_type=alert_type)
+                kwargs["kpi_name"] = "ln2_level"
+                db.add(KpiConfig(**kwargs))
+            # battery_level: below 20 = soft (unit % on alert row)
+            kwargs = _kpi_config_kwargs(alert_name="Battery Level", max_v=20, alert_type="soft", unit="%")
+            kwargs["kpi_name"] = "battery_level"
+            db.add(KpiConfig(**kwargs))
+            # shock: min 1 = critical
+            kwargs = _kpi_config_kwargs(alert_name="Shock", min_v=1, alert_type="critical")
+            kwargs["kpi_name"] = "shock"
+            db.add(KpiConfig(**kwargs))
+            # lid_status: 1 = soft (open)
+            kwargs = _kpi_config_kwargs(alert_name="Lid Status", min_v=1, max_v=1, alert_type="soft")
+            kwargs["kpi_name"] = "lid_status"
+            db.add(KpiConfig(**kwargs))
+            db.flush()
+            created += 1
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"  KPI config seed failed for {tank_code}: {e}")
+            break
+    try:
+        db.commit()
+        if created:
+            logger.info(f"  KPI config seed: created config for {created} tank(s)")
+        else:
+            logger.info("  KPI config seed: no new rows (tanks may already have config)")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"  KPI config seed commit failed: {e}")
+        raise
+
+
+def seed_kpi_readings(db, tanks=None):
+    """Seed 5 snapshots of readings for T30 only. Uses existing KpiConfig for T30 (does not touch config or other tanks)."""
+    if not tanks:
+        tanks = db.query(Tank).all()
+    t30_list = [t for t in tanks if (t.tank_code or "").strip().upper() == "T30"]
+    if not t30_list:
+        t30_list = db.query(Tank).filter(Tank.tank_code == "T30").all()
+    if not t30_list:
+        logger.warning("  No T30 tank found; skipping KPI readings seed")
+        return
+    value_kpis = [
+        "temp_external", "temp_internal", "ln2_level", "evaporation_rate", "battery_level", "lid_status", "shock",
+    ]
+    base_dt = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+    readings_data = [
+        {"timestamp": base_dt, "kpis": [{"name": "temp_external", "value": 25.2, "unit": "°C"}, {"name": "temp_internal", "value": -201.3, "unit": "°C"}, {"name": "ln2_level", "value": 72, "unit": "%"}, {"name": "evaporation_rate", "value": 0.27, "unit": "kg/h"}, {"name": "battery_level", "value": 92, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=15), "kpis": [{"name": "temp_external", "value": 25.8, "unit": "°C"}, {"name": "temp_internal", "value": -200.6, "unit": "°C"}, {"name": "ln2_level", "value": 70, "unit": "%"}, {"name": "evaporation_rate", "value": 0.28, "unit": "kg/h"}, {"name": "battery_level", "value": 90, "unit": "%"}, {"name": "lid_status", "value": 0, "unit": ""}, {"name": "shock", "value": 1, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=30), "kpis": [{"name": "temp_external", "value": 25.9, "unit": "°C"}, {"name": "temp_internal", "value": -200.2, "unit": "°C"}, {"name": "ln2_level", "value": 68, "unit": "%"}, {"name": "evaporation_rate", "value": 0.29, "unit": "kg/h"}, {"name": "battery_level", "value": 89, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(minutes=45), "kpis": [{"name": "temp_external", "value": 26.1, "unit": "°C"}, {"name": "temp_internal", "value": -199.8, "unit": "°C"}, {"name": "ln2_level", "value": 64, "unit": "%"}, {"name": "evaporation_rate", "value": 0.30, "unit": "kg/h"}, {"name": "battery_level", "value": 87, "unit": "%"}, {"name": "lid_status", "value": 0, "unit": ""}, {"name": "shock", "value": 0, "unit": ""}]},
+        {"timestamp": base_dt + timedelta(hours=1), "kpis": [{"name": "temp_external", "value": 26.3, "unit": "°C"}, {"name": "temp_internal", "value": -199.5, "unit": "°C"}, {"name": "ln2_level", "value": 62, "unit": "%"}, {"name": "evaporation_rate", "value": 0.31, "unit": "kg/h"}, {"name": "battery_level", "value": 85, "unit": "%"}, {"name": "lid_status", "value": 1, "unit": ""}, {"name": "shock", "value": 1, "unit": ""}]},
+    ]
+    tanks_with_readings = 0
+    for tank in t30_list:
+        tank_id = tank.tank_id
+        tank_code = tank.tank_code or f"T{tank_id}"
+        branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+        if not branch:
+            continue
+        hospital_id = branch.hospital_id
+        branch_id = tank.branch_id
+        # One config_id per kpi_name (first by id) so we can attach readings; works with alert_name null or set
+        config_rows = (
+            db.query(KpiConfig)
+            .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
+            .order_by(KpiConfig.kpi_name, KpiConfig.id)
+            .all()
+        )
+        config_by_name = {}
+        for c in config_rows:
+            if c.kpi_name not in config_by_name:
+                config_by_name[c.kpi_name] = c.id
+        if not config_by_name:
+            logger.warning(f"  No KPI config for {tank_code}; run seed_kpi_config first. Skipping readings.")
+            continue
+        try:
+            existing_readings = db.query(Readings).filter(Readings.tank_id == tank_id).count()
+            if existing_readings >= 5 * len(value_kpis):
+                logger.info(f"  Readings for {tank_code} already sufficient; skipping")
+                continue
+            logger.info(f"  Seeding readings for {tank_code} (tank_id={tank_id})...")
+            for r in readings_data:
+                ts = r["timestamp"]
+                for k in r["kpis"]:
+                    name = (k.get("name") or "").strip()
+                    if name not in config_by_name:
+                        continue
+                    try:
+                        val = k.get("value")
+                        if val is None:
+                            continue
+                        if not isinstance(val, (int, float)):
+                            val = float(val)
+                    except (TypeError, ValueError):
+                        continue
+                    row = Readings(
+                        hospital_id=hospital_id,
+                        branch_id=branch_id,
+                        device_id=None,
+                        tank_id=tank_id,
+                        kpi_config_id=config_by_name[name],
+                        kpi_value=val,
+                        timestamp=ts,
+                        deviation=False,
+                        deviation_alert_sent=False,
+                    )
+                    db.add(row)
+            tanks_with_readings += 1
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"  KPI readings seed failed for {tank_code}: {e}")
+            break
+    try:
+        db.commit()
+        if tanks_with_readings:
+            logger.info(f"  KPI readings seed: created readings for {tanks_with_readings} tank(s)")
+        else:
+            logger.info("  KPI readings seed: no new rows")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"  KPI readings seed commit failed: {e}")
+        raise
+
+
+def seed_kpi_config_and_readings(db, tanks):
+    """Seed KPI config then readings for T30 (convenience wrapper)."""
+    seed_kpi_config(db, tanks)
+    seed_kpi_readings(db, tanks)
+
+
 def seed_tive_test_data(db, branch):
     """Seed TIVE-TEST-001: device, tank (TIVE-TEST-999), ln2_iot_device with Tive params."""
     try:
@@ -505,6 +712,13 @@ def main():
     logger.info("=" * 60)
     logger.info("SEEDING DEMO DATA")
     logger.info("=" * 60)
+    # Ensure all tables exist (including kpi_config and readings)
+    try:
+        from app.config.database import init_db as create_tables
+        create_tables()
+        logger.info("  Tables verified/created")
+    except Exception as e:
+        logger.warning(f"  create_tables skipped: {e}")
     # Run schema sync (migrations) so new columns exist before seeding
     try:
         from app.init_db import sync_ivf_schema

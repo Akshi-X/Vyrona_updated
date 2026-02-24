@@ -15,7 +15,7 @@ DATABASE_URL = settings.database_url
 engine = create_engine(
     DATABASE_URL, 
     pool_pre_ping=True, 
-    echo=DB_ECHO,
+    echo=DB_ECHO,   
     pool_size=DB_POOL_SIZE,
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
@@ -88,7 +88,8 @@ def init_db():
         ln2_readings_model,
         ln2_iot_raw_data_model,
     )
-    
+    from ..models import kpi_config_model, readings_model
+
     # Note: IVF schema separation has been removed
     # All tables (including IVF tables) are now in public schema
     # If you need to migrate existing tables from ivf schema to public schema,

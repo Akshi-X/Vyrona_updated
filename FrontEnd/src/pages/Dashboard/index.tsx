@@ -1,6 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
 import { Sidebar } from '../../components/Sidebar';
@@ -112,6 +112,28 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfEmbryoTrackingHasMore, setIvfEmbryoTrackingHasMore] = useState(false);
   const [ivfEmbryoTrackingNextOffset, setIvfEmbryoTrackingNextOffset] = useState<number | null>(null);
   const [loadingIvfEmbryoTrackingMore, setLoadingIvfEmbryoTrackingMore] = useState(false);
+  // Filter options from separate API; filter values applied to table API (backend-level)
+  const [ivfEmbryoTrackingFilterOptions, setIvfEmbryoTrackingFilterOptions] = useState<{
+    site_names: string[];
+    statuses: string[];
+    goblet_colors: string[];
+    crylock_colors: string[];
+    total?: number;
+    site_name_counts?: Record<string, number>;
+    status_counts?: Record<string, number>;
+    goblet_color_counts?: Record<string, number>;
+    crylock_color_counts?: Record<string, number>;
+  }>({ site_names: [], statuses: [], goblet_colors: [], crylock_colors: [] });
+  /** Total matching current filters (from embryo_tracking API) */
+  const [ivfEmbryoTrackingFilteredTotal, setIvfEmbryoTrackingFilteredTotal] = useState<number | null>(null);
+  /** Total with no filters (for "filtered / total" denominator); set when filters are all "all" */
+  const [ivfEmbryoTrackingTotalUnfiltered, setIvfEmbryoTrackingTotalUnfiltered] = useState<number | undefined>(undefined);
+  const [ivfEmbryoTrackingFilterValues, setIvfEmbryoTrackingFilterValues] = useState<{
+    siteName: string;
+    status: string;
+    gobletColor: string;
+    crylockColor: string;
+  }>({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
 
   // IVF total embryos/cryolocks metric (live API data)
   const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
@@ -144,6 +166,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
+
+  // Pending approvals (Admin / Pharma_admin only)
+  const [pendingApprovals, setPendingApprovals] = useState<Array<{ user_id: string; first_name: string; last_name: string; email: string; role: string }>>([]);
+  const [loadingPendingApprovals, setLoadingPendingApprovals] = useState(false);
+  const [pendingApprovalsError, setPendingApprovalsError] = useState<string | null>(null);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -362,7 +389,54 @@ export default function Dashboard({ }: DashboardProps) {
     }
   }, [isAuthenticated]);
 
-  // Fetch IVF embryo tracking (ongoing treatments) from API
+  // Fetch IVF embryo tracking filter options; refetch when filter values change so counts reflect current selection
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+    let cancelled = false;
+    ivfService.getEmbryoTrackingFilters(ivfEmbryoTrackingFilterValues)
+      .then((res) => {
+        if (!cancelled) {
+          setIvfEmbryoTrackingFilterOptions({
+            site_names: res?.site_names ?? [],
+            statuses: res?.statuses ?? [],
+            goblet_colors: res?.goblet_colors ?? [],
+            crylock_colors: res?.crylock_colors ?? [],
+            total: res?.total,
+            site_name_counts: res?.site_name_counts,
+            status_counts: res?.status_counts,
+            goblet_color_counts: res?.goblet_color_counts,
+            crylock_color_counts: res?.crylock_color_counts,
+          });
+          const noFilters =
+            ivfEmbryoTrackingFilterValues.siteName === 'all' &&
+            ivfEmbryoTrackingFilterValues.status === 'all' &&
+            ivfEmbryoTrackingFilterValues.gobletColor === 'all' &&
+            ivfEmbryoTrackingFilterValues.crylockColor === 'all';
+          if (noFilters && res?.total != null) {
+            setIvfEmbryoTrackingTotalUnfiltered(res.total);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIvfEmbryoTrackingFilterOptions({ site_names: [], statuses: [], goblet_colors: [], crylock_colors: [] });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [userDepartment, isAuthenticated, ivfEmbryoTrackingFilterValues.siteName, ivfEmbryoTrackingFilterValues.status, ivfEmbryoTrackingFilterValues.gobletColor, ivfEmbryoTrackingFilterValues.crylockColor]);
+
+  // Build API filter params from current filter values (backend-level)
+  const embryoTrackingApiFilters = useMemo(() => {
+    const f: { branch_name?: string; status?: string; cryolock_color?: string; goblet_color?: string } = {};
+    if (ivfEmbryoTrackingFilterValues.siteName && ivfEmbryoTrackingFilterValues.siteName !== 'all') f.branch_name = ivfEmbryoTrackingFilterValues.siteName;
+    if (ivfEmbryoTrackingFilterValues.status && ivfEmbryoTrackingFilterValues.status !== 'all') f.status = ivfEmbryoTrackingFilterValues.status;
+    if (ivfEmbryoTrackingFilterValues.gobletColor && ivfEmbryoTrackingFilterValues.gobletColor !== 'all') f.goblet_color = ivfEmbryoTrackingFilterValues.gobletColor;
+    if (ivfEmbryoTrackingFilterValues.crylockColor && ivfEmbryoTrackingFilterValues.crylockColor !== 'all') f.cryolock_color = ivfEmbryoTrackingFilterValues.crylockColor;
+    return f;
+  }, [ivfEmbryoTrackingFilterValues]);
+
+  // Fetch IVF embryo tracking table (with backend filters); refetch when filters change
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
     if (!shouldFetch) return;
@@ -372,15 +446,17 @@ export default function Dashboard({ }: DashboardProps) {
       setLoadingIvfEmbryoTracking(true);
       setIvfEmbryoTrackingError(null);
       try {
-        const response = await ivfService.getEmbryoTracking(0, 100);
+        const response = await ivfService.getEmbryoTracking(0, 50, embryoTrackingApiFilters);
         if (!cancelled) {
           setIvfEmbryoTracking(response?.data || []);
+          setIvfEmbryoTrackingFilteredTotal(response?.total ?? null);
           setIvfEmbryoTrackingHasMore(response?.has_more || false);
           setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
         }
       } catch (e: any) {
         if (!cancelled) {
           setIvfEmbryoTracking([]);
+          setIvfEmbryoTrackingFilteredTotal(null);
           setIvfEmbryoTrackingError(e?.message || 'Failed to load embryo tracking data');
           setIvfEmbryoTrackingHasMore(false);
           setIvfEmbryoTrackingNextOffset(null);
@@ -391,30 +467,32 @@ export default function Dashboard({ }: DashboardProps) {
     };
 
     fetchEmbryoTracking();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
+    return () => { cancelled = true; };
+  }, [userDepartment, isAuthenticated, embryoTrackingApiFilters]);
 
-  // Load more IVF embryo tracking data
+  // Load more IVF embryo tracking data (same backend filters)
   const loadMoreIvfEmbryoTracking = async () => {
-    if (loadingIvfEmbryoTrackingMore || !ivfEmbryoTrackingHasMore || ivfEmbryoTrackingNextOffset === null) {
-      return;
-    }
-
+    if (loadingIvfEmbryoTrackingMore || !ivfEmbryoTrackingHasMore || ivfEmbryoTrackingNextOffset === null) return;
     setLoadingIvfEmbryoTrackingMore(true);
     try {
-      const response = await ivfService.getEmbryoTracking(ivfEmbryoTrackingNextOffset, 100);
+      const response = await ivfService.getEmbryoTracking(ivfEmbryoTrackingNextOffset, 50, embryoTrackingApiFilters);
       setIvfEmbryoTracking(prev => [...prev, ...(response?.data || [])]);
       setIvfEmbryoTrackingHasMore(response?.has_more || false);
       setIvfEmbryoTrackingNextOffset(response?.next_offset ?? null);
-    } catch (e: any) {
-      // Don't show error for load more - just stop loading
+    } catch {
       setIvfEmbryoTrackingHasMore(false);
       setIvfEmbryoTrackingNextOffset(null);
     } finally {
       setLoadingIvfEmbryoTrackingMore(false);
     }
+  };
+
+  const handleIvfEmbryoTrackingFilterChange = (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => {
+    setIvfEmbryoTrackingFilterValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleIvfEmbryoTrackingClearFilters = () => {
+    setIvfEmbryoTrackingFilterValues({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
   };
 
   // Fetch IVF totals (Total Embryos/Cryolocks) from API
@@ -660,6 +738,30 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated, userRole]);
 
+  // Fetch pending approvals for Admin / Pharma_admin (show list on dashboard)
+  const canApproveUsers = normalizedRole === 'admin' || normalizedRole === 'pharma_admin';
+  useEffect(() => {
+    if (!isAuthenticated || !canApproveUsers) return;
+    let cancelled = false;
+    const fetchPending = async () => {
+      setLoadingPendingApprovals(true);
+      setPendingApprovalsError(null);
+      try {
+        const res = await userService.getPendingApprovals();
+        if (!cancelled) setPendingApprovals(res?.users ?? []);
+      } catch (e: any) {
+        if (!cancelled) {
+          setPendingApprovals([]);
+          setPendingApprovalsError(e?.message || 'Failed to load pending approvals');
+        }
+      } finally {
+        if (!cancelled) setLoadingPendingApprovals(false);
+      }
+    };
+    fetchPending();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, canApproveUsers]);
+
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
     try {
@@ -897,10 +999,44 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {/* Pending approvals list (Admin / Pharma_admin only) */}
+          {canApproveUsers && (
+            <section className="w-full">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
+                <h2 className="font-semibold text-black text-base mb-3">Pending approvals</h2>
+                {loadingPendingApprovals ? (
+                  <p className="text-gray-500 text-sm">Loading...</p>
+                ) : pendingApprovalsError ? (
+                  <p className="text-red-600 text-sm">{pendingApprovalsError}</p>
+                ) : pendingApprovals.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No pending approvals.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {pendingApprovals.map((u) => (
+                      <li key={u.user_id} className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
+                        <span className="text-gray-800 text-sm">
+                          {u.first_name} {u.last_name}
+                          {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/approval?registration_id=${encodeURIComponent(u.user_id)}`)}
+                          className="text-[#6b1176] font-medium text-sm hover:underline whitespace-nowrap"
+                        >
+                          Review
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
+
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
-              <div className="flex gap-6 flex-1 flex-col lg:flex-row">
+              <div className="flex gap-6  flex-col lg:flex-row">
                 {/* Left Column */}
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   <h1 className="font-semibold text-black text-lg">Monthly Summary</h1>
@@ -1279,19 +1415,26 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section>
-                <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
+              <section className="flex flex-1 ">
+                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden w-full h-full">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
                 ) : (
-                  <IVFOngoingTreatments 
-                    treatments={ivfEmbryoTracking} 
+                  <IVFOngoingTreatments
+                    treatments={ivfEmbryoTracking}
                     hasMore={ivfEmbryoTrackingHasMore}
+                    isLoading={loadingIvfEmbryoTracking}
                     isLoadingMore={loadingIvfEmbryoTrackingMore}
                     onLoadMore={loadMoreIvfEmbryoTracking}
+                    filterOptions={ivfEmbryoTrackingFilterOptions}
+                    filterValues={ivfEmbryoTrackingFilterValues}
+                    onFilterChange={handleIvfEmbryoTrackingFilterChange}
+                    onClearFilters={handleIvfEmbryoTrackingClearFilters}
+                    filteredTotal={ivfEmbryoTrackingFilteredTotal}
+                    totalUnfiltered={ivfEmbryoTrackingTotalUnfiltered ?? ivfEmbryoTrackingFilterOptions.total}
                   />
                 )}
                 </div>

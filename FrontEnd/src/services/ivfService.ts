@@ -5,6 +5,26 @@ import type {
   IVFTreatment,
 } from '../types/ivf.ts';
 
+export interface EmbryoTrackingFiltersResponse {
+  site_names: string[];
+  statuses: string[];
+  goblet_colors: string[];
+  crylock_colors: string[];
+  /** Total records (unfiltered) for "filtered / total" display */
+  total?: number;
+  site_name_counts?: Record<string, number>;
+  status_counts?: Record<string, number>;
+  goblet_color_counts?: Record<string, number>;
+  crylock_color_counts?: Record<string, number>;
+}
+
+export interface EmbryoTrackingFilters {
+  branch_name?: string | null;
+  status?: string | null;
+  cryolock_color?: string | null;
+  goblet_color?: string | null;
+}
+
 export interface TotalEmbryosCryolocksResponse {
   total_embryos: number;
   total_cryolocks: number;
@@ -89,6 +109,35 @@ export interface TankInTransitCheckResponse {
   has_in_transit_shipments: boolean;
   in_transit_count: number;
   message: string;
+}
+
+/** Single KPI config row (Alert Setting list/CRUD). */
+export interface KpiConfigRow {
+  id: number;
+  hospital_id: number;
+  branch_id: number;
+  tank_id: number;
+  kpi_name: string;
+  alert_name: string | null;
+  min: number | null;
+  max: number | null;
+  unit: string | null;
+  alert_type: string | null;
+  status: boolean;
+}
+
+/** Payload for create/update KPI config. */
+export interface KpiConfigPayload {
+  hospital_id: number;
+  branch_id: number;
+  tank_id: number;
+  kpi_name: string;
+  alert_name?: string | null;
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
+  alert_type?: string | null;
+  status?: boolean;
 }
 
 export interface DeviationsGraphDataItem {
@@ -305,6 +354,105 @@ export class IvfService extends BaseApiService {
     );
   }
 
+  /**
+   * Get tank KPI limits config for visualization (min/max, ln2 l1/l2/critical, units).
+   * Use for reference lines and thresholds; readings come from WebSocket / kpi-history.
+   */
+  async getTankKpiConfig(tankCode: string): Promise<{
+    tank_id: number;
+    tank_code: string;
+    kpi_limits: Record<
+      string,
+      {
+        min?: number;
+        max?: number;
+        unit?: string;
+        l1?: { min?: number; description?: string };
+        l2?: { min?: number; max?: number; alert_type?: string };
+        critical?: { max?: number; alert_type?: string };
+      }
+    >;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-config`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
+   */
+  async getKpiHistory(tankCode: string, limit = 50): Promise<{
+    tank_code: string;
+    tank_id: number;
+    history: Array<{
+      tank_id: number;
+      tank_code: string;
+      timestamp: string;
+      kpis: Array<{ name: string; value: number; unit: string }>;
+    }>;
+    /** KPI tabs derived from DB (unique name + unit in order of first appearance). */
+    kpi_config?: Array<{ name: string; unit: string }>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-history?limit=${limit}`,
+      { method: 'GET' }
+    );
+  }
+
+  /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
+  async getKpiConfigList(tankId: number): Promise<{
+    tank_id: number;
+    tank_code: string;
+    branch_id: number;
+    hospital_id: number | null;
+    config: Array<KpiConfigRow>;
+  }> {
+    return await this.request(
+      `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
+      { method: 'GET' }
+    );
+  }
+
+  async createKpiConfig(payload: KpiConfigPayload): Promise<KpiConfigRow> {
+    return await this.request('/api/ivf/quality/kpi-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateKpiConfig(configId: number, payload: Partial<KpiConfigPayload>): Promise<KpiConfigRow> {
+    return await this.request(`/api/ivf/quality/kpi-config/${configId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteKpiConfig(configId: number): Promise<{ deleted: boolean; id: number }> {
+    return await this.request(`/api/ivf/quality/kpi-config/${configId}`, { method: 'DELETE' });
+  }
+
+  /** Bulk upsert KPI config to multiple tanks. For each tank, update existing rows (by kpi_name + alert_name) or create. */
+  async bulkUpsertKpiConfig(
+    tankIds: number[],
+    configs: Array<{
+      kpi_name: string;
+      alert_name?: string | null;
+      min?: number | null;
+      max?: number | null;
+      unit?: string | null;
+      alert_type?: string | null;
+    }>
+  ): Promise<{ updated: number; created: number }> {
+    return await this.request('/api/ivf/quality/kpi-config/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tank_ids: tankIds, configs }),
+    });
+  }
+
   async checkTankInTransitStatus(
     tankCode?: string | number,
     branchId?: number | null,
@@ -341,21 +489,50 @@ export class IvfService extends BaseApiService {
     throw new Error('Either tankCode or (hisNumber/cryolockNumber) must be provided');
   }
 
-  async getEmbryoTracking(offset: number = 0, limit: number = 100): Promise<EmbryoTrackingApiResponse> {
+  /**
+   * Get filter options and counts. Pass currentFilterValues to get counts conditioned on
+   * already-selected filters (e.g. status counts within selected site).
+   */
+  async getEmbryoTrackingFilters(currentFilterValues?: {
+    siteName?: string;
+    status?: string;
+    gobletColor?: string;
+    crylockColor?: string;
+  }): Promise<EmbryoTrackingFiltersResponse> {
     const params = new URLSearchParams();
-    if (offset > 0) {
-      params.append('offset', offset.toString());
+    if (currentFilterValues?.siteName && currentFilterValues.siteName !== 'all') {
+      params.append('branch_name', currentFilterValues.siteName);
     }
-    if (limit !== 100) {
-      params.append('limit', limit.toString());
+    if (currentFilterValues?.status && currentFilterValues.status !== 'all') {
+      params.append('status', currentFilterValues.status);
+    }
+    if (currentFilterValues?.gobletColor && currentFilterValues.gobletColor !== 'all') {
+      params.append('goblet_color', currentFilterValues.gobletColor);
+    }
+    if (currentFilterValues?.crylockColor && currentFilterValues.crylockColor !== 'all') {
+      params.append('crylock_color', currentFilterValues.crylockColor);
     }
     const queryString = params.toString();
+    const url = queryString ? `/api/ivf/embryo_tracking/filters?${queryString}` : '/api/ivf/embryo_tracking/filters';
+    return await this.request<EmbryoTrackingFiltersResponse>(url, { method: 'GET' });
+  }
+
+  async getEmbryoTracking(
+    offset: number = 0,
+    limit: number = 50,
+    filters?: EmbryoTrackingFilters
+  ): Promise<EmbryoTrackingApiResponse> {
+    const params = new URLSearchParams();
+    if (offset > 0) params.append('offset', offset.toString());
+    if (limit !== 50) params.append('limit', limit.toString());
+    if (filters?.branch_name) params.append('branch_name', filters.branch_name);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.cryolock_color) params.append('cryolock_color', filters.cryolock_color);
+    if (filters?.goblet_color) params.append('goblet_color', filters.goblet_color);
+    const queryString = params.toString();
     const url = queryString ? `/api/ivf/embryo_tracking?${queryString}` : '/api/ivf/embryo_tracking';
-    
-    
-    const response = await this.request<RawEmbryoTrackingApiResponse>(url, {
-      method: 'GET',
-    });
+
+    const response = await this.request<RawEmbryoTrackingApiResponse>(url, { method: 'GET' });
     return {
       data: response.data.map(mapApiItemToTreatment),
       total: response.total,
