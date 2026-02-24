@@ -792,12 +792,14 @@ class QualityService:
                 if kpi_name not in seen_per_ts[key]:
                     seen_per_ts[key].add(kpi_name)
                     by_ts[key]["kpis"].append({
+                        "timestamp": key,
                         "name": kpi_name,
                         "value": float(value) if value is not None else 0,
                         "unit": unit or "",
                     })
-            out = [{"tank_id": tank_id, "tank_code": tank_code, "timestamp": t["timestamp"], "kpis": t["kpis"]} for t in by_ts.values()]
-            out.sort(key=lambda x: x["timestamp"])
+            # Return with timestamp inside each kpi (no top-level timestamp)
+            out = [{"tank_id": tank_id, "tank_code": tank_code, "kpis": t["kpis"]} for t in by_ts.values()]
+            out.sort(key=lambda x: (x["kpis"][0]["timestamp"] if x.get("kpis") else ""))
             return out[-limit:] if limit else out
         except Exception as e:
             logger.error(f"Error retrieving readings history for tank {tank_id}: {e}")
@@ -1184,14 +1186,16 @@ def append_tank_kpi_snapshot_to_db(
         )
         db.add(row)
     db.flush()
-    payload = {"timestamp": timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp), "kpis": kpis}
+    ts_iso = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+    kpis_with_ts = [{"timestamp": ts_iso, "name": k.get("name"), "value": k.get("value"), "unit": k.get("unit", "")} for k in kpis]
+    payload = {"kpis": kpis_with_ts}
     push_tank_kpi_to_redis(tank_id, tank_code, payload, publish=True)
 
 
 def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish: bool = True) -> None:
     """
     Push tank KPI snapshot to Redis (history list + optionally publish for live Quality Tracking graph).
-    payload must include: timestamp, kpis (list of { name, value, unit }).
+    payload must include: kpis (list of { timestamp, name, value, unit }) — timestamp is per KPI, not top-level.
     """
     try:
         r = get_redis()

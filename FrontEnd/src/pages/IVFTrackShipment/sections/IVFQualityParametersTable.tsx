@@ -119,7 +119,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        if (data.type === 'tank_kpi' && Array.isArray(data.kpis)) setLevelFromKpis(data.kpis);
+        if (data.tank_code === canisterNumber && Array.isArray(data.kpis)) setLevelFromKpis(data.kpis);
       } catch {}
     };
 
