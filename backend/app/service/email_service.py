@@ -5,6 +5,9 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from jinja2.exceptions import TemplateError
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from ..config.config import settings
 from ..constants.app_constants import (
@@ -59,10 +62,10 @@ def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
                 reason="SendGrid API key not configured"
             )
         
-        if not settings.SENDGRID_FROM_EMAIL:
+        if not settings.SENDER_EMAIL:
             raise EmailServiceException(
                 recipient=recipient_email,
-                reason="SendGrid from email not configured"
+                reason="Sender email not configured"
             )
         
         # Initialize SendGrid client
@@ -70,7 +73,7 @@ def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
         
         # Create email message
         message = Mail(
-            from_email=settings.SENDGRID_FROM_EMAIL,
+            from_email=settings.SENDER_EMAIL,
             to_emails=recipient_email,
             subject=subject,
             html_content=html_body
@@ -102,10 +105,10 @@ def send_email_via_sendgrid(recipient_email: str, subject: str, html_body: str):
         )
 
 
-def send_email(recipient_email: str, subject: str, html_body: str):
+def send_email_via_smpt(recipient_email: str, subject: str, html_body: str):
     """
-    Send email using SendGrid.
-
+    Send email using SMTP server
+    
     Args:
         recipient_email: Email address to send to
         subject: Email subject
@@ -113,9 +116,62 @@ def send_email(recipient_email: str, subject: str, html_body: str):
         
     Raises:
         EmailServiceException if sending fails
+    """    
+    try:
+        # Validate SMTP configuration
+        if not settings.SMTP_SERVER or not settings.SMTP_PORT:
+            raise EmailServiceException(
+                recipient=recipient_email,
+                reason="SMTP server or port not configured"
+            )
+        
+        # Create email message
+        msg = MIMEMultipart()
+        msg['From'] = settings.SENDER_EMAIL  # Using same from email for consistency
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Connect to SMTP server and send email
+        logger.info(f"Sending email via SMTP to {recipient_email}...")
+
+        if settings.SMTP_PORT == 587:
+            # Use TLS
+            with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
+                server.starttls()
+                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
+                server.send_message(msg)
+        
+        logger.info(f"Email sent successfully via SMTP to {recipient_email}")
+    
+    except Exception as e:
+        logger.error(f"SMTP error: {type(e).__name__}: {str(e)}")
+        raise EmailServiceException(
+            recipient=recipient_email,
+            reason=f"SMTP email send failed: {str(e)}"
+        )
+
+def send_email(recipient_email: str, subject: str, html_body: str, use_smtp: bool = True):
     """
-    logger.info(f"Attempting to send email to {recipient_email} using SendGrid")
-    send_email_via_sendgrid(recipient_email, subject, html_body)
+    Send email using SendGrid or SMTP.
+
+    Args:
+        recipient_email: Email address to send to
+        subject: Email subject
+        html_body: HTML content of email
+        use_smtp: If True, use SMTP instead of SendGrid
+        
+    Raises:
+        EmailServiceException if sending fails
+    """
+    logger.info(f"Attempting to send email to {recipient_email} using {'SMTP' if use_smtp else 'SendGrid'}")
+    if use_smtp:
+        send_email_via_smpt(recipient_email, subject, html_body)
+    else:
+        send_email_via_sendgrid(recipient_email, subject, html_body)
 
 
 # ============================================

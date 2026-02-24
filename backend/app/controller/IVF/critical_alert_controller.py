@@ -116,6 +116,44 @@ def acknowledge_alert(
             raise HTTPException(status_code=e.status_code, detail=e.message)
         raise HTTPException(status_code=500, detail=f"Error acknowledging alert: {str(e)}")
 
+class DeviationAlertKPICheckModel:
+    tank_id = int
+@router.post("/check_kpi", response_model=CriticalAlertListResponse)
+def check_and_create_kpi_deviation_alerts(
+    tank_id: int = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Check any deviations in the kpi readings and create alert for the same
+
+    Request Body:
+    tank_id: the tank id for which the deviations to be checked.
+
+    Returns:
+    A list of newly created alerts.
+    """  
+
+    try:
+        service = CriticalAlertService(db)
+        if tank_id:
+            alerts = service.check_and_create_alert_for_kpi_deviations(tank_id)
+
+            return CriticalAlertListResponse(
+                acknowledged_count=0,
+                active_count=len(alerts),
+                alerts=alerts,
+                total_count=len(alerts),
+            )
+        else:
+            raise HTTPException(status_code=401, detail=str("Send the tank_id in body"))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking and creating alerts: {str(e)}")
+
 
 @router.post("/check", response_model=CriticalAlertListResponse)
 def check_and_create_alerts(

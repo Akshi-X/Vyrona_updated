@@ -428,6 +428,7 @@ class IVFControlTowerResponse(BaseModel):
 
 class ActiveTankItem(BaseModel):
     """Schema for a single active tank in control tower"""
+    tank_id: int = Field(..., description="Tank ID (primary key)")
     tank_code: str = Field(..., description="Tank code (e.g., 'T1')")
     updated_at: Optional[datetime] = Field(None, description="Last updated date and time from tanks table")
     status: CanisterStatus = Field(..., description="Tank status (safe, risk, critical)")
@@ -573,7 +574,7 @@ class EmbryoTrackingResponse(BaseModel):
     data: List[EmbryoTrackingItem] = Field(..., description="List of embryo tracking records")
     total: int = Field(..., description="Total number of records")
     offset: int = Field(default=0, description="Number of records skipped")
-    limit: int = Field(default=100, description="Number of records fetched")
+    limit: int = Field(default=50, description="Number of records fetched")
     has_more: bool = Field(default=False, description="Whether more records are available")
     next_offset: Optional[int] = Field(None, description="Offset to request next chunk, or null when no more records")
     message: str = Field(default="Embryo tracking data fetched successfully", description="Response message")

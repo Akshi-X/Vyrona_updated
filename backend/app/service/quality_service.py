@@ -20,6 +20,8 @@ from app.models.geolocation_model import Geolocation
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models import KpiConfig, Readings
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
@@ -531,10 +533,312 @@ class QualityService:
             logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
             return []
 
+    def get_tank_kpi_config(self, tank_id: int, tank_code: str) -> dict:
+        """
+        Get KPI limits config for a tank from kpi_config table (nested kpi_limits for frontend).
+        Only includes non-null, non-empty values (no unnecessary null data).
+        """
+        def _omit_none(d: dict) -> dict:
+            return {k: v for k, v in d.items() if v is not None and v != ""}
+
+        try:
+            rows = (
+                self.db.query(KpiConfig)
+                .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
+                .all()
+            )
+            kpi_limits = {}
+            for r in rows:
+                name = r.kpi_name
+                if name not in kpi_limits:
+                    kpi_limits[name] = {}
+                if r.alert_name is None:
+                    # Value config: only include unit if non-empty; min/max only if set
+                    val = _omit_none({
+                        "unit": (r.unit or "").strip() or None,
+                        "min": float(r.min) if r.min is not None else None,
+                        "max": float(r.max) if r.max is not None else None,
+                    })
+                    kpi_limits[name].update(val)
+                else:
+                    # Bands: only include min, max, alert_type when set
+                    band = _omit_none({
+                        "min": float(r.min) if r.min is not None else None,
+                        "max": float(r.max) if r.max is not None else None,
+                        "alert_type": (r.alert_type or "").strip() or None,
+                    })
+                    kpi_limits[name][r.alert_name] = band
+            return {"tank_id": tank_id, "tank_code": tank_code, "kpi_limits": kpi_limits}
+        except Exception as e:
+            logger.error(f"Error retrieving KPI config for tank {tank_id}: {e}")
+            return {"tank_id": tank_id, "tank_code": tank_code, "kpi_limits": {}}
+
+    def list_kpi_config_by_tank(self, tank_id: int) -> List[dict]:
+        """
+        List all KpiConfig rows for a tank (raw rows for Alert Setting CRUD).
+        Returns list of dict with id, hospital_id, branch_id, tank_id, kpi_name, alert_name, min, max, unit, alert_type, status.
+        """
+        try:
+            rows = (
+                self.db.query(KpiConfig)
+                .filter(KpiConfig.tank_id == tank_id)
+                .order_by(KpiConfig.kpi_name, KpiConfig.alert_name)
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "hospital_id": r.hospital_id,
+                    "branch_id": r.branch_id,
+                    "tank_id": r.tank_id,
+                    "kpi_name": r.kpi_name,
+                    "alert_name": r.alert_name,
+                    "min": float(r.min) if r.min is not None else None,
+                    "max": float(r.max) if r.max is not None else None,
+                    "unit": r.unit,
+                    "alert_type": r.alert_type,
+                    "status": bool(r.status),
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Error listing KPI config for tank {tank_id}: {e}")
+            return []
+
+    def create_kpi_config(
+        self,
+        hospital_id: int,
+        branch_id: int,
+        tank_id: int,
+        kpi_name: str,
+        alert_name: Optional[str] = None,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+        unit: Optional[str] = None,
+        alert_type: Optional[str] = None,
+        status: bool = True,
+    ) -> KpiConfig:
+        """Create a KpiConfig row. Validates tank belongs to branch."""
+        self.validate_tank_belongs_to_branch(tank_id, branch_id)
+        row = KpiConfig(
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+            tank_id=tank_id,
+            kpi_name=kpi_name.strip(),
+            alert_name=alert_name.strip() if alert_name else None,
+            min=min_val,
+            max=max_val,
+            unit=unit.strip() if unit else None,
+            alert_type=alert_type.strip() if alert_type else None,
+            status=status,
+        )
+        self.db.add(row)
+        self.db.flush()
+        return row
+
+    def update_kpi_config(
+        self,
+        config_id: int,
+        branch_id: Optional[int],
+        kpi_name: Optional[str] = None,
+        alert_name: Optional[str] = None,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+        unit: Optional[str] = None,
+        alert_type: Optional[str] = None,
+        status: Optional[bool] = None,
+    ) -> Optional[KpiConfig]:
+        """Update a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
+        row = self.db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
+        if not row:
+            return None
+        if branch_id is not None:
+            self.validate_tank_belongs_to_branch(row.tank_id, branch_id)
+        if kpi_name is not None:
+            row.kpi_name = kpi_name.strip()
+        if alert_name is not None:
+            row.alert_name = alert_name.strip() if alert_name else None
+        if min_val is not None:
+            row.min = min_val
+        if max_val is not None:
+            row.max = max_val
+        if unit is not None:
+            row.unit = unit.strip() if unit else None
+        if alert_type is not None:
+            row.alert_type = alert_type.strip() if alert_type else None
+        if status is not None:
+            row.status = status
+        self.db.flush()
+        return row
+
+    def delete_kpi_config(self, config_id: int, branch_id: Optional[int] = None) -> bool:
+        """Delete a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
+        row = self.db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
+        if not row:
+            return False
+        if branch_id is not None:
+            self.validate_tank_belongs_to_branch(row.tank_id, branch_id)
+        self.db.delete(row)
+        self.db.flush()
+        return True
+
+    def bulk_upsert_kpi_config(
+        self,
+        tank_ids: List[int],
+        configs: List[Dict],
+        branch_id: Optional[int] = None,
+    ) -> Dict:
+        """
+        For each tank and each config: if a row exists for (tank_id, kpi_name, alert_name), update it
+        with min, max, alert_type (and unit); otherwise create a new row with the same shape.
+        Config items must have kpi_name; optional: alert_name, min, max, unit, alert_type.
+        Validates each tank belongs to branch when branch_id is provided.
+        Returns {"updated": count, "created": count}.
+        """
+        updated = 0
+        created = 0
+        for tank_id in tank_ids:
+            if branch_id is not None:
+                self.validate_tank_belongs_to_branch(tank_id, branch_id)
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
+                continue
+            branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+            if not branch:
+                continue
+            hospital_id = branch.hospital_id
+            branch_id_val = tank.branch_id
+            for cfg in configs:
+                kpi_name = (cfg.get("kpi_name") or "").strip()
+                if not kpi_name:
+                    continue
+                alert_name = cfg.get("alert_name")
+                if alert_name is not None and isinstance(alert_name, str):
+                    alert_name = alert_name.strip() or None
+                min_val = cfg.get("min")
+                if min_val is not None and not isinstance(min_val, (int, float)):
+                    try:
+                        min_val = float(min_val)
+                    except (TypeError, ValueError):
+                        min_val = None
+                max_val = cfg.get("max")
+                if max_val is not None and not isinstance(max_val, (int, float)):
+                    try:
+                        max_val = float(max_val)
+                    except (TypeError, ValueError):
+                        max_val = None
+                unit = cfg.get("unit")
+                if unit is not None and isinstance(unit, str):
+                    unit = unit.strip() or None
+                alert_type_val = cfg.get("alert_type")
+                if alert_type_val is not None and isinstance(alert_type_val, str):
+                    alert_type_val = alert_type_val.strip() or None
+                query = self.db.query(KpiConfig).filter(
+                    KpiConfig.tank_id == tank_id,
+                    KpiConfig.kpi_name == kpi_name,
+                )
+                if alert_name is None:
+                    query = query.filter(KpiConfig.alert_name.is_(None))
+                else:
+                    query = query.filter(KpiConfig.alert_name == alert_name)
+                existing = query.first()
+                if existing:
+                    existing.min = min_val
+                    existing.max = max_val
+                    existing.alert_type = alert_type_val
+                    if unit is not None:
+                        existing.unit = unit
+                    self.db.flush()
+                    updated += 1
+                else:
+                    row = KpiConfig(
+                        hospital_id=hospital_id,
+                        branch_id=branch_id_val,
+                        tank_id=tank_id,
+                        kpi_name=kpi_name,
+                        alert_name=alert_name,
+                        min=min_val,
+                        max=max_val,
+                        unit=unit,
+                        alert_type=alert_type_val,
+                        status=True,
+                    )
+                    self.db.add(row)
+                    self.db.flush()
+                    created += 1
+        return {"updated": updated, "created": created}
+
+    def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
+        """
+        Get KPI readings history from readings table: group by timestamp, build kpis array.
+        Includes readings for any kpi_config of this tank; one value per kpi_name per timestamp (first by config id).
+        Returns list of { tank_id, tank_code, timestamp, kpis } oldest first.
+        """
+        try:
+            rows = (
+                self.db.query(Readings.timestamp, Readings.kpi_value, KpiConfig.kpi_name, KpiConfig.unit)
+                .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+                .filter(Readings.tank_id == tank_id)
+                .order_by(Readings.timestamp.asc(), KpiConfig.id.asc())
+                .all()
+            )
+            by_ts = {}
+            seen_per_ts = {}
+            for ts, value, kpi_name, unit in rows:
+                key = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+                if key not in by_ts:
+                    by_ts[key] = {"timestamp": key, "kpis": []}
+                    seen_per_ts[key] = set()
+                if kpi_name not in seen_per_ts[key]:
+                    seen_per_ts[key].add(kpi_name)
+                    by_ts[key]["kpis"].append({
+                        "timestamp": key,
+                        "name": kpi_name,
+                        "value": float(value) if value is not None else 0,
+                        "unit": unit or "",
+                    })
+            # Return with timestamp inside each kpi (no top-level timestamp)
+            out = [{"tank_id": tank_id, "tank_code": tank_code, "kpis": t["kpis"]} for t in by_ts.values()]
+            out.sort(key=lambda x: (x["kpis"][0]["timestamp"] if x.get("kpis") else ""))
+            return out[-limit:] if limit else out
+        except Exception as e:
+            logger.error(f"Error retrieving readings history for tank {tank_id}: {e}")
+            return []
+
+    def get_tank_kpi_history(self, tank_id: int, limit: int = 50) -> List[dict]:
+        """
+        Get KPI readings history for a tank from DB (readings table).
+        Returns list of { tank_id, tank_code, timestamp, kpis } oldest first.
+        """
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        tank_code = (tank.tank_code or f"T{tank_id}") if tank else f"T{tank_id}"
+        return self.get_tank_kpi_history_from_readings(tank_id, tank_code, limit=limit)
+
+    def get_tank_kpi_redis_history(self, tank_id: int, limit: int = 30) -> List[dict]:
+        """Get last N tank KPI readings from Redis (same shape as DB)."""
+        try:
+            r = get_redis()
+            key = f"tank_kpi_history:{tank_id}"
+            raw = r.lrange(key, 0, limit - 1)
+            if not raw:
+                return []
+            out = []
+            for item in raw:
+                try:
+                    out.append(json.loads(item))
+                except json.JSONDecodeError:
+                    continue
+            out.reverse()
+            return out
+        except Exception as e:
+            logger.error(f"Error retrieving tank KPI Redis history for tank {tank_id}: {e}")
+            return []
+
     def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
         """
         Get last N LN2 readings for a tank from Redis (separate from quality history).
-        Uses key ln2_quality_history:{tank_id} to keep LN2 and tank quality data isolated.
+        Checks ln2_quality_history:{tank_id} first, then falls back to
+        ln2_quality_history:{device_code} for data written before the key-fix.
 
         Args:
             tank_id: Tank ID to get LN2 history for
@@ -545,8 +849,29 @@ class QualityService:
         """
         try:
             redis_client = get_redis()
+
+            # Try primary key (tank_id based)
             history_key = f"ln2_quality_history:{tank_id}"
             raw_history = redis_client.lrange(history_key, 0, limit - 1)
+
+            # Fallback: check device_code based keys (written by old telemetry code)
+            if not raw_history:
+                from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+                from app.models.IVF.device_model import Device
+                device_rows = (
+                    self.db.query(Device.device_code)
+                    .join(Ln2IotDevice, Ln2IotDevice.device_id == Device.id)
+                    .filter(Ln2IotDevice.tank_id == tank_id)
+                    .distinct()
+                    .all()
+                )
+                for (dev_code,) in device_rows:
+                    fallback_key = f"ln2_quality_history:{dev_code}"
+                    raw_history = redis_client.lrange(fallback_key, 0, limit - 1)
+                    if raw_history:
+                        logger.info(f"Found LN2 history under legacy key {fallback_key} for tank {tank_id}")
+                        break
+
             if not raw_history:
                 return []
             history = []
@@ -807,4 +1132,84 @@ def push_ivf_quality_to_redis(tank_id: int, tank_code: str, data: dict, publish:
         logger.debug(f"Pushed IVF quality to Redis for tank {tank_code} (id={tank_id})")
     except Exception as e:
         logger.warning(f"Failed to push IVF quality to Redis: {e}")
+
+
+def append_tank_kpi_snapshot_to_db(
+    db: Session,
+    tank_id: int,
+    tank_code: str,
+    timestamp,
+    kpis: List[dict],
+) -> None:
+    """
+    Append a KPI snapshot to readings table (one row per kpi) and push to Redis.
+    kpis: list of { name, value, unit }. Looks up kpi_config_id per (tank_id, kpi_name) where alert_name is null.
+    """
+    tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+    if not tank:
+        return
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    hospital_id = branch.hospital_id if branch else None
+    branch_id = tank.branch_id
+    if hospital_id is None:
+        return
+    config_by_name = {
+        c.kpi_name: c.id
+        for c in db.query(KpiConfig).filter(
+            KpiConfig.tank_id == tank_id,
+            KpiConfig.status == True,
+            KpiConfig.alert_name.is_(None),
+        ).all()
+    }
+    for k in kpis:
+        name = (k.get("name") or "").strip()
+        if not name or name not in config_by_name:
+            continue
+        try:
+            val = k.get("value")
+            if val is None:
+                continue
+            if not isinstance(val, (int, float)):
+                val = float(val) if val else 0
+        except (TypeError, ValueError):
+            continue
+        row = Readings(
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+            device_id=None,
+            tank_id=tank_id,
+            kpi_config_id=config_by_name[name],
+            kpi_value=val,
+            timestamp=timestamp,
+            deviation=False,
+            deviation_alert_sent=False,
+        )
+        db.add(row)
+    db.flush()
+    ts_iso = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+    kpis_with_ts = [{"timestamp": ts_iso, "name": k.get("name"), "value": k.get("value"), "unit": k.get("unit", "")} for k in kpis]
+    payload = {"kpis": kpis_with_ts}
+    push_tank_kpi_to_redis(tank_id, tank_code, payload, publish=True)
+
+
+def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish: bool = True) -> None:
+    """
+    Push tank KPI snapshot to Redis (history list + optionally publish for live Quality Tracking graph).
+    payload must include: kpis (list of { timestamp, name, value, unit }) — timestamp is per KPI, not top-level.
+    """
+    try:
+        r = get_redis()
+        data = dict(payload)
+        data["tank_id"] = tank_id
+        data["tank_code"] = tank_code
+        data["type"] = "tank_kpi"
+        msg = json.dumps(data)
+        history_key = f"tank_kpi_history:{tank_id}"
+        r.lpush(history_key, msg)
+        r.ltrim(history_key, 0, 49)
+        if publish:
+            r.publish("tank_kpi_readings_channel", msg)
+        logger.debug(f"Pushed tank KPI to Redis for tank {tank_code} (id={tank_id})")
+    except Exception as e:
+        logger.warning(f"Failed to push tank KPI to Redis: {e}")
 

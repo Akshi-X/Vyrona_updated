@@ -6,12 +6,12 @@ Separate from CGT quality monitoring to maintain isolation
 import asyncio
 import json
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path, Body
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
-from app.service.redis_service import get_redis, get_ln2_pubsub
-from app.service.quality_service import QualityService
+from app.service.redis_service import get_redis, get_ln2_pubsub, get_tank_kpi_pubsub
+from app.service.quality_service import QualityService, push_tank_kpi_to_redis, append_tank_kpi_snapshot_to_db
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
@@ -19,6 +19,7 @@ from app.config.database import get_db, SessionLocal
 from app.service.quality_service import push_ivf_quality_to_redis
 from app.models.user_model import User
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
@@ -138,6 +139,294 @@ def get_ln2_history(
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
 
 
+@router.get("/tanks/{tank_code}/kpi-config")
+def get_tank_kpi_config(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI limits config for the tank (nested kpi_limits for frontend visualization)."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank.tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return quality_service.get_tank_kpi_config(tank.tank_id, tank_code_str)
+
+
+@router.get("/tanks/{tank_code}/kpi-history")
+def get_tank_kpi_history(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    limit: int = Query(50, ge=1, le=200),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI readings history for Quality Tracking tabbed graph (past data)."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    # Prefer Redis (live buffer), then DB (readings table)
+    history = quality_service.get_tank_kpi_redis_history(tank_id, limit=limit)
+    if not history:
+        history = quality_service.get_tank_kpi_history(tank_id, limit=limit)
+    # Derive KPI config (tabs) from DB/Redis data: unique (name, unit) in order of first appearance
+    seen = {}
+    kpi_config = []
+    for entry in history:
+        for k in (entry.get("kpis") or []):
+            name = (k.get("name") or "").strip()
+            if name and name not in seen:
+                seen[name] = True
+                kpi_config.append({"name": name, "unit": k.get("unit") or ""})
+    return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history, "kpi_config": kpi_config}
+
+
+@router.post("/tanks/{tank_code}/kpi-readings")
+def append_tank_kpi_reading(
+    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Append a KPI snapshot (store in DB and push to Redis for live graph). Body: { tank_id?, tank_code?, timestamp, kpis: [{ name, value, unit }] }."""
+    from datetime import datetime, timezone
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    tank_code_str = str(tank_code).strip()
+    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+    tank_id = tank.tank_id
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    if not body or "kpis" not in body:
+        raise HTTPException(status_code=400, detail="Body must include 'kpis' array")
+    ts = body.get("timestamp")
+    if not ts:
+        raise HTTPException(status_code=400, detail="Body must include 'timestamp'")
+    if isinstance(ts, str):
+        ts = ts.replace("Z", "+00:00")
+        try:
+            ts = datetime.fromisoformat(ts)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
+    kpis = list(body["kpis"]) if isinstance(body["kpis"], list) else []
+    append_tank_kpi_snapshot_to_db(db, tank_id, tank_code_str, ts, kpis)
+    db.commit()
+    payload = {"timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts), "kpis": kpis}
+    return {"tank_id": tank_id, "tank_code": tank_code_str, "timestamp": payload["timestamp"]}
+
+
+def _require_alert_setting_role(current_user: User) -> None:
+    """Raise 403 if user is not IVF Manager or Admin (for Alert Setting CRUD)."""
+    if not is_specific_department(getattr(current_user, "department", None) or "", "IVF"):
+        raise HTTPException(status_code=403, detail="Access denied: Alert Setting is for IVF users only")
+    role = (getattr(current_user, "role", None) or "").strip()
+    if hasattr(role, "value"):
+        role = role.value
+    role = (role or "").lower()
+    if role not in ("manager", "admin"):
+        raise HTTPException(status_code=403, detail="Access denied: Alert Setting requires Manager or Admin role")
+
+
+@router.get("/kpi-config/list")
+def list_kpi_config(
+    tank_id: int = Query(..., description="Tank ID to list KPI config for"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all KPI config rows for a tank (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    rows = quality_service.list_kpi_config_by_tank(tank_id)
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    hospital_id = branch.hospital_id if branch else None
+    return {
+        "tank_id": tank_id,
+        "tank_code": tank.tank_code or "",
+        "branch_id": tank.branch_id,
+        "hospital_id": hospital_id,
+        "config": rows,
+    }
+
+
+@router.post("/kpi-config")
+def create_kpi_config(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Create a KPI config row (Alert Setting). Manager and Admin only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
+    for k in required:
+        if k not in body:
+            raise HTTPException(status_code=400, detail=f"Missing required field: {k}")
+    try:
+        hospital_id = int(body["hospital_id"])
+        branch_id_val = int(body["branch_id"])
+        tank_id = int(body["tank_id"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id must be integers")
+    if branch_id is not None and branch_id_val != branch_id:
+        raise HTTPException(status_code=403, detail="Cannot create config for another branch")
+    quality_service = QualityService(db)
+    row = quality_service.create_kpi_config(
+        hospital_id=hospital_id,
+        branch_id=branch_id_val,
+        tank_id=tank_id,
+        kpi_name=str(body["kpi_name"]),
+        alert_name=body.get("alert_name"),
+        min_val=body.get("min") if body.get("min") is not None else None,
+        max_val=body.get("max") if body.get("max") is not None else None,
+        unit=body.get("unit"),
+        alert_type=body.get("alert_type"),
+        status=body.get("status", True),
+    )
+    db.commit()
+    return {
+        "id": row.id,
+        "hospital_id": row.hospital_id,
+        "branch_id": row.branch_id,
+        "tank_id": row.tank_id,
+        "kpi_name": row.kpi_name,
+        "alert_name": row.alert_name,
+        "min": float(row.min) if row.min is not None else None,
+        "max": float(row.max) if row.max is not None else None,
+        "unit": row.unit,
+        "alert_type": row.alert_type,
+        "status": bool(row.status),
+    }
+
+
+@router.post("/kpi-config/bulk")
+def bulk_upsert_kpi_config(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Bulk upsert KPI config to multiple tanks (Alert Setting).
+    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type? }).
+    For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
+    Manager and Admin only.
+    """
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    tank_ids = body.get("tank_ids")
+    configs = body.get("configs")
+    if not isinstance(tank_ids, list) or not tank_ids:
+        raise HTTPException(status_code=400, detail="tank_ids must be a non-empty list")
+    if not isinstance(configs, list):
+        raise HTTPException(status_code=400, detail="configs must be a list")
+    try:
+        tank_ids = [int(t) for t in tank_ids]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="tank_ids must be integers")
+    quality_service = QualityService(db)
+    result = quality_service.bulk_upsert_kpi_config(tank_ids=tank_ids, configs=configs, branch_id=branch_id)
+    db.commit()
+    return result
+
+
+@router.put("/kpi-config/{config_id}")
+def update_kpi_config(
+    config_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """Update a KPI config row (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    quality_service = QualityService(db)
+    row = quality_service.update_kpi_config(
+        config_id=config_id,
+        branch_id=branch_id,
+        kpi_name=body.get("kpi_name"),
+        alert_name=body.get("alert_name"),
+        min_val=body.get("min") if body.get("min") is not None else None,
+        max_val=body.get("max") if body.get("max") is not None else None,
+        unit=body.get("unit"),
+        alert_type=body.get("alert_type"),
+        status=body.get("status"),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    db.commit()
+    return {
+        "id": row.id,
+        "hospital_id": row.hospital_id,
+        "branch_id": row.branch_id,
+        "tank_id": row.tank_id,
+        "kpi_name": row.kpi_name,
+        "alert_name": row.alert_name,
+        "min": float(row.min) if row.min is not None else None,
+        "max": float(row.max) if row.max is not None else None,
+        "unit": row.unit,
+        "alert_type": row.alert_type,
+        "status": bool(row.status),
+    }
+
+
+@router.delete("/kpi-config/{config_id}")
+def delete_kpi_config(
+    config_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a KPI config row (Alert Setting). Manager and Admin only."""
+    _require_alert_setting_role(current_user)
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    quality_service = QualityService(db)
+    ok = quality_service.delete_kpi_config(config_id, branch_id=branch_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    db.commit()
+    return {"deleted": True, "id": config_id}
+
+
 def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
     """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket.
     data may include: device_code (e.g. 'LN2-1'), device_id (alias, same value), timestamp,
@@ -192,6 +481,52 @@ async def ln2_redis_listener():
                     logger.error(f"Error broadcasting LN2 message: {e}")
         except Exception as e:
             logger.error(f"Error in ln2_redis_listener: {e}")
+            pubsub = None
+            await asyncio.sleep(5)
+
+
+async def tank_kpi_redis_listener():
+    """Listen for tank KPI readings from Redis and broadcast to IVF quality WS clients (Quality Tracking live graph)."""
+    from app.service.redis_service import get_tank_kpi_pubsub
+    loop = asyncio.get_event_loop()
+    pubsub = None
+    while True:
+        try:
+            if pubsub is None:
+                try:
+                    pubsub = get_tank_kpi_pubsub()
+                    logger.info("Tank KPI Redis listener started")
+                except Exception as e:
+                    logger.error(f"Error connecting to tank KPI Redis: {e}. Retrying in 5 seconds...")
+                    await asyncio.sleep(5)
+                    continue
+            message = await loop.run_in_executor(
+                None,
+                lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True),
+            )
+            if message and message.get("type") == "message":
+                try:
+                    raw = message.get("data")
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8")
+                    data = json.loads(raw)
+                    logger.debug(f"Tank KPI Redis message received: tank_code={data.get('tank_code')}, tank_id={data.get('tank_id')}")
+                    db = SessionLocal()
+                    try:
+                        await manager.broadcast(data, db)
+                        # Also broadcast to /api/kpi/ws clients (Quality Tracking chart)
+                        from app.controller.kpi_controller import kpi_manager
+                        n = len(kpi_manager.active_connections)
+                        await kpi_manager.broadcast(data, db)
+                        logger.debug(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
+                    finally:
+                        db.close()
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse tank KPI message: {e}")
+                except Exception as e:
+                    logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error in tank_kpi_redis_listener: {e}")
             pubsub = None
             await asyncio.sleep(5)
 
@@ -470,54 +805,79 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
 
 
 def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, limit: int = 12) -> list:
-    """Get LN2 readings history for a tank (Redis first via get_ln2_redis_history, then DB fallback)."""
+    """Get LN2 readings history for a tank.
+
+    Strategy: fetch from both Redis and DB, merge, deduplicate by timestamp,
+    and return the most recent *limit* entries so that cached Redis entries
+    don't shadow richer DB rows (or vice-versa).
+    """
     quality_service = QualityService(db)
-    history = quality_service.get_ln2_redis_history(tank_id, limit=limit)
-    if history:
-        return history
-    # Fallback: ln2_readings by device_id (devices.id)
+    redis_history = quality_service.get_ln2_redis_history(tank_id, limit=limit)
+
+    # Always query DB as well so we never lose data when Redis has a stale subset
+    db_history = []
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
-    if not tank:
-        return []
-    device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
-    if tank.tive_device_id:
-        dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
-        if dev and dev.id not in device_ids:
-            device_ids.append(dev.id)
-    if not device_ids:
-        return []
-    from sqlalchemy import or_, desc
-    readings = (
-        db.query(Ln2Reading)
-        .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
-        .order_by(desc(Ln2Reading.reading_timestamp))
-        .limit(limit)
-        .all()
-    )
-    history = []
-    for r in reversed(readings):
-        ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
-        dev = db.query(Device).filter(Device.id == r.device_id).first()
-        dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
-        item = {
-            "tank_code": tank_code_str,
-            "tank_id": tank_id,
-            "device_code": dev_code,
-            "device_id": dev_code,  # backwards compat; value is device_code
-            "timestamp": ts,
-            "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
-            "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
-            "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
-            "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
-            "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
-            "sensor_status": r.sensor_status,
-            "lid_state": r.lid_state,
-            "refill_detected": r.refill_detected,
-            "quality_status": r.quality_status,
-        }
-        push_ln2_reading_to_redis(tank_id, tank_code_str, item, publish=False)
-        history.append(item)
-    return history
+    if tank:
+        device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
+        if tank.tive_device_id:
+            dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
+            if dev and dev.id not in device_ids:
+                device_ids.append(dev.id)
+        if device_ids:
+            from sqlalchemy import or_, desc
+            readings = (
+                db.query(Ln2Reading)
+                .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
+                .order_by(desc(Ln2Reading.reading_timestamp))
+                .limit(limit)
+                .all()
+            )
+            for r in reversed(readings):
+                ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
+                dev = db.query(Device).filter(Device.id == r.device_id).first()
+                dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
+                item = {
+                    "tank_code": tank_code_str,
+                    "tank_id": tank_id,
+                    "device_code": dev_code,
+                    "device_id": dev_code,
+                    "timestamp": ts,
+                    "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
+                    "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
+                    "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
+                    "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
+                    "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
+                    "sensor_status": r.sensor_status,
+                    "lid_state": r.lid_state,
+                    "refill_detected": r.refill_detected,
+                    "quality_status": r.quality_status,
+                }
+                db_history.append(item)
+
+    # Merge: DB rows preferred (richer columns) then Redis-only entries
+    seen_ts = set()
+    merged: list = []
+    for item in db_history:
+        ts = item.get("timestamp", "")
+        if ts not in seen_ts:
+            seen_ts.add(ts)
+            merged.append(item)
+    for item in redis_history:
+        ts = item.get("timestamp", "")
+        if ts not in seen_ts:
+            seen_ts.add(ts)
+            merged.append(item)
+
+    # Sort ascending by timestamp and take last *limit*
+    merged.sort(key=lambda x: x.get("timestamp", ""))
+    merged = merged[-limit:]
+
+    # Backfill Redis cache so next call is fast
+    if merged and not redis_history:
+        for item in merged:
+            push_ln2_reading_to_redis(tank_id, tank_code_str, item, publish=False)
+
+    return merged
 
 
 @router.websocket("/ln2-ws")

@@ -12,7 +12,8 @@ import VerifyOtp from '../pages/Verify'
 import Dashboard from '../pages/Dashboard'
 import Database from '../pages/Database'
 import ControlTower from '../pages/ControlTower/index'
-import ApprovalScreen from '../pages/ApprovalScreen'
+import AlertSetting from '../pages/AlertSetting'
+import { ApprovalLayout } from '../components/ApprovalLayout'
 import ForgotPassword from '../pages/ForgotPassword'
 import ResetPassword from '../pages/ResetPassword'
 import SuccessAlert from '../pages/SuccessAlert'
@@ -21,7 +22,7 @@ import { AuthRedirect } from '../components/AuthRedirect'
 
 // Wrapper components to ensure context is available
 const DashboardWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
     <Dashboard />
   </RoleBasedRoute>
 )
@@ -33,7 +34,7 @@ const DatabaseWithAuth = () => (
 )
 
 const ControlTowerWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} requireControlTower={true}>
     <ControlTower />
   </RoleBasedRoute>
 )
@@ -56,6 +57,12 @@ const OutboundQualityTrackingWithAuth = () => (
   </RoleBasedRoute>
 )
 
+const AlertSettingWithAuth = () => (
+  <RoleBasedRoute allowedRoles={['Manager', 'Admin']}>
+    <AlertSetting />
+  </RoleBasedRoute>
+)
+
 export const router = createBrowserRouter([
   { path: '/', element: <AuthRedirect /> },
   { path: '/login', element: <Login /> },
@@ -75,7 +82,9 @@ export const router = createBrowserRouter([
   { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
   { path: '/outbound-quality-tracking/:canisterId', element: <OutboundQualityTrackingWithAuth /> },
   { path: '/outbound-quality-tracking', element: <OutboundQualityTrackingWithAuth /> },
-  { path: '/approval-screen', element: <ApprovalScreen /> },
+  { path: '/approval', element: <ApprovalLayout /> },
+  { path: '/approval-screen', element: <ApprovalLayout /> },
+  { path: '/alert-setting', element: <AlertSettingWithAuth /> },
   { path: '*', element: <NotFound /> },
 ])
 
