@@ -22,15 +22,15 @@ interface ContainerRow {
   date: string;
 }
 
-enum KPI_NAMES {
-  IVF_TEMPERATURE_INTERNAL = "temp_internal",
-  IVF_TEMPERATURE_EXTERNAL = "temp_external",
-  IVF_LN2_LEVEL = "ln2_level",
-  IVF_LN2_EVAPORATION_RATE = "ln2_evaporation_rate",
-  IVF_SHOCK = "shock",
-  IVF_TIVE_BATTERY_PERCENTAGE = "tive_battery_percentage",
-  IVF_LN2_LID_STATE = "ln2_lid_state"
-}
+const KPI_NAMES = {
+  IVF_TEMPERATURE_INTERNAL: "temp_internal",
+  IVF_TEMPERATURE_EXTERNAL: "temp_external",
+  IVF_LN2_LEVEL: "ln2_level",
+  IVF_LN2_EVAPORATION_RATE: "ln2_evaporation_rate",
+  IVF_SHOCK: "shock",
+  IVF_TIVE_BATTERY_PERCENTAGE: "tive_battery_percentage",
+  IVF_LN2_LID_STATE: "ln2_lid_state",
+} as const;
 
 // KPI metadata configuration with icons, labels, and descriptions
 interface KpiMetadata {
@@ -236,36 +236,6 @@ export default function AlertSetting() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const openCreate = () => {
-    setEditingId(null);
-    setFormPayload({
-      kpi_name: '',
-      alert_name: null,
-      min: null,
-      max: null,
-      unit: null,
-      alert_type: null,
-      status: true,
-    });
-    setFormError(null);
-    setShowForm(true);
-  };
-
-  const openEdit = (row: KpiConfigRow) => {
-    setEditingId(row.id);
-    setFormPayload({
-      kpi_name: row.kpi_name,
-      alert_name: row.alert_name,
-      min: row.min,
-      max: row.max,
-      unit: row.unit,
-      alert_type: row.alert_type,
-      status: row.status,
-    });
-    setFormError(null);
-    setShowForm(true);
-  };
-
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
@@ -339,11 +309,6 @@ export default function AlertSetting() {
     }
   };
 
-  const openDeleteConfirm = (id: number) => {
-    setConfigToDeleteId(id);
-    setShowDeleteConfirm(true);
-  };
-
   const closeDeleteConfirm = () => {
     if (!deleteLoading) {
       setShowDeleteConfirm(false);
@@ -356,8 +321,6 @@ export default function AlertSetting() {
     { value: 'soft', label: 'Soft Alert' },
     { value: 'critical', label: 'Critical Alert' },
   ];
-
-  const getDisplayName = (r: KpiConfigRow) => (r.alert_name && r.alert_name.trim() !== '' ? r.alert_name : r.kpi_name);
 
   const getDraft = (id: number) => draftConfig[id] ?? {};
   const setDraft = (id: number, patch: { min?: number | null; max?: number | null; alert_type?: string | null }) => {
