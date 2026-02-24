@@ -132,8 +132,8 @@ export default function Dashboard({ }: DashboardProps) {
     siteName: string;
     status: string;
     gobletColor: string;
-    crylockColor: string;
-  }>({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
+    cryolockColor: string;
+  }>({ siteName: 'all', status: 'all', gobletColor: 'all', cryolockColor: 'all' });
 
   // IVF total embryos/cryolocks metric (live API data)
   const [ivfTotalEmbryos, setIvfTotalEmbryos] = useState<number | null>(null);
@@ -412,7 +412,7 @@ export default function Dashboard({ }: DashboardProps) {
             ivfEmbryoTrackingFilterValues.siteName === 'all' &&
             ivfEmbryoTrackingFilterValues.status === 'all' &&
             ivfEmbryoTrackingFilterValues.gobletColor === 'all' &&
-            ivfEmbryoTrackingFilterValues.crylockColor === 'all';
+            ivfEmbryoTrackingFilterValues.cryolockColor === 'all';
           if (noFilters && res?.total != null) {
             setIvfEmbryoTrackingTotalUnfiltered(res.total);
           }
@@ -424,7 +424,7 @@ export default function Dashboard({ }: DashboardProps) {
         }
       });
     return () => { cancelled = true; };
-  }, [userDepartment, isAuthenticated, ivfEmbryoTrackingFilterValues.siteName, ivfEmbryoTrackingFilterValues.status, ivfEmbryoTrackingFilterValues.gobletColor, ivfEmbryoTrackingFilterValues.crylockColor]);
+  }, [userDepartment, isAuthenticated, ivfEmbryoTrackingFilterValues.siteName, ivfEmbryoTrackingFilterValues.status, ivfEmbryoTrackingFilterValues.gobletColor, ivfEmbryoTrackingFilterValues.cryolockColor]);
 
   // Build API filter params from current filter values (backend-level)
   const embryoTrackingApiFilters = useMemo(() => {
@@ -432,7 +432,7 @@ export default function Dashboard({ }: DashboardProps) {
     if (ivfEmbryoTrackingFilterValues.siteName && ivfEmbryoTrackingFilterValues.siteName !== 'all') f.branch_name = ivfEmbryoTrackingFilterValues.siteName;
     if (ivfEmbryoTrackingFilterValues.status && ivfEmbryoTrackingFilterValues.status !== 'all') f.status = ivfEmbryoTrackingFilterValues.status;
     if (ivfEmbryoTrackingFilterValues.gobletColor && ivfEmbryoTrackingFilterValues.gobletColor !== 'all') f.goblet_color = ivfEmbryoTrackingFilterValues.gobletColor;
-    if (ivfEmbryoTrackingFilterValues.crylockColor && ivfEmbryoTrackingFilterValues.crylockColor !== 'all') f.cryolock_color = ivfEmbryoTrackingFilterValues.crylockColor;
+    if (ivfEmbryoTrackingFilterValues.cryolockColor && ivfEmbryoTrackingFilterValues.cryolockColor !== 'all') f.cryolock_color = ivfEmbryoTrackingFilterValues.cryolockColor;
     return f;
   }, [ivfEmbryoTrackingFilterValues]);
 
@@ -487,12 +487,12 @@ export default function Dashboard({ }: DashboardProps) {
     }
   };
 
-  const handleIvfEmbryoTrackingFilterChange = (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => {
+  const handleIvfEmbryoTrackingFilterChange = (key: 'siteName' | 'status' | 'gobletColor' | 'cryolockColor', value: string) => {
     setIvfEmbryoTrackingFilterValues((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleIvfEmbryoTrackingClearFilters = () => {
-    setIvfEmbryoTrackingFilterValues({ siteName: 'all', status: 'all', gobletColor: 'all', crylockColor: 'all' });
+    setIvfEmbryoTrackingFilterValues({ siteName: 'all', status: 'all', gobletColor: 'all', cryolockColor: 'all' });
   };
 
   // Fetch IVF totals (Total Embryos/Cryolocks) from API
