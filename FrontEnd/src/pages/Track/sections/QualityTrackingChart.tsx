@@ -57,6 +57,7 @@ interface DataPoint {
 }
 
 const MAX_DATA_POINTS = 30; // Keep last 30 data points
+const TIMELINE_BUFFER_SLOTS = 4; // Space beyond last point so the curve doesn't end at the right edge
 
 export default function QualityTrackingChart() {
   const { patientId } = useParams<{ patientId: string }>();
@@ -299,22 +300,28 @@ export default function QualityTrackingChart() {
     };
   }, [patientId, token]);
 
-  // Prepare chart data
+  // Prepare chart data (with buffer at end so timeline extends beyond last point)
   const chartData = useMemo(() => {
-    // Unified color palette
     const palette = {
       temperature: '#8AB6F9',
       agitation: '#BDBDBD',
     } as const;
 
-    const labels = dataPoints.map((point) => formatTimestamp(point.timestamp));
-    
-    // Show only first, middle, and last labels to avoid clutter
-    const displayLabels = labels.map((label, index) => {
-      if (labels.length <= 4) return label;
+    const rawLabels = dataPoints.map((point) => formatTimestamp(point.timestamp));
+    const tempData = dataPoints.map((point) => point.temperature);
+    const agitationData = dataPoints.map((point) => point.agitation);
+
+    const bufferLabels = [...rawLabels, ...Array(TIMELINE_BUFFER_SLOTS).fill('')];
+    const bufferTemp = [...tempData, ...Array(TIMELINE_BUFFER_SLOTS).fill(null)];
+    const bufferAgitation = [...agitationData, ...Array(TIMELINE_BUFFER_SLOTS).fill(null)];
+
+    // Show only first, middle, and last labels to avoid clutter (only for real data indices)
+    const displayLabels = bufferLabels.map((label, index) => {
+      if (index >= rawLabels.length) return '';
+      if (rawLabels.length <= 4) return label;
       if (index === 0) return label;
-      if (index === Math.floor(labels.length / 2)) return label;
-      if (index === labels.length - 1) return label;
+      if (index === Math.floor(rawLabels.length / 2)) return label;
+      if (index === rawLabels.length - 1) return label;
       return '';
     });
 
@@ -323,7 +330,7 @@ export default function QualityTrackingChart() {
       datasets: [
         {
           label: 'Temperature (°C)',
-          data: dataPoints.map((point) => point.temperature),
+          data: bufferTemp,
           borderColor: palette.temperature,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -334,10 +341,11 @@ export default function QualityTrackingChart() {
           pointBorderWidth: 1,
           tension: 0.4,
           fill: false,
+          spanGaps: true,
         },
         {
           label: 'Agitation / Vibration',
-          data: dataPoints.map((point) => point.agitation),
+          data: bufferAgitation,
           borderColor: palette.agitation,
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -348,6 +356,7 @@ export default function QualityTrackingChart() {
           pointBorderWidth: 1,
           tension: 0.4,
           fill: false,
+          spanGaps: true,
         },
       ],
     };
@@ -393,6 +402,7 @@ export default function QualityTrackingChart() {
             title: (items: any[]) => {
               if (!items?.length) return '';
               const index = items[0].dataIndex;
+              if (index >= dataPoints.length) return '';
               return dataPoints[index] ? formatTimestamp(dataPoints[index].timestamp) : '';
             },
             label: (context: any) => {
@@ -483,8 +493,8 @@ export default function QualityTrackingChart() {
   );
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[460px]">
-      <div className="flex items-center justify-between mb-1">
+    <div className="w-full min-w-0 min-h-[360px] flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
+      <div className="flex items-center justify-between mb-1 shrink-0">
         <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         {isConnected && (
           <span className="text-xs text-green-600">● Connected</span>
@@ -503,7 +513,7 @@ export default function QualityTrackingChart() {
         </div>
       )}
 
-      <div className="h-[380px]">
+      <div className="min-h-[260px] flex-1 w-full min-w-0 relative">
         {dataPoints.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
             {isConnected ? 'Waiting for data...' : 'Connecting...'}

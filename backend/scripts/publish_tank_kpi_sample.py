@@ -14,8 +14,8 @@ Usage:
   python scripts/publish_tank_kpi_sample.py
   python scripts/publish_tank_kpi_sample.py 1 T30
 
-Redis CLI one-liner (same payload shape; l1/l2 are config-only, not in readings):
-  redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","timestamp":"2026-02-22T13:00:00Z","kpis":[{"name":"temp_external","value":26.5,"unit":"°C"},{"name":"temp_internal","value":-199.2,"unit":"°C"},{"name":"ln2_level","value":62,"unit":"%"},{"name":"evaporation_rate","value":0.31,"unit":"kg/h"},{"name":"battery_level","value":85,"unit":"%"},{"name":"lid_status","value":1,"unit":""},{"name":"shock","value":0,"unit":""}]}'
+Redis CLI one-liner (timestamp inside each kpi):
+  redis-cli PUBLISH tank_kpi_readings_channel '{"type":"tank_kpi","tank_id":1,"tank_code":"T30","kpis":[{"timestamp":"2026-02-22T13:00:00Z","name":"temp_external","value":26.5,"unit":"°C"},{"timestamp":"2026-02-22T13:00:00Z","name":"temp_internal","value":-199.2,"unit":"°C"},{"timestamp":"2026-02-22T13:00:00Z","name":"ln2_level","value":62,"unit":"%"},{"timestamp":"2026-02-22T13:00:00Z","name":"evaporation_rate","value":0.31,"unit":"kg/h"},{"timestamp":"2026-02-22T13:00:00Z","name":"battery_level","value":85,"unit":"%"},{"timestamp":"2026-02-22T13:00:00Z","name":"lid_status","value":1,"unit":""},{"timestamp":"2026-02-22T13:00:00Z","name":"shock","value":0,"unit":""}]}'
 """
 
 import json
@@ -39,19 +39,19 @@ def main() -> None:
     tank_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     tank_code = sys.argv[2] if len(sys.argv) > 2 else "T30"
 
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     payload = {
         "type": "tank_kpi",
         "tank_id": tank_id,
         "tank_code": tank_code,
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "kpis": [
-            {"name": "temp_external", "value": 26.5, "unit": "°C"},
-            {"name": "temp_internal", "value": -199.2, "unit": "°C"},
-            {"name": "ln2_level", "value": 62, "unit": "%"},
-            {"name": "evaporation_rate", "value": 0.31, "unit": "kg/h"},
-            {"name": "battery_level", "value": 85, "unit": "%"},
-            {"name": "lid_status", "value": 1, "unit": ""},
-            {"name": "shock", "value": 0, "unit": ""},
+            {"timestamp": ts, "name": "temp_external", "value": 26.5, "unit": "°C"},
+            {"timestamp": ts, "name": "temp_internal", "value": -199.2, "unit": "°C"},
+            {"timestamp": ts, "name": "ln2_level", "value": 62, "unit": "%"},
+            {"timestamp": ts, "name": "evaporation_rate", "value": 0.31, "unit": "kg/h"},
+            {"timestamp": ts, "name": "battery_level", "value": 85, "unit": "%"},
+            {"timestamp": ts, "name": "lid_status", "value": 1, "unit": ""},
+            {"timestamp": ts, "name": "shock", "value": 0, "unit": ""},
         ],
     }
 

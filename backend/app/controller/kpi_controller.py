@@ -140,20 +140,21 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                             "tank_code": tank_code_str,
                             "branch_id": tank.branch_id,
                         })
-                        # Send last 5 KPI readings from database (readings table); Redis is for live updates only
+                        # Send last 5 KPI readings (timestamp inside each kpi, not top-level)
                         history = quality_service.get_tank_kpi_history(tank.tank_id, limit=5)
                         if not history:
                             history = quality_service.get_tank_kpi_redis_history(tank.tank_id, limit=5)
                         for item in history:
+                            kpis = item.get("kpis") or []
+                            if not kpis:
+                                continue
                             payload = {
                                 "type": "tank_kpi",
                                 "tank_id": item.get("tank_id", tank.tank_id),
                                 "tank_code": item.get("tank_code", tank_code_str),
-                                "timestamp": item.get("timestamp"),
-                                "kpis": item.get("kpis", []),
+                                "kpis": kpis,
                             }
-                            if payload.get("timestamp") and payload.get("kpis") is not None:
-                                await websocket.send_json(payload)
+                            await websocket.send_json(payload)
                     except json.JSONDecodeError:
                         pass
                 except asyncio.TimeoutError:

@@ -198,9 +198,9 @@ export function IVFOngoingTreatments({
   };
 
   return (
-    <div className="rounded-2xl  h-[320px] flex flex-col">
+    <div className="rounded-2xl w-full h-full flex flex-col">
       {countLabel != null && (
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
           <p className="text-xs text-gray-600">
             <span className="font-medium text-[#6B1176]">{countLabel}</span>
           </p>
@@ -215,9 +215,58 @@ export function IVFOngoingTreatments({
           )}
         </div>
       )}
+      {/* <div className='bg-black  text-white h-[320px] overflow-y-auto flex  '>sda
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        sd
+        sd
+        sd
+        ssdasdsda
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        sd
+        sd
+        sd
+        ssdassda
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        sd
+        sd
+        sd
+        ssdassda
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        sd
+        sd
+        sd
+        ssdas</div> */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+        className="h-[320px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
         <table className="min-w-max w-full">
             <thead className="sticky top-0 z-10">
