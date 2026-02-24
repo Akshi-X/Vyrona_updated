@@ -2,7 +2,7 @@
 Individual KPI reading for a tank. One row per (kpi_config_id, timestamp).
 Snapshots (timestamp + multiple kpis) are stored as multiple Readings rows with same timestamp.
 """
-from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import relationship
 
 from app.config.database import Base
@@ -28,6 +28,7 @@ class Readings(Base):
 
     deviation_alert_sent = Column(Boolean, nullable=False, default=False)
     deviation = Column(Boolean, nullable=False, default=False, index=True)
+    alert_id = Column(String(36), nullable=True, index=True, comment="Reference to critical_alerts.alert_id when this reading triggered a deviation alert")
 
     alert_id = Column(Integer, ForeignKey("alerts.alert_id", ondelete="SET NULL"),default=False, nullable=True, index=True)
     checked= Column(Boolean, nullable=True, default=False, index=True)
