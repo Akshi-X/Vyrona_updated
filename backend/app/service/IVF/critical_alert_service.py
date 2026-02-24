@@ -379,6 +379,7 @@ class CriticalAlertService:
             Readings.tank_id == tank_id,
             Readings.deviation == True,
             Readings.deviation_alert_sent == False,
+            Readings.checked == None,
         ).all()
 
         alerts_created = []
@@ -388,24 +389,25 @@ class CriticalAlertService:
                 KpiConfig.id == deviation.kpi_config_id,
             ).first()
             if not kpi_config:
+                deviation.checked = True
                 continue
 
-                alert = self._create_alert(
-                        tank_id=tank_id,
-                        alert_type=AlertType.DEVIATION_ALERT,
-                        source=AlertSource.KPI,
-                        severity=AlertSeverity.LOW if kpi_config.alert_type == "soft_alert" else AlertSeverity.HIGH,
-                        message=f'{kpi_config.alert_name} is deviated at {deviation.value}.',
-                        occurred_at=deviation.timestamp,
-                        triggered_by=AlertTriggeredBy.SYSTEM
-                    )
-                
-                if kpi_config.alert_type == "critical_alert":
-                    self._send_alert_email(alert)
-                
-                deviation.alert_id = alert.id
+            alert = self._create_alert(
+                    tank_id=tank_id,
+                    alert_type=AlertType.DEVIATION_ALERT,
+                    source=AlertSource.KPI,
+                    severity=AlertSeverity.LOW if kpi_config.alert_type == "soft_alert" else AlertSeverity.HIGH,
+                    message=f'{kpi_config.alert_name} is deviated at {deviation.value}.',
+                    occurred_at=deviation.timestamp,
+                    triggered_by=AlertTriggeredBy.SYSTEM
+                )
+            
+            if kpi_config.alert_type == "critical_alert":
+                self._send_alert_email(alert)
+            
+            deviation.alert_id = alert.id
 
-                alerts_created.append(alert)
+            alerts_created.append(alert)
         self.db.commit()
 
         return alerts_created
