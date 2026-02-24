@@ -115,18 +115,8 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
             quality_service = QualityService(db)
             while True:
                 try:
-                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
                     try:
-                        message = json.loads(data)
-                        tank_code = message.get("tank_code") if isinstance(message, dict) else None
                         
-                        try:
-                               
-                            if role == "User" and effective_branch_id is not None:
-                                quality_service.validate_tank_belongs_to_branch(tank.tank_id, effective_branch_id)
-                        except Exception as e:
-                            await websocket.send_json({"type": "error", "message": str(e)})
-                            continue
 
                         kpi_manager.active_connections[connection_id]["branch_id"] = None if role == "Admin" else tank.branch_id
                         kpi_manager.set_tank_subscription(connection_id, tank.tank_id, tank_code_str)
