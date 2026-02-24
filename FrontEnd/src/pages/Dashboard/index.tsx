@@ -1036,7 +1036,7 @@ export default function Dashboard({ }: DashboardProps) {
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
-              <div className="flex gap-6 flex-1 flex-col lg:flex-row">
+              <div className="flex gap-6  flex-col lg:flex-row">
                 {/* Left Column */}
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   <h1 className="font-semibold text-black text-lg">Monthly Summary</h1>
@@ -1415,8 +1415,8 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section>
-                <div className="border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden">
+              <section className="flex flex-1 ">
+                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden w-full h-full">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
