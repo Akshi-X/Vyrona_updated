@@ -467,7 +467,8 @@ class QualityTrackingService:
     def get_tank_tracking_details(
         self,
         tank_code: str,
-        branch_id: Optional[int] = None
+        branch_id: Optional[int] = None,
+        user_role: Optional[str] = None
     ) -> IVFCanisterTrackingResponse:
         """
         Fetch tracking details for all patient crylocks in a specific tank.
@@ -480,8 +481,9 @@ class QualityTrackingService:
             # Use optimized helper function to find tank
             tank = find_tank_by_code(self.db, tank_code, branch_id)
             
-            if not tank:
-                available_tanks = []
+            if not tank and user_role == "User":
+                # Branch-scoped "not found" message and available-tanks list only for User (branch_id set).
+                # Manager/Admin have no branch restriction; use a simple not-found message.
                 if branch_id is not None:
                     available_tanks_query = (
                         self.db.query(Tank.tank_code)
@@ -489,15 +491,13 @@ class QualityTrackingService:
                         .limit(10)
                     )
                     available_tanks = [t[0] for t in available_tanks_query.all()]
-                
-                error_msg = f"Tank with code '{tank_code}' not found"
-                if branch_id:
-                    error_msg += f" in branch {branch_id}"
-                if available_tanks:
-                    error_msg += f". Available tanks in this branch: {', '.join(map(str, available_tanks))}"
+                    error_msg = f"Tank with code '{tank_code}' not found in branch {branch_id}"
+                    if available_tanks:
+                        error_msg += f". Available tanks in this branch: {', '.join(map(str, available_tanks))}"
+                    else:
+                        error_msg += ". No tanks found in this branch."
                 else:
-                    error_msg += ". No tanks found in this branch."
-                
+                    error_msg = f"Tank with code '{tank_code}' not found"
                 raise AppException(
                     message=error_msg,
                     error_code=ErrorMessages.NOT_FOUND,
