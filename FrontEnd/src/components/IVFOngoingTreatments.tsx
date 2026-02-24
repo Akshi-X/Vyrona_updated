@@ -19,7 +19,7 @@ export interface EmbryoTrackingFilterValues {
   siteName: string;
   status: string;
   gobletColor: string;
-  crylockColor: string;
+  cryolockColor: string;
 }
 
 export interface IVFOngoingTreatmentsProps {
@@ -30,7 +30,7 @@ export interface IVFOngoingTreatmentsProps {
   onLoadMore?: () => void;
   filterOptions?: EmbryoTrackingFilterOptions;
   filterValues?: EmbryoTrackingFilterValues;
-  onFilterChange?: (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => void;
+  onFilterChange?: (key: 'siteName' | 'status' | 'gobletColor' | 'cryolockColor', value: string) => void;
   /** Total matching current filters (for "filtered / total" display) */
   filteredTotal?: number | null;
   /** Total without filters (from filters API) */
@@ -71,7 +71,7 @@ const defaultFilterValues: EmbryoTrackingFilterValues = {
   siteName: 'all',
   status: 'all',
   gobletColor: 'all',
-  crylockColor: 'all',
+  cryolockColor: 'all',
 };
 
 export function IVFOngoingTreatments({
@@ -93,7 +93,7 @@ export function IVFOngoingTreatments({
     filterValues.siteName !== 'all' ||
     filterValues.status !== 'all' ||
     filterValues.gobletColor !== 'all' ||
-    filterValues.crylockColor !== 'all';
+    filterValues.cryolockColor !== 'all';
 
   const countLabel =
     hasActiveFilter && filteredTotal != null
@@ -154,7 +154,7 @@ export function IVFOngoingTreatments({
   const getFilterValue = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
       case 'gobletColor': return filterValues.gobletColor;
-      case 'cryolockColor': return filterValues.crylockColor;
+      case 'cryolockColor': return filterValues.cryolockColor;
       case 'siteName': return filterValues.siteName;
       case 'status': return filterValues.status;
       default: return 'all';

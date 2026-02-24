@@ -497,7 +497,7 @@ export class IvfService extends BaseApiService {
     siteName?: string;
     status?: string;
     gobletColor?: string;
-    crylockColor?: string;
+    cryolockColor?: string;
   }): Promise<EmbryoTrackingFiltersResponse> {
     const params = new URLSearchParams();
     if (currentFilterValues?.siteName && currentFilterValues.siteName !== 'all') {
@@ -509,8 +509,8 @@ export class IvfService extends BaseApiService {
     if (currentFilterValues?.gobletColor && currentFilterValues.gobletColor !== 'all') {
       params.append('goblet_color', currentFilterValues.gobletColor);
     }
-    if (currentFilterValues?.crylockColor && currentFilterValues.crylockColor !== 'all') {
-      params.append('crylock_color', currentFilterValues.crylockColor);
+    if (currentFilterValues?.cryolockColor && currentFilterValues.cryolockColor !== 'all') {
+      params.append('crylock_color', currentFilterValues.cryolockColor);
     }
     const queryString = params.toString();
     const url = queryString ? `/api/ivf/embryo_tracking/filters?${queryString}` : '/api/ivf/embryo_tracking/filters';
