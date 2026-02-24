@@ -110,11 +110,11 @@ app.openapi = custom_openapi
 # Setup global exception handlers
 setup_exception_handlers(app)
 
-# # Startup event to initialize database
-# @app.on_event("startup")
-# async def startup_event():
-#     """Run on application startup"""
-#     logger = logging.getLogger(__name__)
+# Startup event to initialize database
+@app.on_event("startup")
+async def startup_event():
+    """Run on application startup"""
+    logger = logging.getLogger(__name__)
 #     logger.info("=" * 60)
 #     logger.info("APPLICATION STARTUP EVENT")
 #     logger.info("=" * 60)
@@ -127,26 +127,26 @@ setup_exception_handlers(app)
 #     logger.info("Creating pharma admin users...")
 #     create_admin()
     
-#     # Step 3: Start quality monitoring background tasks
-#     logger.info("Starting quality monitoring background tasks...")
-#     db = SessionLocal()
-#     quality_service = QualityService(db)
-#     asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
-#     asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
+    # Step 3: Start quality monitoring background tasks
+    logger.info("Starting quality monitoring background tasks...")
+    db = SessionLocal()
+    quality_service = QualityService(db)
+    asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
+    asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
 
-#     # Step 3b: Start LN2 readings WebSocket listener (separate from quality)
-#     logger.info("Starting LN2 Redis listener for real-time readings...")
-#     asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
+    # Step 3b: Start LN2 readings WebSocket listener (separate from quality)
+    logger.info("Starting LN2 Redis listener for real-time readings...")
+    asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
     
-#     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
-#     logger.info("Starting World Bank LPI daily fetch scheduler...")
-#     asyncio.create_task(schedule_daily_lpi_fetch())
+    # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
+    logger.info("Starting World Bank LPI daily fetch scheduler...")
+    asyncio.create_task(schedule_daily_lpi_fetch())
     
-#     # Step 5: Start scheduled task for hourly alert reminders
-#     logger.info("Starting hourly alert reminder scheduler...")
-#     asyncio.create_task(schedule_alert_reminders())
+    # Step 5: Start scheduled task for hourly alert reminders
+    logger.info("Starting hourly alert reminder scheduler...")
+    asyncio.create_task(schedule_alert_reminders())
 
-#     print("!" * 60 + "\n")
+    print("!" * 60 + "\n")
 
 # Enable CORS (add FIRST so it executes FIRST in the chain)
 app.add_middleware(

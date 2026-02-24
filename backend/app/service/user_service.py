@@ -232,11 +232,16 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
                 status_code=400
             )
 
-        if not request.branch_name:
+        # Branch required only for User role; Manager can register without branch (views all branches)
+        role_lower_h = (role or "").strip().lower()
+        if role_lower_h == "manager":
+            # Manager never requires branch; ensure we don't use branch_name
+            pass
+        elif role_lower_h == "user" and not request.branch_name:
             raise DatabaseQueryException(
                 operation="user registration",
                 reason="Branch required",
-                custom_message="branch_name is required for hospital users",
+                custom_message="branch_name is required for User role",
                 status_code=400
             )
 
@@ -250,24 +255,28 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         
         hospital_id = hospital.hospital_id
         company_name = hospital.hospital_name
-        
-        # Validate branch belongs to hospital (lookup by branch_name)
-        branch = db.query(HospitalBranch).filter(
-            HospitalBranch.branch_name == request.branch_name,
-            HospitalBranch.hospital_id == hospital_id
-        ).first()
-        
-        if not branch:
-            logger.error(f"Branch '{request.branch_name}' not found for hospital {hospital_name}")
-            raise DatabaseQueryException(
-                operation="user registration",
-                reason="Branch not found",
-                custom_message=f"Branch '{request.branch_name}' not found for hospital '{hospital_name}'",
-                status_code=404
-            )
-        
-        branch_id = branch.branch_id
-        
+
+        # Manager: no branch (branch_id stays None). User: resolve branch from branch_name.
+        if role_lower_h == "manager":
+            branch_id = None
+        else:
+            # Validate branch belongs to hospital (lookup by branch_name)
+            branch = db.query(HospitalBranch).filter(
+                HospitalBranch.branch_name == request.branch_name,
+                HospitalBranch.hospital_id == hospital_id
+            ).first()
+
+            if not branch:
+                logger.error(f"Branch '{request.branch_name}' not found for hospital {hospital_name}")
+                raise DatabaseQueryException(
+                    operation="user registration",
+                    reason="Branch not found",
+                    custom_message=f"Branch '{request.branch_name}' not found for hospital '{hospital_name}'",
+                    status_code=404
+                )
+
+            branch_id = branch.branch_id
+
         # Validate department matches hospital_type
         if hospital.hospital_type and hospital.hospital_type.upper() != department.upper():
             logger.warning(
