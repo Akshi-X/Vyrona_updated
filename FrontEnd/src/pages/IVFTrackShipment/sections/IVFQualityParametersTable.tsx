@@ -167,7 +167,15 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       setL2(Math.min(100, Math.max(0, l2Kpi.value)));
     }
     // Update last sync time
-    setLastSyncTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' UTC');
+    setLastSyncTime(
+      new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'UTC',
+      }) + ' UTC'
+    );
   };
 
   useEffect(() => {
