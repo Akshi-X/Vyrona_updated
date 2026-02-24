@@ -497,7 +497,7 @@ def update_task(
     db: Session
 ) -> UpdateTaskResponse:
     """
-    Update a task (full update). Only the manager or pharma_admin who created the task can do this.
+    Update a task. Creator can update all fields, assignee can only update status.
     
     Args:
         task_id: Task ID to update
@@ -510,7 +510,7 @@ def update_task(
         
     Raises:
         TaskNotFoundException: If task not found
-        TaskUnauthorizedEditException: If user is not the creator
+        TaskUnauthorizedEditException: If user is neither creator nor assignee
         TaskInvalidAssigneeException: If new assignee is invalid
         TaskInvalidPatientException: If new patient is invalid
         TaskUpdateFailedException: If update fails
@@ -522,10 +522,31 @@ def update_task(
         if not task:
             raise TaskNotFoundException(task_id=task_id)
         
-        # Check authorization: only creator can edit
-        if task.created_by_id != current_user.user_id:
+        # Check authorization: creator can edit all fields, assignee can only edit status
+        is_creator = task.created_by_id == current_user.user_id
+        is_assignee = task.assignee_id == current_user.user_id
+        
+        if not is_creator and not is_assignee:
             raise TaskUnauthorizedEditException(task_id=task_id, user_id=current_user.user_id)
         
+        # If assignee (not creator), only allow status update
+        if is_assignee and not is_creator:
+            # Assignee can only update status - ignore other fields
+            if request.status is not None:
+                task.status = request.status
+                task.updated_by_id = current_user.user_id
+                task.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(task)
+            
+            # Build response
+            task_response = _build_task_response(task, current_user, db)
+            return UpdateTaskResponse(
+                message=SuccessMessages.TASK_UPDATED,
+                task=task_response
+            )
+        
+        # Creator path: can update all fields
         # Validate new assignee (if provided)
         if request.assignee_id:
             assignee = get_user_by_id(request.assignee_id, db)

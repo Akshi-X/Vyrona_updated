@@ -440,3 +440,55 @@ def export_combined_refill_logs_and_deviations_excel(
     except Exception as e:
         logger.error(f"Error in export_combined_refill_logs_and_deviations_excel endpoint: {str(e)}", exc_info=True)
         raise
+
+
+@router.get("/tanks/{tank_code}/readings-deviations/export-excel")
+def export_readings_deviations_excel(
+    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
+    branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export deviations from the readings table combined with KPI config to Excel format.
+    
+    Returns an Excel file with a single sheet containing readings deviations data with:
+    - Date and Time of the reading
+    - Tank Code and Branch Name
+    - Device ID
+    - KPI Name and Alert Name from KPI config
+    - KPI Value recorded
+    - Unit from KPI config
+    - Min and Max thresholds from KPI config
+    - Violation Type (Below Min, Above Max, Threshold Breach)
+    - Alert Type from KPI config
+    - Alert Sent status
+    
+    Query Parameters:
+    - year: Year for the report (e.g., 2024). Optional - defaults to current year.
+    - month: Month for the report (1-12). Optional - if not provided, exports entire year.
+    
+    Example:
+    GET /api/quality-tracking/tanks/T1/readings-deviations/export-excel (exports current year)
+    GET /api/quality-tracking/tanks/T1/readings-deviations/export-excel?year=2024 (exports year 2024)
+    GET /api/quality-tracking/tanks/T1/readings-deviations/export-excel?year=2024&month=3 (exports March 2024)
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        tank_id = quality_tracking_service.resolve_tank_id(
+            tank_code=tank_code,
+            branch_id=branch_id
+        )
+        return quality_tracking_service.export_readings_deviations_excel_for_tank(
+            tank_id=tank_id,
+            year=year,
+            month=month,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in export_readings_deviations_excel endpoint: {str(e)}", exc_info=True)
+        raise

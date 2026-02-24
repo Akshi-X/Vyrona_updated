@@ -280,9 +280,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex items-center justify-center gap-3 py-2 mx-6">
+      <div className="flex items-start justify-center gap-2 ">
         {/* Left KPI Tiles */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 justify-start pt-6">
           <KpiTile
             icon={<LockIcon className="text-[#6B1176]" />}
             label="Lid Status"
@@ -443,7 +443,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         </div>
 
         {/* Right KPI Tiles */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 pt-6">
           <KpiTile
             icon={<SunIcon className="text-[#6B1176]" />}
             label="External Temp"
