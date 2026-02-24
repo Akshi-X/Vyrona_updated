@@ -29,6 +29,9 @@ class Readings(Base):
     deviation_alert_sent = Column(Boolean, nullable=False, default=False)
     deviation = Column(Boolean, nullable=False, default=False, index=True)
 
+    alert_id = Column(Integer, ForeignKey("alerts.alert_id", ondelete="SET NULL"),default=False, nullable=True, index=True)
+    checked= Column(Boolean, nullable=True, default=False, index=True)
+
     kpi_config = relationship("KpiConfig", back_populates="readings")
 
     __table_args__ = (
