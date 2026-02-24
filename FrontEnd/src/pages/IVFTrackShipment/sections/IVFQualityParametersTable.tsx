@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
 import { ivfService } from '../../../services/ivfService';
+// CriticalAlertsIcon import removed - using inline AlertIcon component with dynamic colors
 
 interface IVFQualityParametersTableProps {
   canisterNumber?: string;
@@ -43,6 +44,19 @@ const EvaporationIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
+const ShockIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+// Alert icon with dynamic fill color for threshold markers
+const AlertIcon = ({ color = '#6B1176' }: { color?: string }) => (
+  <svg width="18" height="18" viewBox="0 0 23 21" fill="none">
+    <path d="M11.0476 0.100342C12.1558 0.100342 13.1313 0.667473 13.7 1.5271L13.8083 1.70288L13.8103 1.70581L13.8162 1.71753L21.5291 15.2136C21.7986 15.6712 21.9577 16.2213 21.9578 16.8074C21.9578 17.3947 21.7972 17.9445 21.5193 18.4167L21.5203 18.4177L21.5125 18.4314C20.9532 19.3859 19.9309 20.0173 18.7615 20.0173H3.31421L3.31519 20.0183C3.30974 20.0184 3.30344 20.0183 3.29761 20.0183C2.12295 20.0183 1.09697 19.3813 0.546631 18.4343L0.544678 18.4314L0.538818 18.4207L0.441162 18.2429C0.224877 17.8188 0.100342 17.3279 0.100342 16.8083C0.100355 16.2216 0.259389 15.6719 0.536865 15.2L8.24292 1.71753C8.79815 0.745596 9.82919 0.100394 11.0115 0.100342H11.0476ZM11.0193 1.80835C10.4697 1.80839 9.98895 2.10661 9.73315 2.55151L9.73413 2.55249L9.72925 2.5603L9.72827 2.56323L2.01343 16.0613L2.01245 16.0623C1.88734 16.2746 1.81323 16.5311 1.81323 16.8054C1.81327 17.08 1.88744 17.337 2.01733 17.5574H2.01831C2.27915 18.0069 2.75748 18.3035 3.30444 18.3035H18.7546C19.3009 18.3034 19.778 18.0077 20.0349 17.5671L20.0388 17.5603L20.0408 17.5564C20.1689 17.3421 20.2458 17.083 20.2458 16.8054C20.2458 16.5341 20.1727 16.2799 20.0457 16.0613L20.0437 16.0583L20.0398 16.0515V16.0505L12.3308 2.56323C12.0716 2.10844 11.5903 1.80839 11.0398 1.80835H11.0193ZM11.0281 13.3513C11.6395 13.3513 12.1353 13.8473 12.1355 14.4587C12.1355 15.0703 11.6396 15.5662 11.0281 15.5662C10.4205 15.5655 9.92723 15.0758 9.92163 14.4695V14.4636C9.92163 14.1595 10.0445 13.8834 10.2429 13.6833C10.4425 13.4801 10.7201 13.353 11.0271 13.3513H11.0281ZM11.03 6.56226C11.5023 6.56226 11.8853 6.94547 11.8855 7.41772V11.1853C11.8855 11.6282 11.5492 11.993 11.1179 12.0369L11.03 12.0408H11.0281C10.5561 12.0407 10.1733 11.6581 10.1726 11.1863V11.1453L10.1736 11.1443V7.41772C10.1738 6.94552 10.5568 6.56235 11.0291 6.56226H11.03Z" fill={color} stroke={color} strokeWidth="0.2"/>
+  </svg>
+);
+
 const BatteryIcon = ({ level }: { level: number }) => (
   <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
     <rect x="1" y="2" width="26" height="12" rx="2" stroke="#6B1176" strokeWidth="2" />
@@ -51,24 +65,6 @@ const BatteryIcon = ({ level }: { level: number }) => (
   </svg>
 );
 
-const SignalIcon = ({ strength }: { strength: 'weak' | 'medium' | 'strong' }) => {
-  const bars = strength === 'strong' ? 4 : strength === 'medium' ? 3 : 2;
-  return (
-    <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-      {[0, 1, 2, 3].map((i) => (
-        <rect
-          key={i}
-          x={i * 5}
-          y={12 - i * 3}
-          width="3"
-          height={4 + i * 3}
-          rx="1"
-          fill={i < bars ? '#6B1176' : '#E7E1E1'}
-        />
-      ))}
-    </svg>
-  );
-};
 
 // KPI Tile Card component using system colors
 interface KpiTileProps {
@@ -104,6 +100,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   const [tempExternal, setTempExternal] = useState<number | null>(null);
   const [tempInternal, setTempInternal] = useState<number | null>(null);
   const [lidStatus, setLidStatus] = useState<number | null>(0);
+  const [shock, setShock] = useState<number | null>(0);
+  const [l1, setL1] = useState<number>(75); // L1 level threshold (default 100%)
+  const [l2, setL2] = useState<number>(30);  // L2 level threshold (default 30%)
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -155,8 +154,28 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
       setLidStatus(lid.value);
     }
+    const sh = kpis.find((k) => k.name === 'shock');
+    if (sh?.value !== undefined && typeof sh.value === 'number' && !Number.isNaN(sh.value)) {
+      setShock(sh.value);
+    }
+    const l1Kpi = kpis.find((k) => k.name === 'l1');
+    if (l1Kpi?.value !== undefined && typeof l1Kpi.value === 'number' && !Number.isNaN(l1Kpi.value)) {
+      setL1(Math.min(100, Math.max(0, l1Kpi.value)));
+    }
+    const l2Kpi = kpis.find((k) => k.name === 'l2');
+    if (l2Kpi?.value !== undefined && typeof l2Kpi.value === 'number' && !Number.isNaN(l2Kpi.value)) {
+      setL2(Math.min(100, Math.max(0, l2Kpi.value)));
+    }
     // Update last sync time
-    setLastSyncTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) + ' UTC');
+    setLastSyncTime(
+      new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'UTC',
+      }) + ' UTC'
+    );
   };
 
   useEffect(() => {
@@ -223,13 +242,24 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   const tankBodyBottom = tankBodyTop + tankBodyHeight;
   const fillHeight = (tankBodyHeight * (levelPercent ?? 0)) / 100;
   const liquidSurfaceY = tankBodyBottom - fillHeight;
+  
+  // L1/L2 level marker positions (calculate Y from percentage)
+  const l1Y = tankBodyBottom - (tankBodyHeight * l1) / 100;
+  const l2Y = tankBodyBottom - (tankBodyHeight * l2) / 100;
+  
+  // Alert color based on level thresholds
+  const alertColor = (levelPercent ?? 0) <= l2 
+    ? '#EF4444' // Red if at or below L2
+    : (levelPercent ?? 0) < l1 
+      ? '#F59E0B' // Yellow if between L1 and L2
+      : '#22C55E'; // Green if at or above L1
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex flex-col items-start justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
-        <div className="flex items-center gap-5 flex-wrap">
+        <div className="flex items-center justify-end gap-5 flex-wrap">
           {/* Live indicator */}
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -239,11 +269,6 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
           <div className="flex items-center gap-1.5">
             <BatteryIcon level={batteryLevel} />
             <span className="text-sm font-medium text-black">{batteryLevel}%</span>
-          </div>
-          {/* Signal */}
-          <div className="flex items-center gap-1.5">
-            <SignalIcon strength="strong" />
-            <span className="text-sm font-medium text-black">Strong</span>
           </div>
           {/* Last Sync */}
           <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -273,9 +298,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         {/* Tank SVG */}
         <div className="shrink-0">
           <svg
-            width="180"
+            width="220"
             height="320"
-            viewBox="0 0 200 320"
+            viewBox="0 0 240 320"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             aria-label="Cryocan tank"
@@ -308,7 +333,12 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             <rect x="50" y="15" width="100" height="40" rx="10" fill="#a78bba" stroke="#8B6B9E" strokeWidth="2" />
             <rect x="60" y="22" width="80" height="10" rx="5" fill="#c9b3db" />
             <rect x="70" y="35" width="60" height="8" rx="4" fill="#b8a0cc" />
-
+            
+            {/* Tank base/feet */}
+            <rect x="40" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+            <rect x="130" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+            <rect x="65" y="270" width="70" height="12" rx="3" fill="#a78bba" />
+            
             {/* Tank body outline */}
             <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="url(#tank-body-gradient)" stroke="#8B6B9E" strokeWidth="3" />
 
@@ -369,10 +399,23 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             {/* Tank inner shadow for depth */}
             <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
 
-            {/* Tank base/feet */}
-            <rect x="40" y="270" width="30" height="35" rx="6" fill="#8B6B9E" />
-            <rect x="130" y="270" width="30" height="35" rx="6" fill="#8B6B9E" />
-            <rect x="65" y="280" width="70" height="12" rx="3" fill="#a78bba" />
+            {/* L1 Level Marker */}
+            <g>
+              <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+              <g transform={`translate(192, ${l1Y - 9})`}>
+                <AlertIcon color={alertColor} />
+              </g>
+              <text x="212" y={l1Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
+            </g>
+            
+            {/* L2 Level Marker */}
+            <g>
+              <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+              <g transform={`translate(192, ${l2Y - 9})`}>
+                <AlertIcon color={alertColor} />
+              </g>
+              <text x="212" y={l2Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
+            </g>
 
             {/* Level percentage display on tank */}
             <text
@@ -410,6 +453,11 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
             icon={<EvaporationIcon className="text-[#6B1176]" />}
             label="LN2 Evaporation Rate"
             value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
+          />
+          <KpiTile
+            icon={<ShockIcon className="text-[#6B1176]" />}
+            label="Shock"
+            value={shock != null ? String(shock) : '—'}
           />
         </div>
       </div>
