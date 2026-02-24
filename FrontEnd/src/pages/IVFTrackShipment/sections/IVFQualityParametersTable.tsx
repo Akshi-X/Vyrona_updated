@@ -457,7 +457,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
           <KpiTile
             icon={<ShockIcon className="text-[#6B1176]" />}
             label="Shock"
-            value={String(shock ?? 0)}
+            value={shock != null ? String(shock) : '—'}
           />
         </div>
       </div>
