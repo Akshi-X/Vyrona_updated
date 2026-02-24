@@ -29,16 +29,19 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
     WebSocket for Quality Tracking KPI live updates.
     Query: ?token=<jwt>&branch_id_override=<id> (optional).
     Send JSON: { "tank_code": "T30" } to subscribe. Receives type "tank_kpi" messages for that tank.
+    Auth is validated before accept() so rejections return HTTP 403 instead of upgrading then closing.
     """
     connection_id = None
-    try:
-        await websocket.accept()
-        logger.info(f"KPI WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
+    user_id = None
+    branch_id = None
+    role = None
 
+    # Validate auth before accept() so rejection returns HTTP 403 (not upgrade-then-close)
+    try:
         query_params = dict(websocket.query_params)
         token = query_params.get("token")
         if not token:
-            await websocket.close(code=1008, reason="Authentication required: No token provided")
+            await websocket.close(code=4401)
             return
 
         branch_id_override = None
@@ -52,20 +55,32 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
             auth_info = verify_websocket_token(token)
             user_id = auth_info["user_id"]
         except InvalidTokenException as e:
-            await websocket.close(code=1008, reason=f"Invalid token: {str(e)}")
+            logger.warning(f"KPI WebSocket rejected: invalid token - {e}")
+            await websocket.close(code=4401)
             return
         except Exception as e:
-            await websocket.close(code=1008, reason=f"Token verification failed: {str(e)}")
+            logger.warning(f"KPI WebSocket rejected: token verification failed - {e}")
+            await websocket.close(code=4401)
             return
 
         db_temp = SessionLocal()
         try:
             user = db_temp.query(User).filter(User.user_id == user_id).first()
             if not user:
-                await websocket.close(code=1008, reason="User not found")
+                logger.warning(f"KPI WebSocket rejected: user not found - {user_id}")
+                await websocket.close(code=4403)
+                return
+            if not user.status:
+                logger.warning(f"KPI WebSocket rejected: user inactive - {user_id}")
+                await websocket.close(code=4403)
+                return
+            if getattr(user, "approved_status", None) != "approved":
+                logger.warning(f"KPI WebSocket rejected: user not approved - {user_id}")
+                await websocket.close(code=4403)
                 return
             if not is_specific_department(user.department, "IVF"):
-                await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
+                logger.warning(f"KPI WebSocket rejected: not IVF department - {user_id}")
+                await websocket.close(code=4403)
                 return
 
             role = user.role.value if hasattr(user.role, "value") else str(user.role)
@@ -74,6 +89,9 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                 branch_id = branch_id_override
         finally:
             db_temp.close()
+
+        await websocket.accept()
+        logger.info(f"KPI WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
 
         connection_id = await kpi_manager.connect(websocket)
         kpi_manager.active_connections[connection_id]["user_id"] = user_id

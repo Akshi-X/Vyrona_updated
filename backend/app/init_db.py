@@ -409,6 +409,50 @@ def create_hospitals_and_branches():
         else:
             logger.info(f"Branch already exists: {branch_name} for {hospital_name}")
 
+        # Create separate hospital: mygrape_test (for testing / separate tenant)
+        mygrape_hospital_name = "mygrape_test"
+        mygrape_branch_name = "Main"
+
+        existing_mygrape = db.query(Hospital).filter(
+            Hospital.hospital_name == mygrape_hospital_name
+        ).first()
+
+        if not existing_mygrape:
+            mygrape_hospital = Hospital(
+                hospital_name=mygrape_hospital_name,
+                hospital_type="IVF",
+                created_by="system"
+            )
+            db.add(mygrape_hospital)
+            db.commit()
+            db.refresh(mygrape_hospital)
+            logger.info(f"Hospital created: {mygrape_hospital_name} (ID: {mygrape_hospital.hospital_id})")
+            mygrape_hospital_id = mygrape_hospital.hospital_id
+        else:
+            mygrape_hospital_id = existing_mygrape.hospital_id
+            logger.info(f"Hospital already exists: {mygrape_hospital_name} (ID: {mygrape_hospital_id})")
+
+        existing_mygrape_branch = db.query(HospitalBranch).filter(
+            HospitalBranch.hospital_id == mygrape_hospital_id,
+            HospitalBranch.branch_name == mygrape_branch_name
+        ).first()
+
+        if not existing_mygrape_branch:
+            mygrape_branch = HospitalBranch(
+                hospital_id=mygrape_hospital_id,
+                branch_name=mygrape_branch_name,
+                district_name="Default",
+                state_name="Default",
+                country_name="India",
+                created_by="system"
+            )
+            db.add(mygrape_branch)
+            db.commit()
+            db.refresh(mygrape_branch)
+            logger.info(f"Branch created: {mygrape_branch_name} (ID: {mygrape_branch.branch_id}) for {mygrape_hospital_name}")
+        else:
+            logger.info(f"Branch already exists: {mygrape_branch_name} for {mygrape_hospital_name}")
+
         logger.info("=" * 60)
         logger.info("HOSPITALS AND BRANCHES SETUP COMPLETE")
         logger.info("=" * 60)
