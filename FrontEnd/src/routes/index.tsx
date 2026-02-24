@@ -46,7 +46,7 @@ const TrackPageWithAuth = () => (
 )
 
 const IVFTrackShipmentWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
+  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={false}>
     <IVFTrackShipmentPage />
   </RoleBasedRoute>
 )
