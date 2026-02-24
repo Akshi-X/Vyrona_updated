@@ -19,7 +19,7 @@ export interface EmbryoTrackingFilterValues {
   siteName: string;
   status: string;
   gobletColor: string;
-  crylockColor: string;
+  cryolockColor: string;
 }
 
 export interface IVFOngoingTreatmentsProps {
@@ -30,7 +30,7 @@ export interface IVFOngoingTreatmentsProps {
   onLoadMore?: () => void;
   filterOptions?: EmbryoTrackingFilterOptions;
   filterValues?: EmbryoTrackingFilterValues;
-  onFilterChange?: (key: 'siteName' | 'status' | 'gobletColor' | 'crylockColor', value: string) => void;
+  onFilterChange?: (key: 'siteName' | 'status' | 'gobletColor' | 'cryolockColor', value: string) => void;
   /** Total matching current filters (for "filtered / total" display) */
   filteredTotal?: number | null;
   /** Total without filters (from filters API) */
@@ -43,7 +43,7 @@ export interface IVFOngoingTreatmentsProps {
 interface TableHeader {
   label: string;
   hasFilter?: boolean;
-  filterKey?: 'gobletColor' | 'crylockColor' | 'siteName' | 'status';
+  filterKey?: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status';
 }
 
 const tableHeaders: TableHeader[] = [
@@ -53,7 +53,7 @@ const tableHeaders: TableHeader[] = [
   { label: "Tank ID" },
   { label: "Cane ID" },
   { label: "Goblet Color", hasFilter: true, filterKey: 'gobletColor' },
-  { label: "Cryolock Color", hasFilter: true, filterKey: 'crylockColor' },
+  { label: "Cryolock Color", hasFilter: true, filterKey: 'cryolockColor' },
   { label: "Date of Vitrification" },
   { label: "Description" },
   { label: "Site Name", hasFilter: true, filterKey: 'siteName' },
@@ -71,7 +71,7 @@ const defaultFilterValues: EmbryoTrackingFilterValues = {
   siteName: 'all',
   status: 'all',
   gobletColor: 'all',
-  crylockColor: 'all',
+  cryolockColor: 'all',
 };
 
 export function IVFOngoingTreatments({
@@ -93,7 +93,7 @@ export function IVFOngoingTreatments({
     filterValues.siteName !== 'all' ||
     filterValues.status !== 'all' ||
     filterValues.gobletColor !== 'all' ||
-    filterValues.crylockColor !== 'all';
+    filterValues.cryolockColor !== 'all';
 
   const countLabel =
     hasActiveFilter && filteredTotal != null
@@ -151,46 +151,46 @@ export function IVFOngoingTreatments({
   }, [hasMore, isLoadingMore, onLoadMore]);
 
   // Filter values/options from props (backend-level filtering; no client-side filtering)
-  const getFilterValue = (filterKey: 'gobletColor' | 'crylockColor' | 'siteName' | 'status') => {
+  const getFilterValue = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
       case 'gobletColor': return filterValues.gobletColor;
-      case 'crylockColor': return filterValues.crylockColor;
+      case 'cryolockColor': return filterValues.cryolockColor;
       case 'siteName': return filterValues.siteName;
       case 'status': return filterValues.status;
       default: return 'all';
     }
   };
 
-  const setFilterValue = (filterKey: 'gobletColor' | 'crylockColor' | 'siteName' | 'status', value: string) => {
+  const setFilterValue = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status', value: string) => {
     onFilterChange?.(filterKey, value);
   };
 
-  const getFilterOptions = (filterKey: 'gobletColor' | 'crylockColor' | 'siteName' | 'status') => {
+  const getFilterOptions = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
       case 'gobletColor': return filterOptions.goblet_colors ?? [];
-      case 'crylockColor': return filterOptions.crylock_colors ?? [];
+      case 'cryolockColor': return filterOptions.crylock_colors ?? [];
       case 'siteName': return filterOptions.site_names ?? [];
       case 'status': return filterOptions.statuses ?? [];
       default: return [];
     }
   };
 
-  const getFilterCount = (filterKey: 'gobletColor' | 'crylockColor' | 'siteName' | 'status', option: string): number | null => {
+  const getFilterCount = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status', option: string): number | null => {
     // "All" = count with current other filters applied (so it updates when e.g. Site is selected)
     if (option === 'all') return filterOptions.total ?? totalUnfiltered ?? null;
     switch (filterKey) {
       case 'gobletColor': return filterOptions.goblet_color_counts?.[option] ?? null;
-      case 'crylockColor': return filterOptions.crylock_color_counts?.[option] ?? null;
+      case 'cryolockColor': return filterOptions.crylock_color_counts?.[option] ?? null;
       case 'siteName': return filterOptions.site_name_counts?.[option] ?? null;
       case 'status': return filterOptions.status_counts?.[option] ?? null;
       default: return null;
     }
   };
 
-  const getDropdownRef = (filterKey: 'gobletColor' | 'crylockColor' | 'siteName' | 'status') => {
+  const getDropdownRef = (filterKey: 'gobletColor' | 'cryolockColor' | 'siteName' | 'status') => {
     switch (filterKey) {
       case 'gobletColor': return gobletColorDropdownRef;
-      case 'crylockColor': return cryolockColorDropdownRef;
+      case 'cryolockColor': return cryolockColorDropdownRef;
       case 'siteName': return siteNameDropdownRef;
       case 'status': return statusDropdownRef;
       default: return null;
@@ -307,7 +307,7 @@ export function IVFOngoingTreatments({
                              <div className={`absolute top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg font-normal shadow-lg max-h-[200px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 ${
                                filterKey === 'status' ? 'right-0' : 'left-0'
                              } ${
-                               filterKey === 'gobletColor' || filterKey === 'crylockColor' ? 'w-[150px]' : 'w-[140px]'
+                               filterKey === 'gobletColor' || filterKey === 'cryolockColor' ? 'w-[150px]' : 'w-[140px]'
                              }`}>
                                <button
                                  type="button"
