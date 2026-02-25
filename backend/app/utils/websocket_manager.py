@@ -156,9 +156,10 @@ class ConnectionManager:
             else:
                 logger.warning(f"No tank found for device_code: {device_code!r}")
                 return  # Tank not found for this device
-        elif tank_code:
+        elif tank_id_from_data:
             # Look up tank by tank_code
-            tank = db.query(Tank).filter(Tank.tank_code == str(tank_code)).first()
+            tank = db.query(Tank).filter(Tank.tank_id == str(tank_id_from_data)).first()
+            logger.info(f"Tank found for tank_id: {tank_id_from_data}")
             if tank:
                 tank_id_from_data = tank.tank_id
                 tank_branch_id = tank.branch_id
@@ -204,7 +205,7 @@ class ConnectionManager:
             user_role = conn_data.get("role")
             
             # Admin can see all branches
-            if user_role == "Admin":
+            if user_role == "Admin" or user_role == "Manager":
                 pass  # Allow access
             # User/Manager must match branch
             elif connection_branch_id is not None:

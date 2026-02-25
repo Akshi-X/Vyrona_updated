@@ -509,15 +509,28 @@ async def tank_kpi_redis_listener():
                     raw = message.get("data")
                     if isinstance(raw, bytes):
                         raw = raw.decode("utf-8")
-                    data = json.loads(raw)
-                    logger.debug(f"Tank KPI Redis message received: tank_code={data.get('tank_code')}, tank_id={data.get('tank_id')}")
+
+                    # Redis pubsub messages from some publishers are wrapped as:
+                    # {"type": "message", "data": { ...actual payload... }}
+                    # Unwrap this so ConnectionManager.broadcast sees tank_code/tank_id at top level.
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed.get("data"), dict):
+                        payload = parsed["data"]
+                    else:
+                        payload = parsed
+
+                    logger.info(
+                        "Tank KPI Redis message received: tank_code=%s, tank_id=%s",
+                        payload.get("tank_code"),
+                        payload.get("tank_id"),
+                    )
                     db = SessionLocal()
                     try:
-                        await manager.broadcast(data, db)
+                        await manager.broadcast(payload, db)
                         # Also broadcast to /api/kpi/ws clients (Quality Tracking chart)
                         from app.controller.kpi_controller import kpi_manager
                         n = len(kpi_manager.active_connections)
-                        await kpi_manager.broadcast(data, db)
+                        await kpi_manager.broadcast(payload, db)
                         logger.info(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
                     except Exception as e:
                         logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
