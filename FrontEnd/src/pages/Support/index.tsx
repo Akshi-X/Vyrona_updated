@@ -7,17 +7,73 @@ import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
 import AttachmentThumbnail from '../../components/AttachmentThumbnail';
 
-const modules = [
-  'Dashboard',
-  'Database',
-  'Track shipment',
-  'Control Tower',
-  'After care',
-  'Failure',
-  'Stakeholder chat',
-  'Critical alert',
-  'MyTask',
-];
+type SupportRole = 'User' | 'Manager' | 'Admin';
+
+const MODULES_BY_ROLE: Record<SupportRole, string[]> = {
+  User: [
+    'Dashboard',
+    'Container quality tracking',
+    'User profile',
+    'Ticketing',
+    'Sign in',
+    'Sign up',
+  ],
+  Manager: [
+    'Dashboard',
+    'Container quality tracking',
+    'User profile',
+    'Ticketing',
+    'Control tower',
+    'Sign in',
+    'Sign up',
+  ],
+  Admin: [
+    'Dashboard',
+    'Container quality tracking',
+    'User profile',
+    'Ticketing',
+    'Control tower',
+    'Sign in',
+    'Sign up',
+    'Alert configuration',
+  ],
+};
+
+/** UI label -> backend enum value */
+const UI_MODULE_TO_BACKEND: Record<string, string> = {
+  'Dashboard': 'dashboard',
+  'Container quality tracking': 'container_quality_tracking',
+  'User profile': 'user_profile',
+  'Ticketing': 'ticketing',
+  'Control tower': 'control_tower',
+  'Sign in': 'sign_in',
+  'Sign up': 'signup',
+  'Alert configuration': 'alert_configuration',
+};
+
+/** Backend value -> UI label (for loading existing tickets; includes legacy) */
+const BACKEND_TO_UI_MODULE: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(UI_MODULE_TO_BACKEND).map(([k, v]) => [v, k])
+  ),
+  database: 'User profile',
+  track_shipment: 'Container quality tracking',
+  after_care: 'Ticketing',
+  failure: 'Ticketing',
+  stakeholder_chat: 'Ticketing',
+  critical_alert: 'Alert configuration',
+  my_task: 'Dashboard',
+  other: 'Dashboard',
+};
+
+/** Map auth context userRole (e.g. "admin", "manager", "user") to SupportRole */
+function supportRoleFromAuth(userRole: string | undefined): SupportRole {
+  if (!userRole) return 'User';
+  const r = userRole.toLowerCase();
+  if (r === 'admin') return 'Admin';
+  if (r === 'manager') return 'Manager';
+  return 'User';
+}
 
 interface CommentItem {
   id: string;
@@ -33,7 +89,8 @@ const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 const Support: React.FC = () => {
   const location = useLocation() as { state?: any };
   const navigate = useNavigate();
-  const { isEmailNotificationsEnabled } = useAuth();
+  const { isEmailNotificationsEnabled, userRole } = useAuth();
+  const supportRole = supportRoleFromAuth(userRole);
   const readonly = Boolean(location.state?.readonly);
   const hideAttach = Boolean(location.state?.hideAttach);
   const lockIdentity = Boolean(location.state?.lockIdentity);
@@ -52,6 +109,8 @@ const Support: React.FC = () => {
   const [status, setStatus] = useState<string>(prefill.status || 'Open');
   const [selectedModuleIndices, setSelectedModuleIndices] = useState<number[]>([]);
   const [agreementChecked, setAgreementChecked] = useState<boolean>(false);
+
+  const modules = MODULES_BY_ROLE[supportRole];
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<{path: string, filename: string}[]>([]);
@@ -221,34 +280,22 @@ const Support: React.FC = () => {
         setStatus(details.status || 'Open');
         
          // Parse affected modules (it's now an array of strings)
-         const affectedModulesList = Array.isArray(details.affected_modules) 
-           ? details.affected_modules 
+         const affectedModulesList = Array.isArray(details.affected_modules)
+           ? details.affected_modules
            : (details.affected_modules ? [details.affected_modules] : []);
-         
-         // Set the checkboxes based on all selected modules
-         // Map backend module values to UI module names and find their indices
-         const moduleMap: Record<string, string> = {
-           'dashboard': 'Dashboard',
-           'database': 'Database',
-           'track_shipment': 'Track shipment',
-           'control_tower': 'Control Tower',
-           'after_care': 'After care',
-           'failure': 'Failure',
-           'stakeholder_chat': 'Stakeholder chat',
-           'critical_alert': 'Critical alert',
-           'my_task': 'MyTask',
-           'other': 'Dashboard' // Default fallback
-         };
-         
-         const selectedIndices = affectedModulesList
-           .map(module => {
-             const uiModuleName = moduleMap[module] || module;
-             return modules.findIndex(m => m === uiModuleName);
-           })
-           .filter(index => index !== -1);
-         
-         if (selectedIndices.length > 0) {
-           setSelectedModuleIndices(selectedIndices);
+
+         const uiLabels = affectedModulesList
+           .map((m: string) => BACKEND_TO_UI_MODULE[m] || m)
+           .filter(Boolean);
+         if (uiLabels.length > 0) {
+           const role = supportRoleFromAuth(userRole);
+           const roleModules = MODULES_BY_ROLE[role];
+           const selectedIndices = uiLabels
+             .map((label: string) => roleModules.indexOf(label))
+             .filter((i: number) => i !== -1);
+           if (selectedIndices.length > 0) {
+             setSelectedModuleIndices(selectedIndices);
+           }
          }
 
          // Set existing attachments if available
@@ -267,7 +314,7 @@ const Support: React.FC = () => {
       })
       .catch(() => {
       });
-  }, [activeFeedbackId, readonly]);
+  }, [activeFeedbackId, readonly, userRole]);
 
   useEffect(() => {
     if (!activeFeedbackId) return;
@@ -370,27 +417,13 @@ const Support: React.FC = () => {
     try {
       // Get selected modules from state
       const selectedModules = selectedModuleIndices
-        .filter(index => index >= 0 && index < modules.length) // Validate indices
+        .filter(index => index >= 0 && index < modules.length)
         .map(index => modules[index])
-        .filter(module => module); // Remove any undefined values
-      
-      // Map UI module names to backend enum values
-      const moduleMap: Record<string, string> = {
-        'Dashboard': 'dashboard',
-        'Database': 'database',
-        'Track shipment': 'track_shipment',
-        'Control Tower': 'control_tower',
-        'After care': 'after_care',
-        'Failure': 'failure',
-        'Stakeholder chat': 'stakeholder_chat',
-        'Critical alert': 'critical_alert',
-        'MyTask': 'my_task',
-      };
-      
-      // Map all selected modules to backend enum values
-      const validEnumValues = ['dashboard', 'database', 'track_shipment', 'control_tower', 'after_care', 'failure', 'stakeholder_chat', 'critical_alert', 'my_task', 'other'];
+        .filter(module => module);
+
+      const validEnumValues = ['dashboard', 'container_quality_tracking', 'user_profile', 'ticketing', 'control_tower', 'sign_in', 'signup', 'alert_configuration', 'other'];
       const affectedModules = selectedModules
-        .map(module => moduleMap[module] || 'other')
+        .map(module => UI_MODULE_TO_BACKEND[module] || 'other')
         .filter(module => validEnumValues.includes(module));
       
       // Ensure at least one module is selected
@@ -672,16 +705,16 @@ const Support: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Affected Modules */}
+                  {/* Affected Modules (based on logged-in user role) */}
                   <div>
                     <label className="block text-sm font-bold text-black mb-2">Affected Modules<span className="text-red-500"> *</span></label>
                     <div className="rounded-md border border-gray-300 p-4 bg-white">
                       <div className="grid grid-cols-1 gap-3">
                         {modules.map((label, index) => (
                           <label key={label} className="flex items-center gap-2">
-                            <input 
-                              type="checkbox" 
-                              disabled={readonly} 
+                            <input
+                              type="checkbox"
+                              disabled={readonly}
                               checked={selectedModuleIndices.includes(index)}
                               onChange={(e) => handleModuleChange(index, e.target.checked)}
                               className="h-4 w-4 rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8b2a96]"
