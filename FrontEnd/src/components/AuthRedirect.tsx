@@ -62,9 +62,9 @@ export const AuthRedirect: React.FC = () => {
     // Check if user is IVF Admin (IVF department + Admin role)
     const isIVFAdmin = userDepartment === 'IVF' && userRole?.toLowerCase() === 'admin';
     
-    // If user is IVF Admin, redirect to approval-screen
+    // If user is IVF Admin, redirect to approval
     if (isIVFAdmin) {
-      return <Navigate to="/approval-screen" replace />;
+      return <Navigate to="/approval" replace />;
     }
     
     // If user is Mygrape_admin, redirect to user-profile

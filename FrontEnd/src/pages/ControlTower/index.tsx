@@ -44,6 +44,7 @@ const ControlTower = () => {
     id: string;
     canisterId: string;
     branchName: string;
+    branchId: string;
     status: string;
     date: string;
   }>>([]);
@@ -164,6 +165,7 @@ const ControlTower = () => {
           id: string;
           canisterId: string;
           branchName: string;
+          branchId: string;
           status: string;
           date: string;
         }> = [];
@@ -193,6 +195,7 @@ const ControlTower = () => {
               id: `canister-${canister.canister_number || canister.canister_id}`,
               canisterId: String(canister.canister_number || canister.canister_id),
               branchName: 'N/A', // Flat format doesn't have branch info
+              branchId: 'N/A', // Flat format doesn't have branch info
               status: statusText,
               date: date,
             };
@@ -216,6 +219,7 @@ const ControlTower = () => {
                 return {
                   id: `tank-${branch.branch_name || 'N/A'}-${tank.tank_code || ''}`,
                   canisterId: String(tank.tank_code || ''),
+                  branchId: String(branch.branch_id ?? tank.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: 'Safe', // Default status since tanks don't have status in API response
                   date: date,
@@ -246,6 +250,7 @@ const ControlTower = () => {
                 return {
                   id: `canister-${canister.canister_number || canister.canister_id}`,
                   canisterId: String(canister.canister_number || canister.canister_id),
+                  branchId: String(canister.effective_branch_id ?? branch.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: statusText,
                   date: date,
@@ -720,7 +725,7 @@ const ControlTower = () => {
               {/* Active Routes/Canisters List */}
               <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${isIvfUser ? 'h-[544px]' : 'h-[460px]'}`}>
                 <h2 className="font-bold text-black text-base mb-2">
-                  {isIvfUser ? 'Active Containers' : 'Active Routes'}
+                {isIvfUser ? 'Active Containers' : 'Active Routes'}
                 </h2>
                 <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                   <div className="text-left">{isIvfUser ? 'Containers #' : 'Routes ID'}</div>
@@ -842,7 +847,14 @@ const ControlTower = () => {
                                   <Link 
                                     to={`/ivf-track-shipment/${encodeURIComponent(canister.canisterId)}`}
                                     className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        if (canister.branchId && canister.branchId !== 'N/A') {
+                                          sessionStorage.setItem('ivf_selected_branch_id', String(canister.branchId));
+                                        }
+                                      } catch {}
+                                    }}
                                   >
                                     Container {canister.canisterId}
                                   </Link>
@@ -853,7 +865,7 @@ const ControlTower = () => {
                                 )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (
                                   <div className="text-xs text-gray-900 leading-snug">
-                                    <div className="truncate">{canister.branchName}</div>
+                                    <div className="truncate">{canister.branchName} - {canister.branchId}</div>
                                   </div>
                                 )}
                               </div>

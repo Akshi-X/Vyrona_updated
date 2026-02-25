@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller, iot_controller
-from app.controller.IVF import ivf_controller, ivf_dashboard_controller, quality_tracking_controller, ivf_quality_controller, critical_alert_controller
+from app.controller import user_controller, feedback_controller, task_controller, dashboard_controller, patient_controller, chat_controller, shipment_controller, lane_risk_controller, quality_controller, iot_controller, kpi_controller
+from app.controller.IVF import ivf_controller, ivf_dashboard_controller, quality_tracking_controller, ivf_quality_controller, critical_alert_controller, internal_alert_controller
 
 from app.config.database import init_db as create_tables
 from app.init_db import init_db as create_admin
@@ -115,17 +115,17 @@ setup_exception_handlers(app)
 async def startup_event():
     """Run on application startup"""
     logger = logging.getLogger(__name__)
-    logger.info("=" * 60)
-    logger.info("APPLICATION STARTUP EVENT")
-    logger.info("=" * 60)
+#     logger.info("=" * 60)
+#     logger.info("APPLICATION STARTUP EVENT")
+#     logger.info("=" * 60)
     
-    # Step 1: Create database tables first
-    logger.info("Creating database tables...")
-    create_tables()
+#     # Step 1: Create database tables first
+#     logger.info("Creating database tables...")
+#     create_tables()
     
-    # Step 2: Create pharma admin users
-    logger.info("Creating pharma admin users...")
-    create_admin()
+#     # Step 2: Create pharma admin users
+#     logger.info("Creating pharma admin users...")
+#     create_admin()
     
     # Step 3: Start quality monitoring background tasks
     logger.info("Starting quality monitoring background tasks...")
@@ -133,6 +133,11 @@ async def startup_event():
     quality_service = QualityService(db)
     asyncio.create_task(quality_service.redis_listener(quality_controller.manager))
     asyncio.create_task(quality_service.log_connections_periodically(quality_controller.manager))
+
+    # Step 3b: Start LN2 readings WebSocket listener (separate from quality)
+    logger.info("Starting LN2 Redis listener for real-time readings...")
+    asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
+    asyncio.create_task(ivf_quality_controller.tank_kpi_redis_listener())
     
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
     logger.info("Starting World Bank LPI daily fetch scheduler...")
@@ -187,9 +192,11 @@ app.include_router(quality_controller.router, prefix=API_PREFIX)
 app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(iot_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_controller.router, prefix=API_PREFIX)
+app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
+app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint

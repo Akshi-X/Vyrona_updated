@@ -142,6 +142,11 @@ const Signup: React.FC = () => {
         setrole(selectedRole);
         setIsDropdownOpen(false);
         if (roleError) setroleError("");
+        // Manager has no branch; clear branch when switching to Manager
+        if (selectedRole === "Manager") {
+            setBranch("");
+            if (branchError) setBranchError("");
+        }
     };
 
     const handleBranchSelect = (selectedBranch: string) => {
@@ -207,7 +212,8 @@ const Signup: React.FC = () => {
                 setDepartmentError("Department is required");
                 valid = false;
             }
-            if (!branch) {
+            // Branch required only for User role; Manager can register without branch
+            if (role !== "Manager" && !branch) {
                 setBranchError("Branch is required");
                 valid = false;
             }
@@ -242,7 +248,8 @@ const Signup: React.FC = () => {
         if (isHospitalEmail) {
             payload.department = department;
             payload.hospital_name = hospitalName;
-            payload.branch_name = branch;
+            // Manager is saved without branch; only User sends branch_name
+            if (role === "User") payload.branch_name = branch;
             payload.company_name = ""; // Empty for hospital users
         } else {
             payload.company_name = organization;
@@ -479,16 +486,16 @@ const Signup: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Branch Dropdown */}
+                                    {/* Branch Dropdown - disabled for Manager (can view all branches) */}
                                     <div className="relative w-full" ref={branchDropdownRef}>
                                         <div
-                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${branchError ? "border-red-500" : "border-gray-300"
-                                                } ${!branch ? "text-gray-400" : "text-black"} ${!isHospitalEmail ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                                            onClick={() => isHospitalEmail && setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                                            className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${branchError ? "border-red-500" : "border-gray-300"
+                                                } ${!branch ? "text-gray-400" : "text-black"} ${!isHospitalEmail || role === "Manager" ? "bg-gray-100 cursor-not-allowed" : "cursor-pointer"}`}
+                                            onClick={() => isHospitalEmail && role === "User" && setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                                         >
                                             <div className="flex justify-between items-center">
-                                                <span>{branch || "Branch"}</span>
-                                                {isHospitalEmail && (
+                                                <span>{ (branch || "Branch")}</span>
+                                                {isHospitalEmail && role === "User" && (
                                                     <svg
                                                         className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`}
                                                         fill="none"
@@ -501,7 +508,7 @@ const Signup: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {isBranchDropdownOpen && branchOptions.length > 0 && (
+                                        {isBranchDropdownOpen && role === "User" && branchOptions.length > 0 && (
                                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-60 overflow-y-auto">
                                                 {branchOptions.map((option) => (
                                                     <div

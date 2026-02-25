@@ -15,7 +15,7 @@ DATABASE_URL = settings.database_url
 engine = create_engine(
     DATABASE_URL, 
     pool_pre_ping=True, 
-    echo=DB_ECHO,
+    echo=DB_ECHO,   
     pool_size=DB_POOL_SIZE,
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
@@ -67,6 +67,7 @@ def init_db():
         task_model,
         chat_model,
         chat_read_status,
+        chat_read_status_canister,
         chat_message_tag,
         telemetry_model,
         quality_log_model,
@@ -79,9 +80,16 @@ def init_db():
         tank_model,
         canister_ln2_log_model,
         patient_crylock_info_model,
-        critical_alert_model
+        critical_alert_model,
     )
-    
+    from ..models.IVF import (
+        device_model,
+        ln2_iot_device_model,
+        ln2_readings_model,
+        ln2_iot_raw_data_model,
+    )
+    from ..models import kpi_config_model, readings_model
+
     # Note: IVF schema separation has been removed
     # All tables (including IVF tables) are now in public schema
     # If you need to migrate existing tables from ivf schema to public schema,

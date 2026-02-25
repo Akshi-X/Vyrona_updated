@@ -319,6 +319,33 @@ def get_active_canisters(
         raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
 
 
+@router.get("/embryo_tracking/filters")
+def get_embryo_tracking_filters(
+    request: Request,
+    branch_name: Optional[str] = Query(None, description="Current branch/site filter (counts conditioned on this)"),
+    status: Optional[str] = Query(None, description="Current status filter (counts conditioned on this)"),
+    crylock_color: Optional[str] = Query(None, description="Current cryolock color filter"),
+    goblet_color: Optional[str] = Query(None, description="Current goblet color filter"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get distinct filter values and counts. Pass current filter values to get counts conditioned on them
+    (e.g. when Site Name is selected, other dropdowns show counts within that site).
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request)
+        service = IVFService(db)
+        return service.get_embryo_tracking_filters(
+            branch_id=branch_id,
+            branch_name=branch_name,
+            status=status,
+            crylock_color=crylock_color,
+            goblet_color=goblet_color,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
 def get_embryo_tracking(
     request: Request,
@@ -327,7 +354,7 @@ def get_embryo_tracking(
     cryolock_color: Optional[str] = Query(None, description="Optional cryolock color filter"),
     goblet_color: Optional[str] = Query(None, description="Optional goblet color filter"),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=200, description="Number of records to fetch"),
+    limit: int = Query(50, ge=1, le=200, description="Number of records to fetch"),
     db: Session = Depends(get_db)
 ):
     """

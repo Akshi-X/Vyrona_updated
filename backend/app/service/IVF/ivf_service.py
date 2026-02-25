@@ -196,6 +196,7 @@ class IVFService:
                     branches_dict[branch_id_val]["branch_name"] = branch_name_val or "Unknown"
                 
                 tank_data = {
+                    "tank_id": tank.tank_id,
                     "tank_code": tank.tank_code or "",
                     "updated_at": tank.updated_at or tank.created_at,
                     "status": tank.status
@@ -680,7 +681,7 @@ class IVFService:
         cryolock_color: Optional[str] = None,
         goblet_color: Optional[str] = None,
         offset: int = 0,
-        limit: int = 100
+        limit: int = 50
     ) -> Dict[str, Any]:
         """
         Get embryo tracking data grouped by cryolock.
@@ -863,3 +864,212 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching embryo tracking data: {str(e)}")
 
+    def get_embryo_tracking_filters(
+        self,
+        branch_id: Optional[int] = None,
+        branch_name: Optional[str] = None,
+        status: Optional[str] = None,
+        crylock_color: Optional[str] = None,
+        goblet_color: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get distinct filter values and counts. When current filter params are passed, counts are
+        conditioned on them (e.g. status counts within selected branch_name).
+        """
+        try:
+            latest_shipments_subq = (
+                self.db.query(
+                    IVFShipment.patient_crylock_info_id,
+                    func.max(IVFShipment.id).label("latest_shipment_id"),
+                )
+                .filter(IVFShipment.description.isnot(None))
+                .group_by(IVFShipment.patient_crylock_info_id)
+                .subquery()
+            )
+            tracking_status_expr = case(
+                (PatientCrylockInfo.in_transit == True, "in transit"),
+                (PatientCrylockInfo.embryo_transfer == True, "internal"),
+                else_=func.coalesce(IVFShipment.shipment_status, ""),
+            )
+            need_status_join = bool(status and status.strip())
+
+            def _apply_filters(q, apply_branch_name: bool, apply_status: bool, apply_goblet: bool, apply_crylock: bool):
+                if branch_id is not None:
+                    q = q.filter(PatientCrylockInfo.branch_id == branch_id)
+                if apply_branch_name and branch_name and branch_name.strip():
+                    q = q.filter(func.lower(HospitalBranch.branch_name) == func.lower(branch_name.strip()))
+                if apply_crylock and crylock_color and crylock_color.strip():
+                    q = q.filter(
+                        func.lower(func.coalesce(PatientCrylockInfo.crylock_color, ""))
+                        == func.lower(crylock_color.strip())
+                    )
+                if apply_goblet and goblet_color and goblet_color.strip():
+                    q = q.filter(
+                        func.lower(func.coalesce(PatientCrylockInfo.goblet_color, ""))
+                        == func.lower(goblet_color.strip())
+                    )
+                if apply_status and need_status_join:
+                    norm = (status or "").strip().replace("_", " ")
+                    q = q.filter(func.lower(tracking_status_expr) == func.lower(norm))
+                return q
+
+            # Base for queries that don't need status join
+            def _base_query():
+                return (
+                    self.db.query(PatientCrylockInfo.id)
+                    .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                )
+
+            # Base with status join (for total and when filtering by status)
+            def _base_with_status():
+                q = (
+                    self.db.query(PatientCrylockInfo.id)
+                    .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                    .outerjoin(
+                        latest_shipments_subq,
+                        PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id,
+                    )
+                    .outerjoin(
+                        IVFShipment,
+                        and_(
+                            IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                            IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id,
+                        ),
+                    )
+                )
+                return q
+
+            # Total: all filters applied
+            total_q = _base_with_status() if need_status_join else _base_query()
+            total_q = _apply_filters(total_q, True, True, True, True)
+            total = int(total_q.count() or 0)
+
+            # Site names: filter by status, goblet, crylock (not branch_name)
+            site_q = (
+                self.db.query(HospitalBranch.branch_name, func.count(PatientCrylockInfo.id).label("cnt"))
+                .join(PatientCrylockInfo, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                .filter(HospitalBranch.branch_name.isnot(None), HospitalBranch.branch_name != "")
+            )
+            if need_status_join:
+                site_q = (
+                    site_q.outerjoin(
+                        latest_shipments_subq,
+                        PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id,
+                    )
+                    .outerjoin(
+                        IVFShipment,
+                        and_(
+                            IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                            IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id,
+                        ),
+                    )
+                )
+            site_q = _apply_filters(site_q, False, True, True, True)
+            if branch_id is not None:
+                site_q = site_q.filter(PatientCrylockInfo.branch_id == branch_id)
+            site_rows = site_q.group_by(HospitalBranch.branch_name).all()
+            site_names = sorted([r[0] for r in site_rows if r[0]])
+            site_name_counts = {r[0]: r[1] for r in site_rows if r[0]}
+
+            # Goblet colors: filter by branch_name, status, crylock
+            goblet_q = (
+                self.db.query(PatientCrylockInfo.goblet_color, func.count(PatientCrylockInfo.id).label("cnt"))
+                .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .filter(PatientCrylockInfo.goblet_color.isnot(None), PatientCrylockInfo.goblet_color != "")
+            )
+            if need_status_join:
+                goblet_q = (
+                    goblet_q.outerjoin(
+                        latest_shipments_subq,
+                        PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id,
+                    )
+                    .outerjoin(
+                        IVFShipment,
+                        and_(
+                            IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                            IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id,
+                        ),
+                    )
+                )
+            goblet_q = _apply_filters(goblet_q, True, True, False, True)
+            if branch_id is not None:
+                goblet_q = goblet_q.filter(PatientCrylockInfo.branch_id == branch_id)
+            goblet_rows = goblet_q.group_by(PatientCrylockInfo.goblet_color).all()
+            goblet_colors = sorted([r[0] for r in goblet_rows if r[0]])
+            goblet_color_counts = {r[0]: r[1] for r in goblet_rows if r[0]}
+
+            # Cryolock colors: filter by branch_name, status, goblet
+            crylock_q = (
+                self.db.query(PatientCrylockInfo.crylock_color, func.count(PatientCrylockInfo.id).label("cnt"))
+                .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .filter(PatientCrylockInfo.crylock_color.isnot(None), PatientCrylockInfo.crylock_color != "")
+            )
+            if need_status_join:
+                crylock_q = (
+                    crylock_q.outerjoin(
+                        latest_shipments_subq,
+                        PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id,
+                    )
+                    .outerjoin(
+                        IVFShipment,
+                        and_(
+                            IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                            IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id,
+                        ),
+                    )
+                )
+            crylock_q = _apply_filters(crylock_q, True, True, True, False)
+            if branch_id is not None:
+                crylock_q = crylock_q.filter(PatientCrylockInfo.branch_id == branch_id)
+            crylock_rows = crylock_q.group_by(PatientCrylockInfo.crylock_color).all()
+            crylock_colors = sorted([r[0] for r in crylock_rows if r[0]])
+            crylock_color_counts = {r[0]: r[1] for r in crylock_rows if r[0]}
+
+            # Status: filter by branch_name, goblet, crylock
+            status_q = (
+                self.db.query(tracking_status_expr.label("status"), func.count(PatientCrylockInfo.id).label("cnt"))
+                .select_from(PatientCrylockInfo)
+                .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
+                .join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .outerjoin(
+                    latest_shipments_subq,
+                    PatientCrylockInfo.id == latest_shipments_subq.c.patient_crylock_info_id,
+                )
+                .outerjoin(
+                    IVFShipment,
+                    and_(
+                        IVFShipment.id == latest_shipments_subq.c.latest_shipment_id,
+                        IVFShipment.patient_crylock_info_id == PatientCrylockInfo.id,
+                    ),
+                )
+            )
+            status_q = _apply_filters(status_q, True, False, True, True)
+            if branch_id is not None:
+                status_q = status_q.filter(PatientCrylockInfo.branch_id == branch_id)
+            status_rows = status_q.group_by(tracking_status_expr).all()
+            statuses = sorted([(r[0] or "").strip() for r in status_rows if (r[0] or "").strip()])
+            status_counts = {(r[0] or "").strip(): r[1] for r in status_rows if (r[0] or "").strip()}
+
+            return {
+                "site_names": site_names,
+                "statuses": statuses,
+                "goblet_colors": goblet_colors,
+                "crylock_colors": crylock_colors,
+                "total": total,
+                "site_name_counts": site_name_counts,
+                "status_counts": status_counts,
+                "goblet_color_counts": goblet_color_counts,
+                "crylock_color_counts": crylock_color_counts,
+            }
+        except Exception as e:
+            logger.exception("Error fetching embryo tracking filters: %s", e)
+            return {
+                "site_names": [], "statuses": [], "goblet_colors": [], "crylock_colors": [],
+                "total": 0,
+                "site_name_counts": {}, "status_counts": {}, "goblet_color_counts": {}, "crylock_color_counts": {},
+            }
