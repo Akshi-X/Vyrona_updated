@@ -115,8 +115,40 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
             quality_service = QualityService(db)
             while True:
                 try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
                     try:
-                        
+                        message = json.loads(data)
+                        tank_code = message.get("tank_code") if isinstance(message, dict) else None
+                        if not tank_code:
+                            await websocket.send_json({"type": "error", "message": "Subscription message must contain 'tank_code'"})
+                            continue
+                        tank_code_str = str(tank_code).strip()
+                        effective_branch_id = branch_id
+                        selected_branch_id = message.get("branch_id")
+                        if role == "Manager" and selected_branch_id is not None:
+                            try:
+                                effective_branch_id = int(selected_branch_id)
+                            except (TypeError, ValueError):
+                                await websocket.send_json({"type": "error", "message": "Invalid 'branch_id'"})
+                                continue
+
+                        if effective_branch_id is not None:
+                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str, Tank.branch_id == effective_branch_id).first()
+                        else:
+                            tanks = db.query(Tank).filter(Tank.tank_code == tank_code_str).all()
+                            tank = tanks[0] if len(tanks) == 1 else None
+                            if len(tanks) > 1:
+                                await websocket.send_json({"type": "error", "message": "Multiple branches have this tank code. Send 'branch_id' in subscription."})
+                                continue
+                        if not tank:
+                            await websocket.send_json({"type": "error", "message": f"Tank '{tank_code_str}' not found"})
+                            continue
+                        try:
+                            if role != "Admin" and effective_branch_id is not None:
+                                quality_service.validate_tank_belongs_to_branch(tank.tank_id, effective_branch_id)
+                        except Exception as e:
+                            await websocket.send_json({"type": "error", "message": str(e)})
+                            continue
 
                         kpi_manager.active_connections[connection_id]["branch_id"] = None if role == "Admin" else tank.branch_id
                         kpi_manager.set_tank_subscription(connection_id, tank.tank_id, tank_code_str)
