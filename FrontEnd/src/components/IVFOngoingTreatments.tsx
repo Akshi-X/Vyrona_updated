@@ -306,8 +306,7 @@ export function IVFOngoingTreatments({
                            {isDropdownOpen && (
                              <div className={`absolute top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg font-normal shadow-lg max-h-[200px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 ${
                                filterKey === 'status' ? 'right-0' : 'left-0'
-                             } ${
-                               filterKey === 'gobletColor' || filterKey === 'cryolockColor' ? 'w-[150px]' : 'w-[140px]'
+                             } 
                              }`}>
                                <button
                                  type="button"
