@@ -128,6 +128,13 @@ class AffectedModule(str, Enum):
     CRITICAL_ALERT = "critical_alert"
     MY_TASK = "my_task"
     OTHER = "other"
+    # Role-based support modules
+    CONTAINER_QUALITY_TRACKING = "container_quality_tracking"
+    USER_PROFILE = "user_profile"
+    TICKETING = "ticketing"
+    SIGN_IN = "sign_in"
+    SIGNUP = "signup"
+    ALERT_CONFIGURATION = "alert_configuration"
     
     @classmethod
     def list(cls):
