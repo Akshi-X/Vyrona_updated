@@ -1200,6 +1200,15 @@ def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish:
     try:
         r = get_redis()
         data = dict(payload)
+        # Log first KPI entry (raw) for debugging
+        try:
+            kpis = data.get("kpis") or []
+            if kpis:
+                first = kpis[0]
+                logger.info("Tank KPI first entry raw data: %s", first)
+        except Exception:
+            # Don't let logging issues break publishing
+            pass
         data["tank_id"] = tank_id
         data["tank_code"] = tank_code
         data["type"] = "tank_kpi"
