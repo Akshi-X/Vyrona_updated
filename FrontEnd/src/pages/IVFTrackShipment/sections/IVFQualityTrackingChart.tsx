@@ -572,7 +572,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const hasData = kpiReadings.length > 0;
 
   return (
-    <div className="w-full min-w-0 min-h-[360px] flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
+    <div className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
       <div className="flex items-center justify-between mb-1 shrink-0">
         <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         <div className="flex items-center gap-3">

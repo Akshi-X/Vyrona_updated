@@ -518,7 +518,9 @@ async def tank_kpi_redis_listener():
                         from app.controller.kpi_controller import kpi_manager
                         n = len(kpi_manager.active_connections)
                         await kpi_manager.broadcast(data, db)
-                        logger.debug(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
+                        logger.info(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
+                    except Exception as e:
+                        logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
                     finally:
                         db.close()
                 except json.JSONDecodeError as e:

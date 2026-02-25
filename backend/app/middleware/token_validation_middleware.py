@@ -37,6 +37,7 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         """Intercept requests and validate tokens for protected endpoints."""
         path = request.url.path
+        internal_api_key = request.headers.get("X-Internal-Api-Key")
         method = request.method
         
         # Skip token validation for OPTIONS requests (CORS preflight)
@@ -58,6 +59,10 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
         
         # Skip token validation for static files
         if path.startswith("/static"):
+            return await call_next(request)
+        
+        if internal_api_key:
+            # Skip token validation for internal API endpoints (service-to-service calls)
             return await call_next(request)
         
         # Protected endpoint - VALIDATE TOKEN
