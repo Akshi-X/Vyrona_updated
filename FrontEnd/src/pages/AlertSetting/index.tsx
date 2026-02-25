@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
@@ -12,6 +12,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import BatteryChargingFullIcon from '@mui/icons-material/BatteryChargingFull';
 import SensorDoorIcon from '@mui/icons-material/SensorDoor';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ClearIcon from '@mui/icons-material/Clear';
 
 interface ContainerRow {
   tank_id: number;
@@ -99,6 +100,114 @@ const getKpiMetadata = (kpiName: string): KpiMetadata => {
 // All KPI names as an array for multi-container selection
 const ALL_KPI_NAMES = Object.values(KPI_NAMES);
 
+// KPI-specific input type configurations
+type KpiInputType = 'standard' | 'temperature' | 'percentage' | 'battery' | 'lid_state';
+
+const getKpiInputType = (kpiName: string): KpiInputType => {
+  switch (kpiName) {
+    case KPI_NAMES.IVF_TEMPERATURE_INTERNAL:
+    case KPI_NAMES.IVF_TEMPERATURE_EXTERNAL:
+      return 'temperature';
+    case KPI_NAMES.IVF_LN2_LEVEL:
+      return 'percentage';
+    case KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE:
+      return 'battery';
+    case KPI_NAMES.IVF_LN2_LID_STATE:
+      return 'lid_state';
+    default:
+      return 'standard';
+  }
+};
+
+// Lid state options for select dropdown
+const LID_STATE_OPTIONS = [
+  { value: '', label: 'Select State' },
+  { value: 'closed', label: 'Closed (Alert when opened)' },
+  { value: 'open', label: 'Open (Alert when closed)' },
+];
+
+// Helper to convert lid state to min/max values
+const lidStateToValues = (state: string | null): { min: number | null; max: number | null } => {
+  if (state === 'closed') return { min: 0, max: 0 }; // Alert when lid opens (value becomes 1)
+  if (state === 'open') return { min: 1, max: 1 }; // Alert when lid closes (value becomes 0)
+  return { min: null, max: null };
+};
+
+// Helper to convert min/max to lid state
+const valuesToLidState = (min: number | null, max: number | null): string => {
+  if (min === 0 && max === 0) return 'closed';
+  if (min === 1 && max === 1) return 'open';
+  return '';
+};
+
+// Validation helpers
+const validateMinMax = (min: number | null, max: number | null): { valid: boolean; error?: string } => {
+  if (min !== null && max !== null && min > max) {
+    return { valid: false, error: 'Min must be ≤ Max' };
+  }
+  return { valid: true };
+};
+
+const validateTemperature = (min: number | null, max: number | null): { valid: boolean; error?: string } => {
+  // Both must be set or both must be null
+  if ((min !== null && max === null) || (min === null && max !== null)) {
+    return { valid: false, error: 'Both min and max are required' };
+  }
+  return validateMinMax(min, max);
+};
+
+const validatePercentage = (min: number | null, max: number | null): { valid: boolean; error?: string } => {
+  if (min !== null && min < 0) {
+    return { valid: false, error: 'Min cannot be negative' };
+  }
+  if (max !== null && max < 0) {
+    return { valid: false, error: 'Max cannot be negative' };
+  }
+  return validateMinMax(min, max);
+};
+
+const validateBattery = (min: number | null): { valid: boolean; error?: string } => {
+  if (min !== null && min < 0) {
+    return { valid: false, error: 'Min cannot be negative' };
+  }
+  if (min !== null && min > 100) {
+    return { valid: false, error: 'Min cannot exceed 100' };
+  }
+  return { valid: true };
+};
+
+// Check if alert type should be enabled based on KPI type and values
+const isAlertTypeEnabled = (kpiName: string, min: number | null, max: number | null, lidState?: string): boolean => {
+  const inputType = getKpiInputType(kpiName);
+  switch (inputType) {
+    case 'lid_state':
+      return !!lidState && lidState !== '';
+    case 'battery':
+      return min !== null;
+    case 'temperature':
+      return min !== null && max !== null;
+    default:
+      return min !== null || max !== null;
+  }
+};
+
+// Get validation for a specific KPI
+const getKpiValidation = (kpiName: string, min: number | null, max: number | null): { valid: boolean; error?: string } => {
+  const inputType = getKpiInputType(kpiName);
+  switch (inputType) {
+    case 'temperature':
+      return validateTemperature(min, max);
+    case 'percentage':
+      return validatePercentage(min, max);
+    case 'battery':
+      return validateBattery(min);
+    case 'lid_state':
+      return { valid: true }; // Lid state validation is handled differently
+    default:
+      return validateMinMax(min, max);
+  }
+};
+
 export default function AlertSetting() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
@@ -128,11 +237,53 @@ export default function AlertSetting() {
   const [configToDeleteId, setConfigToDeleteId] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  /** Inline edit draft for KPI table: min, max, alert_type per config id */
-  const [draftConfig, setDraftConfig] = useState<Record<number, { min?: number | null; max?: number | null; alert_type?: string | null }>>({});
+  /** Inline edit draft for KPI table: min, max, alert_type, lid_state per config id */
+  const [draftConfig, setDraftConfig] = useState<Record<number, { min?: number | null; max?: number | null; alert_type?: string | null; lid_state?: string }>>({});
   /** Multi-container draft: keyed by kpi_name instead of id */
-  const [multiDraftConfig, setMultiDraftConfig] = useState<Record<string, { min?: number | null; max?: number | null; alert_type?: string | null }>>({});
+  const [multiDraftConfig, setMultiDraftConfig] = useState<Record<string, { min?: number | null; max?: number | null; alert_type?: string | null; lid_state?: string }>>({});
   const [saveAllLoading, setSaveAllLoading] = useState(false);
+  
+  // Refs for focus management - use a map to store refs by KPI identifier
+  const inputRefsMap = useRef<Map<string, { min?: HTMLInputElement | HTMLSelectElement | null; max?: HTMLInputElement | null; alertType?: HTMLSelectElement | null }>>(new Map());
+  
+  // Get or create ref entry for a KPI
+  const getInputRefs = useCallback((key: string) => {
+    if (!inputRefsMap.current.has(key)) {
+      inputRefsMap.current.set(key, {});
+    }
+    return inputRefsMap.current.get(key)!;
+  }, []);
+  
+  // Handle Enter key to move focus to next input
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, kpiKey: string, currentField: 'min' | 'max' | 'alertType' | 'lidState') => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const refs = getInputRefs(kpiKey);
+      const kpiName = kpiKey.includes('-') ? kpiKey.split('-').pop() : kpiKey;
+      const inputType = getKpiInputType(kpiName || '');
+      
+      switch (currentField) {
+        case 'min':
+          if (inputType === 'battery') {
+            refs.alertType?.focus();
+          } else if (inputType === 'lid_state') {
+            refs.alertType?.focus();
+          } else {
+            refs.max?.focus();
+          }
+          break;
+        case 'max':
+          refs.alertType?.focus();
+          break;
+        case 'lidState':
+          refs.alertType?.focus();
+          break;
+        case 'alertType':
+          // Move to next KPI's first input (optional - could be implemented if needed)
+          break;
+      }
+    }
+  }, [getInputRefs]);
 
   const handleLogout = () => {
     logout();
@@ -323,7 +474,7 @@ export default function AlertSetting() {
   ];
 
   const getDraft = (id: number) => draftConfig[id] ?? {};
-  const setDraft = (id: number, patch: { min?: number | null; max?: number | null; alert_type?: string | null }) => {
+  const setDraft = (id: number, patch: { min?: number | null; max?: number | null; alert_type?: string | null; lid_state?: string }) => {
     setDraftConfig((prev) => {
       const next = { ...prev };
       const current = next[id] ?? {};
@@ -333,16 +484,34 @@ export default function AlertSetting() {
       return next;
     });
   };
+  
+  // Clear draft for single container mode
+  const clearDraft = (id: number) => {
+    setDraftConfig((prev) => {
+      const next = { ...prev };
+      next[id] = { min: null, max: null, alert_type: null, lid_state: '' };
+      return next;
+    });
+  };
 
   // Multi-container draft helpers (keyed by kpi_name)
   const getMultiDraft = (kpiName: string) => multiDraftConfig[kpiName] ?? {};
-  const setMultiDraft = (kpiName: string, patch: { min?: number | null; max?: number | null; alert_type?: string | null }) => {
+  const setMultiDraft = (kpiName: string, patch: { min?: number | null; max?: number | null; alert_type?: string | null; lid_state?: string }) => {
     setMultiDraftConfig((prev) => {
       const next = { ...prev };
       const current = next[kpiName] ?? {};
       const merged = { ...current, ...patch };
       if (Object.keys(merged).length === 0) delete next[kpiName];
       else next[kpiName] = merged;
+      return next;
+    });
+  };
+  
+  // Clear multi-draft for a KPI
+  const clearMultiDraft = (kpiName: string) => {
+    setMultiDraftConfig((prev) => {
+      const next = { ...prev };
+      next[kpiName] = { min: null, max: null, alert_type: null, lid_state: '' };
       return next;
     });
   };
@@ -355,13 +524,31 @@ export default function AlertSetting() {
         .map((kpiName) => {
           const d = getMultiDraft(kpiName);
           const metadata = getKpiMetadata(kpiName);
+          const inputType = getKpiInputType(kpiName);
+          
+          // Handle special cases
+          let minVal = d.min ?? null;
+          let maxVal = d.max ?? null;
+          
+          // For battery, max is always 100
+          if (inputType === 'battery' && minVal !== null) {
+            maxVal = 100;
+          }
+          
+          // For lid_state, convert state to min/max
+          if (inputType === 'lid_state' && d.lid_state) {
+            const values = lidStateToValues(d.lid_state);
+            minVal = values.min;
+            maxVal = values.max;
+          }
+          
           // Only include if at least one value is set
-          if (d.min !== undefined || d.max !== undefined || d.alert_type !== undefined) {
+          if (minVal !== null || maxVal !== null || d.alert_type !== undefined) {
             return {
               kpi_name: kpiName,
               alert_name: metadata.label,
-              min: d.min ?? null,
-              max: d.max ?? null,
+              min: minVal,
+              max: maxVal,
               unit: metadata.unit ?? null,
               alert_type: d.alert_type ?? null,
             };
@@ -398,9 +585,30 @@ export default function AlertSetting() {
       for (const id of ids) {
         const d = draftConfig[id];
         if (!d) continue;
+        
+        // Find the KPI name for this config id to apply special logic
+        const config = configList.find(c => c.id === id);
+        const kpiName = config?.kpi_name || '';
+        const inputType = getKpiInputType(kpiName);
+        
+        let minVal = d.min !== undefined ? d.min : undefined;
+        let maxVal = d.max !== undefined ? d.max : undefined;
+        
+        // For battery, max is always 100
+        if (inputType === 'battery' && minVal !== undefined && minVal !== null) {
+          maxVal = 100;
+        }
+        
+        // For lid_state, convert state to min/max
+        if (inputType === 'lid_state' && d.lid_state !== undefined) {
+          const values = lidStateToValues(d.lid_state || null);
+          minVal = values.min;
+          maxVal = values.max;
+        }
+        
         await ivfService.updateKpiConfig(id, {
-          min: d.min !== undefined ? d.min : undefined,
-          max: d.max !== undefined ? d.max : undefined,
+          min: minVal,
+          max: maxVal,
           alert_type: d.alert_type !== undefined ? d.alert_type : undefined,
         });
       }
@@ -568,13 +776,13 @@ export default function AlertSetting() {
           {/* Right: KPI config cards */}
           <section className="flex-1 flex flex-col bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-hidden">
             <h2 className="font-bold text-black text-base mb-4">
-              Alert Configuration {selectedContainers.length > 1 ? `— ${selectedContainers.length} Containers Selected` : primaryContainer ? `— Container ${primaryContainer.canisterId}` : ''}
+              Alert Configuration {selectedContainers.length > 1 ? `- ${selectedContainers.length} Containers Selected` : primaryContainer ? `- Container ${primaryContainer.canisterId}` : ''}
             </h2>
             <p className="text-sm text-gray-600 mb-6">
               {selectedContainers.length > 1 
-                ? 'Configure alert thresholds to apply to all selected containers. Enter values and save to apply the same configuration to all.'
+                ? 'Configure alert thresholds to apply to all selected containers. Enter values and save to apply the same configuration to the selected containers.'
                 : configList.length === 0 && !configLoading
-                  ? 'This container has no configuration yet. Setting the values below will add the configuration.'
+                  ? 'Selecting a tank will allow you to create alert configurations for various KPIs. Start by adding a new alert and setting thresholds to receive notifications when conditions are met.'
                   : 'Configure alert thresholds for the selected container. Set minimum and maximum values to receive notifications when conditions are met.'
               }
             </p>
@@ -586,7 +794,7 @@ export default function AlertSetting() {
                     <rect x="9" y="3" width="6" height="4" rx="1" />
                     <path d="M9 12h6M9 16h6" strokeLinecap="round" />
                   </svg>
-                  <p className="text-sm">Select one or more containers to configure alerts</p>
+                  <p className="text-md">Select one or more containers to configure alerts</p>
                 </div>
               </div>
             ) : (
@@ -614,9 +822,23 @@ export default function AlertSetting() {
                           const minVal = d.min ?? null;
                           const maxVal = d.max ?? null;
                           const typeVal = d.alert_type ?? null;
+                          const lidStateVal = d.lid_state ?? '';
                           const metadata = getKpiMetadata(kpiName);
+                          const inputType = getKpiInputType(kpiName);
+                          const kpiKey = `multi-${kpiName}`;
+                          const refs = getInputRefs(kpiKey);
+                          
+                          // Determine if alert type should be enabled based on KPI type
+                          const canEnableAlert = isAlertTypeEnabled(kpiName, minVal, maxVal, lidStateVal);
+                          
+                          // Validation
+                          const validation = getKpiValidation(kpiName, minVal, maxVal);
+                          
                           const isAlertEnabled = typeVal && typeVal !== '';
                           const isCritical = typeVal === 'critical';
+                          
+                          // Check if any value is set (for showing clear button)
+                          const hasAnyValue = minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== '';
 
                           return (
                             <div
@@ -651,7 +873,18 @@ export default function AlertSetting() {
                                         {metadata.description}
                                       </p>
                                     </div>
-                                    <div className="flex-shrink-0">
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      {/* Clear button */}
+                                      {hasAnyValue && (
+                                        <button
+                                          type="button"
+                                          onClick={() => clearMultiDraft(kpiName)}
+                                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                                          title="Clear configuration"
+                                        >
+                                          <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
+                                        </button>
+                                      )}
                                       {isAlertEnabled ? (
                                         <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
                                           isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
@@ -679,51 +912,118 @@ export default function AlertSetting() {
                                       )}
                                     </div>
                                   </div>
+                                  
+                                  {/* Validation error */}
+                                  {!validation.valid && (
+                                    <p className="text-xs text-red-500 mt-1">{validation.error}</p>
+                                  )}
+                                  
                                   <div className="flex items-center gap-3 mt-3">
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        value={minVal != null ? minVal : ''}
-                                        onChange={(e) => {
-                                          const v = e.target.value === '' ? null : Number(e.target.value);
-                                          setMultiDraft(kpiName, { min: v });
-                                        }}
-                                        placeholder="Min"
-                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                      />
-                                      {metadata.unit && (
-                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        value={maxVal != null ? maxVal : ''}
-                                        onChange={(e) => {
-                                          const v = e.target.value === '' ? null : Number(e.target.value);
-                                          setMultiDraft(kpiName, { max: v });
-                                        }}
-                                        placeholder="Max"
-                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                      />
-                                      {metadata.unit && (
-                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                      )}
-                                    </div>
+                                    {/* Lid State - special select input */}
+                                    {inputType === 'lid_state' ? (
+                                      <div className="flex items-center gap-2">
+                                        <select
+                                          ref={(el) => { refs.min = el; }}
+                                          value={lidStateVal}
+                                          onChange={(e) => {
+                                            setMultiDraft(kpiName, { lid_state: e.target.value });
+                                          }}
+                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
+                                          className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                        >
+                                          {LID_STATE_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                              {opt.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ) : inputType === 'battery' ? (
+                                      /* Battery - only min input, max is always 100 */
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Alert below</span>
+                                        <input
+                                          ref={(el) => { refs.min = el; }}
+                                          type="number"
+                                          step="any"
+                                          min={0}
+                                          max={100}
+                                          value={minVal != null ? minVal : ''}
+                                          onChange={(e) => {
+                                            let v = e.target.value === '' ? null : Number(e.target.value);
+                                            if (v !== null && v < 0) v = 0;
+                                            if (v !== null && v > 100) v = 100;
+                                            setMultiDraft(kpiName, { min: v });
+                                          }}
+                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                          placeholder="Min"
+                                          className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                        />
+                                        {metadata.unit && (
+                                          <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      /* Standard/Temperature/Percentage inputs */
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.min = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={inputType === 'percentage' ? 0 : undefined}
+                                            value={minVal != null ? minVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                              setMultiDraft(kpiName, { min: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                            placeholder="Min"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.max = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={inputType === 'percentage' ? 0 : undefined}
+                                            value={maxVal != null ? maxVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                              setMultiDraft(kpiName, { max: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'max')}
+                                            placeholder="Max"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
                                     <select
+                                      ref={(el) => { refs.alertType = el; }}
                                       value={typeVal ?? ''}
                                       onChange={(e) => {
                                         const v = e.target.value === '' ? null : e.target.value;
                                         setMultiDraft(kpiName, { alert_type: v });
                                       }}
+                                      disabled={!canEnableAlert}
                                       className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                        isAlertEnabled
-                                          ? isCritical
-                                            ? 'border-red-200 bg-red-50 text-red-700'
-                                            : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                          : 'border-gray-200 bg-white text-gray-500'
+                                        !canEnableAlert
+                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : isAlertEnabled
+                                            ? isCritical
+                                              ? 'border-red-200 bg-red-50 text-red-700'
+                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                            : 'border-gray-200 bg-white text-gray-500'
                                       }`}
                                     >
                                       {alertTypeOptions.map((opt) => (
@@ -747,6 +1047,19 @@ export default function AlertSetting() {
                           const typeVal = d.alert_type !== undefined ? d.alert_type : r.alert_type;
                           const metadata = getKpiMetadata(r.kpi_name);
                           const displayLabel = r.alert_name?.trim() ? r.alert_name : metadata.label;
+                          const inputType = getKpiInputType(r.kpi_name);
+                          const kpiKey = `single-${r.id}`;
+                          const refs = getInputRefs(kpiKey);
+                          
+                          // For lid_state, calculate the state from min/max values
+                          const lidStateVal = d.lid_state !== undefined ? d.lid_state : valuesToLidState(r.min, r.max);
+                          
+                          // Determine if alert type should be enabled based on KPI type
+                          const canEnableAlert = isAlertTypeEnabled(r.kpi_name, minVal, maxVal, lidStateVal);
+                          
+                          // Validation
+                          const validation = getKpiValidation(r.kpi_name, minVal, maxVal);
+                          
                           const isAlertEnabled = typeVal && typeVal !== '';
                           const isCritical = typeVal === 'critical';
 
@@ -787,8 +1100,17 @@ export default function AlertSetting() {
                                       </p>
                                     </div>
 
-                                    {/* Alert Toggle Icon */}
-                                    <div className="flex-shrink-0">
+                                    {/* Alert Toggle Icon + Clear Button */}
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      {/* Clear button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => clearDraft(r.id)}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                                        title="Clear configuration"
+                                      >
+                                        <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
+                                      </button>
                                       {isAlertEnabled ? (
                                         <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
                                           isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
@@ -800,7 +1122,7 @@ export default function AlertSetting() {
                                           >
                                             <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
                                           </svg>
-                                          <span className="mx-2">
+                                          <span className="mx-2 text-xs">
                                             {isCritical ? "Email Alert Enabled" : ""}
                                           </span> 
                                         </div>
@@ -817,57 +1139,120 @@ export default function AlertSetting() {
                                     </div>
                                   </div>
 
+                                  {/* Validation error */}
+                                  {!validation.valid && (
+                                    <p className="text-xs text-red-500 mt-1">{validation.error}</p>
+                                  )}
+
                                   {/* Inputs Row */}
                                   <div className="flex items-center gap-3 mt-3">
-                                    {/* Min Input */}
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        value={minVal != null ? minVal : ''}
-                                        onChange={(e) => {
-                                          const v = e.target.value === '' ? null : Number(e.target.value);
-                                          setDraft(r.id, { min: v });
-                                        }}
-                                        placeholder="Min"
-                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                      />
-                                      {metadata.unit && (
-                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                      )}
-                                    </div>
-
-                                    {/* Max Input */}
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        value={maxVal != null ? maxVal : ''}
-                                        onChange={(e) => {
-                                          const v = e.target.value === '' ? null : Number(e.target.value);
-                                          setDraft(r.id, { max: v });
-                                        }}
-                                        placeholder="Max"
-                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                      />
-                                      {metadata.unit && (
-                                        <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                      )}
-                                    </div>
+                                    {/* Lid State - special select input */}
+                                    {inputType === 'lid_state' ? (
+                                      <div className="flex items-center gap-2">
+                                        <select
+                                          ref={(el) => { refs.min = el; }}
+                                          value={lidStateVal}
+                                          onChange={(e) => {
+                                            setDraft(r.id, { lid_state: e.target.value });
+                                          }}
+                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
+                                          className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                        >
+                                          {LID_STATE_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                              {opt.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ) : inputType === 'battery' ? (
+                                      /* Battery - only min input, max is always 100 */
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Alert below</span>
+                                        <input
+                                          ref={(el) => { refs.min = el; }}
+                                          type="number"
+                                          step="any"
+                                          min={0}
+                                          max={100}
+                                          value={minVal != null ? minVal : ''}
+                                          onChange={(e) => {
+                                            let v = e.target.value === '' ? null : Number(e.target.value);
+                                            if (v !== null && v < 0) v = 0;
+                                            if (v !== null && v > 100) v = 100;
+                                            setDraft(r.id, { min: v });
+                                          }}
+                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                          placeholder="Min"
+                                          className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                        />
+                                        {metadata.unit && (
+                                          <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      /* Standard/Temperature/Percentage inputs */
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.min = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={inputType === 'percentage' ? 0 : undefined}
+                                            value={minVal != null ? minVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                              setDraft(r.id, { min: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                            placeholder="Min"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.max = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={inputType === 'percentage' ? 0 : undefined}
+                                            value={maxVal != null ? maxVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                              setDraft(r.id, { max: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'max')}
+                                            placeholder="Max"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
 
                                     {/* Alert Type Select */}
                                     <select
+                                      ref={(el) => { refs.alertType = el; }}
                                       value={typeVal ?? ''}
                                       onChange={(e) => {
                                         const v = e.target.value === '' ? null : e.target.value;
                                         setDraft(r.id, { alert_type: v });
                                       }}
+                                      disabled={!canEnableAlert}
                                       className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                        isAlertEnabled
-                                          ? isCritical
-                                            ? 'border-red-200 bg-red-50 text-red-700'
-                                            : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                          : 'border-gray-200 bg-white text-gray-500'
+                                        !canEnableAlert
+                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : isAlertEnabled
+                                            ? isCritical
+                                              ? 'border-red-200 bg-red-50 text-red-700'
+                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                            : 'border-gray-200 bg-white text-gray-500'
                                       }`}
                                     >
                                       {alertTypeOptions.map((opt) => (
