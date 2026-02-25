@@ -296,7 +296,7 @@ export default function IVFTrackShipmentPage() {
                     {/* Row 1: Quality Tracking (left) | Quality Parameter (right) */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Quality Tracking */}
-                        <div>
+                        <div className="h-full">
                             <IVFQualityTrackingChart canisterNumber={canisterId} />
                         </div>
                         {/* Right Column: Quality Parameter */}

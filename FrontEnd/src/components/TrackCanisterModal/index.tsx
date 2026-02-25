@@ -24,7 +24,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 }) => {
   const { userRole } = useAuth();
   const normalizedRole = (userRole || '').trim().toLowerCase();
-  const isManager = normalizedRole.includes('manager');
+  const isManagerAdmin = normalizedRole.includes('manager') || normalizedRole.includes('admin');
 
   const [canisterId, setCanisterId] = useState('');
   const [hisNumber, setHisNumber] = useState('');
@@ -131,7 +131,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!isManager) return;
+    if (!isManagerAdmin) return;
 
     let cancelled = false;
     setBranchesLoading(true);
@@ -155,7 +155,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isManager]);
+  }, [isOpen, isManagerAdmin]);
 
   const checkCanister = async (tankCode: string): Promise<boolean | null> => {
     const trimmed = tankCode.trim();
@@ -268,18 +268,18 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       // For other modals, use the existing checkCanister logic
       const trimmedCanisterId = canisterId.trim();
       if (!trimmedCanisterId) return;
-      if (isManager && !selectedBranchName) return;
+      if (isManagerAdmin && !selectedBranchName) return;
       
       const exists = await checkCanister(trimmedCanisterId);
       
       // Only navigate if canister exists (exists === true)
       if (exists === true) {
-        if (isManager && selectedBranchId != null) {
+        if (isManagerAdmin && selectedBranchId != null) {
           try {
             sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
           } catch {}
         }
-        onTrack?.(trimmedCanisterId, isManager ? selectedBranchName : undefined);
+        onTrack?.(trimmedCanisterId, isManagerAdmin ? selectedBranchName : undefined);
       }
       // If exists === false, error message is already set by checkCanister
     }
@@ -290,7 +290,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      description={title === "Outbound Quality Tracking" ? "Please enter the HIS # (Cryolock # is optional)" : (isManager ? "Please enter the tank code and branch" : "Please enter the tank code")}
+      description={title === "Outbound Quality Tracking" ? "Please enter the HIS # (Cryolock # is optional)" : (isManagerAdmin ? "Please enter the tank code and branch" : "Please enter the tank code")}
       icon={
         <img
           src={icon}
@@ -385,7 +385,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                 <p className="mt-2 text-sm text-red-600">{error}</p>
               ) : null}
             </div>
-            {isManager ? (
+            {isManagerAdmin ? (
               <div className="relative w-full" ref={branchDropdownRef}>
             <div
               className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${
@@ -434,7 +434,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
             ) : null}
           </div>
             ) : null}
-            {isManager && isBranchDropdownOpen && branches.length > 0 && branchMenuStyle && typeof document !== 'undefined'
+            {isManagerAdmin && isBranchDropdownOpen && branches.length > 0 && branchMenuStyle && typeof document !== 'undefined'
               ? createPortal(
               <div
                 ref={branchMenuRef}
@@ -484,7 +484,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
             disabled={
               title === "Outbound Quality Tracking"
                 ? !hisNumber.trim() || canisterCheckLoading
-                : !canisterId.trim() || (isManager && !selectedBranchName) || canisterCheckLoading
+                : !canisterId.trim() || (isManagerAdmin && !selectedBranchName) || canisterCheckLoading
             }
           >
             Track

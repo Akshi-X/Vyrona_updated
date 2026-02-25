@@ -14,8 +14,18 @@ export function useDashboardChatWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = import.meta.env.MAX_RECONNECT_ATTEMPTS;
-  const reconnectDelay = import.meta.env.RECONNECT_DELAY;
+  const shouldReconnectRef = useRef(true);
+  const maxReconnectAttempts = import.meta.env.MAX_RECONNECT_ATTEMPTS ;
+  const reconnectDelay = import.meta.env.RECONNECT_DELAY ;
+
+  const isIvfUser = useCallback(() => {
+    try {
+      const dept = localStorage.getItem('department');
+      return dept && dept.toUpperCase() === 'IVF';
+    } catch {
+      return false;
+    }
+  }, []);
 
   const getWebSocketUrl = useCallback(() => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -25,6 +35,9 @@ export function useDashboardChatWebSocket() {
   }, []);
 
   const connect = useCallback(() => {
+    if (isIvfUser()) {
+      return;
+    }
     if (!isAuthenticated || !token) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -34,7 +47,7 @@ export function useDashboardChatWebSocket() {
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-       
+        shouldReconnectRef.current = true;
         setIsConnected(true);
         reconnectAttemptsRef.current = 0;
 
@@ -76,6 +89,13 @@ export function useDashboardChatWebSocket() {
           // Handle error
           if (data.type === 'error') {
             console.error('[Dashboard Chat WS] Error:', data.message);
+            // If auth fails (e.g. missing pharma_id), stop reconnect loop
+            if (data.error_code === 'ERR_11009') {
+              shouldReconnectRef.current = false;
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.close();
+              }
+            }
           }
         } catch (error) {
           console.error('[Dashboard Chat WS] Parse error:', error);
@@ -83,12 +103,11 @@ export function useDashboardChatWebSocket() {
       };
 
       ws.onclose = () => {
-        
         setIsConnected(false);
         wsRef.current = null;
 
         // Attempt to reconnect
-        if (reconnectAttemptsRef.current < maxReconnectAttempts && isAuthenticated) {
+        if (shouldReconnectRef.current && reconnectAttemptsRef.current < maxReconnectAttempts && isAuthenticated) {
           reconnectAttemptsRef.current++;
           reconnectTimeoutRef.current = setTimeout(() => {
 
@@ -117,6 +136,11 @@ export function useDashboardChatWebSocket() {
 
   // Connect on mount and when auth changes
   useEffect(() => {
+    if (isIvfUser()) {
+      disconnect();
+      return;
+    }
+
     if (isAuthenticated && token) {
       connect();
     } else {
@@ -126,7 +150,7 @@ export function useDashboardChatWebSocket() {
     return () => {
       disconnect();
     };
-  }, [isAuthenticated, token, connect, disconnect]);
+  }, [isAuthenticated, token, connect, disconnect, isIvfUser]);
 
   // Request unread messages periodically (fallback)
   useEffect(() => {

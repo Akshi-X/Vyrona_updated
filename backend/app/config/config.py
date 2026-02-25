@@ -110,7 +110,22 @@ class Settings(BaseSettings):
     MYGRAPE_ADMIN_PASSWORD: str
     # SendGrid (Optional - for enhanced email delivery)
     SENDGRID_API_KEY: Optional[str] = None
-    SENDGRID_FROM_EMAIL: Optional[str] = None
+    SENDER_EMAIL: Optional[str] = None
+    # SMTP Configuration 
+    """
+    For gmail, you can use the following settings:
+        MTP Server: smtp.gmail.com
+        Username: Your full Gmail address (e.g., example@gmail.com)
+        Password: Your Gmail password or App Password (recommended)
+        Port (TLS): 587
+        Authentication Required: Yes
+        TLS/SSL Required: Yes 
+    """
+    SMTP_SERVER: Optional[str] = None  # e.g., "smtp.gmail.com"
+    SMTP_PORT: Optional[int] = None  # e.g., 587 for TLS
+    SMTP_USERNAME: Optional[str] = None  # e.g., "
+    SMTP_PASSWORD: Optional[str] = None  # e.g., "your-app-password-here"
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -130,6 +145,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6380  # Default to 6380 for Azure Redis SSL
     REDIS_DB: int = 0
+    REDIS_USERNAME: Optional[str] = None  # For Redis Labs / Redis 6+ ACL (e.g. "default")
     REDIS_PASSWORD: Optional[str] = None
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 10  # Increased timeout for Azure Redis
     REDIS_SOCKET_TIMEOUT: int = 10  # Increased timeout for Azure Redis
@@ -153,6 +169,8 @@ class Settings(BaseSettings):
     IOT_CLIENT_ID: str
     IOT_CLIENT_SECRET: str
     IOT_ACCOUNT_ID: str
+    # Internal Service-to-Service API Key (Required for telemetry-service calls)
+    INTERNAL_API_KEY: Optional[str] = None  # Shared secret for service-to-service authentication
     # ARC IVF API Configuration (Optional - set in .env)
     ARC_API_TOKEN: Optional[str] = None  # Token ID for ARC IVF Storage API authentication
     ARC_IVF_TOKEN_ID: Optional[str] = None  # Alias for ARC_API_TOKEN (for backward compatibility)
@@ -163,7 +181,11 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """Construct database URL from components"""
         password = quote_plus(self.DB_PASSWORD)
-        return f"postgresql+psycopg2://{self.DB_USER}:{password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        url = f"postgresql+psycopg2://{self.DB_USER}:{password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        # Neon and most cloud Postgres require SSL
+        if "neon.tech" in self.DB_HOST or "neon" in self.DB_HOST.lower():
+            url += "?sslmode=require"
+        return url
     @property
     def cors_origins(self) -> List[str]:
         """Parse CORS origins string to list"""
@@ -219,8 +241,28 @@ class Settings(BaseSettings):
             return resolved
         return data
    
+    def get_ivf_admins(self) -> List[Dict[str, Any]]:
+        """
+        Load IVF admins from ivf_admins.json file.
+        IVF users must have email @zucisystems.com or @mygrape.org.
+        Returns a list of IVF admin dictionaries.
+        """
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            backend_dir = os.path.dirname(os.path.dirname(current_dir))
+            ivf_admins_path = os.path.join(backend_dir, "ivf_admins.json")
+            if not os.path.exists(ivf_admins_path):
+                return []
+            with open(ivf_admins_path, 'r', encoding='utf-8') as f:
+                admins = json.load(f)
+                return admins if isinstance(admins, list) else []
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error loading IVF admins: {str(e)}")
+            return []
+   
     class Config:
-        env_file = ".env"
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
         env_file_encoding = "utf-8"
         case_sensitive = True
         extra = "ignore"  # Allow extra fields from environment

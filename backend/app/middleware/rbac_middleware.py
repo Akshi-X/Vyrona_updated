@@ -38,6 +38,14 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if method == "OPTIONS":
             return await call_next(request)
         
+        # Skip RBAC for WebSocket upgrade requests - they authenticate in the endpoint
+        upgrade_header = request.headers.get("Upgrade", "").lower()
+        connection_header = request.headers.get("Connection", "").lower()
+        if upgrade_header == "websocket" and "upgrade" in connection_header:
+            return await call_next(request)
+        if path.rstrip("/").endswith("/ws"):
+            return await call_next(request)
+        
         # Skip RBAC for public endpoints
         if self._is_public_endpoint(method, path) or path.startswith("/static"):
             return await call_next(request)

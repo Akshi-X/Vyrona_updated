@@ -165,7 +165,7 @@ SECRET_KEY=your-secret-key-minimum-32-characters-long-for-jwt-tokens
 # ============================================
 ADMIN_EMAIL=admin@example.com
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-email@example.com
+SENDER_EMAIL=your-email@example.com
 
 # ============================================
 # External API Configuration
@@ -263,6 +263,20 @@ cd migration
 # Run migrations (if configured)
 alembic upgrade head
 ```
+
+#### Seed Demo Data
+
+To populate sample data for CGT and IVF dashboards:
+
+```bash
+poetry run python seed_db.py
+```
+
+This creates:
+- **CGT (Pharma)**: Patients, shipments, provider, carrier (5 patients, 5 shipments with legs)
+- **IVF**: Tanks, cryolocks (embryos), outbound shipments
+
+Log in as pharma user or `admin@zucisystems.com` (IVF) to view the dashboards.
 
 ### 6. Redis Setup
 
@@ -863,7 +877,7 @@ alembic downgrade -1
 
 ```env
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-verified-email@example.com
+SENDER_EMAIL=your-verified-email@example.com
 ```
 
 ## 🧪 Development
@@ -1037,7 +1051,7 @@ poetry shell
 | `SECRET_KEY` | Yes | - | JWT secret key (min 32 chars) |
 | `ADMIN_EMAIL` | Yes | - | Admin email address |
 | `SENDGRID_API_KEY` | Yes | - | SendGrid API key |
-| `SENDGRID_FROM_EMAIL` | Yes | - | SendGrid sender email |
+| `SENDER_EMAIL` | Yes | - | SendGrid sender email |
 | `ADMIN_DEFAULT_PASSWORD` | Yes | - | Default admin password |
 | `MYGRAPE_ADMIN_EMAIL` | Yes | - | MyGrape admin email |
 | `MYGRAPE_ADMIN_PASSWORD` | Yes | - | MyGrape admin password |

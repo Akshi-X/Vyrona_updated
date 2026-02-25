@@ -20,6 +20,7 @@ This guide provides step-by-step instructions to set up the entire MyGrape devel
 10. [Verification & Testing](#verification--testing)
 11. [Troubleshooting](#troubleshooting)
 12. [Development Workflow](#development-workflow)
+13. [Shared Models (Monorepo)](#-shared-models-monorepo)
 
 ---
 
@@ -90,7 +91,7 @@ The MyGrape project consists of three main components:
 ### Project Structure
 
 ```
-mygrape/
+dashboard-service/
 ├── backend/              # FastAPI backend application
 │   ├── app/              # Application code
 │   ├── migration/        # Database migrations (Alembic)
@@ -103,6 +104,17 @@ mygrape/
 │   ├── src/              # Source code
 │   ├── package.json      # Node dependencies
 │   └── vite.config.ts    # Vite configuration
+│
+├── telemetry-service/    # Azure Functions (IoT telemetry processing)
+│   ├── TelemetryHook/    # Main Azure Function
+│   ├── shared/           # Function-internal utilities (database, publisher logic)
+│   ├── config.py         # Settings (Pydantic BaseSettings + Azure Key Vault)
+│   └── host.json         # Azure Functions host configuration
+│
+├── shared/               # Shared pip package (mgscale_shared)
+│   ├── pyproject.toml    # Package definition - install with: pip install -e ./shared
+│   └── backend/
+│       └── models/       # SQLAlchemy models shared across backend & telemetry-service
 │
 └── publisher/            # Quality data publisher service
     ├── publisher.py      # Main publisher script
@@ -380,7 +392,7 @@ SECRET_KEY=your-secret-key-minimum-32-characters-long-generate-random-string
 ADMIN_EMAIL=admin@example.com
 # SendGrid Configuration
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-email@example.com
+SENDER_EMAIL=your-email@example.com
 
 # ============================================
 # Admin Account Configuration
@@ -990,7 +1002,7 @@ poetry install
 ```bash
 # Check .env file:
 SENDGRID_API_KEY=your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=your-verified-email@example.com
+SENDER_EMAIL=your-verified-email@example.com
 ```
 
 #### 7. CORS Errors in Browser
@@ -1176,6 +1188,7 @@ Use this checklist to verify your setup:
 - [ ] Redis 6.x or 7.x installed and running
 - [ ] Database `mygrape` created
 - [ ] Backend dependencies installed (`poetry install`)
+- [ ] Shared package installed in backend and telemetry-service (`pip install -e ./shared`)
 - [ ] Frontend dependencies installed (`npm install`)
 - [ ] Backend `.env` file created and configured
 - [ ] Publisher `.publisher.env` file created and configured
@@ -1207,6 +1220,41 @@ If you've completed all the steps above, you should have:
 - Check the project README files for more information
 
 **Happy Coding! 🚀**
+
+---
+
+## 🔗 KPI Models (KpiConfig & Readings)
+
+KPI config and readings models live in the main backend models package and use the same `Base` as all other backend models.
+
+| Term | Value |
+|------|--------|
+| Source directory | `backend/app/models/` |
+| Import in backend | `from app.models import KpiConfig, Readings` |
+
+---
+
+### Model files
+
+- **KpiConfig** — `backend/app/models/kpi_config_model.py` (tank KPI limits: min/max, units, ln2_level l1/l2/critical).
+- **Readings** — `backend/app/models/readings_model.py` (individual KPI readings per timestamp; snapshots = multiple rows with same timestamp).
+
+Both are exported from `backend/app/models/__init__.py` and imported in `init_db()` so their tables are created with the rest of the schema.
+
+---
+
+### Usage
+
+```python
+from app.models import KpiConfig, Readings
+
+# Query example
+def get_tank_kpi_config(db: Session, tank_id: int):
+    return db.query(KpiConfig).filter(
+        KpiConfig.tank_id == tank_id,
+        KpiConfig.status == True,
+    ).all()
+```
 
 ---
 

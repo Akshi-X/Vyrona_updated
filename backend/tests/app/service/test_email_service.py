@@ -19,7 +19,7 @@ def test_send_email_via_sendgrid_success(mock_sendgrid_client, mock_settings):
     """Test sending email via SendGrid successfully"""
     # Setup mocks
     mock_settings.SENDGRID_API_KEY = "test_api_key"
-    mock_settings.SENDGRID_FROM_EMAIL = "test@example.com"
+    mock_settings.SENDER_EMAIL = "test@example.com"
     
     mock_sg_instance = MagicMock()
     mock_response = MagicMock()
@@ -43,7 +43,7 @@ def test_send_email_via_sendgrid_success(mock_sendgrid_client, mock_settings):
 def test_send_email_via_sendgrid_no_api_key(mock_settings):
     """Test sending email via SendGrid when API key not configured"""
     mock_settings.SENDGRID_API_KEY = None
-    mock_settings.SENDGRID_FROM_EMAIL = "test@example.com"
+    mock_settings.SENDER_EMAIL = "test@example.com"
     
     with pytest.raises(EmailServiceException) as exc_info:
         email_service.send_email_via_sendgrid(
@@ -60,7 +60,7 @@ def test_send_email_via_sendgrid_no_api_key(mock_settings):
 def test_send_email_via_sendgrid_no_from_email(mock_settings):
     """Test sending email via SendGrid when from email not configured"""
     mock_settings.SENDGRID_API_KEY = "test_api_key"
-    mock_settings.SENDGRID_FROM_EMAIL = None
+    mock_settings.SENDER_EMAIL = None
     
     with pytest.raises(EmailServiceException) as exc_info:
         email_service.send_email_via_sendgrid(
@@ -78,7 +78,7 @@ def test_send_email_via_sendgrid_no_from_email(mock_settings):
 def test_send_email_via_sendgrid_error_response(mock_sendgrid_client, mock_settings):
     """Test sending email via SendGrid when API returns error"""
     mock_settings.SENDGRID_API_KEY = "test_api_key"
-    mock_settings.SENDGRID_FROM_EMAIL = "test@example.com"
+    mock_settings.SENDER_EMAIL = "test@example.com"
     
     mock_sg_instance = MagicMock()
     mock_response = MagicMock()
@@ -103,7 +103,7 @@ def test_send_email_via_sendgrid_error_response(mock_sendgrid_client, mock_setti
 def test_send_email_via_sendgrid_exception(mock_sendgrid_client, mock_settings):
     """Test sending email via SendGrid when exception occurs"""
     mock_settings.SENDGRID_API_KEY = "test_api_key"
-    mock_settings.SENDGRID_FROM_EMAIL = "test@example.com"
+    mock_settings.SENDER_EMAIL = "test@example.com"
     
     mock_sendgrid_client.side_effect = Exception("Connection error")
     

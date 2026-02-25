@@ -1,0 +1,12 @@
+[
+  {
+    "email": "admin@zucisystems.com",
+    "password": "IVFAdmin1!",
+    "first_name": "IVF",
+    "last_name": "Admin",
+    "hospital_name": "ARC Fertility Hospitals",
+    "branch_name": "Main Branch",
+    "department": "IVF",
+    "role": "Admin"
+  }
+]

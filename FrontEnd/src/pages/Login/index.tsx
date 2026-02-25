@@ -140,7 +140,7 @@ const Login: React.FC = () => {
                         if (pathname) {
                             fromPath = `${pathname}${search}${hash}`;
                         } else if (search) {
-                            fromPath = `/approval-screen${search}${hash}`;
+                            fromPath = `/approval${search}${hash}`;
                         }
                     }
                 }

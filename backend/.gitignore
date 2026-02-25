@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.class
@@ -62,6 +62,7 @@ migration/versions/*.pyc
 
 # Pharma Admins
 pharma_admins.json
+ivf_admins.json
 # Publisher folder
 publisher/
 # Uploads

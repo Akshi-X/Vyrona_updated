@@ -1,62 +1,125 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
-import QualityLossModal from '../../../components/QualityLossModal';
-
-interface Threshold {
-  min: number | null;
-  max: number | null;
-  unit: string;
-}
-
-interface QualityPayload {
-  temp_internal: number;
-  temp_external: number | null;
-  shock: number;
-  thresholds: {
-    temp_internal: Threshold;
-    temp_external: Threshold;
-    shock: Threshold;
-  };
-  threshold_violations: {
-    temp_internal: boolean;
-    temp_external: boolean;
-    shock: boolean;
-  };
-  quality_loss?: number;
-  quality_status?: string;
-  quality_percentage?: number;
-}
+import { ivfService } from '../../../services/ivfService';
+// CriticalAlertsIcon import removed - using inline AlertIcon component with dynamic colors
 
 interface IVFQualityParametersTableProps {
   canisterNumber?: string;
 }
 
+// Icon components for KPI tiles - using system purple #6B1176
+const LockIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+const ThermometerIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+  </svg>
+);
+
+const SunIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+);
+
+const EvaporationIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M8 19a4 4 0 0 1-4-4 7 7 0 0 1 7-7h.5" />
+    <path d="M13.5 8a7 7 0 0 1 7 7 4 4 0 0 1-4 4" />
+    <path d="M12 3v3m0 4v3m0 4v3" />
+  </svg>
+);
+
+const ShockIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+// Alert icon with dynamic fill color for threshold markers
+const AlertIcon = ({ color = '#6B1176' }: { color?: string }) => (
+  <svg width="18" height="18" viewBox="0 0 23 21" fill="none">
+    <path d="M11.0476 0.100342C12.1558 0.100342 13.1313 0.667473 13.7 1.5271L13.8083 1.70288L13.8103 1.70581L13.8162 1.71753L21.5291 15.2136C21.7986 15.6712 21.9577 16.2213 21.9578 16.8074C21.9578 17.3947 21.7972 17.9445 21.5193 18.4167L21.5203 18.4177L21.5125 18.4314C20.9532 19.3859 19.9309 20.0173 18.7615 20.0173H3.31421L3.31519 20.0183C3.30974 20.0184 3.30344 20.0183 3.29761 20.0183C2.12295 20.0183 1.09697 19.3813 0.546631 18.4343L0.544678 18.4314L0.538818 18.4207L0.441162 18.2429C0.224877 17.8188 0.100342 17.3279 0.100342 16.8083C0.100355 16.2216 0.259389 15.6719 0.536865 15.2L8.24292 1.71753C8.79815 0.745596 9.82919 0.100394 11.0115 0.100342H11.0476ZM11.0193 1.80835C10.4697 1.80839 9.98895 2.10661 9.73315 2.55151L9.73413 2.55249L9.72925 2.5603L9.72827 2.56323L2.01343 16.0613L2.01245 16.0623C1.88734 16.2746 1.81323 16.5311 1.81323 16.8054C1.81327 17.08 1.88744 17.337 2.01733 17.5574H2.01831C2.27915 18.0069 2.75748 18.3035 3.30444 18.3035H18.7546C19.3009 18.3034 19.778 18.0077 20.0349 17.5671L20.0388 17.5603L20.0408 17.5564C20.1689 17.3421 20.2458 17.083 20.2458 16.8054C20.2458 16.5341 20.1727 16.2799 20.0457 16.0613L20.0437 16.0583L20.0398 16.0515V16.0505L12.3308 2.56323C12.0716 2.10844 11.5903 1.80839 11.0398 1.80835H11.0193ZM11.0281 13.3513C11.6395 13.3513 12.1353 13.8473 12.1355 14.4587C12.1355 15.0703 11.6396 15.5662 11.0281 15.5662C10.4205 15.5655 9.92723 15.0758 9.92163 14.4695V14.4636C9.92163 14.1595 10.0445 13.8834 10.2429 13.6833C10.4425 13.4801 10.7201 13.353 11.0271 13.3513H11.0281ZM11.03 6.56226C11.5023 6.56226 11.8853 6.94547 11.8855 7.41772V11.1853C11.8855 11.6282 11.5492 11.993 11.1179 12.0369L11.03 12.0408H11.0281C10.5561 12.0407 10.1733 11.6581 10.1726 11.1863V11.1453L10.1736 11.1443V7.41772C10.1738 6.94552 10.5568 6.56235 11.0291 6.56226H11.03Z" fill={color} stroke={color} strokeWidth="0.2"/>
+  </svg>
+);
+
+const BatteryIcon = ({ level }: { level: number }) => (
+  <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
+    <rect x="1" y="2" width="26" height="12" rx="2" stroke="#6B1176" strokeWidth="2" />
+    <rect x="27" y="5" width="3" height="6" rx="1" fill="#6B1176" />
+    <rect x="3" y="4" width={Math.max(0, (level / 100) * 22)} height="8" rx="1" fill="#6B1176" />
+  </svg>
+);
+
+
+// KPI Tile Card component using system colors
+interface KpiTileProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
+
+const KpiTile = ({ icon, label, value }: KpiTileProps) => (
+  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm px-4 py-3 flex items-center gap-3 min-w-44">
+    <div className="bg-[#FDF4FF] rounded-lg p-2.5 flex items-center justify-center">
+      {icon}
+    </div>
+    <div className="flex flex-col">
+      <span className="text-[11px] text-gray-500 font-medium">{label}</span>
+      <span className="text-[15px] font-semibold text-black">{value}</span>
+    </div>
+  </div>
+);
+
+/**
+ * Cylinder level diagram for Quality Parameter.
+ * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
+ */
 export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
-  
-  const [showAnomalies, setShowAnomalies] = useState(false);
-  const [showQualityLossModal, setShowQualityLossModal] = useState(false);
-  const [latest, setLatest] = useState<QualityPayload | null>(null);
+
+  const [level, setLevel] = useState<number | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number>(82);
+  const [evaporationRate, setEvaporationRate] = useState<{ value: number; unit: string } | null>(null);
+  const [tempExternal, setTempExternal] = useState<number | null>(null);
+  const [tempInternal, setTempInternal] = useState<number | null>(null);
+  const [lidStatus, setLidStatus] = useState<number | null>(0);
+  const [shock, setShock] = useState<number | null>(0);
+  const [l1, setL1] = useState<number>(75); // L1 level threshold (default 100%)
+  const [l2, setL2] = useState<number>(30);  // L2 level threshold (default 30%)
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [hasReceivedData, setHasReceivedData] = useState(false);
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     const baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
-    const wsUrl = baseUrl.replace(/^http/, 'ws');
-    return `${wsUrl}/api/ivf/quality/ws`;
+    return `${baseUrl.replace(/^http/, 'ws')}/api/kpi/ws`;
   };
 
   const getManagerBranchOverride = (): string | undefined => {
     try {
       const role = (localStorage.getItem('user_role') || '').trim().toLowerCase();
       if (!role.includes('manager')) return undefined;
-      const fromUrl = new URLSearchParams(window.location.search).get('branch_id_override')
-        || new URLSearchParams(window.location.search).get('branch_id')
-        || undefined;
+      const fromUrl =
+        new URLSearchParams(window.location.search).get('branch_id_override') ||
+        new URLSearchParams(window.location.search).get('branch_id') ||
+        undefined;
       const fromSession = sessionStorage.getItem('ivf_selected_branch_id') || undefined;
       return fromUrl || fromSession || undefined;
     } catch {
@@ -64,295 +127,340 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     }
   };
 
+  const setLevelFromKpis = (kpis: Array<{ name: string; value: number; unit: string }> | undefined) => {
+    if (!kpis?.length) return;
+    const ln2 = kpis.find((k) => k.name === 'ln2_level');
+    const bat = kpis.find((k) => k.name === 'battery_level');
+    const value = ln2?.value ?? bat?.value;
+    if (value !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
+      setLevel(Math.min(100, Math.max(0, value)));
+    }
+    if (bat?.value !== undefined && typeof bat.value === 'number' && !Number.isNaN(bat.value)) {
+      setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
+    }
+    const evap = kpis.find((k) => k.name === 'evaporation_rate');
+    if (evap?.value !== undefined && typeof evap.value === 'number' && !Number.isNaN(evap.value)) {
+      setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
+    }
+    const ext = kpis.find((k) => k.name === 'temp_external');
+    if (ext?.value !== undefined && typeof ext.value === 'number' && !Number.isNaN(ext.value)) {
+      setTempExternal(ext.value);
+    }
+    const int = kpis.find((k) => k.name === 'temp_internal');
+    if (int?.value !== undefined && typeof int.value === 'number' && !Number.isNaN(int.value)) {
+      setTempInternal(int.value);
+    }
+    const lid = kpis.find((k) => k.name === 'lid_status');
+    if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
+      setLidStatus(lid.value);
+    }
+    const sh = kpis.find((k) => k.name === 'shock');
+    if (sh?.value !== undefined && typeof sh.value === 'number' && !Number.isNaN(sh.value)) {
+      setShock(sh.value);
+    }
+    const l1Kpi = kpis.find((k) => k.name === 'l1');
+    if (l1Kpi?.value !== undefined && typeof l1Kpi.value === 'number' && !Number.isNaN(l1Kpi.value)) {
+      setL1(Math.min(100, Math.max(0, l1Kpi.value)));
+    }
+    const l2Kpi = kpis.find((k) => k.name === 'l2');
+    if (l2Kpi?.value !== undefined && typeof l2Kpi.value === 'number' && !Number.isNaN(l2Kpi.value)) {
+      setL2(Math.min(100, Math.max(0, l2Kpi.value)));
+    }
+    // Update last sync time
+    setLastSyncTime(
+      new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'UTC',
+      }) + ' UTC'
+    );
+  };
+
+  useEffect(() => {
+    if (!canisterNumber) return;
+    ivfService.getKpiHistory(canisterNumber, 1).then((res) => {
+      if (!isMountedRef.current || !res?.history?.length) return;
+      const last = res.history[res.history.length - 1];
+      setLevelFromKpis(last?.kpis);
+    }).catch(() => {});
+  }, [canisterNumber]);
+
   useEffect(() => {
     isMountedRef.current = true;
-
     if (!canisterNumber) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
 
-    try {
-      const params = new URLSearchParams({ token: authToken });
-      const branchOverride = getManagerBranchOverride();
-      if (branchOverride) {
-        params.set('branch_id_override', branchOverride);
-      }
-      const ws = new WebSocket(`${getWebSocketUrl()}?${params.toString()}`);
+    const params = new URLSearchParams({ token: authToken });
+    const branchOverride = getManagerBranchOverride();
+    if (branchOverride) params.set('branch_id_override', branchOverride);
+    const ws = new WebSocket(`${getWebSocketUrl()}?${params.toString()}`);
 
-      ws.onopen = () => {
-        setIsConnected(true);
-        setHasReceivedData(false);
-        if (canisterNumber) ws.send(JSON.stringify({ tank_code: canisterNumber }));
-      };
+    ws.onopen = () => {
+      setIsConnected(true);
+      if (canisterNumber) ws.send(JSON.stringify({ tank_code: canisterNumber }));
+    };
 
-      ws.onmessage = (event) => {
-        if (!isMountedRef.current) return;
-        try {
-          const data: any = JSON.parse(event.data);
-          
-          if (data.type === 'subscription_confirmed') {
-            return;
-          }
-          
-          if (data.type === 'error') {
-            return;
-          }
-          
-          // Check if this is quality data (has tank_code, canister_number, or canister_id and timestamp)
-          // IVF data uses temp_internal (not temperature) and shock (not agitation)
-          const hasCanisterId = data.tank_code || data.canister_number || data.canister_id;
-          const hasTimestamp = data.timestamp;
-          const hasTemperature = data.temperature !== undefined || data.temp_internal !== undefined;
-          
-          if (hasCanisterId && hasTimestamp && hasTemperature) {
-            // Extract IVF field names
-            const temp_internal = data.temp_internal !== undefined ? data.temp_internal : data.temperature;
-            const temp_external = data.temp_external !== undefined && data.temp_external !== null ? data.temp_external : null;
-            const shock = data.shock !== undefined ? data.shock : data.agitation;
-            
-            // Only process if we have valid numeric values for required fields
-            if (temp_internal !== undefined && temp_internal !== null && 
-                shock !== undefined && shock !== null) {
-              // Map the data to QualityPayload format
-              const qualityPayload: QualityPayload = {
-                temp_internal: typeof temp_internal === 'number' ? temp_internal : parseFloat(temp_internal),
-                temp_external: temp_external !== null ? (typeof temp_external === 'number' ? temp_external : parseFloat(temp_external)) : null,
-                shock: typeof shock === 'number' ? shock : parseFloat(shock),
-                thresholds: {
-                  temp_internal: data.thresholds?.temperature || data.thresholds?.temp_internal || { min: null, max: null, unit: '°C' },
-                  temp_external: data.thresholds?.temp_external || { min: null, max: null, unit: '°C' },
-                  shock: data.thresholds?.agitation || data.thresholds?.shock || { min: null, max: null, unit: 'G' },
-                },
-                threshold_violations: {
-                  temp_internal: data.threshold_violations?.temperature || data.threshold_violations?.temp_internal || false,
-                  temp_external: data.threshold_violations?.temp_external || false,
-                  shock: data.threshold_violations?.agitation || data.threshold_violations?.shock || false,
-                },
-                quality_loss: data.quality_loss,
-                quality_status: data.quality_status,
-                quality_percentage: data.quality_percentage,
-              };
-              
-              setHasReceivedData(true);
-              setLatest(qualityPayload);
-            }
-          }
-        } catch (e) {
-          // Error parsing WebSocket message
-        }
-      };
+    ws.onmessage = (event) => {
+      if (!isMountedRef.current) return;
+      try {
+        const data: any = JSON.parse(event.data);
+        if (data.type === 'subscription_confirmed') return;
+        if (data.type === 'error') return;
+        if (data.tank_code === canisterNumber && Array.isArray(data.kpis)) setLevelFromKpis(data.kpis);
+      } catch {}
+    };
 
-      ws.onerror = () => {
-        setIsConnected(false);
-      };
-      ws.onclose = () => {
-        setIsConnected(false);
-      };
-
-      wsRef.current = ws;
-    } catch (e) {
-      // ignore connection errors here
-    }
+    ws.onerror = () => setIsConnected(false);
+    ws.onclose = () => setIsConnected(false);
+    wsRef.current = ws;
 
     return () => {
       isMountedRef.current = false;
-      if (wsRef.current) {
-        try {
-          wsRef.current.close(1000, 'component unmount');
-        } catch {}
-        wsRef.current = null;
-      }
+      try {
+        wsRef.current?.close(1000, 'unmount');
+      } catch {}
+      wsRef.current = null;
     };
   }, [canisterNumber, token]);
 
-  type Row = {
-    key: keyof QualityPayload['thresholds'];
-    label: string;
-    value: number;
-    threshold: Threshold;
-    violated: boolean;
-  };
+  const levelPercent = level != null ? Math.min(100, Math.max(0, level)) : null;
 
-  const rows: Row[] = useMemo(() => {
-    if (!latest) return [];
+  // System purple color scheme
+  const fillColor = '#c9a8e0';
+  const fillColorTop = '#e0ccf0';
 
-    const mapping: Array<{ key: Row['key']; label: string; value: number | null }> = [
-      { key: 'temp_internal', label: 'Temperature Internal (°C)', value: latest.temp_internal },
-      { key: 'temp_external', label: 'Temperature External (°C)', value: latest.temp_external },
-      { key: 'shock', label: 'Shock (G)', value: latest.shock },
-    ];
+  const formatTemp = (v: number | null) =>
+    v != null ? `${v.toFixed(1)}°C` : '—';
+  const lidLabel = lidStatus === 1 ? 'Open' : 'Closed';
 
-    const isViolated = (value: number | null, t: Threshold) => {
-      if (value === null || value === undefined) return false;
-      const belowMin = t.min !== null && t.min !== undefined && value < t.min;
-      const aboveMax = t.max !== null && t.max !== undefined && value > t.max;
-      return belowMin || aboveMax;
-    };
-
-    return mapping
-      .filter((m) => m.value !== null && m.value !== undefined) // Filter out null values
-      .map((m) => {
-        const threshold = latest.thresholds[m.key];
-        return {
-          key: m.key,
-          label: m.label,
-          value: m.value as number,
-          threshold,
-          violated: isViolated(m.value, threshold),
-        };
-      });
-  }, [latest]);
-
-  const filteredRows = useMemo(() => {
-    return showAnomalies ? rows.filter((r) => r.violated) : rows;
-  }, [rows, showAnomalies]);
-
-  const hasRows = filteredRows.length > 0;
-
-  const formatRange = (t: Threshold) => {
-    // Round threshold values to 1 decimal place for consistency
-    const formatThresholdValue = (val: number | null | undefined): string => {
-      if (val === null || val === undefined) return '-';
-      const rounded = Math.round(val * 10) / 10;
-      return rounded.toString();
-    };
-    
-    const min = formatThresholdValue(t.min);
-    const max = formatThresholdValue(t.max);
-    const unit = t.unit || '';
-    if (min !== '-' && max !== '-') return `${min}${unit ? ` ${unit}` : ''} - ${max}${unit ? ` ${unit}` : ''}`;
-    if (min !== '-') return `≥ ${min}${unit ? ` ${unit}` : ''}`;
-    if (max !== '-') return `≤ ${max}${unit ? ` ${unit}` : ''}`;
-    return '—';
-  };
-
-  const formatValueWithUnit = (value: number, t: Threshold, label: string) => {
-    // Round values appropriately based on type
-    let roundedValue: number;
-    if (label.includes('Temperature')) {
-      // Round temperature to 1 decimal place
-      roundedValue = Math.round(value * 10) / 10;
-    } else if (label.includes('Shock')) {
-      // Round shock to 1 decimal place
-      roundedValue = Math.round(value * 10) / 10;
-    } else {
-      // Default: round to 1 decimal place
-      roundedValue = Math.round(value * 10) / 10;
-    }
-    
-    if (t.unit) return `${roundedValue}${t.unit ? ` ${t.unit}` : ''}`;
-    if (label.includes('Temperature')) return `${roundedValue} °C`;
-    if (label.includes('Shock')) return `${roundedValue} G`;
-    return `${roundedValue}`;
-  };
+  // Tank dimensions for fill calculation
+  const tankBodyTop = 50;
+  const tankBodyHeight = 220;
+  const tankBodyBottom = tankBodyTop + tankBodyHeight;
+  const fillHeight = (tankBodyHeight * (levelPercent ?? 0)) / 100;
+  const liquidSurfaceY = tankBodyBottom - fillHeight;
+  
+  // L1/L2 level marker positions (calculate Y from percentage)
+  const l1Y = tankBodyBottom - (tankBodyHeight * l1) / 100;
+  const l2Y = tankBodyBottom - (tankBodyHeight * l2) / 100;
+  
+  // Alert color based on level thresholds
+  const alertColor = (levelPercent ?? 0) <= l2 
+    ? '#EF4444' // Red if at or below L2
+    : (levelPercent ?? 0) < l1 
+      ? '#F59E0B' // Yellow if between L1 and L2
+      : '#22C55E'; // Green if at or above L1
 
   return (
-    <div className="rounded-[5px] border border-gray-200 h-[460px] bg-white p-4">
-      <div className="mb-3">
-        <h3 className="text-base font-semibold text-gray-900 text-[16px] mb-2">Quality Parameter</h3>
-        <div className="flex items-center justify-between">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex flex-col items-start justify-between flex-wrap gap-2">
+        <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
+        <div className="flex items-center justify-end gap-5 flex-wrap">
+          {/* Live indicator */}
           <div className="flex items-center gap-2">
-            <span className="text-black text-[14px] font-medium">Anomalies</span>
-            {/* Toggle */}
-            <button
-              type="button"
-              aria-pressed={showAnomalies}
-              onClick={() => setShowAnomalies((v) => !v)}
-              className={`h-5 w-9 rounded-full transition-colors ${
-                showAnomalies ? 'bg-[#6B1176]' : 'bg-gray-300'
-              } relative`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
-                  showAnomalies ? 'left-4' : 'left-0.5'
-                }`}
-              />
-            </button>
+            <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            <span className="text-sm font-medium text-[#6B1176]">LIVE</span>
           </div>
-          <div className="flex items-center gap-3">
-            {latest?.quality_loss !== undefined ? (
-              <button
-                type="button"
-                onClick={() => setShowQualityLossModal(true)}
-                className={`rounded-[6px] px-3 py-2 text-xs font-semibold h-[30px] text-white ${
-                  latest.quality_loss >= 30
-                    ? 'bg-red-600'
-                    : latest.quality_loss >= 15
-                    ? 'bg-[#EAB308]'
-                    : 'bg-green-600'
-                }`}
-              >
-                Quality Loss: {latest.quality_loss}%
-              </button>
-            ) : (
-              <span className="rounded-[6px] bg-gray-400 px-3 py-2 text-xs font-semibold h-[30px] text-white">
-                Quality Loss: —
-              </span>
-            )}
+          {/* Battery */}
+          <div className="flex items-center gap-1.5">
+            <BatteryIcon level={batteryLevel} />
+            <span className="text-sm font-medium text-black">{batteryLevel}%</span>
+          </div>
+          {/* Last Sync */}
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Last Sync:</span>
+            <span className="font-medium text-black">{lastSyncTime || '—'}</span>
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-400'}`} />
           </div>
         </div>
       </div>
 
-      <div
-        className={`overflow-x-auto ${hasRows ? 'h-[224px] overflow-y-auto' : ''}`}
-        style={{ scrollbarWidth: 'thin' as any }}
-      >
-        <table className="w-full text-xs table-fixed">
-          <colgroup>
-            <col className="w-1.5/6" />
-            <col className="w-1.5/6" />
-            <col className="w-1/6" />
-            <col className="w-2/6" />
-          </colgroup>
-          <thead className="bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px] sticky top-0">
-            <tr>
-              <th className="px-3 py-2 text-left rounded-tl-[10px]">Parameter</th>
-              <th className="px-3 py-2 text-left">Current Value</th>
-              <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-left rounded-tr-[10px]">Acceptable Range</th>
-            </tr>
-          </thead>
-          <tbody>
-            {hasRows === false ? (
-              <tr>
-                <td className="px-3 py-4 text-gray-600 text-center" colSpan={4}>
-                  <div className="flex items-center justify-center">
-                    {latest ? (
-                      'No anomalies'
-                    ) : isConnected && wsRef.current?.readyState === WebSocket.OPEN && !hasReceivedData ? (
-                      'No data available'
-                    ) : (
-                      'Waiting for live data...'
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filteredRows.map((r, i) => (
-                <tr key={i} className="text-black text-[14px] h-[56px] hover:bg-gray-50">
-                  <td className="px-3 py-2 text-black text-[14px] ">{r.label}</td>
-                  <td className={`px-3 py-2  ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
-                    {formatValueWithUnit(r.value, r.threshold, r.label)}
-                  </td>
-                  <td className={`px-3 py-2 ${r.violated ? 'text-red-600' : 'text-green-700'}`}>
-                    {r.violated ? 'Anomaly' : 'Normal'}
-                  </td>
-                  <td className="px-3 py-2">{formatRange(r.threshold)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Main content: Left tiles + Tank + Right tiles */}
+      <div className="flex items-start justify-center gap-2 ">
+        {/* Left KPI Tiles */}
+        <div className="flex flex-col gap-3 justify-start pt-6">
+          <KpiTile
+            icon={<LockIcon className="text-[#6B1176]" />}
+            label="Lid Status"
+            value={lidLabel}
+          />
+          <KpiTile
+            icon={<ThermometerIcon className="text-[#6B1176]" />}
+            label="Internal Temp"
+            value={formatTemp(tempInternal)}
+          />
+        </div>
 
-      <QualityLossModal
-        isOpen={showQualityLossModal}
-        onClose={() => setShowQualityLossModal(false)}
-        qualityLoss={latest?.quality_loss}
-        qualityScore={latest?.quality_percentage}
-        activeAnomalies={filteredRows.filter((r) => r.violated).length}
-      />
+        {/* Tank SVG */}
+        <div className="shrink-0">
+          <svg
+            width="220"
+            height="320"
+            viewBox="0 0 240 320"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-label="Cryocan tank"
+          >
+            <defs>
+              <linearGradient id="tank-fill-gradient" x1="0" x2="0" y1="1" y2="0">
+                <stop offset="0%" stopColor={fillColor} />
+                <stop offset="100%" stopColor={fillColorTop} />
+              </linearGradient>
+              <linearGradient id="tank-body-gradient" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stopColor="#9580a8" />
+                <stop offset="50%" stopColor="#c9b3db" />
+                <stop offset="100%" stopColor="#9580a8" />
+              </linearGradient>
+              <clipPath id="tank-body-clip">
+                <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" />
+              </clipPath>
+              {/* Wave animation keyframes */}
+              <style>
+                {`
+                  @keyframes wave {
+                    0%, 100% { d: path('M30 0 Q55 -8 80 0 T130 0 T180 0'); }
+                    50% { d: path('M30 0 Q55 8 80 0 T130 0 T180 0'); }
+                  }
+                `}
+              </style>
+            </defs>
+
+            {/* Tank lid/cap */}
+            <rect x="50" y="15" width="100" height="40" rx="10" fill="#a78bba" stroke="#8B6B9E" strokeWidth="2" />
+            <rect x="60" y="22" width="80" height="10" rx="5" fill="#c9b3db" />
+            <rect x="70" y="35" width="60" height="8" rx="4" fill="#b8a0cc" />
+            
+            {/* Tank base/feet */}
+            <rect x="40" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+            <rect x="130" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+            <rect x="65" y="270" width="70" height="12" rx="3" fill="#a78bba" />
+            
+            {/* Tank body outline */}
+            <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="url(#tank-body-gradient)" stroke="#8B6B9E" strokeWidth="3" />
+
+            {/* LN2 fill level with wave effect */}
+            <g clipPath="url(#tank-body-clip)">
+              {/* Main liquid fill */}
+              <rect
+                x="30"
+                y={liquidSurfaceY}
+                width="140"
+                height={fillHeight}
+                fill="url(#tank-fill-gradient)"
+                className="transition-all duration-700 ease-out"
+              />
+              
+              {/* Animated wave on liquid surface */}
+              {levelPercent != null && levelPercent > 0 && (
+                <g transform={`translate(0, ${liquidSurfaceY})`}>
+                  {/* Primary wave */}
+                  <path
+                    d="M30 0 Q55 -6 80 0 T130 0 T170 0"
+                    fill={fillColorTop}
+                    opacity="0.9"
+                  >
+                    <animate
+                      attributeName="d"
+                      values="M30 0 Q55 -6 80 0 T130 0 T170 0;M30 0 Q55 6 80 0 T130 0 T170 0;M30 0 Q55 -6 80 0 T130 0 T170 0"
+                      dur="3s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  {/* Secondary wave for depth */}
+                  <path
+                    d="M30 2 Q65 8 100 2 T170 2"
+                    fill={fillColor}
+                    opacity="0.5"
+                  >
+                    <animate
+                      attributeName="d"
+                      values="M30 2 Q65 8 100 2 T170 2;M30 2 Q65 -4 100 2 T170 2;M30 2 Q65 8 100 2 T170 2"
+                      dur="2.5s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  {/* Highlight shimmer */}
+                  <ellipse cx="100" cy="0" rx="40" ry="3" fill="white" opacity="0.3">
+                    <animate
+                      attributeName="opacity"
+                      values="0.3;0.5;0.3"
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                  </ellipse>
+                </g>
+              )}
+            </g>
+
+            {/* Tank inner shadow for depth */}
+            <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
+
+            {/* L1 Level Marker */}
+            <g>
+              <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+              <g transform={`translate(192, ${l1Y - 9})`}>
+                <AlertIcon color={alertColor} />
+              </g>
+              <text x="212" y={l1Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
+            </g>
+            
+            {/* L2 Level Marker */}
+            <g>
+              <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+              <g transform={`translate(192, ${l2Y - 9})`}>
+                <AlertIcon color={alertColor} />
+              </g>
+              <text x="212" y={l2Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
+            </g>
+
+            {/* Level percentage display on tank */}
+            <text
+              x="100"
+              y="175"
+              textAnchor="middle"
+              className="text-[24px] font-bold"
+              fill="#6B1176"
+              style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+            >
+              {levelPercent != null ? `${Math.round(levelPercent)}%` : '—'}
+            </text>
+            <text
+              x="100"
+              y="195"
+              textAnchor="middle"
+              className="text-[12px]"
+              fill="#6B1176"
+              opacity="0.7"
+              style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+            >
+              LN2 Level
+            </text>
+          </svg>
+        </div>
+
+        {/* Right KPI Tiles */}
+        <div className="flex flex-col gap-3 pt-6">
+          <KpiTile
+            icon={<SunIcon className="text-[#6B1176]" />}
+            label="External Temp"
+            value={formatTemp(tempExternal)}
+          />
+          <KpiTile
+            icon={<EvaporationIcon className="text-[#6B1176]" />}
+            label="LN2 Evaporation Rate"
+            value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
+          />
+          <KpiTile
+            icon={<ShockIcon className="text-[#6B1176]" />}
+            label="Shock"
+            value={shock != null ? String(shock) : '—'}
+          />
+        </div>
+      </div>
     </div>
   );
 }
-

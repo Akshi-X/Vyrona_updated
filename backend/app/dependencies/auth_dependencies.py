@@ -231,6 +231,10 @@ def validate_registration_request(request: UserRegister, db: Session) -> UserReg
         # Keep request aligned with domain-resolved hospital when not explicitly set.
         if not request.hospital_name:
             request.hospital_name = hospital.hospital_name
+        # Manager does not require branch_name; normalize so downstream never expects it.
+        role_val = (getattr(request, "role", None) or "").strip()
+        if role_val and role_val.lower() == "manager":
+            request.branch_name = None
     else:
         # Pharma default department.
         if not request.department:
