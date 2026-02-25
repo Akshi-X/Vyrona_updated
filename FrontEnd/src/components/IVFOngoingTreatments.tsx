@@ -384,7 +384,7 @@ export function IVFOngoingTreatments({
                       className="border-b border-[#F3E0FF] bg-white transition-colors  whitespace-nowrap"
                     >
                       <td className="px-4 py-3 text-xs">{treatment.hisNumber || '-'}</td>
-                      <td className="px-4 py-3 text-xs">{treatment.cryolockNum || '-'}</td>
+                      <td className="px-4 py-3 text-xs">{treatment.cryolockNum?.split("/").pop() || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.canisterNum || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.tankCode || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.caneCode || '-'}</td>

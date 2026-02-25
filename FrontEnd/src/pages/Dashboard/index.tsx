@@ -1087,7 +1087,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Performance Section */}
                   <section>
-                    <h2 className="font-semibold text-black text-base mb-4">Performance</h2>
+                    <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
@@ -1131,7 +1131,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Outbound Shipments Section */}
                   <section>
-                    <h2 className="font-semibold text-black text-base mb-4">Outbound Shipments</h2>
+                    <h2 className="font-semibold text-black text-base mb-4">Shipment Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbond Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
@@ -1140,7 +1140,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Outbound Shipment" src={OutboundShipmentIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Outbound Shipments
+                            Total Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfOutboundShipments
