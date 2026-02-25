@@ -137,6 +137,7 @@ async def startup_event():
     # Step 3b: Start LN2 readings WebSocket listener (separate from quality)
     logger.info("Starting LN2 Redis listener for real-time readings...")
     asyncio.create_task(ivf_quality_controller.ln2_redis_listener())
+    asyncio.create_task(ivf_quality_controller.tank_kpi_redis_listener())
     
     # Step 4: Start scheduled task to fetch World Bank LPI data daily at midnight
     logger.info("Starting World Bank LPI daily fetch scheduler...")
