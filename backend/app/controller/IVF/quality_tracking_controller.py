@@ -37,9 +37,9 @@ router = APIRouter(
 )
 
 
-@router.post("/tanks/{tank_code}/refill-logs", response_model=RefillLogResponse, status_code=201)
+@router.post("/tanks/{tank_id}/refill-logs", response_model=RefillLogResponse, status_code=201)
 def create_refill_log(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, uses first canister in tank."),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     refill_log_data: RefillLogCreate = ...,
@@ -61,12 +61,8 @@ def create_refill_log(
     - Status: Status of the refill log (default: Not started)
     """
     try:
-        quality_tracking_service = QualityTrackingService(db)
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
+        quality_tracking_service = QualityTrackingService(db)
         return quality_tracking_service.create_refill_log_for_tank(
             tank_id=tank_id,
             canister_number=canister_number,
@@ -79,9 +75,9 @@ def create_refill_log(
         raise
 
 
-@router.get("/tanks/{tank_code}/refill-logs", response_model=RefillLogListResponse)
+@router.get("/tanks/{tank_id}/refill-logs", response_model=RefillLogListResponse)
 def get_refill_logs_by_container(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, returns logs for all canisters in tank."),
     status: Optional[str] = Query(None, description="Filter by status (Done, In progress, Not started)"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Limit number of results"),
@@ -116,10 +112,6 @@ def get_refill_logs_by_container(
         
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.get_refill_logs_for_tank(
             tank_id=tank_id,
             canister_number=canister_number,
@@ -134,9 +126,9 @@ def get_refill_logs_by_container(
         raise
 
 
-@router.patch("/tanks/{tank_code}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
+@router.patch("/tanks/{tank_id}/refill-logs/{log_id}/status", response_model=RefillLogResponse)
 def update_refill_log_status(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     log_id: int = Path(..., description="Refill log ID"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     status_update: RefillLogStatusUpdate = ...,
@@ -150,10 +142,6 @@ def update_refill_log_status(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.update_refill_log_status_for_tank(
             tank_id=tank_id,
             log_id=log_id,
@@ -166,9 +154,9 @@ def update_refill_log_status(
         raise
 
 
-@router.get("/tanks/{tank_code}/tracking-details", response_model=IVFCanisterTrackingResponse)
+@router.get("/tanks/{tank_id}/tracking-details", response_model=IVFCanisterTrackingResponse)
 def get_canister_tracking_details(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T2') - represents Tank Number from ARC API format"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -198,7 +186,7 @@ def get_canister_tracking_details(
         effective_branch_id = None if (role in ("Manager", "Admin")) else branch_id
         quality_tracking_service = QualityTrackingService(db)
         return quality_tracking_service.get_tank_tracking_details(
-            tank_code=tank_code,
+            tank_id=tank_id,
             branch_id=effective_branch_id,
             user_role=user_role
         )
@@ -211,9 +199,9 @@ def get_canister_tracking_details(
         raise
 
 
-@router.patch("/tanks/{tank_code}/goblet-color", response_model=ColorUpdateResponse)
+@router.patch("/tanks/{tank_id}/goblet-color", response_model=ColorUpdateResponse)
 def update_goblet_color(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     color_update: GobletColorUpdate = ...,
     request: Request = None,
@@ -243,25 +231,21 @@ def update_goblet_color(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.update_goblet_color_for_tank(
             tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
             branch_id=branch_id,
-            tank_code=tank_code
+            tank_code=None
         )
     except Exception as e:
         logger.error(f"Error in update_goblet_color endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/tanks/{tank_code}/cryolock-color", response_model=ColorUpdateResponse)
+@router.patch("/tanks/{tank_id}/cryolock-color", response_model=ColorUpdateResponse)
 def update_cryolock_color(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     color_update: CryolockColorUpdate = ...,
     request: Request = None,
@@ -291,25 +275,21 @@ def update_cryolock_color(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.update_cryolock_color_for_tank(
             tank_id=tank_id,
             color_update=color_update,
             updated_by=current_user.email if current_user else None,
             branch_id=branch_id,
-            tank_code=tank_code
+            tank_code=None
         )
     except Exception as e:
         logger.error(f"Error in update_cryolock_color endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/tanks/{tank_code}/embryo-transfer", response_model=CryolockFlagUpdateResponse)
+@router.patch("/tanks/{tank_id}/embryo-transfer", response_model=CryolockFlagUpdateResponse)
 def mark_embryo_transfer(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     flag_update: CryolockFlagUpdate = ...,
     request: Request = None,
@@ -327,25 +307,21 @@ def mark_embryo_transfer(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.mark_embryo_transfer_for_tank(
             tank_id=tank_id,
             flag_update=flag_update,
             updated_by=current_user.email if current_user else None,
             branch_id=branch_id,
-            tank_code=tank_code
+            tank_code=None
         )
     except Exception as e:
         logger.error(f"Error in mark_embryo_transfer endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.patch("/tanks/{tank_code}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
+@router.patch("/tanks/{tank_id}/in-transit-with-shipment", response_model=InTransitWithShipmentResponse)
 def mark_in_transit_with_shipment(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
     shipment_request: InTransitWithShipmentRequest = ...,
     request: Request = None,
@@ -383,25 +359,21 @@ def mark_in_transit_with_shipment(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.mark_in_transit_with_shipment_for_tank(
             tank_id=tank_id,
             request=shipment_request,
             updated_by=current_user.email if current_user else None,
             branch_id=branch_id,
-            tank_code=tank_code
+            tank_code=None
         )
     except Exception as e:
         logger.error(f"Error in mark_in_transit_with_shipment endpoint: {str(e)}", exc_info=True)
         raise
 
 
-@router.get("/tanks/{tank_code}/combined-report/export-excel")
+@router.get("/tanks/{tank_id}/combined-report/export-excel")
 def export_combined_refill_logs_and_deviations_excel(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     canister_number: Optional[str] = Query(None, description="Optional canister number (e.g., 'C1'). If not provided, exports data for all canisters in tank."),
     year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
     month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
@@ -430,10 +402,6 @@ def export_combined_refill_logs_and_deviations_excel(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.export_combined_refill_logs_and_deviations_excel_for_tank(
             tank_id=tank_id,
             canister_number=canister_number,
@@ -446,9 +414,9 @@ def export_combined_refill_logs_and_deviations_excel(
         raise
 
 
-@router.get("/tanks/{tank_code}/readings-deviations/export-excel")
+@router.get("/tanks/{tank_id}/readings-deviations/export-excel")
 def export_readings_deviations_excel(
-    tank_code: str = Path(..., description="Tank code from URL (e.g., 'T1', 'T10')"),
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
     year: Optional[int] = Query(None, ge=2000, le=2100, description="Year for the report (e.g., 2024). If not provided, uses current year."),
     month: Optional[int] = Query(None, ge=1, le=12, description="Month for the report (1-12). If not provided, exports entire year."),
     branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
@@ -483,10 +451,6 @@ def export_readings_deviations_excel(
     try:
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
-        tank_id = quality_tracking_service.resolve_tank_id(
-            tank_code=tank_code,
-            branch_id=branch_id
-        )
         return quality_tracking_service.export_readings_deviations_excel_for_tank(
             tank_id=tank_id,
             year=year,

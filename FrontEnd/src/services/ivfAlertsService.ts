@@ -64,9 +64,9 @@ export class IvfAlertsService extends BaseApiService {
   /**
    * Get alerts for a specific tank
    */
-  async getCanisterAlerts(tank_code: string): Promise<CanisterAlertsResponse> {
+  async getCanisterAlerts(tankId: string | number): Promise<CanisterAlertsResponse> {
     return await this.request<CanisterAlertsResponse>(
-      `/api/ivf/alerts/tank/${encodeURIComponent(tank_code)}`,
+      `/api/ivf/alerts/tank/${encodeURIComponent(tankId)}`,
       { method: 'GET' }
     );
   }

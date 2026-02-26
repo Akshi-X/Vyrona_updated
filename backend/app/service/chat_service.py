@@ -212,12 +212,12 @@ def mark_canister_as_read(user_id: str, tank_id: int, db: Session) -> int:
     ).scalar()
     
     if latest_message is None:
-        # No messages for this tank
+        # No messages for this tank. Keep DB FK nullable and return 0 in API.
         latest_message = 0
     
     # Get or create read status
     read_status = get_or_create_read_status_canister(user_id, tank_id, db)
-    read_status.last_read_message_id = latest_message
+    read_status.last_read_message_id = latest_message if latest_message > 0 else None
     read_status.updated_at = datetime.now(timezone.utc)
     
     db.commit()
@@ -838,7 +838,7 @@ async def get_patient_messages(
 
 
 async def get_canister_messages(
-    tank_code: str,
+    tank_id: int,
     current_user_id: str,
     current_user_pharma_id: Optional[int],
     current_user_hospital_id: Optional[int],
@@ -854,12 +854,9 @@ async def get_canister_messages(
     For pharma users: filters by pharma_id (if provided)
     """
     try:
-        # Resolve tank_code to tank_id
-        tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
-            raise ChatPatientNotFoundException(f"Tank with code '{tank_code}' not found")
-        
-        tank_id = tank.tank_id
+            raise ChatPatientNotFoundException(f"Tank with id '{tank_id}' not found")
         
         # Get all messages for this tank
         # For hospital users (IVF), filter by hospital_id

@@ -22,10 +22,12 @@ import StakeholderChatBox from '../../components/StakeholderChatBox';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
 export default function IVFTrackShipmentPage() {
-    const { canisterId } = useParams<{ canisterId: string }>();
+    const { tankId } = useParams<{ tankId: string }>();
     const { logout, userRole } = useAuth();
     const navigate = useNavigate();
     const [userInitials, setUserInitials] = useState<string>('U');
+    const [headerTankCode, setHeaderTankCode] = useState<string>('-');
+    const [headerBranchName, setHeaderBranchName] = useState<string>('-');
     
     // Header interactions state
     const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -46,12 +48,12 @@ export default function IVFTrackShipmentPage() {
 
     // Calculate stakeholder chat count: only show count if canister has tagged unread messages
     const stakeholderChatCount = React.useMemo(() => {
-        if (!canisterId || !wsUnreadMessages) return 0;
+        if (!tankId || !wsUnreadMessages) return 0;
         // Count only tagged unread messages for this specific canister (IVF flow uses canister_number)
         return wsUnreadMessages.filter(msg => 
-            msg.canister_number === canisterId || msg.patient_id === canisterId
+            msg.canister_number === tankId || msg.patient_id === tankId
         ).length;
-    }, [canisterId, wsUnreadMessages]);
+    }, [tankId, wsUnreadMessages]);
     
     const criticalAlertsCount = criticalAlerts.length;
     const myTasksCount = myTasks.length;
@@ -59,10 +61,10 @@ export default function IVFTrackShipmentPage() {
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
-            // If canisterId is available, fetch canister-specific alerts
+            // If tankId is available, fetch canister-specific alerts
             // Otherwise, fetch hospital-wide alerts
-            if (canisterId) {
-                const response = await ivfAlertsService.getCanisterAlerts(canisterId);
+            if (tankId) {
+                const response = await ivfAlertsService.getCanisterAlerts(tankId);
                 setCriticalAlerts(response.alerts || []);
             } else {
                 const response = await ivfAlertsService.getHospitalAlerts();
@@ -81,10 +83,10 @@ export default function IVFTrackShipmentPage() {
         try {
             let allTasks: Task[] = [];
             
-            // IVF flow: if canisterId is available, use canister-specific endpoint
+            // IVF flow: if tankId is available, use canister-specific endpoint
             // Otherwise fallback to general "my tasks"
-            if (canisterId) {
-                const canisterResponse = await tasksService.getCanisterTasks(canisterId);
+            if (tankId) {
+                const canisterResponse = await tasksService.getCanisterTasks(tankId);
                 allTasks = Array.isArray(canisterResponse.tasks) ? canisterResponse.tasks : [];
             } else {
                 const response = await tasksService.getMyTasks();
@@ -119,9 +121,27 @@ export default function IVFTrackShipmentPage() {
         }
     };
 
+    const fetchHeaderMetadata = async () => {
+        if (!tankId) {
+            setHeaderTankCode('-');
+            setHeaderBranchName('-');
+            return;
+        }
+
+        try {
+            const kpiConfigResponse = await ivfService.getTankKpiConfig(tankId);
+
+            setHeaderTankCode(kpiConfigResponse?.tank_code || '-');
+            setHeaderBranchName(kpiConfigResponse?.branch_name || '-');
+        } catch {
+            setHeaderTankCode('-');
+            setHeaderBranchName('-');
+        }
+    };
+
     const handleExport = async () => {
-        if (!canisterId) {
-            console.error('Canister ID is required for export');
+        if (!tankId) {
+            console.error('Tank ID is required for export');
             return;
         }
 
@@ -131,7 +151,7 @@ export default function IVFTrackShipmentPage() {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
             
-            await ivfService.exportCombinedReportExcel(canisterId, year, month);
+            await ivfService.exportCombinedReportExcel(tankId, year, month);
         } catch (e: any) {
             console.error('Error exporting report:', e);
             // You could show a toast notification here
@@ -144,13 +164,17 @@ export default function IVFTrackShipmentPage() {
         fetchCriticalAlerts();
         fetchMyTasks();
         fetchCurrentUser();
-    }, [canisterId]);
+    }, [tankId]);
+
+    useEffect(() => {
+        fetchHeaderMetadata();
+    }, [tankId]);
 
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
         if (wsUnreadMessages && wsUnreadMessages.length > 0) {
             const transformedChats = wsUnreadMessages
-                .filter(msg => msg.canister_number === canisterId || (msg.patient_id && canisterId && msg.patient_id === canisterId))
+                .filter(msg => msg.canister_number === tankId || (msg.patient_id && tankId && msg.patient_id === tankId))
                 .map((msg) => ({
                     id: msg.canister_number || msg.patient_id || '',
                     sender: msg.sender_name,
@@ -163,7 +187,7 @@ export default function IVFTrackShipmentPage() {
         } else {
             setStakeholderChats([]);
         }
-    }, [wsUnreadMessages, canisterId]);
+    }, [wsUnreadMessages, tankId]);
 
     return (
         <div className="bg-[#FDFAFF] flex w-full h-full">
@@ -195,7 +219,7 @@ export default function IVFTrackShipmentPage() {
                             <span className="text-gray-500">/</span>
                             <span className="text-black font-semibold">Container Quality Tracking</span>
                             <span className="text-black font-semibold">-</span>
-                            <span className="text-black font-semibold">Container ID: {canisterId || 'C1'}</span>
+                            <span className="text-black font-semibold">Tank: {headerTankCode} - {headerBranchName}</span>
                         </div>
                         <div className="flex items-center gap-6">
                             {/* Export Excel */}
@@ -203,7 +227,7 @@ export default function IVFTrackShipmentPage() {
                                 <button
                                     type="button"
                                     onClick={handleExport}
-                                    disabled={exporting || !canisterId}
+                                    disabled={exporting || !tankId}
                                     className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {exporting ? (
@@ -297,22 +321,22 @@ export default function IVFTrackShipmentPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Quality Tracking */}
                         <div className="h-full">
-                            <IVFQualityTrackingChart canisterNumber={canisterId} />
+                            <IVFQualityTrackingChart canisterNumber={tankId} />
                         </div>
                         {/* Right Column: Quality Parameter */}
                         <div>
-                            <IVFQualityParametersTable canisterNumber={canisterId} />
+                            <IVFQualityParametersTable canisterNumber={tankId} />
                         </div>
                     </div>
 
                     {/* Row 2: Container Data (full width) */}
                     <div>
-                        <ContainerDataTable canisterNumber={canisterId} />
+                        <ContainerDataTable canisterNumber={tankId} />
                     </div>
 
                     {/* Row 3: Refill Log (full width) */}
                     <div>
-                        <RefillLogTable canisterNumber={canisterId} />
+                        <RefillLogTable canisterNumber={tankId} />
                     </div>
 
                 </div>
@@ -322,7 +346,7 @@ export default function IVFTrackShipmentPage() {
             <StakeholderChatBox
                 isOpen={showStakeholderChatScreen}
                 onClose={() => setShowStakeholderChatScreen(false)}
-                canisterNumber={canisterId}
+                canisterNumber={tankId}
                 onMessagesUpdated={() => {
                     // WebSocket will automatically update unread count
                     // No need to manually refresh
@@ -368,7 +392,7 @@ export default function IVFTrackShipmentPage() {
                             id: task.id.toString(),
                             patientId: task.patient_id || 'N/A',
                             tankCode: task.tank_code || undefined,
-                            canisterNumber: task.canister_number || canisterId || 'N/A',
+                            canisterNumber: task.canister_number || tankId || 'N/A',
                             taskName: task.task_name,
                             description: task.description || '',
                             assigneeBy: task.created_by 
@@ -387,7 +411,7 @@ export default function IVFTrackShipmentPage() {
                             id: task.id?.toString() || 'unknown',
                             patientId: task.patient_id || 'N/A',
                             tankCode: task.tank_code || undefined,
-                            canisterNumber: task.canister_number || canisterId || 'N/A',
+                            canisterNumber: task.canister_number || tankId || 'N/A',
                             taskName: task.task_name || 'Unknown Task',
                             description: task.description || '',
                             assigneeBy: 'Unknown',
@@ -403,7 +427,7 @@ export default function IVFTrackShipmentPage() {
                 currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
                 currentUserId={currentUserId}
                 userRole={userRole || currentUser?.role || ''}
-                defaultCanisterNumber={canisterId || ''}
+                defaultCanisterNumber={tankId || ''}
                 onTaskCreated={() => {
                     // Refresh tasks after creation
                     fetchMyTasks();

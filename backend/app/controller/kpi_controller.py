@@ -28,7 +28,8 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
     """
     WebSocket for Quality Tracking KPI live updates.
     Query: ?token=<jwt>&branch_id_override=<id> (optional).
-    Send JSON: { "tank_code": "T30" } to subscribe. Receives type "tank_kpi" messages for that tank.
+    Send JSON: { "tank_id": 87 } to subscribe.
+    Receives type "tank_kpi" messages for that tank.
     Auth is validated before accept() so rejections return HTTP 403 instead of upgrading then closing.
     """
     connection_id = None
@@ -118,11 +119,13 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                     data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
                     try:
                         message = json.loads(data)
-                        tank_code = message.get("tank_code") if isinstance(message, dict) else None
-                        if not tank_code:
-                            await websocket.send_json({"type": "error", "message": "Subscription message must contain 'tank_code'"})
+                        tank_id = message.get("tank_id") if isinstance(message, dict) else None
+                        if tank_id is None:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Subscription message must contain 'tank_id'",
+                            })
                             continue
-                        tank_code_str = str(tank_code).strip()
                         effective_branch_id = branch_id
                         selected_branch_id = message.get("branch_id")
                         if role == "Manager" and selected_branch_id is not None:
@@ -132,17 +135,18 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                                 await websocket.send_json({"type": "error", "message": "Invalid 'branch_id'"})
                                 continue
 
-                        if effective_branch_id is not None:
-                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str, Tank.branch_id == effective_branch_id).first()
-                        else:
-                            tanks = db.query(Tank).filter(Tank.tank_code == tank_code_str).all()
-                            tank = tanks[0] if len(tanks) == 1 else None
-                            if len(tanks) > 1:
-                                await websocket.send_json({"type": "error", "message": "Multiple branches have this tank code. Send 'branch_id' in subscription."})
-                                continue
-                        if not tank:
-                            await websocket.send_json({"type": "error", "message": f"Tank '{tank_code_str}' not found"})
+                        try:
+                            tank_id_int = int(tank_id)
+                        except (TypeError, ValueError):
+                            await websocket.send_json({"type": "error", "message": "Invalid 'tank_id'"})
                             continue
+
+                        tank = db.query(Tank).filter(Tank.tank_id == tank_id_int).first()
+                        if not tank:
+                            await websocket.send_json({"type": "error", "message": "Invalid 'tank_id'"})
+                            continue
+
+                        tank_code_str = str(tank.tank_code).strip()
                         try:
                             if role != "Admin" and effective_branch_id is not None:
                                 quality_service.validate_tank_belongs_to_branch(tank.tank_id, effective_branch_id)

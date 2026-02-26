@@ -90,6 +90,7 @@ const KpiTile = ({ icon, label, value }: KpiTileProps) => (
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
 export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
+  const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
@@ -179,17 +180,17 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   };
 
   useEffect(() => {
-    if (!canisterNumber) return;
-    ivfService.getKpiHistory(canisterNumber, 1).then((res) => {
+    if (!tankId) return;
+    ivfService.getKpiHistory(tankId, 1).then((res) => {
       if (!isMountedRef.current || !res?.history?.length) return;
       const last = res.history[res.history.length - 1];
       setLevelFromKpis(last?.kpis);
     }).catch(() => {});
-  }, [canisterNumber]);
+  }, [tankId]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (!canisterNumber) return;
+    if (!tankId) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
 
@@ -200,7 +201,10 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (canisterNumber) ws.send(JSON.stringify({ tank_code: canisterNumber }));
+      if (tankId) {
+        const numericTankId = Number(tankId);
+        ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
+      }
     };
 
     ws.onmessage = (event) => {
@@ -209,7 +213,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        if (data.tank_code === canisterNumber && Array.isArray(data.kpis)) setLevelFromKpis(data.kpis);
+        if (data.tank_id != null && String(data.tank_id) === tankId && Array.isArray(data.kpis)) {
+          setLevelFromKpis(data.kpis);
+        }
       } catch {}
     };
 
@@ -224,7 +230,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       } catch {}
       wsRef.current = null;
     };
-  }, [canisterNumber, token]);
+  }, [tankId, token]);
 
   const levelPercent = level != null ? Math.min(100, Math.max(0, level)) : null;
 
