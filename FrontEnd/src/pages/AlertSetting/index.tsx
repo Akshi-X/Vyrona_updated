@@ -1270,7 +1270,10 @@ export default function AlertSetting() {
                       )}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex justify-end">
-                      <button
+                      {!(saveAllLoading ||
+                          (selectedContainers.length > 1 || configList.length === 0
+                            ? Object.keys(multiDraftConfig).length === 0
+                            : Object.keys(draftConfig).length === 0)) && <button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={
@@ -1295,7 +1298,7 @@ export default function AlertSetting() {
                             Save Changes
                           </>
                         )}
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 )}
