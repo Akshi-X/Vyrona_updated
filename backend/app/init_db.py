@@ -630,19 +630,19 @@ def init_db():
     logger.info("Database tables created/verified")
     
     # Create pharma companies if not exists
-    create_pharma_companies()
+    #create_pharma_companies()
     
     # Create pharma admins if not exists
-    create_pharma_admins()
+    #create_pharma_admins()
     
     # Create hospitals and branches for IVF users
-    create_hospitals_and_branches()
+    #create_hospitals_and_branches()
     
     # Create IVF admins if ivf_admins.json exists
-    create_ivf_admins()
+    #create_ivf_admins()
     
     # Create MyGrape platform admin if not exists
-    create_mygrape_admin()
+    #create_mygrape_admin()
     
     logger.info("Database initialization complete")
     logger.info("=" * 60)

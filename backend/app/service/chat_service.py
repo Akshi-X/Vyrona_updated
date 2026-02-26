@@ -206,23 +206,21 @@ def mark_canister_as_read(user_id: str, tank_id: int, db: Session) -> int:
     Mark all messages for a tank as read by updating last_read_message_id to latest (IVF flow).
     Returns the latest message ID that was set.
     """
-    # Get latest message ID for tank
+    # Get latest message ID for tank (None when no messages exist)
     latest_message = db.query(func.max(ChatMessage.id)).filter(
         ChatMessage.tank_id == tank_id
     ).scalar()
-    
-    if latest_message is None:
-        # No messages for this tank. Keep DB FK nullable and return 0 in API.
-        latest_message = 0
-    
+
     # Get or create read status
     read_status = get_or_create_read_status_canister(user_id, tank_id, db)
-    read_status.last_read_message_id = latest_message if latest_message > 0 else None
+    # Assign directly; None when no messages exist, keeping FK constraint valid
+    read_status.last_read_message_id = latest_message
     read_status.updated_at = datetime.now(timezone.utc)
-    
+
     db.commit()
-    
-    return latest_message
+
+    # Return 0 in API when no messages exist
+    return latest_message or 0
 
 
 async def broadcast_unread_messages_update(
