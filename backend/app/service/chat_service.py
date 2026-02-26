@@ -1314,9 +1314,11 @@ async def handle_websocket_message(
                     current_user, pharma_id
                 )
             elif message_type == WS_MSG_TYPE_MARK_READ:
-                response = await handle_mark_read_ws(
-                    message_data, current_user, pharma_id, connection_manager
-                )
+                await mark_canister_as_read(tank_id=tank_id, user=current_user)
+                response = {
+                    "type": WS_MSG_TYPE_SUCCESS,
+                    "data": {"tank_id": tank_id},
+                }
             else:
                 raise ChatWebSocketInvalidTypeException(message_type=message_type)
         else:
