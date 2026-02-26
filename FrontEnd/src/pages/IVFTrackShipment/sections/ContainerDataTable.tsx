@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ivfService } from '../../../services/ivfService';
 import type { IVFTreatment } from '../../../types/ivf.ts';
-import moveToIcon from '../../../assets/moveto.svg';
-import MoveContainerModal from '../../../components/MoveContainerModal';
 
 interface ContainerDataTableProps {
   canisterNumber?: string | number;
@@ -12,8 +10,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   const [rows, setRows] = useState<IVFTreatment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<IVFTreatment | null>(null);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<{ gobletColor: string; cryolockColor: string }>({
     gobletColor: '',
@@ -195,27 +191,25 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
               <th className="px-3 py-2 text-left whitespace-nowrap">Goblet Color</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock Color</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Date of Vitrification</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap">Description</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap">Move to</th>
               <th className="px-3 py-2 text-left rounded-tr-[10px] whitespace-nowrap">Edit</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={10}>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={8}>
                   Loading...
                 </td>
               </tr>
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={10}>
+                <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={8}>
                   {error}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={10}>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={8}>
                   No container data found
                 </td>
               </tr>
@@ -258,22 +252,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.dateOfVitrification || '-'}</td>
-                    <td className="px-3 py-2 whitespace-nowrap max-w-[200px]">
-                      <div className="truncate" title={row.description || undefined}>
-                        {row.description || '-'}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <div 
-                        className="cursor-pointer flex justify-center items-center"
-                        onClick={() => {
-                          setSelectedRow(row);
-                          setIsMoveModalOpen(true);
-                        }}
-                      >
-                        <img src={moveToIcon} alt="Move to" className="w-6 h-6" />
-                      </div>
-                    </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {isEditing ? (
                         <div className="flex justify-center items-center gap-2">
@@ -325,49 +303,6 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           </tbody>
         </table>
       </div>
-      <MoveContainerModal
-        isOpen={isMoveModalOpen}
-        onClose={() => {
-          setIsMoveModalOpen(false);
-          setSelectedRow(null);
-        }}
-        containerData={selectedRow || undefined}
-        onMoveToIncubator={async () => {
-          if (!canisterNumber || !selectedRow?.cryolockNum) {
-            throw new Error('Canister number and cryolock number are required');
-          }
-          
-          await ivfService.markEmbryoTransfer(
-            canisterNumber,
-            selectedRow.cryolockNum
-          );
-          
-          // Refresh the data after successful move
-          const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
-          setRows(response?.data || []);
-          setTotalContainers(response?.total || 0);
-          setIsMoveModalOpen(false);
-          setSelectedRow(null);
-        }}
-        onMoveToTransit={async (description: string) => {
-          if (!canisterNumber || !selectedRow?.cryolockNum) {
-            throw new Error('Canister number and cryolock number are required');
-          }
-          
-          await ivfService.markInTransitWithShipment(
-            canisterNumber,
-            selectedRow.cryolockNum,
-            description
-          );
-          
-          // Refresh the data after successful move
-          const response = await ivfService.getCanisterTrackingDetails(canisterNumber);
-          setRows(response?.data || []);
-          setTotalContainers(response?.total || 0);
-          setIsMoveModalOpen(false);
-          setSelectedRow(null);
-        }}
-      />
     </div>
   );
 }

@@ -56,9 +56,38 @@ const toFiniteNumber = (value: unknown): number | null => {
  * kpi_limits payload can contain multiple named thresholds per KPI
  * (example: LN2 L1 and LN2 L2). Keep every min/max as independent lines.
  */
-const extractThresholdConfigFromKpiLimits = (limitGroup: unknown): KpiThresholdConfig => {
+const extractThresholdConfigFromKpiLimits = (
+  kpiName: string,
+  limitGroup: unknown
+): KpiThresholdConfig => {
   if (!limitGroup || typeof limitGroup !== 'object') {
     return { min: null, max: null, lines: [] };
+  }
+
+  // Custom LN2 mapping requested:
+  // - LN2 L1.max (100) => L1
+  // - LN2 L1.min (60)  => L2
+  // - LN2 L2.min (0)   => L3
+  // - LN2 L2.max (59)  => ignored
+  if (kpiName === 'ln2_level') {
+    const groups = limitGroup as Record<string, any>;
+    const l1 = groups['LN2 L1'] ?? groups['ln2 l1'] ?? null;
+    const l2 = groups['LN2 L2'] ?? groups['ln2 l2'] ?? null;
+
+    const l1Max = toFiniteNumber(l1?.max);
+    const l1Min = toFiniteNumber(l1?.min);
+    const l2Min = toFiniteNumber(l2?.min);
+
+    const lines: KpiThresholdLine[] = [];
+    if (l1Max != null) lines.push({ kind: 'max', value: l1Max, label: 'L1' });
+    if (l1Min != null) lines.push({ kind: 'min', value: l1Min, label: 'L2' });
+    if (l2Min != null) lines.push({ kind: 'min', value: l2Min, label: 'L3' });
+
+    return {
+      min: lines.length ? Math.min(...lines.map((line) => line.value)) : null,
+      max: lines.length ? Math.max(...lines.map((line) => line.value)) : null,
+      lines,
+    };
   }
 
   const lines: KpiThresholdLine[] = [];
@@ -135,6 +164,10 @@ const formatTimeLabel = (timestamp: string): string => {
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {
   const k = reading.kpis.find((x) => x.name === kpiName);
   if (k == null || typeof k.value !== 'number' || isNaN(k.value)) return null;
+  if (kpiName === 'lid_status') {
+    // Enforce binary display: 0 = Close, 1 = Open.
+    return k.value >= 1 ? 1 : 0;
+  }
   return k.value;
 }
 
@@ -229,7 +262,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         if (!isMountedRef.current || !res?.kpi_limits) return;
         const thresholdMap = Object.entries(res.kpi_limits as Record<string, unknown>).reduce<KpiThresholdMap>(
           (acc, [kpiName, limitGroup]) => {
-            acc[kpiName] = extractThresholdConfigFromKpiLimits(limitGroup);
+            acc[kpiName] = extractThresholdConfigFromKpiLimits(kpiName, limitGroup);
             return acc;
           },
           {}
@@ -517,6 +550,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const values = sorted.map((r) => getKpiValue(r, activeTab));
     const tab = kpiTabs.find((t) => t.id === activeTab);
     const unit = tab?.unit ?? '';
+    const datasetLabel = unit
+      ? `${tab?.label ?? activeTab} (${unit})`
+      : `${tab?.label ?? activeTab}`;
 
     // Extend timeline beyond last point so the curve doesn't end at the right edge
     const bufferLabels = [...labels, ...Array(TIMELINE_BUFFER_SLOTS).fill('')];
@@ -524,15 +560,28 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
     const datasets: any[] = [
       {
-        label: `${tab?.label ?? activeTab} (${unit})`,
+        label: datasetLabel,
         data: bufferValues,
-        borderColor: '#1a1a1a',
-        backgroundColor: 'transparent',
+        borderColor: '#6B1176',
+        backgroundColor: (context: any) => {
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea) {
+            return 'rgba(107, 17, 118, 0.75)';
+          }
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(107, 17, 118, 0.75)');
+          gradient.addColorStop(1, 'rgba(107, 17, 118, 0.08)');
+          return gradient;
+        },
         borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
+        pointRadius: 2.5,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#6B1176',
+        pointBorderColor: '#6B1176',
+        pointBorderWidth: 0,
         tension: 0.3,
-        fill: false,
+        fill: true,
         spanGaps: true,
       },
     ];
@@ -542,7 +591,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       datasets.push({
         label: line.label,
         data: [...values.map(() => line.value), ...Array(TIMELINE_BUFFER_SLOTS).fill(line.value)],
-        borderColor: line.kind === 'max' ? '#dc2626' : '#f97316',
+        borderColor: line.kind === 'max' ? 'rgba(220, 38, 38, 0.45)' : 'rgba(249, 115, 22, 0.45)',
         borderWidth: 1.5,
         borderDash: idx % 2 === 0 ? [4, 4] : [8, 4],
         pointRadius: 0,
@@ -602,6 +651,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const v = context.parsed?.y;
               if (v == null) return '';
               const label = context.dataset.label || '';
+              if (activeTab === 'lid_status') {
+                return `${label}: ${v >= 1 ? 'Open (1)' : 'Close (0)'}`;
+              }
               return `${label}: ${typeof v === 'number' ? (Math.round(v * 100) / 100).toFixed(2) : v}`;
             },
           },
@@ -616,10 +668,28 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           border: { display: false },
         },
         y: {
-          min: minY != null ? minY - padding : undefined,
-          max: maxY != null ? maxY + padding : undefined,
+          // Keep binary ticks at 0/1, but add headroom for visual breathing space.
+          min: activeTab === 'lid_status' ? -0.2 : (minY != null ? minY - padding : undefined),
+          max: activeTab === 'lid_status' ? 1.2 : (maxY != null ? maxY + padding : undefined),
           grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
-          ticks: { color: '#6B6B6B', font: { size: 10 } },
+          ticks: {
+            color: '#6B6B6B',
+            font: { size: 10 },
+            stepSize: activeTab === 'lid_status' ? 1 : undefined,
+            callback: (value: string | number) => {
+              if (activeTab !== 'lid_status') {
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue)) return String(value);
+                // Avoid float artifacts like 0.45000000000000007.
+                return Number(numericValue.toFixed(2)).toString();
+              }
+              const numericValue = Number(value);
+              if (Math.abs(numericValue - 0) < 1e-6) return 'Close';
+              if (Math.abs(numericValue - 1) < 1e-6) return 'Open';
+              // Hide labels for padded headroom ticks.
+              return '';
+            },
+          },
           border: { display: false },
         },
       },
@@ -652,7 +722,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             onClick={() => setActiveTab(tab.id)}
             className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
               activeTab === tab.id
-                ? 'bg-amber-100 border-amber-300 text-amber-900'
+                ? 'bg-purple-100 border-purple-300 text-purple-900'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
             }`}
           >
