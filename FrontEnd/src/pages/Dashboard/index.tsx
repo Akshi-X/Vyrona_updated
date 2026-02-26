@@ -561,7 +561,7 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationsError(null);
       try {
         const response = await ivfService.getQualityDeviationsFlagged();
-        if (!cancelled) setIvfQualityDeviations(response?.total_quality_deviations ?? 0);
+        if (!cancelled) setIvfQualityDeviations(response?.total_deviations ?? 0);
       } catch (e: any) {
         if (!cancelled) {
           setIvfQualityDeviations(null);
@@ -588,8 +588,18 @@ export default function Dashboard({ }: DashboardProps) {
       setLoadingIvfTopDeviationDriver(true);
       setIvfTopDeviationDriverError(null);
       try {
-        const response = await ivfService.getTopDeviationDriver();
-        if (!cancelled) setIvfTopDeviationDriverName(response?.driver_name ?? 'N/A');
+        const response = await ivfService.getTotalDeviations();
+
+        let max_deviated_alert = ""
+        let max_deviations = 0
+        for(const alert_name in response.deviations_by_kpi) {
+          if(response.deviations_by_kpi[alert_name] > max_deviations) {
+            max_deviated_alert = alert_name;
+            max_deviations = response.deviations_by_kpi[alert_name];
+          }
+        }
+
+        if (!cancelled) setIvfTopDeviationDriverName(max_deviated_alert || 'N/A');
       } catch (e: any) {
         if (!cancelled) {
           setIvfTopDeviationDriverName(null);
@@ -674,48 +684,22 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationChartError(null);
       try {
         const response = await ivfService.getDeviationsGraph();
-        if (!cancelled && response?.data) {
-          // Transform API response to chart format
-          // Manager -> show site_name, User -> show container_name
-          const isManagerRole = normalizedRole.includes('manager');
-          const containers = response.data.map((item) => {
-            const preferred = isManagerRole ? item.site_name : item.container_name;
-            return preferred || item.site_name || item.container_name || '';
-          });
-          
-          // Extract data for each metric
-          const tempInternalData = response.data.map((item) => item.temp_internal || 0);
-          const tempExternalData = response.data.map((item) => item.temp_external || 0);
-          const shockData = response.data.map((item) => item.shock || 0);
-          const topRiskDriverData = response.data.map((item) => item.top_risk_driver || 0);
-
-          const metrics = [
-            {
-              name: 'Internal temperature',
-              color: '#C7A0E8',
-              data: tempInternalData,
-            },
-            {
-              name: 'External temperature',
-              color: '#4A90E2',
-              data: tempExternalData,
-            },
-            {
-              name: 'Shock',
-              color: '#F5A9E1',
-              data: shockData,
-            },
-            {
-              name: 'Top risk driver',
-              color: '#85A2DF',
-              data: topRiskDriverData,
-            },
-          ];
-
-          setIvfQualityDeviationChart({
-            containers,
-            metrics,
-          });
+        if (!cancelled && response && Array.isArray(response)) {
+          // Unique branch names (x-axis)
+          const containers = Array.from(new Set(response.map(item => item.branch_name)));
+          // Unique alert names (series)
+          const alertNames = Array.from(new Set(response.map(item => item.alert_name)));
+          const colorPalette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+          // For each alert_name, build a series with data for each branch
+          const metrics = alertNames.map((alertName, idx) => ({
+            name: alertName,
+            color: colorPalette[idx % colorPalette.length],
+            data: containers.map(branchName => {
+              const found = response.find(item => item.branch_name === branchName && item.alert_name === alertName);
+              return found ? found.deviation_count : 0;
+            })
+          }));
+          setIvfQualityDeviationChart({ containers, metrics });
         }
       } catch (e: any) {
         if (!cancelled) {
@@ -1068,10 +1052,10 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Outbound Shipments Section */}
-                  <section>
+                  {false && <section>
                     <h2 className="font-semibold text-black text-base mb-4">Shipment Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
-                      {/* Outbond Shipments */}
+                      {/* Outbound Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
@@ -1109,7 +1093,7 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
                     </div>
-                  </section>
+                  </section>}
                 </div>
 
                 {/* Right Column */}
@@ -1384,10 +1368,10 @@ export default function Dashboard({ }: DashboardProps) {
             <>
               <div className="flex gap-6 flex-1 flex-col lg:flex-row">
                 {/* Left Column */}
-            <div className="flex-1 flex flex-col gap-6 min-w-0">
-              <h1 className="font-semibold text-black text-lg">
-                Monthly Summary
-              </h1>
+              <div className="flex-1 flex flex-col gap-6 min-w-0">
+                <h1 className="font-semibold text-black text-lg">
+                  Monthly Summary
+                </h1>
 
               {/* Volume Section */}
               <section>
@@ -1824,9 +1808,9 @@ export default function Dashboard({ }: DashboardProps) {
                     </span>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
-          </div>
               {/* Ongoing Treatments Section */}
               <section>
                 <h2 className="font-semibold text-black text-base mb-4">
