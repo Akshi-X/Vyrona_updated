@@ -88,6 +88,12 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
   const statuses: ('Active' | 'Acknowledged' | 'Resolved' | 'Escalated')[] = ['Active', 'Acknowledged', 'Resolved', 'Escalated'];
 
   const handleAcknowledge = async (alertId: string) => {
+    const confirmation = window.confirm('Are you sure you want to acknowledge this alert?');
+
+    if (!confirmation) {
+      return;
+    }
+
     if (!onAcknowledge) return;
     
     setAcknowledgingIds(prev => new Set(prev).add(alertId));
@@ -283,7 +289,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                     <button
                       onClick={() => handleAcknowledge(alert.id)}
                       disabled={acknowledgingIds.has(alert.id)}
-                      className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                      className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors ${
                         acknowledgingIds.has(alert.id)
                           ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                           : 'bg-[#6b1176] text-white hover:bg-[#5a0f66]'
