@@ -121,11 +121,11 @@ async def startup_event():
     
 #     # Step 1: Create database tables first
 #     logger.info("Creating database tables...")
-#     create_tables()
+    create_tables()
     
 #     # Step 2: Create pharma admin users
 #     logger.info("Creating pharma admin users...")
-#     create_admin()
+    create_admin()
     
     # Step 3: Start quality monitoring background tasks
     logger.info("Starting quality monitoring background tasks...")
