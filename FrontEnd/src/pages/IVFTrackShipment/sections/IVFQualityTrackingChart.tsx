@@ -154,11 +154,11 @@ const parseTimestamp = (timestamp: string): Date | null => {
 const formatTimeLabel = (timestamp: string): string => {
   const date = parseTimestamp(timestamp);
   if (!date) return timestamp;
-  const h = date.getHours();
-  const m = date.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const displayH = h % 12 || 12;
-  return `${displayH}:${m} ${ampm}`;
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 };
 
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {

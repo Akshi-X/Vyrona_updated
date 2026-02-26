@@ -57,13 +57,33 @@ const AlertIcon = ({ color = '#6B1176' }: { color?: string }) => (
   </svg>
 );
 
-const BatteryIcon = ({ level }: { level: number }) => (
-  <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
-    <rect x="1" y="2" width="26" height="12" rx="2" stroke="#6B1176" strokeWidth="2" />
-    <rect x="27" y="5" width="3" height="6" rx="1" fill="#6B1176" />
-    <rect x="3" y="4" width={Math.max(0, (level / 100) * 22)} height="8" rx="1" fill="#6B1176" />
-  </svg>
-);
+const BatteryIcon = ({ level }: { level: number }) => {
+  const safeLevel = Math.max(0, Math.min(100, Math.round(level)));
+  const fillColor =
+    safeLevel <= 20 ? '#EF4444' : safeLevel <= 40 ? '#F59E0B' : '#B58BC6';
+  const textColor = '#000000';
+
+  return (
+    <div className="relative h-5 w-[58px]">
+      <div className="absolute right-0 top-[7px] h-2 w-1.5 rounded-r bg-[#D9C1E5]" />
+      <div className="absolute left-0 top-0 h-5 w-[53px] overflow-hidden rounded-md border-2 border-[#B58BC6] bg-white">
+        <div
+          className="h-full transition-all duration-300"
+          style={{
+            width: `${safeLevel}%`,
+            background: `linear-gradient(90deg, ${fillColor} 0%, ${fillColor}CC 100%)`,
+          }}
+        />
+        <span
+          className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold"
+          style={{ color: textColor }}
+        >
+          {safeLevel}%
+        </span>
+      </div>
+    </div>
+  );
+};
 
 
 // KPI Tile Card component using system colors
@@ -96,16 +116,16 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const isMountedRef = useRef(true);
 
   const [level, setLevel] = useState<number | null>(null);
-  const [batteryLevel, setBatteryLevel] = useState<number>(82);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [evaporationRate, setEvaporationRate] = useState<{ value: number; unit: string } | null>(null);
   const [tempExternal, setTempExternal] = useState<number | null>(null);
   const [tempInternal, setTempInternal] = useState<number | null>(null);
-  const [lidStatus, setLidStatus] = useState<number | null>(0);
-  const [shock, setShock] = useState<number | null>(0);
-  const [l1, setL1] = useState<number>(75); // L1 level threshold (default 100%)
-  const [l2, setL2] = useState<number>(30);  // L2 level threshold (default 30%)
-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [lidStatus, setLidStatus] = useState<number | null>(null);
+  const [shock, setShock] = useState<number | null>(null);
+  const [l1, setL1] = useState<number | null>(null);
+  const [l2, setL2] = useState<number | null>(null);
+  const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
+  const [nowTs, setNowTs] = useState<number>(Date.now());
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -128,64 +148,152 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     }
   };
 
+  const toFiniteNumber = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const clampPercent = (value: number | null): number | null =>
+    value == null ? null : Math.min(100, Math.max(0, value));
+
+  const extractLn2Thresholds = (kpiLimits: unknown): { l1: number | null; l2: number | null } => {
+    const ln2Level =
+      kpiLimits && typeof kpiLimits === 'object'
+        ? (kpiLimits as Record<string, unknown>).ln2_level
+        : null;
+
+    if (!ln2Level || typeof ln2Level !== 'object') {
+      return { l1: null, l2: null };
+    }
+
+    const entries = Object.entries(ln2Level as Record<string, Record<string, unknown>>);
+    const l1Entry = entries.find(([name]) => name.toLowerCase().includes('l1'))?.[1];
+    const l2Entry = entries.find(([name]) => name.toLowerCase().includes('l2'))?.[1];
+
+    // Preferred mapping:
+    // - L1 from LN2 L1 max
+    // - L2 from LN2 L1 min (fallback to LN2 L2 max)
+    const nextL1 = toFiniteNumber(l1Entry?.max) ?? toFiniteNumber(l2Entry?.min);
+    const nextL2 = toFiniteNumber(l1Entry?.min) ?? toFiniteNumber(l2Entry?.max);
+
+    return {
+      l1: clampPercent(nextL1),
+      l2: clampPercent(nextL2),
+    };
+  };
+
   const setLevelFromKpis = (kpis: Array<{ name: string; value: number; unit: string }> | undefined) => {
     if (!kpis?.length) return;
+    let hasAnyUpdate = false;
     const ln2 = kpis.find((k) => k.name === 'ln2_level');
     const bat = kpis.find((k) => k.name === 'battery_level');
     const value = ln2?.value ?? bat?.value;
     if (value !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
       setLevel(Math.min(100, Math.max(0, value)));
+      hasAnyUpdate = true;
     }
     if (bat?.value !== undefined && typeof bat.value === 'number' && !Number.isNaN(bat.value)) {
       setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
+      hasAnyUpdate = true;
     }
     const evap = kpis.find((k) => k.name === 'evaporation_rate');
     if (evap?.value !== undefined && typeof evap.value === 'number' && !Number.isNaN(evap.value)) {
       setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
+      hasAnyUpdate = true;
     }
     const ext = kpis.find((k) => k.name === 'temp_external');
     if (ext?.value !== undefined && typeof ext.value === 'number' && !Number.isNaN(ext.value)) {
       setTempExternal(ext.value);
+      hasAnyUpdate = true;
     }
     const int = kpis.find((k) => k.name === 'temp_internal');
     if (int?.value !== undefined && typeof int.value === 'number' && !Number.isNaN(int.value)) {
       setTempInternal(int.value);
+      hasAnyUpdate = true;
     }
     const lid = kpis.find((k) => k.name === 'lid_status');
     if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
+      hasAnyUpdate = true;
     }
     const sh = kpis.find((k) => k.name === 'shock');
     if (sh?.value !== undefined && typeof sh.value === 'number' && !Number.isNaN(sh.value)) {
       setShock(sh.value);
-    }
-    const l1Kpi = kpis.find((k) => k.name === 'l1');
-    if (l1Kpi?.value !== undefined && typeof l1Kpi.value === 'number' && !Number.isNaN(l1Kpi.value)) {
-      setL1(Math.min(100, Math.max(0, l1Kpi.value)));
-    }
-    const l2Kpi = kpis.find((k) => k.name === 'l2');
-    if (l2Kpi?.value !== undefined && typeof l2Kpi.value === 'number' && !Number.isNaN(l2Kpi.value)) {
-      setL2(Math.min(100, Math.max(0, l2Kpi.value)));
+      hasAnyUpdate = true;
     }
     // Update last sync time
-    setLastSyncTime(
-      new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZone: 'UTC',
-      }) + ' UTC'
-    );
+    if (hasAnyUpdate) {
+      setLastUpdateAt(Date.now());
+    }
+  };
+
+  const formatTimeAgo = (timestampMs: number | null): string => {
+    if (timestampMs == null) return '—';
+    const diffMs = Math.max(0, nowTs - timestampMs);
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes <= 0) return 'just now';
+    if (diffMinutes === 1) return '1 min ago';
+    return `${diffMinutes} min ago`;
   };
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const minutesSinceUpdate =
+    lastUpdateAt == null ? null : Math.floor(Math.max(0, nowTs - lastUpdateAt) / 60000);
+  const timeAgoColorClass =
+    minutesSinceUpdate == null
+      ? 'text-gray-500'
+      : minutesSinceUpdate < 60
+        ? 'text-green-600'
+        : 'text-orange-500';
+
+  useEffect(() => {
+    if (!normalizedTankId) {
+      setL1(null);
+      setL2(null);
+      return;
+    }
+    let cancelled = false;
+    ivfService
+      .getTankKpiConfig(normalizedTankId)
+      .then((res) => {
+        if (cancelled) return;
+        const thresholds = extractLn2Thresholds(res?.kpi_limits);
+        setL1(thresholds.l1);
+        setL2(thresholds.l2);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedTankId]);
+
+  useEffect(() => {
     if (!normalizedTankId) return;
-    ivfService.getKpiHistory(normalizedTankId, 1).then((res) => {
+    ivfService.getKpiHistory(normalizedTankId, 50).then((res) => {
       if (!isMountedRef.current || !res?.history?.length) return;
-      const last = res.history[res.history.length - 1];
-      setLevelFromKpis(last?.kpis);
+      const sortedHistory = [...res.history].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      const latestByKpi = new Map<string, { name: string; value: number; unit: string }>();
+      for (const item of sortedHistory) {
+        if (!Array.isArray(item.kpis)) continue;
+        for (const kpi of item.kpis) {
+          latestByKpi.set(kpi.name, kpi);
+        }
+      }
+      setLevelFromKpis(Array.from(latestByKpi.values()));
     }).catch(() => {});
   }, [normalizedTankId]);
 
@@ -201,7 +309,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     const ws = new WebSocket(`${getWebSocketUrl()}?${params.toString()}`);
 
     ws.onopen = () => {
-      setIsConnected(true);
       if (normalizedTankId) {
         const numericTankId = Number(normalizedTankId);
         ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : normalizedTankId }));
@@ -214,14 +321,26 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        if (data.tank_id != null && String(data.tank_id) === normalizedTankId && Array.isArray(data.kpis)) {
-          setLevelFromKpis(data.kpis);
+        const incomingKpis: Array<{ name: string; value: number; unit: string }> | null =
+          Array.isArray(data.kpis)
+            ? data.kpis
+            : (typeof data.kpi_name === 'string' &&
+                typeof data.kpi_value === 'number' &&
+                !Number.isNaN(data.kpi_value))
+              ? [{ name: data.kpi_name, value: data.kpi_value, unit: data.kpi_unit || '' }]
+              : null;
+
+        const messageMatchesTank =
+          data.tank_id == null || String(data.tank_id) === normalizedTankId;
+
+        if (messageMatchesTank && incomingKpis?.length) {
+          setLevelFromKpis(incomingKpis);
         }
       } catch {}
     };
 
-    ws.onerror = () => setIsConnected(false);
-    ws.onclose = () => setIsConnected(false);
+    ws.onerror = () => {};
+    ws.onclose = () => {};
     wsRef.current = ws;
 
     return () => {
@@ -241,7 +360,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   const formatTemp = (v: number | null) =>
     v != null ? `${v.toFixed(1)}°C` : '—';
-  const lidLabel = lidStatus === 1 ? 'Open' : 'Closed';
+  const lidLabel = lidStatus == null ? '—' : lidStatus === 1 ? 'Open' : 'Closed';
 
   // Tank dimensions for fill calculation
   const tankBodyTop = 50;
@@ -251,38 +370,36 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const liquidSurfaceY = tankBodyBottom - fillHeight;
   
   // L1/L2 level marker positions (calculate Y from percentage)
-  const l1Y = tankBodyBottom - (tankBodyHeight * l1) / 100;
-  const l2Y = tankBodyBottom - (tankBodyHeight * l2) / 100;
+  const l1Y = l1 != null ? tankBodyBottom - (tankBodyHeight * l1) / 100 : null;
+  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * l2) / 100 : null;
   
   // Alert color based on level thresholds
-  const alertColor = (levelPercent ?? 0) <= l2 
-    ? '#EF4444' // Red if at or below L2
-    : (levelPercent ?? 0) < l1 
-      ? '#F59E0B' // Yellow if between L1 and L2
-      : '#22C55E'; // Green if at or above L1
+  const alertColor = levelPercent == null
+    ? '#6B1176'
+    : (l2 != null && levelPercent <= l2)
+      ? '#EF4444' // Red if at or below L2
+      : (l1 != null && levelPercent < l1)
+        ? '#F59E0B' // Yellow if between L1 and L2
+        : '#22C55E'; // Green if at or above L1
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4">
       {/* Header */}
-      <div className="flex flex-col items-start justify-between flex-wrap gap-2">
+      <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
-        <div className="flex items-center justify-end gap-5 flex-wrap">
-          {/* Live indicator */}
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-            <span className="text-sm font-medium text-[#6B1176]">LIVE</span>
-          </div>
+        <div className="flex items-center justify-end gap-5 flex-wrap ml-auto">
           {/* Battery */}
           <div className="flex items-center gap-1.5">
-            <BatteryIcon level={batteryLevel} />
-            <span className="text-sm font-medium text-black">{batteryLevel}%</span>
+          <div className={`text-xs pr-2  ${timeAgoColorClass}`}>
+            {formatTimeAgo(lastUpdateAt)}
           </div>
-          {/* Last Sync */}
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Last Sync:</span>
-            <span className="font-medium text-black">{lastSyncTime || '—'}</span>
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-400'}`} />
+            {batteryLevel != null ? (
+              <BatteryIcon level={batteryLevel} />
+            ) : (
+              <span className="text-sm font-medium text-black">—</span>
+            )}
           </div>
+          
         </div>
       </div>
 
@@ -407,22 +524,26 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             <rect x="30" y={tankBodyTop} width="140" height={tankBodyHeight} rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
 
             {/* L1 Level Marker */}
-            <g>
-              <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
-              <g transform={`translate(192, ${l1Y - 9})`}>
-                <AlertIcon color={alertColor} />
+            {l1Y != null && (
+              <g>
+                <line x1="150" y1={l1Y} x2="185" y2={l1Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+                <g transform={`translate(192, ${l1Y - 9})`}>
+                  <AlertIcon color={alertColor} />
+                </g>
+                <text x="212" y={l1Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
               </g>
-              <text x="212" y={l1Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L1</text>
-            </g>
+            )}
             
             {/* L2 Level Marker */}
-            <g>
-              <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
-              <g transform={`translate(192, ${l2Y - 9})`}>
-                <AlertIcon color={alertColor} />
+            {l2Y != null && (
+              <g>
+                <line x1="150" y1={l2Y} x2="185" y2={l2Y} stroke="#6B1176" strokeWidth="2" strokeDasharray="4,2" />
+                <g transform={`translate(192, ${l2Y - 9})`}>
+                  <AlertIcon color={alertColor} />
+                </g>
+                <text x="212" y={l2Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
               </g>
-              <text x="212" y={l2Y + 4} fill="#6B1176" fontSize="11" fontWeight="600" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>L2</text>
-            </g>
+            )}
 
             {/* Level percentage display on tank */}
             <text
