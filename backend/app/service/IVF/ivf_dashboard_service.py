@@ -5,7 +5,10 @@ Service layer for IVF dashboard metrics with role-based access control.
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, case
+from sqlalchemy import func, and_, or_, case, text
+
+from ...models.readings_model import Readings
+from ...models.kpi_config_model import KpiConfig
 
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
@@ -17,6 +20,42 @@ from ...models.IVF.ivf_shipment_model import IVFShipment
 class IVFDashboardService:
     """Service for IVF dashboard metrics with role-based filtering."""
     
+    def get_deviation_counts_by_kpi(self, hospital_id: int, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict[str, int]:
+            """
+            Get count of deviated readings grouped by KpiConfig.alert_name for a specific hospital and branch.
+            Only readings with deviation=True are counted.
+            Args:
+                hospital_id: The hospital ID to filter readings.
+                branch_id: Optional branch ID to filter by (role-based).
+                role: User's role to determine filtering.
+            Returns:
+                Dictionary mapping KpiConfig.alert_name to count of deviations.
+            """
+            filter_branch_id = self._get_branch_filter(branch_id, role)
+
+            # Build base query: readings with deviation=True, filtered by hospital and branch
+            query = text("""SELECT
+                                k.alert_name,
+                                COUNT(r.id) AS deviation_count
+                            FROM
+                                readings r
+                            JOIN
+                                kpi_config k ON r.kpi_config_id = k.id
+                            JOIN
+                                tanks t ON r.tank_id = t.tank_id
+                            WHERE
+                                r.deviation = TRUE
+                                AND r.hospital_id = :hospital_id
+                                -- Optionally filter by branch if needed:
+                                AND (:branch_id IS NULL OR t.branch_id = :branch_id)
+                            GROUP BY
+                                k.id, k.alert_name;""")
+
+            results = self.db.execute(query, {"hospital_id": hospital_id, "branch_id": filter_branch_id}).fetchall()
+
+            # Return as {alert_name: count}
+            return {alert_name: deviation_count for alert_name, deviation_count in results}
+
     def __init__(self, db: Session):
         self.db = db
     
@@ -296,14 +335,9 @@ class IVFDashboardService:
             "all_drivers": drivers
         }
     
-    def get_total_deviations(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_total_deviations(self, hospital_id: Optional[int] = None, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get total count of deviations from IVF quality logs.
-        
-        Counts distinct records in IVFQualityLog where any deviation flag is True:
-        - is_temp_internal_loss (Internal Temperature)
-        - is_temp_external_loss (External Temperature)
-        - is_shock_loss (Shock)
         
         Uses distinct count to avoid double-counting records with multiple violations.
         
@@ -313,6 +347,7 @@ class IVFDashboardService:
         - Admin: Count deviations across all branches
         
         Args:
+            hospital_id: Optional hospital ID to filter by
             branch_id: Optional branch ID to filter by
             role: User's role to determine filtering
             
@@ -322,63 +357,13 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Count total deviations (any flag is True)
-        # Use distinct count to avoid double-counting records with multiple violations
-        total_filter = or_(
-            IVFQualityLog.is_temp_internal_loss == True,
-            IVFQualityLog.is_temp_external_loss == True,
-            IVFQualityLog.is_shock_loss == True
-        )
-        total_query = (
-            self.db.query(func.count(func.distinct(IVFQualityLog.id)))
-            .filter(total_filter)
-        )
+        deviations = self.get_deviation_counts_by_kpi(hospital_id=hospital_id, branch_id=filter_branch_id, role=role)
         
-        # Apply branch filtering if needed
-        # Join through: IVFQualityLog -> Tank -> Branch (tank-level monitoring)
-        if filter_branch_id is not None:
-            total_query = (
-                total_query
-                .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(HospitalBranch.branch_id == filter_branch_id)
-            )
-        
-        total_count = total_query.scalar() or 0
-        
-        # Count individual KPI deviations for breakdown
-        # Helper function to build query with optional branch filtering
-        def build_count_query(deviation_filter):
-            query = (
-                self.db.query(func.count(func.distinct(IVFQualityLog.id)))
-                .filter(deviation_filter)
-            )
-            
-            # Apply branch filtering if needed
-            if filter_branch_id is not None:
-                query = (
-                    query
-                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
-                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                    .filter(HospitalBranch.branch_id == filter_branch_id)
-                )
-            
-            return query
-        
-        # Count internal temperature deviations
-        temp_internal_count = build_count_query(IVFQualityLog.is_temp_internal_loss == True).scalar() or 0
-        
-        # Count external temperature deviations
-        temp_external_count = build_count_query(IVFQualityLog.is_temp_external_loss == True).scalar() or 0
-        
-        # Count shock deviations
-        shock_count = build_count_query(IVFQualityLog.is_shock_loss == True).scalar() or 0
+        print(f"Deviation counts by KPI for hospital_id={hospital_id}, branch_id={branch_id}, role={role}: {deviations}")
         
         return {
-            "total_deviations": total_count,
-            "temp_internal_deviations": temp_internal_count,
-            "temp_external_deviations": temp_external_count,
-            "shock_deviations": shock_count
+            "total_deviations": sum(deviations.values()),
+            "deviations_by_kpi": deviations
         }
     
     def get_outbound_shipments(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
@@ -436,6 +421,32 @@ class IVFDashboardService:
             "total_outbound_shipments": total_shipments
         }
 
+    def get_branch_deviations(self, hospital_id: Optional[int] = None) -> Dict:
+        query = text("""
+        SELECT
+            b.branch_name,
+            k.alert_name,
+            COUNT(r.id) AS deviation_count
+        FROM
+            readings r
+        JOIN
+            kpi_config k ON r.kpi_config_id = k.id
+        JOIN
+            tanks t ON r.tank_id = t.tank_id
+        JOIN
+            hospital_branches b ON t.branch_id = b.branch_id
+        WHERE
+            r.deviation = TRUE
+            AND r.hospital_id = :hospital_id
+        GROUP BY
+            b.branch_name, k.id, k.alert_name;
+        """)
+
+        results = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
+
+        
+        return results
+
     def get_deviations_graph(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get deviations graph data for IVF dashboard.
@@ -479,9 +490,6 @@ class IVFDashboardService:
                 self.db.query(
                     Tank.tank_id.label("tank_id"),
                     Tank.tank_code.label("tank_code"),
-                    func.coalesce(func.sum(temp_internal_case), 0).label("temp_internal_deviations"),
-                    func.coalesce(func.sum(temp_external_case), 0).label("temp_external_deviations"),
-                    func.coalesce(func.sum(shock_case), 0).label("shock_deviations")
                 )
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .outerjoin(IVFQualityLog, log_join)

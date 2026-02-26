@@ -81,6 +81,39 @@ class ChatConnectionManager:
         for conn_id in disconnected:
             self.disconnect(conn_id)
 
+    def subscribe_to_tank(self, connection_id: str, tank_id: str):
+        """Subscribe connection to a specific tank's messages (IVF flow)"""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_tanks", set()).add(tank_id)
+    
+    def unsubscribe_from_tank(self, connection_id: str, tank_id: str):
+        """Unsubscribe connection from a specific tank's messages (IVF flow)"""
+        if connection_id in self.active_connections:
+            self.active_connections[connection_id].setdefault("subscribed_tanks", set()).discard(tank_id)
+
+    async def broadcast_to_tank(self, tank_id: str, message_data: dict, sender_tank_id: int, db):
+        """Broadcast message to connections subscribed to this tank (IVF flow)"""
+        if not self.active_connections:
+            return
+        
+        from app.models.IVF.tank_model import Tank
+        tank = db.query(Tank).filter(Tank.id == tank_id).first()
+        if not tank or tank.tank_id != sender_tank_id:
+            return
+        
+        disconnected = []
+        for connection_id, conn_data in list(self.active_connections.items()):
+            subscribed_tanks = conn_data.get("subscribed_tanks", set())
+            if tank_id in subscribed_tanks:
+                try:
+                    await conn_data["websocket"].send_json(message_data)
+                except Exception as e:
+                    logger.error(f"Error sending message to {connection_id}: {e}", exc_info=True)
+                    disconnected.append(connection_id)
+        
+        for conn_id in disconnected:
+            self.disconnect(conn_id)
+
     async def send_to_user(self, user_id: str, message_data: dict):
         """Send message to a specific user"""
         disconnected = []

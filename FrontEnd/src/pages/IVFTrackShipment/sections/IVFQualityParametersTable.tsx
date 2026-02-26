@@ -5,7 +5,7 @@ import { ivfService } from '../../../services/ivfService';
 // CriticalAlertsIcon import removed - using inline AlertIcon component with dynamic colors
 
 interface IVFQualityParametersTableProps {
-  canisterNumber?: string;
+  tankId?: string;
 }
 
 // Icon components for KPI tiles - using system purple #6B1176
@@ -89,8 +89,8 @@ const KpiTile = ({ icon, label, value }: KpiTileProps) => (
  * Cylinder level diagram for Quality Parameter.
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
-export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
-  const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
+export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableProps) {
+  const normalizedTankId = tankId != null ? String(tankId) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
@@ -153,7 +153,8 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
     }
     const lid = kpis.find((k) => k.name === 'lid_status');
     if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
-      setLidStatus(lid.value);
+      // Enforce binary display: 0 = Close, 1 = Open.
+      setLidStatus(lid.value >= 1 ? 1 : 0);
     }
     const sh = kpis.find((k) => k.name === 'shock');
     if (sh?.value !== undefined && typeof sh.value === 'number' && !Number.isNaN(sh.value)) {
@@ -180,17 +181,17 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   };
 
   useEffect(() => {
-    if (!tankId) return;
-    ivfService.getKpiHistory(tankId, 1).then((res) => {
+    if (!normalizedTankId) return;
+    ivfService.getKpiHistory(normalizedTankId, 1).then((res) => {
       if (!isMountedRef.current || !res?.history?.length) return;
       const last = res.history[res.history.length - 1];
       setLevelFromKpis(last?.kpis);
     }).catch(() => {});
-  }, [tankId]);
+  }, [normalizedTankId]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (!tankId) return;
+    if (!normalizedTankId) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
 
@@ -201,9 +202,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (tankId) {
-        const numericTankId = Number(tankId);
-        ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
+      if (normalizedTankId) {
+        const numericTankId = Number(normalizedTankId);
+        ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : normalizedTankId }));
       }
     };
 
@@ -213,7 +214,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        if (data.tank_id != null && String(data.tank_id) === tankId && Array.isArray(data.kpis)) {
+        if (data.tank_id != null && String(data.tank_id) === normalizedTankId && Array.isArray(data.kpis)) {
           setLevelFromKpis(data.kpis);
         }
       } catch {}
@@ -230,7 +231,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       } catch {}
       wsRef.current = null;
     };
-  }, [tankId, token]);
+  }, [normalizedTankId, token]);
 
   const levelPercent = level != null ? Math.min(100, Math.max(0, level)) : null;
 

@@ -125,7 +125,7 @@ async def startup_event():
     
 #     # Step 2: Create pharma admin users
 #     logger.info("Creating pharma admin users...")
-    create_admin()
+#    create_admin()
     
     # Step 3: Start quality monitoring background tasks
     logger.info("Starting quality monitoring background tasks...")

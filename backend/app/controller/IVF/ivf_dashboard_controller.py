@@ -206,7 +206,7 @@ def get_outbound_shipments(
         raise HTTPException(status_code=500, detail=f"Error getting outbound shipments: {str(e)}")
 
 
-@router.get("/metrics/deviations-graph", response_model=DeviationsGraphResponse)
+@router.get("/metrics/deviations-graph")
 def get_deviations_graph(
     request: Request,
     db: Session = Depends(get_db)
@@ -226,22 +226,20 @@ def get_deviations_graph(
     - Manager/Admin (IVF): Cumulative deviations per site with top deviation type
     """
     try:
-        branch_id, role = get_dashboard_branch_filter(request)
-        
         service = IVFDashboardService(db)
-        result = service.get_deviations_graph(branch_id=branch_id, role=role)
+        result = service.get_branch_deviations(hospital_id=request.state.current_user.hospital_id)
         
-        return DeviationsGraphResponse(**result)
+        return result
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting deviations graph: {str(e)}")
 
 
-@router.get("/metrics/total-deviations", response_model=TotalDeviationsResponse)
+@router.get("/metrics/total-deviations")
 def get_total_deviations(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get total count of deviations from IVF quality logs.
@@ -258,11 +256,13 @@ def get_total_deviations(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+
+        hospital_id = request.state.current_user.hospital_id if request.state.current_user else None
         
         service = IVFDashboardService(db)
-        result = service.get_total_deviations(branch_id=branch_id, role=role)
+        result = service.get_total_deviations(hospital_id=hospital_id, branch_id=branch_id, role=role)
         
-        return TotalDeviationsResponse(**result)
+        return result
     except HTTPException:
         raise
     except Exception as e:
