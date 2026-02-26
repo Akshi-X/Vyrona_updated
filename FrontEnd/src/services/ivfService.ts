@@ -40,11 +40,8 @@ export interface TotalContainersResponse {
 }
 
 export interface QualityDeviationsFlaggedResponse {
-  total_quality_deviations: number;
-  canister_status_deviations: number;
-  ln2_level_deviations: number;
-  last_updated: string;
-  status: string;
+  total_deviations: number;
+  deviations_by_kpi: Record<string, number>;
 }
 
 export interface TopDeviationDriverResponse {
@@ -71,12 +68,7 @@ export interface AvgQualityLossPerContainerResponse {
 
 export interface TotalDeviationsResponse {
   total_deviations: number;
-  temperature_deviations: number;
-  humidity_deviations: number;
-  agitation_deviations: number;
-  light_deviations: number;
-  last_updated: string;
-  status: string;
+  deviations_by_kpi: Record<string, number>;
 }
 
 export interface IvfBranch {
@@ -155,13 +147,7 @@ export interface DeviationsGraphDataItem {
   shock: number;
 }
 
-export interface DeviationsGraphResponse {
-  view_level: string;
-  data: DeviationsGraphDataItem[];
-  top_deviation_type: string | null;
-  last_updated: string;
-  status: string;
-}
+export type DeviationsGraphResponse = {alert_name:string,branch_name:string,deviation_count:number}[]
 
 export interface RefillLogItem {
   canister_id: number;
@@ -358,9 +344,11 @@ export class IvfService extends BaseApiService {
    * Get tank KPI limits config for visualization (min/max, ln2 l1/l2/critical, units).
    * Use for reference lines and thresholds; readings come from WebSocket / kpi-history.
    */
-  async getTankKpiConfig(tankCode: string): Promise<{
+  async getTankKpiConfig(tankId: string | number): Promise<{
     tank_id: number;
     tank_code: string;
+    branch_id?: number | null;
+    branch_name?: string | null;
     kpi_limits: Record<
       string,
       {
@@ -374,7 +362,7 @@ export class IvfService extends BaseApiService {
     >;
   }> {
     return await this.request(
-      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-config`,
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-config`,
       { method: 'GET' }
     );
   }
@@ -382,7 +370,7 @@ export class IvfService extends BaseApiService {
   /**
    * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
    */
-  async getKpiHistory(tankCode: string, limit = 50): Promise<{
+  async getKpiHistory(tankId: string | number, limit = 50): Promise<{
     tank_code: string;
     tank_id: number;
     history: Array<{
@@ -395,7 +383,7 @@ export class IvfService extends BaseApiService {
     kpi_config?: Array<{ name: string; unit: string }>;
   }> {
     return await this.request(
-      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-history?limit=${limit}`,
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history?limit=${limit}`,
       { method: 'GET' }
     );
   }
@@ -560,7 +548,7 @@ export class IvfService extends BaseApiService {
 
   async getQualityDeviationsFlagged(): Promise<QualityDeviationsFlaggedResponse> {
     return await this.request<QualityDeviationsFlaggedResponse>(
-      '/api/ivf/dashboard/metrics/quality-deviations-flagged',
+      '/api/ivf/dashboard/metrics/total-deviations',
       { method: 'GET' }
     );
   }
@@ -594,22 +582,14 @@ export class IvfService extends BaseApiService {
   }
 
   async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
-    const raw = await this.request<DeviationsGraphResponse | DeviationsGraphResponse[]>(
+    const raw = await this.request<DeviationsGraphResponse>(
       '/api/ivf/dashboard/metrics/deviations-graph',
       { method: 'GET' }
     );
     // Some environments return an array like: [{ view_level, data, ... }]
     // Normalize to a single object for consistent UI consumption.
     if (Array.isArray(raw)) {
-      return (
-        raw[0] ?? {
-          view_level: 'container',
-          data: [],
-          top_deviation_type: null,
-          last_updated: new Date().toISOString(),
-          status: 'success',
-        }
-      );
+      return raw
     }
     return raw;
   }

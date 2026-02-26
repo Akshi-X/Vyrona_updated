@@ -84,8 +84,8 @@ export class TasksService extends BaseApiService {
    * Get tasks for a specific tank (IVF flow)
    * Returns PatientTaskListResponse with tasks array inside
    */
-  async getCanisterTasks(tank_code: string): Promise<ScopedTaskListResponse> {
-    return await this.request<ScopedTaskListResponse>(`/api/canisters/${encodeURIComponent(tank_code)}/tasks`, {
+  async getCanisterTasks(tankId: string | number): Promise<ScopedTaskListResponse> {
+    return await this.request<ScopedTaskListResponse>(`/api/canisters/${encodeURIComponent(tankId)}/tasks`, {
       method: 'GET',
     });
   }
@@ -108,6 +108,7 @@ export class TasksService extends BaseApiService {
     assignee_id: string;
     patient_id?: string;
     tank_code?: string;
+    tank_id?: number;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';
     status?: 'Not started' | 'In progress' | 'Done';
@@ -127,6 +128,7 @@ export class TasksService extends BaseApiService {
     assignee_id?: string;
     patient_id?: string;
     tank_code?: string;
+    tank_id?: number;
     due_date?: string;
     priority?: 'Low' | 'Medium' | 'High';
     status?: 'Not started' | 'In progress' | 'Done';

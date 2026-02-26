@@ -34,13 +34,99 @@ export const KPI_TABS = [
 
 export type KpiTabId = (typeof KPI_TABS)[number]['id'];
 
-/** Optional upper/lower bounds for red threshold lines (null = no line). */
-const KPI_THRESHOLDS: Partial<Record<KpiTabId, { min: number | null; max: number | null }>> = {
-  temp_external: { min: 20, max: 35 },
-  temp_internal: { min: -210, max: -190 },
-  ln2_level: { min: 30, max: 100 },
-  evaporation_rate: { min: null, max: 0.5 },
-  battery_level: { min: 20, max: 100 },
+type KpiThresholdLine = { kind: 'min' | 'max'; value: number; label: string };
+type KpiThresholdConfig = { min: number | null; max: number | null; lines: KpiThresholdLine[] };
+type KpiThresholdMap = Record<string, KpiThresholdConfig>;
+
+const DEFAULT_TAB_UNIT_MAP = KPI_TABS.reduce<Record<string, string>>((acc, tab) => {
+  acc[tab.id] = tab.unit;
+  return acc;
+}, {});
+
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+/**
+ * kpi_limits payload can contain multiple named thresholds per KPI
+ * (example: LN2 L1 and LN2 L2). Keep every min/max as independent lines.
+ */
+const extractThresholdConfigFromKpiLimits = (
+  kpiName: string,
+  limitGroup: unknown
+): KpiThresholdConfig => {
+  if (!limitGroup || typeof limitGroup !== 'object') {
+    return { min: null, max: null, lines: [] };
+  }
+
+  // Custom LN2 mapping requested:
+  // - LN2 L1.max (100) => L1
+  // - LN2 L1.min (60)  => L2
+  // - LN2 L2.min (0)   => L3
+  // - LN2 L2.max (59)  => ignored
+  if (kpiName === 'ln2_level') {
+    const groups = limitGroup as Record<string, any>;
+    const l1 = groups['LN2 L1'] ?? groups['ln2 l1'] ?? null;
+    const l2 = groups['LN2 L2'] ?? groups['ln2 l2'] ?? null;
+
+    const l1Max = toFiniteNumber(l1?.max);
+    const l1Min = toFiniteNumber(l1?.min);
+    const l2Min = toFiniteNumber(l2?.min);
+
+    const lines: KpiThresholdLine[] = [];
+    if (l1Max != null) lines.push({ kind: 'max', value: l1Max, label: 'L1' });
+    if (l1Min != null) lines.push({ kind: 'min', value: l1Min, label: 'L2' });
+    if (l2Min != null) lines.push({ kind: 'min', value: l2Min, label: 'L3' });
+
+    return {
+      min: lines.length ? Math.min(...lines.map((line) => line.value)) : null,
+      max: lines.length ? Math.max(...lines.map((line) => line.value)) : null,
+      lines,
+    };
+  }
+
+  const lines: KpiThresholdLine[] = [];
+  Object.entries(limitGroup as Record<string, any>).forEach(([thresholdName, entry]) => {
+    const min = toFiniteNumber(entry?.min);
+    const max = toFiniteNumber(entry?.max);
+    const alertType = typeof entry?.alert_type === 'string' ? entry.alert_type : '';
+    const suffix = [thresholdName, alertType].filter(Boolean).join(' - ');
+
+    if (min != null) {
+      lines.push({
+        kind: 'min',
+        value: min,
+        label: suffix ? `Lower limit (${suffix})` : 'Lower limit',
+      });
+    }
+    if (max != null) {
+      lines.push({
+        kind: 'max',
+        value: max,
+        label: suffix ? `Upper limit (${suffix})` : 'Upper limit',
+      });
+    }
+  });
+
+  const mins = lines
+    .filter((line) => line.kind === 'min')
+    .map((line) => line.value)
+    .filter((value): value is number => value != null);
+  const maxes = lines
+    .filter((line) => line.kind === 'max')
+    .map((line) => line.value)
+    .filter((value): value is number => value != null);
+
+  return {
+    min: mins.length ? Math.min(...mins) : null,
+    max: maxes.length ? Math.max(...maxes) : null,
+    lines,
+  };
 };
 
 interface KpiReading {
@@ -68,16 +154,20 @@ const parseTimestamp = (timestamp: string): Date | null => {
 const formatTimeLabel = (timestamp: string): string => {
   const date = parseTimestamp(timestamp);
   if (!date) return timestamp;
-  const h = date.getHours();
-  const m = date.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const displayH = h % 12 || 12;
-  return `${displayH}:${m} ${ampm}`;
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 };
 
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {
   const k = reading.kpis.find((x) => x.name === kpiName);
   if (k == null || typeof k.value !== 'number' || isNaN(k.value)) return null;
+  if (kpiName === 'lid_status') {
+    // Enforce binary display: 0 = Close, 1 = Open.
+    return k.value >= 1 ? 1 : 0;
+  }
   return k.value;
 }
 
@@ -94,6 +184,7 @@ interface IVFQualityTrackingChartProps {
 }
 
 export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTrackingChartProps) {
+  const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -108,9 +199,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   /** Tabs from DB (kpi_config) when available; otherwise fallback to KPI_TABS. */
   const [kpiTabs, setKpiTabs] = useState<Array<{ id: string; label: string; unit: string }>>([...KPI_TABS]);
   const [activeTab, setActiveTab] = useState<string>('temp_external');
+  const [kpiThresholds, setKpiThresholds] = useState<KpiThresholdMap>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [hasReceivedData, setHasReceivedData] = useState(false);
 
   const getWebSocketUrl = () => {
@@ -156,18 +247,27 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
   // Reset tabs when canister changes (until new config loads)
   useEffect(() => {
-    if (!canisterNumber) return;
+    if (!tankId) return;
     setKpiTabs([...KPI_TABS]);
+    setKpiThresholds({});
     setActiveTab('temp_external');
-  }, [canisterNumber]);
+  }, [tankId]);
 
   // Fetch KPI config (limits + units) for tabs and visualization; prefer over kpi_history's kpi_config
   useEffect(() => {
-    if (!canisterNumber) return;
+    if (!tankId) return;
     ivfService
-      .getTankKpiConfig(canisterNumber)
+      .getTankKpiConfig(tankId)
       .then((res) => {
         if (!isMountedRef.current || !res?.kpi_limits) return;
+        const thresholdMap = Object.entries(res.kpi_limits as Record<string, unknown>).reduce<KpiThresholdMap>(
+          (acc, [kpiName, limitGroup]) => {
+            acc[kpiName] = extractThresholdConfigFromKpiLimits(kpiName, limitGroup);
+            return acc;
+          },
+          {}
+        );
+        setKpiThresholds(thresholdMap);
         const order = [
           'temp_external',
           'temp_internal',
@@ -184,20 +284,20 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           const tabs = keys.map((name) => ({
             id: name,
             label: kpiNameToLabel(name),
-            unit: (res.kpi_limits[name]?.unit as string) || '',
+            unit: DEFAULT_TAB_UNIT_MAP[name] || '',
           }));
           setKpiTabs(tabs);
           setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? current));
         }
       })
       .catch(() => {});
-  }, [canisterNumber]);
+  }, [tankId]);
 
   // Fetch KPI history (past data); tabs may already be set from kpi-config
   useEffect(() => {
-    if (!canisterNumber) return;
+    if (!tankId) return;
     ivfService
-      .getKpiHistory(canisterNumber, MAX_DATA_POINTS)
+      .getKpiHistory(tankId, MAX_DATA_POINTS)
       .then((res) => {
         if (!isMountedRef.current) return;
         // Fallback: use history's kpi_config for tabs only when config endpoint didn't set them (still default)
@@ -244,19 +344,17 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           });
           setHasReceivedData(true);
           const last = res.history[res.history.length - 1];
-          const kpis = last?.kpis ?? [];
-          const bat = kpis.find((k: { name: string }) => k.name === 'battery_level') as { value?: number } | undefined;
-          if (bat != null && typeof bat.value === 'number') setBatteryLevel(bat.value);
+          void last;
         }
       })
       .catch(() => {});
-  }, [canisterNumber]);
+  }, [tankId]);
 
   // WebSocket for live KPI updates
   useEffect(() => {
     isMountedRef.current = true;
     reconnectAttemptsRef.current = 0; // fresh attempts when canister or token changes
-    if (!canisterNumber) {
+    if (!tankId) {
       setError('Canister number missing');
       return;
     }
@@ -290,8 +388,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           reconnectAttemptsRef.current = 0;
           isConnectingRef.current = false;
           setHasReceivedData(false);
-          if (ws.readyState === WebSocket.OPEN && canisterNumber) {
-            ws.send(JSON.stringify({ tank_code: canisterNumber }));
+          if (ws.readyState === WebSocket.OPEN && tankId) {
+            const numericTankId = Number(tankId);
+            ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
           }
         };
 
@@ -313,7 +412,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
             // Tank KPI update for current canister: accept any message with tank_code + kpis (no type check)
             const isTankKpi =
-              parsed.tank_code === canisterNumber &&
+              parsed.tank_id != null &&
+              String(parsed.tank_id) === tankId &&
               Array.isArray(parsed.kpis) &&
               parsed.kpis.length > 0;
             if (isTankKpi) {
@@ -332,8 +432,6 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 timestamp,
                 kpis: normalizedKpis,
               };
-              const bat = normalizedKpis.find((k: { name: string; value: number; unit: string }) => k.name === 'battery_level');
-              if (bat != null && typeof bat.value === 'number') setBatteryLevel(bat.value);
               setHasReceivedData(true);
               setKpiReadings((prev) => {
                 const byTs = new Map(prev.map((r) => [r.timestamp, r]));
@@ -355,7 +453,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             const hasTemp =
               parsed.temp_internal !== undefined ||
               parsed.frequency_results?.temp_internal !== undefined;
-            if (isQuality && hasCanister && hasTs && hasTemp && parsed.tank_code === canisterNumber) {
+            if (
+              isQuality &&
+              hasCanister &&
+              hasTs &&
+              hasTemp &&
+              parsed.tank_id != null &&
+              String(parsed.tank_id) === tankId
+            ) {
               const kpis = [
                 { name: 'temp_external', value: parsed.temp_external ?? parsed.frequency_results?.temp_external ?? 0, unit: '°C' },
                 { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal ?? 0, unit: '°C' },
@@ -365,7 +470,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               ];
               const reading: KpiReading = {
                 tank_id: parsed.tank_id ?? 0,
-                tank_code: parsed.tank_code || canisterNumber,
+                tank_code: parsed.tank_code || tankId,
                 timestamp: parsed.timestamp,
                 kpis,
               };
@@ -435,7 +540,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       isMountedRef.current = false;
       closeWebSocket();
     };
-  }, [canisterNumber, token]);
+  }, [tankId, token]);
 
   const chartData = useMemo(() => {
     const sorted = [...kpiReadings].sort(
@@ -445,6 +550,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const values = sorted.map((r) => getKpiValue(r, activeTab));
     const tab = kpiTabs.find((t) => t.id === activeTab);
     const unit = tab?.unit ?? '';
+    const datasetLabel = unit
+      ? `${tab?.label ?? activeTab} (${unit})`
+      : `${tab?.label ?? activeTab}`;
 
     // Extend timeline beyond last point so the curve doesn't end at the right edge
     const bufferLabels = [...labels, ...Array(TIMELINE_BUFFER_SLOTS).fill('')];
@@ -452,68 +560,66 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
     const datasets: any[] = [
       {
-        label: `${tab?.label ?? activeTab} (${unit})`,
+        label: datasetLabel,
         data: bufferValues,
-        borderColor: '#1a1a1a',
-        backgroundColor: 'transparent',
+        borderColor: '#6B1176',
+        backgroundColor: (context: any) => {
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea) {
+            return 'rgba(107, 17, 118, 0.75)';
+          }
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(107, 17, 118, 0.75)');
+          gradient.addColorStop(1, 'rgba(107, 17, 118, 0.08)');
+          return gradient;
+        },
         borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
+        pointRadius: 2.5,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#6B1176',
+        pointBorderColor: '#6B1176',
+        pointBorderWidth: 0,
         tension: 0.3,
-        fill: false,
+        fill: true,
         spanGaps: true,
       },
     ];
 
-    const thresholds = KPI_THRESHOLDS[activeTab as KpiTabId];
-    if (thresholds?.min != null) {
+    const thresholds = kpiThresholds[activeTab];
+    thresholds?.lines?.forEach((line, idx) => {
       datasets.push({
-        label: 'Lower limit',
-        data: [...values.map(() => thresholds.min), ...Array(TIMELINE_BUFFER_SLOTS).fill(thresholds.min)],
-        borderColor: '#dc2626',
+        label: line.label,
+        data: [...values.map(() => line.value), ...Array(TIMELINE_BUFFER_SLOTS).fill(line.value)],
+        borderColor: line.kind === 'max' ? 'rgba(220, 38, 38, 0.45)' : 'rgba(249, 115, 22, 0.45)',
         borderWidth: 1.5,
-        borderDash: [4, 4],
+        borderDash: idx % 2 === 0 ? [4, 4] : [8, 4],
         pointRadius: 0,
         tension: 0,
         fill: false,
         spanGaps: true,
       });
-    }
-    if (thresholds?.max != null) {
-      datasets.push({
-        label: 'Upper limit',
-        data: [...values.map(() => thresholds.max), ...Array(TIMELINE_BUFFER_SLOTS).fill(thresholds.max)],
-        borderColor: '#dc2626',
-        borderWidth: 1.5,
-        borderDash: [4, 4],
-        pointRadius: 0,
-        tension: 0,
-        fill: false,
-        spanGaps: true,
-      });
-    }
+    });
 
     return { labels: bufferLabels, datasets };
-  }, [kpiReadings, activeTab, kpiTabs]);
+  }, [kpiReadings, activeTab, kpiTabs, kpiThresholds]);
 
   const chartOptions = useMemo(() => {
     const sorted = [...kpiReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
     const values = sorted.map((r) => getKpiValue(r, activeTab)).filter((v): v is number => v != null);
-    const thresholds = KPI_THRESHOLDS[activeTab as KpiTabId];
+    const thresholds = kpiThresholds[activeTab];
     let minY: number | undefined;
     let maxY: number | undefined;
     if (values.length > 0) {
       minY = Math.min(...values);
       maxY = Math.max(...values);
     }
-    if (thresholds?.min != null) {
-      minY = minY != null ? Math.min(minY, thresholds.min) : thresholds.min;
-    }
-    if (thresholds?.max != null) {
-      maxY = maxY != null ? Math.max(maxY, thresholds.max) : thresholds.max;
-    }
+    thresholds?.lines?.forEach((line) => {
+      minY = minY != null ? Math.min(minY, line.value) : line.value;
+      maxY = maxY != null ? Math.max(maxY, line.value) : line.value;
+    });
     const padding = maxY != null && minY != null ? (maxY - minY) * 0.1 || 1 : 5;
     return {
       responsive: true,
@@ -545,6 +651,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const v = context.parsed?.y;
               if (v == null) return '';
               const label = context.dataset.label || '';
+              if (activeTab === 'lid_status') {
+                return `${label}: ${v >= 1 ? 'Open (1)' : 'Close (0)'}`;
+              }
               return `${label}: ${typeof v === 'number' ? (Math.round(v * 100) / 100).toFixed(2) : v}`;
             },
           },
@@ -559,15 +668,33 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           border: { display: false },
         },
         y: {
-          min: minY != null ? minY - padding : undefined,
-          max: maxY != null ? maxY + padding : undefined,
+          // Keep binary ticks at 0/1, but add headroom for visual breathing space.
+          min: activeTab === 'lid_status' ? -0.2 : (minY != null ? minY - padding : undefined),
+          max: activeTab === 'lid_status' ? 1.2 : (maxY != null ? maxY + padding : undefined),
           grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
-          ticks: { color: '#6B6B6B', font: { size: 10 } },
+          ticks: {
+            color: '#6B6B6B',
+            font: { size: 10 },
+            stepSize: activeTab === 'lid_status' ? 1 : undefined,
+            callback: (value: string | number) => {
+              if (activeTab !== 'lid_status') {
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue)) return String(value);
+                // Avoid float artifacts like 0.45000000000000007.
+                return Number(numericValue.toFixed(2)).toString();
+              }
+              const numericValue = Number(value);
+              if (Math.abs(numericValue - 0) < 1e-6) return 'Close';
+              if (Math.abs(numericValue - 1) < 1e-6) return 'Open';
+              // Hide labels for padded headroom ticks.
+              return '';
+            },
+          },
           border: { display: false },
         },
       },
     };
-  }, [kpiReadings, activeTab, kpiTabs]);
+  }, [kpiReadings, activeTab, kpiTabs, kpiThresholds]);
 
   const hasData = kpiReadings.length > 0;
 
@@ -576,23 +703,6 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       <div className="flex items-center justify-between mb-1 shrink-0">
         <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
         <div className="flex items-center gap-3">
-          {batteryLevel != null && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-md">
-              <svg className="w-5 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="7" width="16" height="10" rx="2" fill="none" />
-                <line x1="22" y1="11" x2="22" y2="13" />
-                <rect
-                  x="3"
-                  y="8"
-                  width={Math.max(0, Math.min(14, (14 * Math.round(batteryLevel)) / 100))}
-                  height="8"
-                  rx="1.5"
-                  fill="#9C3AA6"
-                />
-              </svg>
-              <span className="text-xs font-medium text-gray-700">{Math.round(batteryLevel)}%</span>
-            </div>
-          )}
           {isConnected && wsRef.current?.readyState === WebSocket.OPEN && (
             <span className="text-xs text-green-600">● Connected</span>
           )}
@@ -612,7 +722,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             onClick={() => setActiveTab(tab.id)}
             className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
               activeTab === tab.id
-                ? 'bg-amber-100 border-amber-300 text-amber-900'
+                ? 'bg-purple-100 border-purple-300 text-purple-900'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
             }`}
           >

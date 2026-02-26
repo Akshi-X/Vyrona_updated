@@ -542,6 +542,11 @@ class QualityService:
             return {k: v for k, v in d.items() if v is not None and v != ""}
 
         try:
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            branch = None
+            if tank and tank.branch_id is not None:
+                branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+
             rows = (
                 self.db.query(KpiConfig)
                 .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
@@ -568,10 +573,22 @@ class QualityService:
                         "alert_type": (r.alert_type or "").strip() or None,
                     })
                     kpi_limits[name][r.alert_name] = band
-            return {"tank_id": tank_id, "tank_code": tank_code, "kpi_limits": kpi_limits}
+            return {
+                "tank_id": tank_id,
+                "tank_code": tank_code,
+                "branch_id": tank.branch_id if tank else None,
+                "branch_name": branch.branch_name if branch else None,
+                "kpi_limits": kpi_limits,
+            }
         except Exception as e:
             logger.error(f"Error retrieving KPI config for tank {tank_id}: {e}")
-            return {"tank_id": tank_id, "tank_code": tank_code, "kpi_limits": {}}
+            return {
+                "tank_id": tank_id,
+                "tank_code": tank_code,
+                "branch_id": None,
+                "branch_name": None,
+                "kpi_limits": {},
+            }
 
     def list_kpi_config_by_tank(self, tank_id: int) -> List[dict]:
         """

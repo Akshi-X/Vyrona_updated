@@ -414,7 +414,7 @@ export function useCanisterChatWebSocket(canisterNumber: string | undefined) {
 
     try {
       const wsUrl = getWebSocketUrl();
-      const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
+      const url = `${wsUrl}?token=${encodeURIComponent(token)}&tank_id=${encodeURIComponent(canisterNumber)}`;
       const ws = new WebSocket(url);
 
       ws.onopen = () => {

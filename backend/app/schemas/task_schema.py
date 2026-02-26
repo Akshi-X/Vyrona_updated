@@ -17,6 +17,7 @@ class CreateTaskRequest(BaseModel):
     assignee_id: str
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    tank_id: Optional[int] = None  # For IVF flow (internal tank ID)
     due_date: Optional[datetime] = None
     priority: TaskPriority
     status: Optional[TaskStatus] = TaskStatus.NOT_STARTED
@@ -39,6 +40,23 @@ class CreateTaskRequest(BaseModel):
             raise ValueError("Description is too long (max 2000 characters)")
         return v.strip() if v else None
 
+    @model_validator(mode='after')
+    def validate_patient_or_tank(self):
+        """Validate that exactly one of patient_id, tank_code, tank_id is provided."""
+        patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
+        tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
+        tank_id = self.tank_id
+
+        provided = [bool(patient_id), bool(tank_code), tank_id is not None]
+        if sum(provided) > 1:
+            raise ValueError("Provide only one of patient_id, tank_code, or tank_id")
+        if sum(provided) == 0:
+            raise ValueError("Either patient_id (CGT) or tank_code/tank_id (IVF) must be provided")
+
+        self.patient_id = patient_id if patient_id else None
+        self.tank_code = tank_code if tank_code else None
+        return self
+
 
 class UpdateTaskRequest(BaseModel):
     """Request schema for updating a task (full update by manager)"""
@@ -47,6 +65,7 @@ class UpdateTaskRequest(BaseModel):
     assignee_id: Optional[str] = None
     patient_id: Optional[str] = None  # For CGT flow
     tank_code: Optional[str] = None  # For IVF flow (e.g., "T1")
+    tank_id: Optional[int] = None  # For IVF flow (internal tank ID)
     due_date: Optional[datetime] = None
     priority: Optional[TaskPriority] = None
     status: Optional[TaskStatus] = None
@@ -73,19 +92,19 @@ class UpdateTaskRequest(BaseModel):
     
     @model_validator(mode='after')
     def validate_patient_or_tank(self):
-        """Validate that patient_id and tank_code are not both provided"""
+        """Validate that patient_id, tank_code, tank_id are not provided together"""
         # Treat empty strings as None
         patient_id = self.patient_id.strip() if self.patient_id and isinstance(self.patient_id, str) else self.patient_id
         tank_code = self.tank_code.strip() if self.tank_code and isinstance(self.tank_code, str) else self.tank_code
+        tank_id = self.tank_id
         
-        # If both are provided, raise error
-        if patient_id and tank_code:
-            raise ValueError("Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
+        provided = [bool(patient_id), bool(tank_code), tank_id is not None]
+        if sum(provided) > 1:
+            raise ValueError("Provide only one of patient_id, tank_code, or tank_id")
         
         # Update the model with cleaned values
-        if patient_id is not None or tank_code is not None:
-            self.patient_id = patient_id if patient_id else None
-            self.tank_code = tank_code if tank_code else None
+        self.patient_id = patient_id if patient_id else None
+        self.tank_code = tank_code if tank_code else None
         return self
 
 

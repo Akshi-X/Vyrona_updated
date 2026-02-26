@@ -69,7 +69,6 @@ interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, logout, userRole } = useAuth();
-  const normalizedRole = (userRole || '').trim().toLowerCase();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -166,11 +165,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
-
-  // Pending approvals (Admin / Pharma_admin only)
-  const [pendingApprovals, setPendingApprovals] = useState<Array<{ user_id: string; first_name: string; last_name: string; email: string; role: string }>>([]);
-  const [loadingPendingApprovals, setLoadingPendingApprovals] = useState(false);
-  const [pendingApprovalsError, setPendingApprovalsError] = useState<string | null>(null);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -566,7 +560,7 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationsError(null);
       try {
         const response = await ivfService.getQualityDeviationsFlagged();
-        if (!cancelled) setIvfQualityDeviations(response?.total_quality_deviations ?? 0);
+        if (!cancelled) setIvfQualityDeviations(response?.total_deviations ?? 0);
       } catch (e: any) {
         if (!cancelled) {
           setIvfQualityDeviations(null);
@@ -593,8 +587,18 @@ export default function Dashboard({ }: DashboardProps) {
       setLoadingIvfTopDeviationDriver(true);
       setIvfTopDeviationDriverError(null);
       try {
-        const response = await ivfService.getTopDeviationDriver();
-        if (!cancelled) setIvfTopDeviationDriverName(response?.driver_name ?? 'N/A');
+        const response = await ivfService.getTotalDeviations();
+
+        let max_deviated_alert = ""
+        let max_deviations = 0
+        for(const alert_name in response.deviations_by_kpi) {
+          if(response.deviations_by_kpi[alert_name] > max_deviations) {
+            max_deviated_alert = alert_name;
+            max_deviations = response.deviations_by_kpi[alert_name];
+          }
+        }
+
+        if (!cancelled) setIvfTopDeviationDriverName(max_deviated_alert || 'N/A');
       } catch (e: any) {
         if (!cancelled) {
           setIvfTopDeviationDriverName(null);
@@ -679,48 +683,22 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationChartError(null);
       try {
         const response = await ivfService.getDeviationsGraph();
-        if (!cancelled && response?.data) {
-          // Transform API response to chart format
-          // Manager -> show site_name, User -> show container_name
-          const isManagerRole = normalizedRole.includes('manager');
-          const containers = response.data.map((item) => {
-            const preferred = isManagerRole ? item.site_name : item.container_name;
-            return preferred || item.site_name || item.container_name || '';
-          });
-          
-          // Extract data for each metric
-          const tempInternalData = response.data.map((item) => item.temp_internal || 0);
-          const tempExternalData = response.data.map((item) => item.temp_external || 0);
-          const shockData = response.data.map((item) => item.shock || 0);
-          const topRiskDriverData = response.data.map((item) => item.top_risk_driver || 0);
-
-          const metrics = [
-            {
-              name: 'Internal temperature',
-              color: '#C7A0E8',
-              data: tempInternalData,
-            },
-            {
-              name: 'External temperature',
-              color: '#4A90E2',
-              data: tempExternalData,
-            },
-            {
-              name: 'Shock',
-              color: '#F5A9E1',
-              data: shockData,
-            },
-            {
-              name: 'Top risk driver',
-              color: '#85A2DF',
-              data: topRiskDriverData,
-            },
-          ];
-
-          setIvfQualityDeviationChart({
-            containers,
-            metrics,
-          });
+        if (!cancelled && response && Array.isArray(response)) {
+          // Unique branch names (x-axis)
+          const containers = Array.from(new Set(response.map(item => item.branch_name)));
+          // Unique alert names (series)
+          const alertNames = Array.from(new Set(response.map(item => item.alert_name)));
+          const colorPalette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+          // For each alert_name, build a series with data for each branch
+          const metrics = alertNames.map((alertName, idx) => ({
+            name: alertName,
+            color: colorPalette[idx % colorPalette.length],
+            data: containers.map(branchName => {
+              const found = response.find(item => item.branch_name === branchName && item.alert_name === alertName);
+              return found ? found.deviation_count : 0;
+            })
+          }));
+          setIvfQualityDeviationChart({ containers, metrics });
         }
       } catch (e: any) {
         if (!cancelled) {
@@ -737,30 +715,6 @@ export default function Dashboard({ }: DashboardProps) {
       cancelled = true;
     };
   }, [userDepartment, isAuthenticated, userRole]);
-
-  // Fetch pending approvals for Admin / Pharma_admin (show list on dashboard)
-  const canApproveUsers = normalizedRole === 'admin' || normalizedRole === 'pharma_admin';
-  useEffect(() => {
-    if (!isAuthenticated || !canApproveUsers) return;
-    let cancelled = false;
-    const fetchPending = async () => {
-      setLoadingPendingApprovals(true);
-      setPendingApprovalsError(null);
-      try {
-        const res = await userService.getPendingApprovals();
-        if (!cancelled) setPendingApprovals(res?.users ?? []);
-      } catch (e: any) {
-        if (!cancelled) {
-          setPendingApprovals([]);
-          setPendingApprovalsError(e?.message || 'Failed to load pending approvals');
-        }
-      } finally {
-        if (!cancelled) setLoadingPendingApprovals(false);
-      }
-    };
-    fetchPending();
-    return () => { cancelled = true; };
-  }, [isAuthenticated, canApproveUsers]);
 
   // Transform API data to match component interface
   const transformedTasks: MyTask[] = myTasks.map(task => {
@@ -999,39 +953,6 @@ export default function Dashboard({ }: DashboardProps) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          {/* Pending approvals list (Admin / Pharma_admin only) */}
-          {canApproveUsers && (
-            <section className="w-full">
-              <div className="bg-white border border-[#E7E1E1] rounded-lg p-4">
-                <h2 className="font-semibold text-black text-base mb-3">Pending approvals</h2>
-                {loadingPendingApprovals ? (
-                  <p className="text-gray-500 text-sm">Loading...</p>
-                ) : pendingApprovalsError ? (
-                  <p className="text-red-600 text-sm">{pendingApprovalsError}</p>
-                ) : pendingApprovals.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No pending approvals.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {pendingApprovals.map((u) => (
-                      <li key={u.user_id} className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
-                        <span className="text-gray-800 text-sm">
-                          {u.first_name} {u.last_name}
-                          {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/approval?registration_id=${encodeURIComponent(u.user_id)}`)}
-                          className="text-[#6b1176] font-medium text-sm hover:underline whitespace-nowrap"
-                        >
-                          Review
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-          )}
 
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
@@ -1130,10 +1051,10 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Outbound Shipments Section */}
-                  <section>
+                  {false && <section>
                     <h2 className="font-semibold text-black text-base mb-4">Shipment Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
-                      {/* Outbond Shipments */}
+                      {/* Outbound Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
@@ -1171,7 +1092,7 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
                     </div>
-                  </section>
+                  </section>}
                 </div>
 
                 {/* Right Column */}
@@ -1300,7 +1221,8 @@ export default function Dashboard({ }: DashboardProps) {
                       <div 
                         className="flex-1 bg-[#6B1176] rounded-lg  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
-                          setShowOutboundQualityTracking(true);
+                          // setShowOutboundQualityTracking(true);
+                          // Disable
                         }}
                       >
                         {/* Background Graphic - Subtle Icon */}
@@ -1445,10 +1367,10 @@ export default function Dashboard({ }: DashboardProps) {
             <>
               <div className="flex gap-6 flex-1 flex-col lg:flex-row">
                 {/* Left Column */}
-            <div className="flex-1 flex flex-col gap-6 min-w-0">
-              <h1 className="font-semibold text-black text-lg">
-                Monthly Summary
-              </h1>
+              <div className="flex-1 flex flex-col gap-6 min-w-0">
+                <h1 className="font-semibold text-black text-lg">
+                  Monthly Summary
+                </h1>
 
               {/* Volume Section */}
               <section>
@@ -1885,9 +1807,9 @@ export default function Dashboard({ }: DashboardProps) {
                     </span>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
-          </div>
               {/* Ongoing Treatments Section */}
               <section>
                 <h2 className="font-semibold text-black text-base mb-4">
