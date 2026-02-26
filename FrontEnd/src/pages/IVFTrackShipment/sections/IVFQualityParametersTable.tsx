@@ -74,8 +74,8 @@ interface KpiTileProps {
 }
 
 const KpiTile = ({ icon, label, value }: KpiTileProps) => (
-  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm px-4 py-3 flex items-center gap-3 min-w-44">
-    <div className="bg-[#FDF4FF] rounded-lg p-2.5 flex items-center justify-center">
+  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full">
+    <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
       {icon}
     </div>
     <div className="flex flex-col">
@@ -286,7 +286,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex items-start justify-center gap-2 ">
+      <div className="flex items-start justify-center gap-1 ">
         {/* Left KPI Tiles */}
         <div className="flex flex-col gap-3 justify-start pt-6">
           <KpiTile
