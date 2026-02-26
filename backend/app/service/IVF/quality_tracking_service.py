@@ -70,22 +70,33 @@ class QualityTrackingService:
 
     def resolve_tank_id(self, tank_code: str, branch_id: Optional[int] = None) -> int:
         """
-        Resolve a tank_code (external identifier) to the internal tank_id.
-        Uses optimized helper function with direct references.
+        Resolve a tank identifier to the internal tank_id.
+        Accepts either numeric tank_id (e.g., "91") or tank_code (e.g., "T1", "T10").
 
         Args:
-            tank_code: Tank code (e.g., "T1", "T10")
+            tank_code: Tank ID or tank code
             branch_id: Optional branch filter for authorization (when present)
 
         Returns:
             tank_id (int)
 
         Raises:
-            AppException: If the tank_code is not found (or not accessible under branch filter)
+            AppException: If the tank is not found (or not accessible under branch filter)
         """
         try:
-            # Use optimized helper function
-            tank = find_tank_by_code(self.db, tank_code, branch_id)
+            identifier = str(tank_code).strip()
+            tank = None
+
+            # Numeric path segments are treated as tank_id.
+            if identifier.isdigit():
+                tank_query = self.db.query(Tank).filter(Tank.tank_id == int(identifier))
+                if branch_id is not None:
+                    tank_query = tank_query.filter(Tank.branch_id == branch_id)
+                tank = tank_query.first()
+
+            # Fallback to tank_code lookup.
+            if not tank:
+                tank = find_tank_by_code(self.db, identifier, branch_id)
             
             if not tank:
                 available_tanks = []
@@ -97,7 +108,7 @@ class QualityTrackingService:
                     )
                     available_tanks = [t[0] for t in available_tanks_query.all()]
                 
-                error_msg = f"Tank with code '{tank_code}' not found"
+                error_msg = f"Tank '{identifier}' not found"
                 if branch_id:
                     error_msg += f" in branch {branch_id}"
                 if available_tanks:
@@ -113,7 +124,7 @@ class QualityTrackingService:
         except AppException:
             raise
         except Exception as e:
-            logger.error(f"Error resolving tank_id for tank_code={tank_code}: {str(e)}", exc_info=True)
+            logger.error(f"Error resolving tank_id for identifier={tank_code}: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to resolve tank: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
@@ -466,7 +477,7 @@ class QualityTrackingService:
 
     def get_tank_tracking_details(
         self,
-        tank_code: str,
+        tank_id: int,
         branch_id: Optional[int] = None,
         user_role: Optional[str] = None
     ) -> IVFCanisterTrackingResponse:
@@ -478,28 +489,10 @@ class QualityTrackingService:
         total_slots - count(crylocks where embryo_transfer OR in_transit)
         """
         try:
-            # Use optimized helper function to find tank
-            tank = find_tank_by_code(self.db, tank_code, branch_id)
-            
-            if not tank and user_role == "User":
-                # Branch-scoped "not found" message and available-tanks list only for User (branch_id set).
-                # Manager/Admin have no branch restriction; use a simple not-found message.
-                if branch_id is not None:
-                    available_tanks_query = (
-                        self.db.query(Tank.tank_code)
-                        .filter(Tank.branch_id == branch_id)
-                        .limit(10)
-                    )
-                    available_tanks = [t[0] for t in available_tanks_query.all()]
-                    error_msg = f"Tank with code '{tank_code}' not found in branch {branch_id}"
-                    if available_tanks:
-                        error_msg += f". Available tanks in this branch: {', '.join(map(str, available_tanks))}"
-                    else:
-                        error_msg += ". No tanks found in this branch."
-                else:
-                    error_msg = f"Tank with code '{tank_code}' not found"
+            tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+            if not tank:
                 raise AppException(
-                    message=error_msg,
+                    message=f"Tank with ID '{tank_id}' not found",
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -512,7 +505,7 @@ class QualityTrackingService:
             # Verify tank belongs to user's branch (for User role)
             if branch_id is not None and tank.branch_id != branch_id:
                 raise AppException(
-                    message=f"Tank '{tank_code}' does not belong to your branch",
+                    message=f"Tank '{tank_id}' does not belong to your branch",
                     error_code=ErrorMessages.FORBIDDEN,
                     status_code=HTTPStatus.FORBIDDEN
                 )
@@ -849,13 +842,15 @@ class QualityTrackingService:
         10. Return response with shipment details
         """
         try:
-            # Step 1 & 2: Get PatientCrylockInfo, tank, and source branch using new table structure
-            # Find tank by tank_code and branch_id
-            tank = find_tank_by_code(self.db, tank_code, branch_id) if tank_code else None
+            # Step 1 & 2: Get PatientCrylockInfo, tank, and source branch using tank_id.
+            tank_query = self.db.query(Tank).filter(Tank.tank_id == canister_id)
+            if branch_id is not None:
+                tank_query = tank_query.filter(Tank.branch_id == branch_id)
+            tank = tank_query.first()
             
             if not tank:
                 raise AppException(
-                    message=f"Tank with code '{tank_code}' not found" + (f" in your branch" if branch_id else ""),
+                    message=f"Tank with ID '{canister_id}' not found" + (f" in your branch" if branch_id else ""),
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -880,9 +875,8 @@ class QualityTrackingService:
             
             if not cryolock:
                 error_msg = f"Cryolock with number '{request.cryolock_number}' not found"
-                if tank_code:
-                    error_msg += f" in tank {tank_code}"
-                if branch_id:
+                error_msg += f" in tank {tank.tank_code or canister_id}"
+                if branch_id is not None:
                     error_msg += f" in your branch"
                 raise AppException(
                     message=error_msg,
@@ -1182,14 +1176,16 @@ class QualityTrackingService:
             )
 
         try:
-            # Direct query using tank_code and crylock_number - no fallback needed
-            # Find tank by tank_code and branch_id
-            tank = find_tank_by_code(self.db, tank_code, branch_id) if tank_code else None
+            # Use tank_id directly from path param; optional branch filter enforces access.
+            tank_query = self.db.query(Tank).filter(Tank.tank_id == canister_id)
+            if branch_id is not None:
+                tank_query = tank_query.filter(Tank.branch_id == branch_id)
+            tank = tank_query.first()
             encrypted_cryolock_number = encrypt_sensitive_ivf_value(cryolock_number)
             
             if not tank:
                 raise AppException(
-                    message=f"Tank with code '{tank_code}' not found" + (f" in your branch" if branch_id else ""),
+                    message=f"Tank with ID '{canister_id}' not found" + (f" in your branch" if branch_id else ""),
                     error_code=ErrorMessages.NOT_FOUND,
                     status_code=HTTPStatus.NOT_FOUND
                 )
@@ -1213,9 +1209,8 @@ class QualityTrackingService:
             
             if not cryolock:
                 error_msg = f"Cryolock with number '{cryolock_number}' not found"
-                if tank_code:
-                    error_msg += f" in tank {tank_code}"
-                if branch_id:
+                error_msg += f" in tank {tank.tank_code or canister_id}"
+                if branch_id is not None:
                     error_msg += f" in your branch"
                 raise AppException(
                     message=error_msg,
@@ -1287,6 +1282,7 @@ class QualityTrackingService:
                 query = (
                     self.db.query(PatientCrylockInfo)
                     .filter(
+                        PatientCrylockInfo.tank_id == canister_id,
                         PatientCrylockInfo.crylock_number.in_([
                             encrypted_cryolock_number,
                             color_update.cryolock_number
@@ -1399,6 +1395,7 @@ class QualityTrackingService:
                 query = (
                     self.db.query(PatientCrylockInfo)
                     .filter(
+                        PatientCrylockInfo.tank_id == canister_id,
                         PatientCrylockInfo.crylock_number.in_([
                             encrypted_cryolock_number,
                             color_update.cryolock_number

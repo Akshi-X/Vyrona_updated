@@ -74,8 +74,8 @@ interface KpiTileProps {
 }
 
 const KpiTile = ({ icon, label, value }: KpiTileProps) => (
-  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm px-4 py-3 flex items-center gap-3 min-w-44">
-    <div className="bg-[#FDF4FF] rounded-lg p-2.5 flex items-center justify-center">
+  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full">
+    <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
       {icon}
     </div>
     <div className="flex flex-col">
@@ -90,6 +90,7 @@ const KpiTile = ({ icon, label, value }: KpiTileProps) => (
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
 export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParametersTableProps) {
+  const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
@@ -179,17 +180,17 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
   };
 
   useEffect(() => {
-    if (!canisterNumber) return;
-    ivfService.getKpiHistory(canisterNumber, 1).then((res) => {
+    if (!tankId) return;
+    ivfService.getKpiHistory(tankId, 1).then((res) => {
       if (!isMountedRef.current || !res?.history?.length) return;
       const last = res.history[res.history.length - 1];
       setLevelFromKpis(last?.kpis);
     }).catch(() => {});
-  }, [canisterNumber]);
+  }, [tankId]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (!canisterNumber) return;
+    if (!tankId) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
 
@@ -200,7 +201,10 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (canisterNumber) ws.send(JSON.stringify({ tank_code: canisterNumber }));
+      if (tankId) {
+        const numericTankId = Number(tankId);
+        ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
+      }
     };
 
     ws.onmessage = (event) => {
@@ -209,7 +213,9 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        if (data.tank_code === canisterNumber && Array.isArray(data.kpis)) setLevelFromKpis(data.kpis);
+        if (data.tank_id != null && String(data.tank_id) === tankId && Array.isArray(data.kpis)) {
+          setLevelFromKpis(data.kpis);
+        }
       } catch {}
     };
 
@@ -224,7 +230,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       } catch {}
       wsRef.current = null;
     };
-  }, [canisterNumber, token]);
+  }, [tankId, token]);
 
   const levelPercent = level != null ? Math.min(100, Math.max(0, level)) : null;
 
@@ -280,7 +286,7 @@ export function IVFQualityParametersTable({ canisterNumber }: IVFQualityParamete
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex items-start justify-center gap-2 ">
+      <div className="flex items-start justify-center gap-1 ">
         {/* Left KPI Tiles */}
         <div className="flex flex-col gap-3 justify-start pt-6">
           <KpiTile

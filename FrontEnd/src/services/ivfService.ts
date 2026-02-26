@@ -358,9 +358,11 @@ export class IvfService extends BaseApiService {
    * Get tank KPI limits config for visualization (min/max, ln2 l1/l2/critical, units).
    * Use for reference lines and thresholds; readings come from WebSocket / kpi-history.
    */
-  async getTankKpiConfig(tankCode: string): Promise<{
+  async getTankKpiConfig(tankId: string | number): Promise<{
     tank_id: number;
     tank_code: string;
+    branch_id?: number | null;
+    branch_name?: string | null;
     kpi_limits: Record<
       string,
       {
@@ -374,7 +376,7 @@ export class IvfService extends BaseApiService {
     >;
   }> {
     return await this.request(
-      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-config`,
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-config`,
       { method: 'GET' }
     );
   }
@@ -382,7 +384,7 @@ export class IvfService extends BaseApiService {
   /**
    * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
    */
-  async getKpiHistory(tankCode: string, limit = 50): Promise<{
+  async getKpiHistory(tankId: string | number, limit = 50): Promise<{
     tank_code: string;
     tank_id: number;
     history: Array<{
@@ -395,7 +397,7 @@ export class IvfService extends BaseApiService {
     kpi_config?: Array<{ name: string; unit: string }>;
   }> {
     return await this.request(
-      `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/kpi-history?limit=${limit}`,
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history?limit=${limit}`,
       { method: 'GET' }
     );
   }

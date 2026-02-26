@@ -57,10 +57,34 @@ def _resolve_tank_code_to_id(tank_code: str, db: Session) -> int:
     Raises:
         TaskInvalidPatientException: If tank not found
     """
-    tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+    tank_code_str = str(tank_code).strip()
+    tank = db.query(Tank).filter(Tank.tank_code == tank_code_str).first()
+    if not tank and tank_code_str.isdigit():
+        tank = db.query(Tank).filter(Tank.tank_id == int(tank_code_str)).first()
     if not tank:
         raise TaskInvalidPatientException(patient_id=f"Tank with code '{tank_code}' not found")
     return tank.tank_id
+
+
+def _resolve_tank_identifier_to_id(
+    db: Session,
+    tank_id: Optional[int] = None,
+    tank_code: Optional[str] = None
+) -> int:
+    """
+    Resolve tank_id/tank_code to canonical tank_id.
+    Supports both new tank_id flow and legacy tank_code flow.
+    """
+    if tank_id is not None:
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise TaskInvalidPatientException(patient_id=f"Tank with id '{tank_id}' not found")
+        return tank.tank_id
+
+    if tank_code:
+        return _resolve_tank_code_to_id(tank_code, db)
+
+    raise TaskInvalidPatientException(patient_id="Either tank_id or tank_code is required for IVF flow")
 
 
 def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskResponse:
@@ -190,24 +214,20 @@ def create_task(
             if not assignee.pharma_id or assignee.pharma_id != current_user.pharma_id:
                 raise TaskInvalidAssigneeException(user_id=request.assignee_id)
         
-        # Validate that only one is provided (not both)
-        if request.patient_id and request.tank_code:
-            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
-        
-        # Ensure at least one is provided (patient_id for CGT or tank_code for IVF)
-        if not request.patient_id and not request.tank_code:
-            raise TaskInvalidPatientException(patient_id="Either patient_id (CGT) or tank_code (IVF) must be provided")
-        
         # Validate patient exists (if provided for CGT flow)
         if request.patient_id:
             patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
             if not patient:
                 raise TaskInvalidPatientException(patient_id=request.patient_id)
         
-        # Resolve tank_code to tank_id if provided (for IVF flow)
+        # Resolve tank identifier for IVF flow
         tank_id = None
-        if request.tank_code:
-            tank_id = _resolve_tank_code_to_id(request.tank_code, db)
+        if request.tank_id is not None or request.tank_code:
+            tank_id = _resolve_tank_identifier_to_id(
+                db=db,
+                tank_id=request.tank_id,
+                tank_code=request.tank_code
+            )
         
         # Create task
         task = Tasks(
@@ -375,7 +395,7 @@ def get_tasks_by_patient(
 
 
 def get_tasks_by_canister(
-    tank_code: str,
+    tank_id: int,
     current_user: User,
     db: Session,
     *,
@@ -391,14 +411,11 @@ def get_tasks_by_canister(
     Other roles are limited to tasks they created or are assigned to.
     """
     try:
-        if not tank_code:
-            raise TaskInvalidPatientException(patient_id=f"Invalid tank_code: {tank_code}")
-
-        # Resolve tank_code to tank_id
-        tank_id = _resolve_tank_code_to_id(tank_code, db)
+        if not tank_id:
+            raise TaskInvalidPatientException(patient_id=f"Invalid tank_id: {tank_id}")
         tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
-            raise TaskInvalidPatientException(patient_id=f"Tank {tank_code} not found")
+            raise TaskInvalidPatientException(patient_id=f"Tank with id '{tank_id}' not found")
 
         sanitized_page = max(page, 1)
         sanitized_page_size = max(1, min(page_size, MAX_PAGE_SIZE))
@@ -440,7 +457,7 @@ def get_tasks_by_canister(
         return PatientTaskListResponse(
             message=SuccessMessages.TASKS_RETRIEVED,
             patient_id=None,
-            tank_code=tank_code,
+            tank_code=tank.tank_code or f"T{tank_id}",
             total=total,
             page=sanitized_page,
             page_size=sanitized_page_size,
@@ -578,10 +595,6 @@ def update_task(
             
             task.assignee_id = request.assignee_id
         
-        # Validate that only one is provided (not both) - schema validation should catch this, but double-check
-        if request.patient_id and request.tank_code:
-            raise TaskInvalidPatientException(patient_id="Cannot provide both patient_id and tank_code. Use patient_id for CGT or tank_code for IVF")
-        
         # Validate new patient (if provided for CGT flow)
         if request.patient_id:
             patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
@@ -590,9 +603,13 @@ def update_task(
             task.patient_id = request.patient_id
             task.tank_id = None  # Clear tank_id when setting patient_id
         
-        # Resolve tank_code to tank_id if provided (for IVF flow)
-        if request.tank_code:
-            tank_id = _resolve_tank_code_to_id(request.tank_code, db)
+        # Resolve tank identifier if provided (for IVF flow)
+        if request.tank_id is not None or request.tank_code:
+            tank_id = _resolve_tank_identifier_to_id(
+                db=db,
+                tank_id=request.tank_id,
+                tank_code=request.tank_code
+            )
             task.tank_id = tank_id
             task.patient_id = None  # Clear patient_id when setting tank_id
         

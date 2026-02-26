@@ -157,7 +157,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     };
   }, [isOpen, isManagerAdmin]);
 
-  const checkCanister = async (tankCode: string): Promise<boolean | null> => {
+  const checkCanister = async (tankCode: string): Promise<CanisterCheckResponse | null> => {
     const trimmed = tankCode.trim();
     if (!trimmed) {
       setCanisterCheckMessage(null);
@@ -177,12 +177,12 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       } else {
         setCanisterCheckError(null);
       }
-      return response.exists;
+      return response;
     } catch (e: any) {
       const errorMessage = (e?.message as string) || 'Failed to check tank code';
       setCanisterCheckError(errorMessage);
       setCanisterCheckMessage(null);
-      return false;
+      return null;
     } finally {
       setCanisterCheckLoading(false);
     }
@@ -270,18 +270,22 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       if (!trimmedCanisterId) return;
       if (isManagerAdmin && !selectedBranchName) return;
       
-      const exists = await checkCanister(trimmedCanisterId);
-      
-      // Only navigate if canister exists (exists === true)
-      if (exists === true) {
+      const canisterCheck = await checkCanister(trimmedCanisterId);
+
+      // Only navigate when tank exists and backend returns a tank id.
+      if (canisterCheck?.exists === true) {
         if (isManagerAdmin && selectedBranchId != null) {
           try {
             sessionStorage.setItem('ivf_selected_branch_id', String(selectedBranchId));
           } catch {}
         }
-        onTrack?.(trimmedCanisterId, isManagerAdmin ? selectedBranchName : undefined);
+        const tankIdForRoute =
+          canisterCheck.canister_id != null
+            ? String(canisterCheck.canister_id)
+            : trimmedCanisterId;
+        onTrack?.(tankIdForRoute, isManagerAdmin ? selectedBranchName : undefined);
       }
-      // If exists === false, error message is already set by checkCanister
+      // If not found, error message is already set by checkCanister.
     }
   };
 

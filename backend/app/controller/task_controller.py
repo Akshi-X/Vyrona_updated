@@ -146,9 +146,9 @@ def get_patient_tasks(
     )
 
 
-@router.get("/canisters/{tank_code}/tasks", response_model=PatientTaskListResponse)
+@router.get("/canisters/{tank_id}/tasks", response_model=PatientTaskListResponse)
 def get_canister_tasks(
-    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
+    tank_id: int = Path(..., description="Tank ID"),
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     status: Optional[TaskStatus] = Query(None),
@@ -163,7 +163,7 @@ def get_canister_tasks(
     are limited to their own created or assigned tasks.
     
     Path Parameters:
-    - tank_code: Tank code (e.g., 'T1')
+    - tank_id: Tank ID
     
     Query Parameters:
     - page: Page number (default 1)
@@ -172,7 +172,7 @@ def get_canister_tasks(
     - priority: Filter by task priority
     """
     return task_service.get_tasks_by_canister(
-        tank_code=tank_code,
+        tank_id=tank_id,
         current_user=current_user,
         db=db,
         status=status,

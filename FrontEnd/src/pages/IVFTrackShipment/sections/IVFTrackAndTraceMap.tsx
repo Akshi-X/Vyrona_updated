@@ -25,6 +25,7 @@ interface IVFTrackAndTraceMapProps {
 }
 
 const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
+  const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
@@ -70,7 +71,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
   useEffect(() => {
     isMountedRef.current = true;
 
-    if (!canisterNumber) return;
+    if (!tankId) return;
     const authToken = token || authUtils.getToken();
     if (!authToken) return;
 
@@ -85,8 +86,9 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
       ws.onopen = () => {
         setIsConnected(true);
         setHasReceivedData(false);
-        if (canisterNumber) {
-          ws.send(JSON.stringify({ tank_code: canisterNumber }));
+        if (tankId) {
+          const numericTankId = Number(tankId);
+          ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
         }
       };
 
@@ -222,7 +224,7 @@ const IVFTrackAndTraceMap = ({ canisterNumber }: IVFTrackAndTraceMapProps) => {
         wsRef.current = null;
       }
     };
-  }, [canisterNumber, token]);
+  }, [tankId, token]);
 
   // Initialize map markers and polylines
   useEffect(() => {
