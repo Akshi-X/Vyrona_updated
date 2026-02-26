@@ -253,7 +253,7 @@ export default function OutboundQualityTrackingPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Quality Parameter Table */}
                         <div>
-                            <IVFQualityParametersTable canisterNumber={canisterId} />
+                            <IVFQualityParametersTable tankId={canisterId} />
                         </div>
 
                         {/* Quality Tracking Chart */}

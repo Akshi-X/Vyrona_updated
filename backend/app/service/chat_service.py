@@ -206,23 +206,21 @@ def mark_canister_as_read(user_id: str, tank_id: int, db: Session) -> int:
     Mark all messages for a tank as read by updating last_read_message_id to latest (IVF flow).
     Returns the latest message ID that was set.
     """
-    # Get latest message ID for tank
+    # Get latest message ID for tank (None when no messages exist)
     latest_message = db.query(func.max(ChatMessage.id)).filter(
         ChatMessage.tank_id == tank_id
     ).scalar()
-    
-    if latest_message is None:
-        # No messages for this tank
-        latest_message = 0
-    
+
     # Get or create read status
     read_status = get_or_create_read_status_canister(user_id, tank_id, db)
+    # Assign directly; None when no messages exist, keeping FK constraint valid
     read_status.last_read_message_id = latest_message
     read_status.updated_at = datetime.now(timezone.utc)
-    
+
     db.commit()
-    
-    return latest_message
+
+    # Return 0 in API when no messages exist
+    return latest_message or 0
 
 
 async def broadcast_unread_messages_update(
@@ -551,7 +549,7 @@ def create_chat_message(
         # Resolve tank_code to tank_id if provided (for IVF flow)
         tank_id = None
         if request.tank_code:
-            tank = db.query(Tank).filter(Tank.tank_code == request.tank_code).first()
+            tank = db.query(Tank).filter(Tank.tank_id == request.tank_code).first()
             if not tank:
                 raise ChatPatientNotFoundException(f"Tank with code '{request.tank_code}' not found")
             tank_id = tank.tank_id
@@ -838,7 +836,7 @@ async def get_patient_messages(
 
 
 async def get_canister_messages(
-    tank_code: str,
+    tank_id: int,
     current_user_id: str,
     current_user_pharma_id: Optional[int],
     current_user_hospital_id: Optional[int],
@@ -854,12 +852,9 @@ async def get_canister_messages(
     For pharma users: filters by pharma_id (if provided)
     """
     try:
-        # Resolve tank_code to tank_id
-        tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
-            raise ChatPatientNotFoundException(f"Tank with code '{tank_code}' not found")
-        
-        tank_id = tank.tank_id
+            raise ChatPatientNotFoundException(f"Tank with id '{tank_id}' not found")
         
         # Get all messages for this tank
         # For hospital users (IVF), filter by hospital_id
@@ -1039,7 +1034,6 @@ async def get_canister_messages(
             db.rollback()
         except Exception:
             pass
-
 
 def get_unread_messages(
     current_user_id: str,
@@ -1285,6 +1279,7 @@ async def handle_websocket_message(
     connection_id: str,
     current_user: User,
     pharma_id: int,
+    tank_id: Optional[int],
     connection_manager: ChatConnectionManager
 ) -> Dict[str, Any]:
     """
@@ -1300,28 +1295,55 @@ async def handle_websocket_message(
     try:
         logger.debug(f"Handling WebSocket message: type={message_type}, connection_id={connection_id}")
         
-        if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
-            response = await handle_subscribe_patient(
-                message_data, connection_id, pharma_id, connection_manager
-            )
-        elif message_type == WS_MSG_TYPE_UNSUBSCRIBE_PATIENT:
-            response = await handle_unsubscribe_patient(
-                message_data, connection_id, connection_manager
-            )
-        elif message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
-            response = await handle_get_patient_messages_ws(
-                message_data, connection_id, current_user, pharma_id, connection_manager
-            )
-        elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
-            response = await handle_get_unread_messages_ws(
-                current_user, pharma_id
-            )
-        elif message_type == WS_MSG_TYPE_MARK_READ:
-            response = await handle_mark_read_ws(
-                message_data, current_user, pharma_id, connection_manager
-            )
+        if tank_id:
+            logger.debug(f"Message is for tank_id={tank_id}")
+            if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
+                response = await handle_subscribe_tank(
+                    message_data, connection_id, current_user, tank_id=tank_id, connection_manager=connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_UNSUBSCRIBE_PATIENT:
+                response = await handle_unsubscribe_tank(
+                    message_data, connection_id, connection_manager=connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
+                response = await handle_get_tank_messages_ws(
+                    message_data, connection_id, current_user, hospital_id=None, tank_id=tank_id, connection_manager=connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
+                response = await handle_get_unread_messages_ws(
+                    current_user, pharma_id
+                )
+            elif message_type == WS_MSG_TYPE_MARK_READ:
+                await mark_canister_as_read(tank_id=tank_id, user=current_user)
+                response = {
+                    "type": WS_MSG_TYPE_SUCCESS,
+                    "data": {"tank_id": tank_id},
+                }
+            else:
+                raise ChatWebSocketInvalidTypeException(message_type=message_type)
         else:
-            raise ChatWebSocketInvalidTypeException(message_type=message_type)
+            if message_type == WS_MSG_TYPE_SUBSCRIBE_PATIENT:
+                response = await handle_subscribe_patient(
+                    message_data, connection_id, pharma_id, connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_UNSUBSCRIBE_PATIENT:
+                response = await handle_unsubscribe_patient(
+                    message_data, connection_id, connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_PATIENT_MESSAGES:
+                response = await handle_get_patient_messages_ws(
+                    message_data, connection_id, current_user, pharma_id, connection_manager
+                )
+            elif message_type == WS_MSG_TYPE_GET_UNREAD_MESSAGES:
+                response = await handle_get_unread_messages_ws(
+                    current_user, pharma_id
+                )
+            elif message_type == WS_MSG_TYPE_MARK_READ:
+                response = await handle_mark_read_ws(
+                    message_data, current_user, pharma_id, connection_manager
+                )
+            else:
+                raise ChatWebSocketInvalidTypeException(message_type=message_type)
         
         # Validate response is not empty
         if not response or not isinstance(response, dict):
@@ -1343,6 +1365,33 @@ async def handle_websocket_message(
             ChatInvalidDataException(reason=str(e))
         )
 
+async def handle_subscribe_tank(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    current_user: User,
+    tank_id: int,
+    connection_manager: ChatConnectionManager
+) -> Dict[str, Any]:
+    """Handle subscribe to tank messages (IVF flow)"""
+    tank_id = message_data.get("tank_id")
+    if not tank_id:
+        raise ChatInvalidDataException("tank_id is required")
+    
+    with SessionLocal() as db:
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            raise ChatInvalidDataException(f"Tank {tank_id} not found")
+        tank_hospital_id = tank.hospital_id
+
+    # Subscribe connection to tank
+    connection_manager.subscribe_to_tank(connection_id, tank_id)
+    
+    return {
+        "type": WS_MSG_TYPE_SUCCESS,
+        "success": True,
+        "message": f"Subscribed to tank {tank_id}",
+        "data": {"tank_id": tank_id}
+    }
 
 async def handle_subscribe_patient(
     message_data: Dict[str, Any],
@@ -1374,6 +1423,24 @@ async def handle_subscribe_patient(
         "data": {"patient_id": patient_id}
     }
 
+async def handle_unsubscribe_tank(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    connection_manager: ChatConnectionManager
+) -> Dict[str, Any]:
+    """Handle unsubscribe from tank messages (IVF flow)"""
+    tank_id = message_data.get("tank_id")
+    if not tank_id:
+        raise ChatInvalidDataException("tank_id is required")
+    
+    connection_manager.unsubscribe_from_tank(connection_id, tank_id)
+    
+    return {
+        "type": WS_MSG_TYPE_SUCCESS,
+        "success": True,
+        "message": f"Unsubscribed from tank {tank_id}",
+        "data": {"tank_id": tank_id}
+    }
 
 async def handle_unsubscribe_patient(
     message_data: Dict[str, Any],
@@ -1394,6 +1461,40 @@ async def handle_unsubscribe_patient(
         "data": {"patient_id": patient_id}
     }
 
+async def handle_get_tank_messages_ws(
+    message_data: Dict[str, Any],
+    connection_id: str,
+    current_user: User,
+    hospital_id: int,
+    connection_manager: ChatConnectionManager
+) -> Dict[str,any]:
+    """
+    Handle get tank messages request via WebSocket (IVF flow) - does NOT mark as read
+    """
+    tank_id = message_data.get("tank_id")
+    if not tank_id:
+        raise ChatInvalidDataException("tank_id is required")
+    
+    # Auto-subscribe to tank when fetching messages
+    connection_manager.subscribe_to_tank(connection_id, tank_id)
+    
+    # Get messages without marking as read (frontend controls when to mark as read)
+    with SessionLocal() as db:
+        result = await get_canister_messages(
+            tank_id,
+            current_user.user_id,
+            None,  # pharma_id is not used for tank messages
+            hospital_id,
+            db,
+            connection_manager,
+            mark_as_read=False  # Never auto-mark as read
+        )
+    
+    return {
+        "type": WS_MSG_TYPE_PATIENT_MESSAGES,
+        "success": True,
+        "data": result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+    }
 
 async def handle_get_patient_messages_ws(
     message_data: Dict[str, Any],
@@ -1511,7 +1612,8 @@ async def handle_websocket_connection(
     token: str,
     patient_id: Optional[str],
     connection_manager: ChatConnectionManager,
-    authenticate_websocket_func
+    authenticate_websocket_func,
+    tank_id:Optional[str]
 ):
     """Handle WebSocket connection lifecycle. Returns: (connection_id, current_user, pharma_id)"""
     connection_id = None
@@ -1530,17 +1632,39 @@ async def handle_websocket_connection(
         connection_id = await connection_manager.connect(
             websocket, current_user.user_id, pharma_id
         )
-        
+
         connection_response = {
             "type": "connection_confirmed",
             "success": True,
             "user_id": current_user.user_id,
             "pharma_id": pharma_id,
             "connection_id": connection_id,
-            "patient_id": patient_id if patient_id else None
+            "patient_id": patient_id if patient_id else None,
+            "tank_id": tank_id if tank_id else None
         }
-        
-        if patient_id:
+
+        if tank_id:
+            # With tank_id: send only tank messages
+            with SessionLocal() as db:
+                tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+                if tank:
+                    connection_manager.subscribe_to_tank(connection_id, tank_id)
+                    try:
+                        result = await get_canister_messages(
+                            tank_id,
+                            current_user.user_id,
+                            pharma_id,
+                            current_user.hospital_id,
+                            db,
+                            connection_manager,
+                            mark_as_read=False
+                        )
+                        canister_payload = result.model_dump(mode='json', exclude_none=False, exclude_unset=False)
+                        connection_response["canister_messages"] = canister_payload
+                        connection_response["unread_count"] = canister_payload.get("unread_count", 0)
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch canister messages: {e}")
+        elif patient_id:
             # With patient_id: send only patient messages
             with SessionLocal() as db:
                 patient = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -1622,6 +1746,7 @@ async def handle_websocket_message_loop(
     connection_id: str,
     current_user: User,
     pharma_id: int,
+    tank_id: int,
     connection_manager: ChatConnectionManager
 ):
     """Handle WebSocket message loop"""
@@ -1645,6 +1770,7 @@ async def handle_websocket_message_loop(
                 connection_id,
                 current_user,
                 pharma_id,
+                tank_id,
                 connection_manager
             )
             

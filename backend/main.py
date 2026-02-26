@@ -123,7 +123,7 @@ async def startup_event():
     
 #     # Step 1: Create database tables first
 #     logger.info("Creating database tables...")
-#     create_tables()
+    create_tables()
     
 #     # Step 2: Create pharma admin users
 #     logger.info("Creating pharma admin users...")

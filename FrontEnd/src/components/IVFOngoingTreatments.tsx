@@ -55,7 +55,6 @@ const tableHeaders: TableHeader[] = [
   { label: "Goblet Color", hasFilter: true, filterKey: 'gobletColor' },
   { label: "Cryolock Color", hasFilter: true, filterKey: 'cryolockColor' },
   { label: "Date of Vitrification" },
-  { label: "Description" },
   { label: "Site Name", hasFilter: true, filterKey: 'siteName' },
   { label: "Status", hasFilter: true, filterKey: 'status' },
 ];
@@ -360,7 +359,7 @@ export function IVFOngoingTreatments({
               if (isLoading) {
                 return (
                   <tr className="bg-white">
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-xs">
                       Loading...
                     </td>
                   </tr>
@@ -369,7 +368,7 @@ export function IVFOngoingTreatments({
               if (treatments.length === 0) {
                 return (
                   <tr className="bg-white">
-                    <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-xs">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-xs">
                       No treatments found
                     </td>
                   </tr>
@@ -390,18 +389,13 @@ export function IVFOngoingTreatments({
                       <td className="px-4 py-3 text-xs">{treatment.gobletColor || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
-                      <td className="px-4 py-3 text-xs max-w-[200px]">
-                        <div className="truncate" title={treatment.description || undefined}>
-                          {treatment.description || '-'}
-                        </div>
-                      </td>
                       <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
                     </tr>
                   ))}
                   {isLoadingMore && (
                     <tr className="bg-white">
-                      <td colSpan={11} className="px-4 py-3 text-center text-gray-500 text-xs">
+                      <td colSpan={10} className="px-4 py-3 text-center text-gray-500 text-xs">
                         Loading more data...
                       </td>
                     </tr>
