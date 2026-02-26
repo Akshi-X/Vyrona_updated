@@ -24,9 +24,9 @@ from app.constants.enums import AlertStatus
 router = APIRouter(prefix="/ivf/alerts", tags=["IVF Critical Alerts"])
 
 
-@router.get("/tank/{tank_code}", response_model=TankAlertsResponse)
+@router.get("/tank/{tank_id}", response_model=TankAlertsResponse)
 def get_tank_alerts(
-    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
+    tank_id: int = Path(..., description="Tank ID"),
     request: Request = None,
     db: Session = Depends(get_db)
 ):
@@ -36,12 +36,12 @@ def get_tank_alerts(
     Returns all alerts (active and acknowledged) for the specified tank.
     
     Path Parameters:
-    - tank_code: Tank code (e.g., 'T1')
+    - tank_id: Tank ID
     """
     try:
         branch_id, _ = get_branch_filter_info(request) if request else (None, None)
         service = CriticalAlertService(db)
-        result = service.get_tank_alerts_by_code(tank_code, branch_id=branch_id)
+        result = service.get_tank_alerts(tank_id, branch_id=branch_id)
         return result
     except HTTPException:
         raise

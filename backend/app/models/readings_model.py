@@ -30,7 +30,6 @@ class Readings(Base):
     deviation = Column(Boolean, nullable=False, default=False, index=True)
     alert_id = Column(String(36), nullable=True, index=True, comment="Reference to critical_alerts.alert_id when this reading triggered a deviation alert")
 
-    alert_id = Column(Integer, ForeignKey("alerts.alert_id", ondelete="SET NULL"),default=False, nullable=True, index=True)
     checked= Column(Boolean, nullable=True, default=False, index=True)
 
     kpi_config = relationship("KpiConfig", back_populates="readings")

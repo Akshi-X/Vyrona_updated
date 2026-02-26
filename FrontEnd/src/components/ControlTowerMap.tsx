@@ -58,6 +58,24 @@ interface ControlTowerMapProps {
   zoomToBranchName?: string | null;
 }
 
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const toValidLatLng = (latitude: unknown, longitude: unknown): google.maps.LatLngLiteral | null => {
+  const lat = toFiniteNumber(latitude);
+  const lng = toFiniteNumber(longitude);
+  if (lat === null || lng === null) return null;
+  if (lat < -90 || lat > 90) return null;
+  if (lng < -180 || lng > 180) return null;
+  return { lat, lng };
+};
+
 const darkWorldStyle: google.maps.MapTypeStyle[] = [
 
   // Continents (land) solid black
@@ -195,9 +213,18 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
             // Transform the nested state structure into a flat array of branches
             let branches: IVFBranch[] = [];
             Object.entries(data.states).forEach(([stateName, stateBranches]) => {
-              stateBranches.forEach((branch) => {
+              (stateBranches as any[]).forEach((branch: any) => {
+                const validLocation = toValidLatLng(
+                  branch?.geoLocation?.latitude,
+                  branch?.geoLocation?.longitude,
+                );
+                if (!validLocation) return;
                 branches.push({
                   ...branch,
+                  geoLocation: {
+                    latitude: validLocation.lat,
+                    longitude: validLocation.lng,
+                  },
                   state: stateName,
                 });
               });
@@ -348,13 +375,18 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
       if (countryBranches.length > 0) {
         // Calculate bounds for all branches in that country
         const bounds = new google.maps.LatLngBounds();
+        let hasValidCoordinates = false;
         countryBranches.forEach(branch => {
-          bounds.extend({
-            lat: branch.geoLocation.latitude,
-            lng: branch.geoLocation.longitude,
-          });
+          const position = toValidLatLng(
+            branch.geoLocation.latitude,
+            branch.geoLocation.longitude,
+          );
+          if (!position) return;
+          hasValidCoordinates = true;
+          bounds.extend(position);
         });
-        
+        if (!hasValidCoordinates) return;
+
         // Fit bounds with padding
         mapRef.fitBounds(bounds, {
           top: 50,
@@ -383,10 +415,11 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     const branch = ivfBranches.find(b => b.branch_name === zoomToBranchName);
     if (!branch) return;
 
-    const position = {
-      lat: branch.geoLocation.latitude,
-      lng: branch.geoLocation.longitude,
-    };
+    const position = toValidLatLng(
+      branch.geoLocation.latitude,
+      branch.geoLocation.longitude,
+    );
+    if (!position) return;
 
     mapRef.panTo(position);
     const currentZoom = mapRef.getZoom() ?? 3;
@@ -687,10 +720,11 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
               {/* IVF Branch Markers (Inbound only) */}
               {direction === 'inbound' && ivfBranches.map((branch) => {
                 const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
-                const branchPosition = {
-                  lat: branch.geoLocation.latitude,
-                  lng: branch.geoLocation.longitude,
-                } as google.maps.LatLngLiteral;
+                const branchPosition = toValidLatLng(
+                  branch.geoLocation.latitude,
+                  branch.geoLocation.longitude,
+                );
+                if (!branchPosition) return null;
                 const markerIconUrl = getBranchMarkerIcon(branch.branch_status);
 
                 return (
