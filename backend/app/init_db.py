@@ -128,6 +128,7 @@ def sync_ivf_schema():
         db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS lid_state VARCHAR(50)"))
         db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS refill_detected BOOLEAN"))
         db.execute(text("ALTER TABLE ln2_readings ADD COLUMN IF NOT EXISTS quality_status VARCHAR(50)"))
+        db.execute(text("ALTER TABLE readings ADD COLUMN IF NOT EXISTS checked BOOLEAN DEFAULT false"))
         # ln2_readings: drop legacy columns (replaced by evaporation_rate_kg_per_h, ln2_mass_kg)
         db.execute(text("ALTER TABLE ln2_readings DROP COLUMN IF EXISTS ln2_evaporation_rate"))
         db.execute(text("ALTER TABLE ln2_readings DROP COLUMN IF EXISTS ln2_level"))

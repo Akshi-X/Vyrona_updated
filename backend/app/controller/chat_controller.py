@@ -407,7 +407,8 @@ def chat_health_check():
 async def websocket_chat_endpoint(
     websocket: WebSocket,
     token: str = Query(...),
-    patient_id: str = Query(None)
+    patient_id: str = Query(None),
+    tank_id: int = Query(None)
 ):
     """
     WebSocket endpoint for real-time chat messaging
@@ -417,6 +418,7 @@ async def websocket_chat_endpoint(
     Query Parameters:
     - token: JWT authentication token (required)
     - patient_id: Optional patient ID to auto-subscribe on connection
+    - tank_id: Optional tank ID (IVF flow) to auto-subscribe on connection
     
     Message Types (Client -> Server):
         - subscribe_patient: Subscribe to patient messages
@@ -441,7 +443,8 @@ async def websocket_chat_endpoint(
             token,
             patient_id,
             chat_connection_manager,
-            authenticate_websocket
+            authenticate_websocket,
+            tank_id
         )
         
         # Handle message loop via service
