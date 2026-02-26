@@ -337,11 +337,11 @@ async def authenticate_websocket(
             # Pharma users have pharma_id but may not have branch_id
             if pharma_id is None:
                 # Check if user is a hospital user (has branch_id)
-                if not user.branch_id:
+                if not user.branch_id and user.role != "User":
                     # Not a hospital user and no pharma_id - this is an error
-                    raise ChatWebSocketAuthFailedException(reason="Pharma ID not found")
+                    raise ChatWebSocketAuthFailedException(reason="Branch ID not found")
                 # Hospital user with branch_id but no pharma_id - this is OK
-                logger.debug(f"Hospital user {user_id} connecting without pharma_id (has branch_id: {user.branch_id})")
+                logger.debug(f"Hospital user {user_id} connecting without pharma_id)")
 
             db.expunge(user)
 
