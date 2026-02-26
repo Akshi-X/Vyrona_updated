@@ -211,7 +211,7 @@ def get_user_unread_messages(
         })
 
 
-@router.get("/canisters/{tank_code}/messages",
+@router.get("/canisters/{tank_id}/messages",
     response_model=PatientMessagesResponse,
     summary="Get tank messages",
     description="""
@@ -223,7 +223,7 @@ def get_user_unread_messages(
     - Keeps chat window open while receiving new messages
     """)
 async def get_canister_chat_messages(
-    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
+    tank_id: int = Path(..., description="Tank ID"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
     http_request: Request = None
@@ -239,7 +239,7 @@ async def get_canister_chat_messages(
             hospital_id = http_request.state.hospital_id
         
         result = await get_canister_messages(
-            tank_code, 
+            tank_id,
             current_user.user_id, 
             pharma_id, 
             hospital_id,
@@ -315,7 +315,7 @@ async def mark_patient_messages_as_read(
         })
 
 
-@router.post("/canisters/{tank_code}/mark-read",
+@router.post("/canisters/{tank_id}/mark-read",
     summary="Mark tank messages as read",
     description="""
     Mark all messages for a tank as read (IVF flow).
@@ -325,23 +325,20 @@ async def mark_patient_messages_as_read(
     - User keeps chat window open while receiving new messages
     """)
 async def mark_canister_messages_as_read(
-    tank_code: str = Path(..., description="Tank code (e.g., 'T1')"),
+    tank_id: int = Path(..., description="Tank ID"),
     db: Session = Depends(database.get_db),
     current_user: user_model.User = Depends(get_current_user),
     http_request: Request = None
 ):
     """Mark all messages for a tank as read"""
     try:
-        # Resolve tank_code to tank_id
-        tank = db.query(Tank).filter(Tank.tank_code == tank_code).first()
+        tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
         if not tank:
             raise HTTPException(status_code=404, detail={
                 "error_code": "CHAT_TANK_NOT_FOUND",
-                "message": f"Tank with code '{tank_code}' not found"
+                "message": f"Tank with id '{tank_id}' not found"
             })
-        
-        tank_id = tank.tank_id
-        
+
         # Mark all messages as read
         latest_message_id = mark_canister_as_read(current_user.user_id, tank_id, db)
         
@@ -370,8 +367,9 @@ async def mark_canister_messages_as_read(
         
         return {
             "success": True,
-            "message": f"Messages for tank {tank_code} marked as read",
-            "tank_code": tank_code,
+            "message": f"Messages for tank {tank_id} marked as read",
+            "tank_id": tank_id,
+            "tank_code": tank.tank_code,
             "last_read_message_id": latest_message_id,
             "unread_count": unread_count
         }

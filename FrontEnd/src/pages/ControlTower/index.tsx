@@ -43,6 +43,7 @@ const ControlTower = () => {
   const [canisters, setCanisters] = useState<Array<{
     id: string;
     canisterId: string;
+    tankId: string;
     branchName: string;
     branchId: string;
     status: string;
@@ -164,6 +165,7 @@ const ControlTower = () => {
         let flattenedCanisters: Array<{
           id: string;
           canisterId: string;
+          tankId: string;
           branchName: string;
           branchId: string;
           status: string;
@@ -194,6 +196,7 @@ const ControlTower = () => {
             return {
               id: `canister-${canister.canister_number || canister.canister_id}`,
               canisterId: String(canister.canister_number || canister.canister_id),
+              tankId: String(canister.tank_id ?? canister.canister_id ?? 'N/A'),
               branchName: 'N/A', // Flat format doesn't have branch info
               branchId: 'N/A', // Flat format doesn't have branch info
               status: statusText,
@@ -219,6 +222,7 @@ const ControlTower = () => {
                 return {
                   id: `tank-${branch.branch_name || 'N/A'}-${tank.tank_code || ''}`,
                   canisterId: String(tank.tank_code || ''),
+                  tankId: String(tank.tank_id ?? 'N/A'),
                   branchId: String(branch.branch_id ?? tank.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: 'Safe', // Default status since tanks don't have status in API response
@@ -250,6 +254,7 @@ const ControlTower = () => {
                 return {
                   id: `canister-${canister.canister_number || canister.canister_id}`,
                   canisterId: String(canister.canister_number || canister.canister_id),
+                  tankId: String(canister.tank_id ?? canister.canister_id ?? 'N/A'),
                   branchId: String(canister.effective_branch_id ?? branch.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: statusText,
@@ -845,7 +850,9 @@ const ControlTower = () => {
                               <div className="min-w-0 text-left overflow-hidden">
                                 {canister.canisterId ? (
                                   <Link 
-                                    to={`/ivf-track-shipment/${encodeURIComponent(canister.canisterId)}`}
+                                    to={`/ivf-track-shipment/${encodeURIComponent(
+                                      canister.tankId && canister.tankId !== 'N/A' ? canister.tankId : canister.canisterId
+                                    )}`}
                                     className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -857,10 +864,12 @@ const ControlTower = () => {
                                     }}
                                   >
                                     Container {canister.canisterId}
+                                    {canister.tankId && canister.tankId !== 'N/A' ? ` - ${canister.tankId}` : ''}
                                   </Link>
                                 ) : (
                                   <span className="text-[#6b1176] text-xs font-bold">
                                     Container {canister.canisterId}
+                                    {canister.tankId && canister.tankId !== 'N/A' ? ` - ${canister.tankId}` : ''}
                                   </span>
                                 )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (

@@ -78,7 +78,7 @@ export const router = createBrowserRouter([
   { path: '/database', element: <DatabaseWithAuth /> },
   { path: '/control-tower', element: <ControlTowerWithAuth /> },
   { path: '/track/:patientId', element: <TrackPageWithAuth /> },
-  { path: '/ivf-track-shipment/:canisterId', element: <IVFTrackShipmentWithAuth /> },
+  { path: '/ivf-track-shipment/:tankId', element: <IVFTrackShipmentWithAuth /> },
   { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
   { path: '/outbound-quality-tracking/:canisterId', element: <OutboundQualityTrackingWithAuth /> },
   { path: '/outbound-quality-tracking', element: <OutboundQualityTrackingWithAuth /> },

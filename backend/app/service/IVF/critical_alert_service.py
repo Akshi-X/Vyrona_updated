@@ -1151,10 +1151,17 @@ class CriticalAlertService:
                 # Re-raise to track in calling function
                 raise
     
-    def get_tank_alerts(self, tank_id: int) -> TankAlertsResponse:
+    def get_tank_alerts(
+        self,
+        tank_id: int,
+        branch_id: Optional[int] = None
+    ) -> TankAlertsResponse:
         """Get all alerts for a specific tank by tank_id (tank-level monitoring)"""
         # Get tank
-        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        tank_query = self.db.query(Tank).filter(Tank.tank_id == tank_id)
+        if branch_id is not None:
+            tank_query = tank_query.filter(Tank.branch_id == branch_id)
+        tank = tank_query.first()
         if not tank:
             raise ValueError(f"Tank {tank_id} not found")
         

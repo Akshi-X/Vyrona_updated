@@ -139,33 +139,32 @@ def get_ln2_history(
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
 
 
-@router.get("/tanks/{tank_code}/kpi-config")
+@router.get("/tanks/{tank_id}/kpi-config")
 def get_tank_kpi_config(
-    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    tank_id: int = Path(..., description="Tank ID"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get KPI limits config for the tank (nested kpi_limits for frontend visualization)."""
     branch_id, role = get_branch_filter_info(request) if request else (None, None)
-    tank_code_str = str(tank_code).strip()
-    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    query = db.query(Tank).filter(Tank.tank_id == tank_id)
     if role != "Admin" and branch_id is not None:
         query = query.filter(Tank.branch_id == branch_id)
     tank = query.first()
     if not tank:
-        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank.tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
-    return quality_service.get_tank_kpi_config(tank.tank_id, tank_code_str)
+    return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
 
 
-@router.get("/tanks/{tank_code}/kpi-history")
+@router.get("/tanks/{tank_id}/kpi-history")
 def get_tank_kpi_history(
-    tank_code: str = Path(..., description="Tank code (e.g., T15)"),
+    tank_id: int = Path(..., description="Tank ID"),
     limit: int = Query(50, ge=1, le=200),
     request: Request = None,
     db: Session = Depends(get_db),
@@ -173,14 +172,12 @@ def get_tank_kpi_history(
 ):
     """Get KPI readings history for Quality Tracking tabbed graph (past data)."""
     branch_id, role = get_branch_filter_info(request) if request else (None, None)
-    tank_code_str = str(tank_code).strip()
-    query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
+    query = db.query(Tank).filter(Tank.tank_id == tank_id)
     if role != "Admin" and branch_id is not None:
         query = query.filter(Tank.branch_id == branch_id)
     tank = query.first()
     if not tank:
-        raise HTTPException(status_code=404, detail=f"Tank '{tank_code}' not found")
-    tank_id = tank.tank_id
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
@@ -199,7 +196,7 @@ def get_tank_kpi_history(
             if name and name not in seen:
                 seen[name] = True
                 kpi_config.append({"name": name, "unit": k.get("unit") or ""})
-    return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history, "kpi_config": kpi_config}
+    return {"tank_code": tank.tank_code or f"T{tank_id}", "tank_id": tank_id, "history": history, "kpi_config": kpi_config}
 
 
 @router.post("/tanks/{tank_code}/kpi-readings")
