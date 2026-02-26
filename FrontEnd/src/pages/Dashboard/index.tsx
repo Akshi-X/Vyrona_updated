@@ -69,7 +69,6 @@ interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, logout, userRole } = useAuth();
-  const normalizedRole = (userRole || '').trim().toLowerCase();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
