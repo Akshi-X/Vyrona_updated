@@ -325,7 +325,7 @@ export default function IVFTrackShipmentPage() {
                         </div>
                         {/* Right Column: Quality Parameter */}
                         <div>
-                            <IVFQualityParametersTable canisterNumber={tankId} />
+                            <IVFQualityParametersTable tankId={tankId} />
                         </div>
                     </div>
 
