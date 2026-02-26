@@ -233,7 +233,7 @@ const ControlTower = () => {
                   branchId: String(branch.branch_id ?? tank.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: statusText,
-                  deviations: tank.deviations
+                  deviations: tank.deviations,
                   date: date,
                 };
               });
