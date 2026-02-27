@@ -45,43 +45,43 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
   [KPI_NAMES.IVF_TEMPERATURE_INTERNAL]: {
     label: 'Internal Temperature',
     description: 'Monitor the internal tank temperature for safe storage conditions',
-    icon: <DeviceThermostatIcon sx={{ fontSize: 24 }} />,
+    icon: <DeviceThermostatIcon sx={{ fontSize: 20 }} />,
     unit: '°C',
   },
   [KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]: {
     label: 'External Temperature',
     description: 'Track ambient temperature around the storage container',
-    icon: <ThermostatAutoIcon sx={{ fontSize: 24 }} />,
+    icon: <ThermostatAutoIcon sx={{ fontSize: 20 }} />,
     unit: '°C',
   },
   [KPI_NAMES.IVF_LN2_LEVEL]: {
-    label: 'LN2 Level',
+    label: 'LN2',
     description: 'Liquid nitrogen level monitoring for cryogenic safety',
-    icon: <WaterDropIcon sx={{ fontSize: 24 }} />,
+    icon: <WaterDropIcon sx={{ fontSize: 20 }} />,
     unit: '%',
   },
   [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]: {
     label: 'Evaporation Rate',
     description: 'Track LN2 evaporation rate to predict refill schedules',
-    icon: <TrendingUpIcon sx={{ fontSize: 24 }} />,
+    icon: <TrendingUpIcon sx={{ fontSize: 20 }} />,
     unit: '%/day',
   },
   [KPI_NAMES.IVF_SHOCK]: {
     label: 'Shock Detection',
     description: 'Alert for physical impacts or sudden movements',
-    icon: <BoltIcon sx={{ fontSize: 24 }} />,
+    icon: <BoltIcon sx={{ fontSize: 20 }} />,
     unit: 'g',
   },
   [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]: {
     label: 'Battery Level',
     description: 'Monitor device battery to ensure continuous tracking',
-    icon: <BatteryChargingFullIcon sx={{ fontSize: 24 }} />,
+    icon: <BatteryChargingFullIcon sx={{ fontSize: 20 }} />,
     unit: '%',
   },
   [KPI_NAMES.IVF_LN2_LID_STATE]: {
     label: 'Lid State',
     description: 'Monitor container lid open/close status for security',
-    icon: <SensorDoorIcon sx={{ fontSize: 24 }} />,
+    icon: <SensorDoorIcon sx={{ fontSize: 20 }} />,
   },
 };
 
@@ -89,7 +89,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
 const DEFAULT_KPI_METADATA: KpiMetadata = {
   label: 'Custom Alert',
   description: 'Custom monitoring parameter',
-  icon: <InfoOutlinedIcon sx={{ fontSize: 24 }} />,
+  icon: <InfoOutlinedIcon sx={{ fontSize: 20 }} />,
 };
 
 // Helper to get KPI metadata
@@ -178,6 +178,9 @@ const validateBattery = (min: number | null): { valid: boolean; error?: string }
 
 // Check if alert type should be enabled based on KPI type and values
 const isAlertTypeEnabled = (kpiName: string, min: number | null, max: number | null, lidState?: string): boolean => {
+  if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+    return min !== null;
+  }
   const inputType = getKpiInputType(kpiName);
   switch (inputType) {
     case 'lid_state':
@@ -193,6 +196,9 @@ const isAlertTypeEnabled = (kpiName: string, min: number | null, max: number | n
 
 // Get validation for a specific KPI
 const getKpiValidation = (kpiName: string, min: number | null, max: number | null): { valid: boolean; error?: string } => {
+  if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+    return validatePercentage(min, null);
+  }
   const inputType = getKpiInputType(kpiName);
   switch (inputType) {
     case 'temperature':
@@ -261,10 +267,13 @@ export default function AlertSetting() {
       const refs = getInputRefs(kpiKey);
       const kpiName = kpiKey.includes('-') ? kpiKey.split('-').pop() : kpiKey;
       const inputType = getKpiInputType(kpiName || '');
+      const isLn2Level = (kpiName || '') === KPI_NAMES.IVF_LN2_LEVEL;
       
       switch (currentField) {
         case 'min':
           if (inputType === 'battery') {
+            refs.alertType?.focus();
+          } else if (isLn2Level) {
             refs.alertType?.focus();
           } else if (inputType === 'lid_state') {
             refs.alertType?.focus();
@@ -373,9 +382,15 @@ export default function AlertSetting() {
 
   useEffect(() => {
     setDraftConfig({});
+    setMultiDraftConfig({});
   }, [primaryContainer?.tank_id]);
 
   const branchOptions = useMemo(() => ['All', ...branches.map((b) => b.branch_name)], [branches]);
+  const configuredKpiNames = useMemo(() => new Set(configList.map((r) => r.kpi_name)), [configList]);
+  const missingKpiNames = useMemo(
+    () => ALL_KPI_NAMES.filter((kpiName) => !configuredKpiNames.has(kpiName)),
+    [configuredKpiNames]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -533,25 +548,14 @@ export default function AlertSetting() {
         const metadata = getKpiMetadata(kpiName);
         const inputType = getKpiInputType(kpiName);
 
-        // LN2 Level: store as two bands — LN2 L2 (0 to L2-1, critical), LN2 L1 (L2 to L1, soft)
-        if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
-          const l2 = d.min ?? 60;
-          const l1 = d.max ?? 100;
-          if (d.min !== null || d.max !== null || d.alert_type != null) {
-            const l2Max = Math.max(0, l2 - 1);
-            configsToApply.push(
-              { kpi_name: 'ln2_level', alert_name: 'LN2 L2', min: 0, max: l2Max, unit: '%', alert_type: 'critical' },
-              { kpi_name: 'ln2_level', alert_name: 'LN2 L1', min: l2, max: l1, unit: '%', alert_type: 'soft' },
-            );
-          }
-          continue;
-        }
-
         let minVal = d.min ?? null;
         let maxVal = d.max ?? null;
 
         if (inputType === 'battery' && minVal !== null) {
           maxVal = 100;
+        }
+        if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+          maxVal = null;
         }
         if (inputType === 'lid_state' && d.lid_state) {
           const values = lidStateToValues(d.lid_state);
@@ -559,10 +563,10 @@ export default function AlertSetting() {
           maxVal = values.max;
         }
 
-        if (minVal !== null || maxVal !== null || d.alert_type !== undefined) {
+        if (minVal !== null || maxVal !== null || (d.alert_type !== undefined && d.alert_type !== null)) {
           configsToApply.push({
             kpi_name: kpiName,
-            alert_name: metadata.label,
+            alert_name: kpiName === KPI_NAMES.IVF_LN2_LEVEL ? 'LN2' : metadata.label,
             min: minVal,
             max: maxVal,
             unit: metadata.unit ?? null,
@@ -593,7 +597,8 @@ export default function AlertSetting() {
       return;
     }
     const ids = Object.keys(draftConfig).map(Number);
-    if (ids.length === 0) return;
+    const hasTemplateDrafts = Object.keys(multiDraftConfig).length > 0;
+    if (ids.length === 0 && !hasTemplateDrafts) return;
     setSaveAllLoading(true);
     try {
       for (const id of ids) {
@@ -612,6 +617,9 @@ export default function AlertSetting() {
         if (inputType === 'battery' && minVal !== undefined && minVal !== null) {
           maxVal = 100;
         }
+        if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+          maxVal = null;
+        }
         
         // For lid_state, convert state to min/max
         if (inputType === 'lid_state' && d.lid_state !== undefined) {
@@ -626,7 +634,54 @@ export default function AlertSetting() {
           alert_type: d.alert_type !== undefined ? d.alert_type : undefined,
         });
       }
+      if (primaryContainer && hasTemplateDrafts) {
+        const configsToApply: Array<{
+          kpi_name: string;
+          alert_name: string | null;
+          min: number | null;
+          max: number | null;
+          unit: string | null;
+          alert_type: string | null;
+        }> = [];
+
+        for (const kpiName of missingKpiNames) {
+          const d = getMultiDraft(kpiName);
+          const metadata = getKpiMetadata(kpiName);
+          const inputType = getKpiInputType(kpiName);
+
+          let minVal = d.min ?? null;
+          let maxVal = d.max ?? null;
+
+          if (inputType === 'battery' && minVal !== null) {
+            maxVal = 100;
+          }
+          if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+            maxVal = null;
+          }
+          if (inputType === 'lid_state' && d.lid_state) {
+            const values = lidStateToValues(d.lid_state);
+            minVal = values.min;
+            maxVal = values.max;
+          }
+
+          if (minVal !== null || maxVal !== null || (d.alert_type !== undefined && d.alert_type !== null)) {
+            configsToApply.push({
+              kpi_name: kpiName,
+              alert_name: kpiName === KPI_NAMES.IVF_LN2_LEVEL ? 'LN2' : metadata.label,
+              min: minVal,
+              max: maxVal,
+              unit: metadata.unit ?? null,
+              alert_type: d.alert_type ?? null,
+            });
+          }
+        }
+
+        if (configsToApply.length > 0) {
+          await ivfService.bulkUpsertKpiConfig([primaryContainer.tank_id], configsToApply);
+        }
+      }
       setDraftConfig({});
+      setMultiDraftConfig({});
       if (primaryContainer) {
         const res = await ivfService.getKpiConfigList(primaryContainer.tank_id);
         setConfigList(res?.config ?? []);
@@ -654,6 +709,11 @@ export default function AlertSetting() {
       setDeleteLoading(false);
     }
   };
+
+  const isMultiMode = selectedContainers.length > 1 || configList.length === 0;
+  const hasPendingChanges = isMultiMode
+    ? Object.keys(multiDraftConfig).length > 0
+    : (Object.keys(draftConfig).length > 0 || Object.keys(multiDraftConfig).length > 0);
 
   return (
     <div className="flex w-full bg-[#FDFAFF]" style={{ height: '100vh' }}>
@@ -848,11 +908,8 @@ export default function AlertSetting() {
                           // Validation
                           const validation = getKpiValidation(kpiName, minVal, maxVal);
                           
-                          // LN2 Level: enabled when L2 or L1 is set (bands are fixed: L2 critical, L1 soft)
-                          const isAlertEnabled = kpiName === KPI_NAMES.IVF_LN2_LEVEL
-                            ? (minVal !== null || maxVal !== null)
-                            : (typeVal && typeVal !== '');
-                          const isCritical = kpiName === KPI_NAMES.IVF_LN2_LEVEL ? false : typeVal === 'critical';
+                          const isAlertEnabled = !!(typeVal && typeVal !== '');
+                          const isCritical = typeVal === 'critical';
                           
                           // Check if any value is set (for showing clear button)
                           const hasAnyValue = minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== '';
@@ -860,7 +917,7 @@ export default function AlertSetting() {
                           return (
                             <div
                               key={kpiName}
-                              className={`relative rounded-xl border-2 p-4 transition-all duration-200 ${
+                              className={`relative rounded-xl border-2 p-5 transition-all duration-200 ${
                                 isAlertEnabled
                                   ? isCritical
                                     ? 'border-red-200 bg-gradient-to-r from-red-50/50 to-white'
@@ -870,12 +927,12 @@ export default function AlertSetting() {
                             >
                               <div className="flex items-center gap-4">
                                 <div
-                                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transform ${
+                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transform ${
                                     isAlertEnabled
                                       ? isCritical
                                         ? 'bg-red-100 text-red-600'
                                         : 'bg-[#F2E4FF] text-[#6b1176]'
-                                      : 'bg-gray-200 text-gray-400'
+                                      : 'bg-[#F2E4FF] text-[#6b1176]'
                                   }`}
                                 >
                                   {metadata.icon}
@@ -902,6 +959,9 @@ export default function AlertSetting() {
                                           <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
                                         </button>
                                       )}
+                                      <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700">
+                                        Unset
+                                      </span>
                                       {isAlertEnabled ? (
                                         <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
                                           isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
@@ -935,7 +995,7 @@ export default function AlertSetting() {
                                     <p className="text-xs text-red-500 mt-1">{validation.error}</p>
                                   )}
                                   
-                                  <div className="flex items-center gap-3 mt-3">
+                                  <div className="flex items-center gap-3 mt-4">
                                     {/* Lid State - special select input */}
                                     {inputType === 'lid_state' ? (
                                       <div className="flex items-center gap-2">
@@ -981,52 +1041,30 @@ export default function AlertSetting() {
                                         )}
                                       </div>
                                     ) : kpiName === KPI_NAMES.IVF_LN2_LEVEL ? (
-                                      /* LN2 Level: L2 (critical band 0–L2-1), L1 (soft band L2–L1) */
-                                      <>
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            ref={(el) => { refs.min = el; }}
-                                            type="number"
-                                            step="any"
-                                            min={0}
-                                            max={100}
-                                            value={minVal != null ? minVal : ''}
-                                            onChange={(e) => {
-                                              let v = e.target.value === '' ? null : Number(e.target.value);
-                                              if (v !== null && (v < 0 || v > 100)) v = Math.max(0, Math.min(100, v));
-                                              setMultiDraft(kpiName, { min: v });
-                                            }}
-                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
-                                            placeholder="L2"
-                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                          />
-                                          {metadata.unit && (
-                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            ref={(el) => { refs.max = el; }}
-                                            type="number"
-                                            step="any"
-                                            min={0}
-                                            max={100}
-                                            value={maxVal != null ? maxVal : ''}
-                                            onChange={(e) => {
-                                              let v = e.target.value === '' ? null : Number(e.target.value);
-                                              if (v !== null && (v < 0 || v > 100)) v = Math.max(0, Math.min(100, v));
-                                              setMultiDraft(kpiName, { max: v });
-                                            }}
-                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'max')}
-                                            placeholder="L1"
-                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                          />
-                                          {metadata.unit && (
-                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
-                                          )}
-                                        </div>
-                                        <span className="text-xs text-gray-400 shrink-0">L2: critical, L1: soft</span>
-                                      </>
+                                      /* LN2 - single threshold like battery */
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Alert below</span>
+                                        <input
+                                          ref={(el) => { refs.min = el; }}
+                                          type="number"
+                                          step="any"
+                                          min={0}
+                                          max={100}
+                                          value={minVal != null ? minVal : ''}
+                                          onChange={(e) => {
+                                            let v = e.target.value === '' ? null : Number(e.target.value);
+                                            if (v !== null && v < 0) v = 0;
+                                            if (v !== null && v > 100) v = 100;
+                                            setMultiDraft(kpiName, { min: v, max: null });
+                                          }}
+                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                          placeholder="Min"
+                                          className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                        />
+                                        {metadata.unit && (
+                                          <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                        )}
+                                      </div>
                                     ) : (
                                       /* Standard/Temperature/Percentage inputs */
                                       <>
@@ -1072,32 +1110,30 @@ export default function AlertSetting() {
                                         </div>
                                       </>
                                     )}
-                                    {kpiName !== KPI_NAMES.IVF_LN2_LEVEL && (
-                                      <select
-                                        ref={(el) => { refs.alertType = el; }}
-                                        value={typeVal ?? ''}
-                                        onChange={(e) => {
-                                          const v = e.target.value === '' ? null : e.target.value;
-                                          setMultiDraft(kpiName, { alert_type: v });
-                                        }}
-                                        disabled={!canEnableAlert}
-                                        className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                          !canEnableAlert
-                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : isAlertEnabled
-                                              ? isCritical
-                                                ? 'border-red-200 bg-red-50 text-red-700'
-                                                : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                              : 'border-gray-200 bg-white text-gray-500'
-                                        }`}
-                                      >
-                                        {alertTypeOptions.map((opt) => (
-                                          <option key={opt.label} value={opt.value ?? ''}>
-                                            {opt.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    )}
+                                    <select
+                                      ref={(el) => { refs.alertType = el; }}
+                                      value={typeVal ?? ''}
+                                      onChange={(e) => {
+                                        const v = e.target.value === '' ? null : e.target.value;
+                                        setMultiDraft(kpiName, { alert_type: v });
+                                      }}
+                                      disabled={!canEnableAlert}
+                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
+                                        !canEnableAlert
+                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : isAlertEnabled
+                                            ? isCritical
+                                              ? 'border-red-200 bg-red-50 text-red-700'
+                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                            : 'border-gray-200 bg-white text-gray-500'
+                                      }`}
+                                    >
+                                      {alertTypeOptions.map((opt) => (
+                                        <option key={opt.label} value={opt.value ?? ''}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
                                 </div>
                               </div>
@@ -1105,8 +1141,9 @@ export default function AlertSetting() {
                           );
                         })
                       ) : (
-                        /* Single container mode: show existing config */
-                        configList.map((r) => {
+                        /* Single container mode: show existing config + missing KPI templates as unset */
+                        <>
+                        {configList.map((r) => {
                           const d = getDraft(r.id);
                           const minVal = d.min !== undefined ? d.min : r.min;
                           const maxVal = d.max !== undefined ? d.max : r.max;
@@ -1132,7 +1169,7 @@ export default function AlertSetting() {
                           return (
                             <div
                               key={r.id}
-                              className={`relative rounded-xl border-2 p-4 transition-all duration-200 ${
+                              className={`relative rounded-xl border-2 p-5 transition-all duration-200 ${
                                 isAlertEnabled
                                   ? isCritical
                                     ? 'border-red-200 bg-gradient-to-r from-red-50/50 to-white'
@@ -1143,12 +1180,12 @@ export default function AlertSetting() {
                               <div className="flex items-center gap-4">
                                 {/* Icon */}
                                 <div
-                                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transform ${
+                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transform ${
                                     isAlertEnabled
                                       ? isCritical
                                         ? 'bg-red-100 text-red-600'
                                         : 'bg-[#F2E4FF] text-[#6b1176]'
-                                      : 'bg-gray-200 text-gray-400'
+                                      : 'bg-[#F2E4FF] text-[#6b1176]'
                                   }`}
                                 >
                                     {metadata.icon}
@@ -1159,7 +1196,7 @@ export default function AlertSetting() {
                                   <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0">
                                       <h3 className={`font-semibold text-sm ${isAlertEnabled ? 'text-gray-900' : 'text-gray-500'}`}>
-                                        {displayLabel}
+                                        {r.kpi_name === KPI_NAMES.IVF_LN2_LEVEL ? 'LN2' : displayLabel}
                                       </h3>
                                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
                                         {metadata.description}
@@ -1211,7 +1248,7 @@ export default function AlertSetting() {
                                   )}
 
                                   {/* Inputs Row */}
-                                  <div className="flex items-center gap-3 mt-3">
+                                  <div className="flex items-center gap-3 mt-4">
                                     {/* Lid State - special select input */}
                                     {inputType === 'lid_state' ? (
                                       <div className="flex items-center gap-2">
@@ -1231,7 +1268,7 @@ export default function AlertSetting() {
                                           ))}
                                         </select>
                                       </div>
-                                    ) : inputType === 'battery' ? (
+                                    ) : inputType === 'battery' || r.kpi_name === KPI_NAMES.IVF_LN2_LEVEL ? (
                                       /* Battery - only min input, max is always 100 */
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-500">Alert below</span>
@@ -1246,7 +1283,7 @@ export default function AlertSetting() {
                                             let v = e.target.value === '' ? null : Number(e.target.value);
                                             if (v !== null && v < 0) v = 0;
                                             if (v !== null && v > 100) v = 100;
-                                            setDraft(r.id, { min: v });
+                                            setDraft(r.id, { min: v, ...(r.kpi_name === KPI_NAMES.IVF_LN2_LEVEL ? { max: null } : {}) });
                                           }}
                                           onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
                                           placeholder="Min"
@@ -1332,21 +1369,160 @@ export default function AlertSetting() {
                               </div>
                             </div>
                           );
-                        })
+                        })}
+                        {missingKpiNames.map((kpiName) => {
+                          const d = getMultiDraft(kpiName);
+                          const minVal = d.min ?? null;
+                          const maxVal = d.max ?? null;
+                          const typeVal = d.alert_type ?? null;
+                          const lidStateVal = d.lid_state ?? '';
+                          const metadata = getKpiMetadata(kpiName);
+                          const inputType = getKpiInputType(kpiName);
+                          const kpiKey = `single-missing-${kpiName}`;
+                          const refs = getInputRefs(kpiKey);
+                          const canEnableAlert = isAlertTypeEnabled(kpiName, minVal, maxVal, lidStateVal);
+
+                          return (
+                            <div key={`missing-${kpiName}`} className="relative rounded-xl border-2 border-gray-200 bg-gray-50/30 p-5 transition-all duration-200">
+                              <div className="flex items-center gap-4">
+                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                                  {metadata.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <h3 className="font-semibold text-sm text-gray-500">
+                                        {kpiName === KPI_NAMES.IVF_LN2_LEVEL ? 'LN2' : metadata.label}
+                                      </h3>
+                                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{metadata.description}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
+                                        <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                                          <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                                        </svg>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                        </div>
+                                      </div>
+                                      <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700">
+                                        Unset
+                                      </span>
+                                      {(minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== '') && (
+                                        <button
+                                          type="button"
+                                          onClick={() => clearMultiDraft(kpiName)}
+                                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                                          title="Clear configuration"
+                                        >
+                                          <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 mt-4">
+                                {inputType === 'lid_state' ? (
+                                  <select
+                                    ref={(el) => { refs.min = el; }}
+                                    value={lidStateVal}
+                                    onChange={(e) => setMultiDraft(kpiName, { lid_state: e.target.value })}
+                                    onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
+                                    className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                  >
+                                    {LID_STATE_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                ) : inputType === 'battery' || kpiName === KPI_NAMES.IVF_LN2_LEVEL ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">Alert below</span>
+                                    <input
+                                      ref={(el) => { refs.min = el; }}
+                                      type="number"
+                                      step="any"
+                                      min={0}
+                                      max={100}
+                                      value={minVal != null ? minVal : ''}
+                                      onChange={(e) => {
+                                        let v = e.target.value === '' ? null : Number(e.target.value);
+                                        if (v !== null && v < 0) v = 0;
+                                        if (v !== null && v > 100) v = 100;
+                                        setMultiDraft(kpiName, { min: v, ...(kpiName === KPI_NAMES.IVF_LN2_LEVEL ? { max: null } : {}) });
+                                      }}
+                                      onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                      placeholder="Min"
+                                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                    />
+                                    {metadata.unit && <span className="text-xs text-gray-400">{metadata.unit}</span>}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <input
+                                      ref={(el) => { refs.min = el; }}
+                                      type="number"
+                                      step="any"
+                                      min={inputType === 'percentage' ? 0 : undefined}
+                                      value={minVal != null ? minVal : ''}
+                                      onChange={(e) => {
+                                        let v = e.target.value === '' ? null : Number(e.target.value);
+                                        if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                        setMultiDraft(kpiName, { min: v });
+                                      }}
+                                      onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                      placeholder="Min"
+                                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                    />
+                                    <input
+                                      ref={(el) => { refs.max = el; }}
+                                      type="number"
+                                      step="any"
+                                      min={inputType === 'percentage' ? 0 : undefined}
+                                      value={maxVal != null ? maxVal : ''}
+                                      onChange={(e) => {
+                                        let v = e.target.value === '' ? null : Number(e.target.value);
+                                        if (inputType === 'percentage' && v !== null && v < 0) v = 0;
+                                        setMultiDraft(kpiName, { max: v });
+                                      }}
+                                      onKeyDown={(e) => handleKeyDown(e, kpiKey, 'max')}
+                                      placeholder="Max"
+                                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                    />
+                                    {metadata.unit && <span className="text-xs text-gray-400">{metadata.unit}</span>}
+                                  </>
+                                )}
+                                <select
+                                  ref={(el) => { refs.alertType = el; }}
+                                  value={typeVal ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value === '' ? null : e.target.value;
+                                    setMultiDraft(kpiName, { alert_type: v });
+                                  }}
+                                  disabled={!canEnableAlert}
+                                  className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
+                                    !canEnableAlert
+                                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      : 'border-gray-200 bg-white text-gray-700'
+                                  }`}
+                                >
+                                  {alertTypeOptions.map((opt) => (
+                                    <option key={opt.label} value={opt.value ?? ''}>{opt.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        </>
                       )}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex justify-end">
-                      {!(saveAllLoading ||
-                          (selectedContainers.length > 1 || configList.length === 0
-                            ? Object.keys(multiDraftConfig).length === 0
-                            : Object.keys(draftConfig).length === 0)) && <button
+                      {!(saveAllLoading || !hasPendingChanges) && <button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={
-                          saveAllLoading ||
-                          (selectedContainers.length > 1 || configList.length === 0
-                            ? Object.keys(multiDraftConfig).length === 0
-                            : Object.keys(draftConfig).length === 0)
+                          saveAllLoading || !hasPendingChanges
                         }
                         className="px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >

@@ -246,8 +246,13 @@ export default function Dashboard({ }: DashboardProps) {
   // Use the maximum of WebSocket count and API count to ensure accuracy
   // This handles cases where WebSocket might not be connected yet or API has more recent data
   const stakeholderChatCount = Math.max(wsUnreadCount || 0, apiUnreadCount || 0);
-  const criticalAlertsCount = criticalAlerts.length; // Show total alerts count
-  const myTasksCount = myTasks.length; // Show total tasks count
+  const criticalAlertsCount = criticalAlerts.filter((alert) => {
+    if ('acknowledged_at' in alert) {
+      return alert.acknowledged_at == null && alert.status === 'Active';
+    }
+    return alert.status === 'Active';
+  }).length;
+  const myTasksCount = myTasks.filter(task => task.status === 'Not started' || task.status === 'In progress').length;
 
   // Format count for display (show "9+" for counts > 9)
   const formatCount = (count: number): string => {
@@ -1943,5 +1948,4 @@ export default function Dashboard({ }: DashboardProps) {
     </div>
   );
 }
-
 

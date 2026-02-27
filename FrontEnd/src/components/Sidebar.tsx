@@ -12,6 +12,8 @@ import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
 import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
 import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
+import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
+import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 
 interface SidebarProps {
@@ -78,8 +80,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
     { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
-    { icon: DatabaseIconWhite, label: "Pending approvals", path: "/approval" },
-    { icon: DatabaseIconWhite, label: "Alert Configuration", path: "/alert-setting" }
+    { icon: MyTasksIcon, label: "Pending approvals", path: "/approval" },
+    { icon: CriticalAlertsIcon, label: "Alert Configuration", path: "/alert-setting" }
   ];
 
   // Filter nav by role/department: Database hidden for IVF; Control Tower hidden for IVF User; Pending approvals only for Admin/Pharma_admin; Alert Setting only for IVF Manager/Admin
@@ -150,11 +152,12 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             if (item.label === "Control Tower") {
               return isActive ? ControlTowerIconDark : ControlTowerIconWhite;
             }
-            if (item.label === "Pending approvals" || item.label === "Alert Configuration") {
-              return isActive ? DatabaseIconDark : DatabaseIconWhite;
-            }
             return item.icon;
           })();
+          const iconStyle =
+            (item.label === "Pending approvals" || item.label === "Alert Configuration") && !isActive
+              ? { filter: "brightness(0) saturate(100%) invert(100%)" }
+              : undefined;
           return (
             <button
               key={index}
@@ -163,7 +166,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
               }`}
             >
-              <img className="w-5 h-5" alt={`${item.label} icon`} src={iconSrc} />
+              <img className="w-5 h-5" alt={`${item.label} icon`} src={iconSrc} style={iconStyle} />
               <span
                 className={`font-semibold text-sm ${
                   isActive ? "text-[#6b1176]" : "text-white"

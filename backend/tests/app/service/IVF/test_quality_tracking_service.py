@@ -476,8 +476,8 @@ def test_update_cryolock_color_success(quality_tracking_service, db_session):
     
     mock_cryolock = Mock()
     mock_cryolock.cryolock_id = 1
-    mock_cryolock.cryolock_number = "CL1"
-    mock_cryolock.cryolock_color = "red"
+    mock_cryolock.crylock_number = "CL1"
+    mock_cryolock.crylock_color = "red"
     
     query = MagicMock()
     query.join.return_value = query
@@ -490,7 +490,7 @@ def test_update_cryolock_color_success(quality_tracking_service, db_session):
     
     result = quality_tracking_service.update_cryolock_color(1, color_update)
     
-    assert mock_cryolock.cryolock_color == "blue"
+    assert mock_cryolock.crylock_color == "blue"
     db_session.commit.assert_called_once()
     assert isinstance(result, ColorUpdateResponse)
     assert result.updated_color == "blue"
@@ -525,7 +525,7 @@ def test_update_goblet_color_success(quality_tracking_service, db_session):
     
     mock_cryolock = Mock()
     mock_cryolock.cryolock_id = 1
-    mock_cryolock.cryolock_number = "CL1"
+    mock_cryolock.crylock_number = "CL1"
     mock_cryolock.goblet_color = "red"
     
     query = MagicMock()
