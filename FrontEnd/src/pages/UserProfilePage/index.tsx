@@ -152,8 +152,8 @@ const UserProfilePage: React.FC = () => {
       setTicketsError(null);
       setLoadingTickets(true);
  
-      const isAdmin = role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin';
-      const ticketPromise = isAdmin
+      const isMygrapeAdmin = role?.toLowerCase() === 'mygrape_admin';
+      const ticketPromise = isMygrapeAdmin
         ? feedbackApi.getAllFeedbackTickets()
         : feedbackApi.getUserTickets(uid);
  
@@ -511,32 +511,25 @@ const UserProfilePage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
-            {/* Only show Submit New Request button for non-admin users */}
-            {!(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') ? (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={handleSubmitRequest}
-                  className="px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
-                >
-                  Submit New Request
-                </button>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500 italic">
-                Admin view - Viewing all system tickets
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleSubmitRequest}
+                className="px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
+              >
+                Submit New Request
+              </button>
+            </div>
           </div>
  
           <div>
             <div className="flex items-center justify-between mb-4 pl-2">
               <h3 className="text-lg font-bold text-gray-700">
-                {role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin'
+                {role?.toLowerCase() === 'mygrape_admin'
                   ? 'All Tickets & Feedback'
                   : 'My Tickets & Feedback'
                 }
               </h3>
-              {(role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'mygrape_admin') && (
+              {role?.toLowerCase() === 'mygrape_admin' && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                   <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clipRule="evenodd" />
