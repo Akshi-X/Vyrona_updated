@@ -7,7 +7,7 @@ import threading
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
-from anyio import current_time
+
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -405,14 +405,19 @@ class CriticalAlertService:
             last_alert = self.db.query(CriticalAlert).filter(
                 CriticalAlert.tank_id == tank_id,
                 CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
-                CriticalAlert.dedup_key.like(f":{kpi_config.id}%"),
+                CriticalAlert.dedup_key.like(f"%:{kpi_config.id}"),
                 CriticalAlert.status != AlertStatus.ACKNOWLEDGED.value
             ).order_by(CriticalAlert.created_at.desc()).first()
             
-            if last_alert and (current_time() - last_alert.created_at).total_seconds() < 3600:  # 1 hour in seconds
-                logger.info("Skipping alert creation for kpi_config_id=%s as last alert was created within 1 hour", kpi_config.id)
-                deviation.checked = True
-                continue
+            now = datetime.now(timezone.utc)
+            # Ensure timezone-aware comparison
+            if last_alert and last_alert.created_at:
+                created_at = last_alert.created_at if last_alert.created_at.tzinfo else last_alert.created_at.replace(tzinfo=timezone.utc)
+                if (now - created_at).total_seconds() < 3600:  # 1 hour in seconds
+                    logger.info("Skipping alert creation for kpi_config_id=%s as last alert was created within 1 hour", kpi_config.id)
+                    deviation.checked = True
+                    checked_kpi_configs.append(kpi_config.id)
+                    continue
 
             tank_code = self.db.query(Tank.tank_code).filter(Tank.tank_id == tank_id).scalar()
             branch_name = self.db.query(HospitalBranch.branch_name).filter(HospitalBranch.branch_id == deviation.branch_id).scalar()
@@ -421,8 +426,8 @@ class CriticalAlertService:
                     tank_id=tank_id,
                     alert_type=AlertType.DEVIATION_ALERT,
                     source=AlertSource.KPI,
-                    severity=AlertSeverity.LOW if kpi_config.alert_type == "soft_alert" else AlertSeverity.HIGH,
-                    message=f'{kpi_config.alert_name} is deviated to {deviation.kpi_value} in {branch_name} branch for {tank_code} tank',
+                    severity=AlertSeverity.LOW if kpi_config.alert_type == "soft" else AlertSeverity.HIGH,
+                    message=f'{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank',
                     occurred_at=deviation.timestamp,
                     triggered_by=AlertTriggeredBy.SYSTEM,
                     extra_info=str(kpi_config.id)  # Include kpi_config_id in dedup_key for better tracking
@@ -431,7 +436,7 @@ class CriticalAlertService:
             alert.branch_id = deviation.branch_id  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
 
-            if kpi_config.alert_type == "critical_alert":
+            if kpi_config.alert_type == "critical":
                 self._send_alert_email(alert)
             
             deviation.alert_id = alert.alert_id
@@ -640,7 +645,7 @@ class CriticalAlertService:
                             alert_refreshed = bg_db.query(CriticalAlert).filter(
                                 CriticalAlert.alert_id == alert.alert_id
                             ).first()
-                            if alert_refreshed:
+                            if alert_refreshed and alert_refreshed.severity == AlertSeverity.HIGH.value:
                                 self._send_alert_email(alert_refreshed)
                         except Exception as e:
                             logger.error(f"Failed to send alert email for alert_id={alert.alert_id}: {str(e)}")
@@ -655,24 +660,26 @@ class CriticalAlertService:
         return alerts_created
     
     def _send_alert_email(self, alert: CriticalAlert):
-        """Send email notification for alert with acknowledge button (tank-level monitoring)"""
+        """Send email notification for critical (High severity) alerts only.
+        Recipients: all Managers across the hospital + Users in the tank's branch."""
+        # Only send emails for critical (High severity) alerts
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(f"Skipping email for non-critical alert_id={alert.alert_id} (severity={alert.severity})")
+            return
+        
         # Get tank directly (tank-level monitoring)
         tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
         if not tank:
             return
         
         # Get branch and hospital info
-        
         branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
         if not branch:
             return
         
-        # Get users to notify
-        # Manager: all users in all branches of the hospital
-        # User: all users in the same branch
         hospital_id = branch.hospital_id
         
-        # Get all branches for the hospital
+        # Get all branches for the hospital (needed to find all managers)
         all_branches = (
             self.db.query(HospitalBranch)
             .filter(HospitalBranch.hospital_id == hospital_id)
@@ -680,25 +687,25 @@ class CriticalAlertService:
         )
         branch_ids = [b.branch_id for b in all_branches]
         
-        # Get users to notify
-        # For Manager role: all users in all branches
-        # For User role: all users in the specific branch
-        users_to_notify = (
+        # All Managers across every branch of the hospital
+        managers = (
             self.db.query(User)
             .filter(
                 User.department == "IVF",
+                User.role == "Manager",
                 User.branch_id.in_(branch_ids),
-                User.status == True,  # Active users only
+                User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED
             )
             .all()
         )
         
-        # Also include branch-specific users
+        # Users (non-manager) in the tank's branch only
         branch_users = (
             self.db.query(User)
             .filter(
                 User.department == "IVF",
+                User.role == "User",
                 User.branch_id == tank.branch_id,
                 User.status == True,
                 User.approved_status == ApprovalStatus.APPROVED
@@ -707,7 +714,7 @@ class CriticalAlertService:
         )
         
         # Combine and deduplicate
-        all_users = {user.user_id: user for user in users_to_notify + branch_users}.values()
+        all_users = {user.user_id: user for user in managers + branch_users}.values()
         
         # Send email to each user
         # Navigate to dashboard with alert_id query param - Dashboard will open alerts modal automatically
