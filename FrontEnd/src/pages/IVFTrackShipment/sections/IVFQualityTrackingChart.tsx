@@ -164,7 +164,7 @@ const formatTimeLabel = (timestamp: string): string => {
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {
   const k = reading.kpis.find((x) => x.name === kpiName);
   if (k == null || typeof k.value !== 'number' || isNaN(k.value)) return null;
-  if (kpiName === 'lid_status') {
+  if (kpiName === 'lid_state') {
     // Enforce binary display: 0 = Close, 1 = Open.
     return k.value >= 1 ? 1 : 0;
   }
@@ -272,9 +272,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           'temp_external',
           'temp_internal',
           'ln2_level',
-          'evaporation_rate',
-          'battery_level',
-          'lid_status',
+          'ln2_evaporation_rate',
+          'tive_battery_level',
+          'lid_state',
           'shock',
         ];
         const keys = Object.keys(res.kpi_limits).sort(
@@ -465,8 +465,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 { name: 'temp_external', value: parsed.temp_external ?? parsed.frequency_results?.temp_external ?? 0, unit: '°C' },
                 { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal ?? 0, unit: '°C' },
                 { name: 'ln2_level', value: parsed.ln2_level ?? 0, unit: '%' },
-                { name: 'evaporation_rate', value: parsed.evaporation_rate ?? 0, unit: 'kg/day' },
-                { name: 'battery_level', value: parsed.battery_percentage ?? 0, unit: '%' },
+                { name: 'ln2_evaporation_rate', value: parsed.ln2_evaporation_rate ?? 0, unit: 'kg/day' },
+                { name: 'tive_battery_level', value: parsed.tive_battery_percentage ?? 0, unit: '%' },
               ];
               const reading: KpiReading = {
                 tank_id: parsed.tank_id ?? 0,
@@ -651,7 +651,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const v = context.parsed?.y;
               if (v == null) return '';
               const label = context.dataset.label || '';
-              if (activeTab === 'lid_status') {
+              if (activeTab === 'lid_state') {
                 return `${label}: ${v >= 1 ? 'Open (1)' : 'Close (0)'}`;
               }
               return `${label}: ${typeof v === 'number' ? (Math.round(v * 100) / 100).toFixed(2) : v}`;
@@ -669,15 +669,15 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         },
         y: {
           // Keep binary ticks at 0/1, but add headroom for visual breathing space.
-          min: activeTab === 'lid_status' ? -0.2 : (minY != null ? minY - padding : undefined),
-          max: activeTab === 'lid_status' ? 1.2 : (maxY != null ? maxY + padding : undefined),
+          min: activeTab === 'lid_state' ? -0.2 : (minY != null ? minY - padding : undefined),
+          max: activeTab === 'lid_state' ? 1.2 : (maxY != null ? maxY + padding : undefined),
           grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
           ticks: {
             color: '#6B6B6B',
             font: { size: 10 },
-            stepSize: activeTab === 'lid_status' ? 1 : undefined,
+            stepSize: activeTab === 'lid_state' ? 1 : undefined,
             callback: (value: string | number) => {
-              if (activeTab !== 'lid_status') {
+              if (activeTab !== 'lid_state') {
                 const numericValue = Number(value);
                 if (!Number.isFinite(numericValue)) return String(value);
                 // Avoid float artifacts like 0.45000000000000007.
