@@ -447,6 +447,67 @@ class IVFDashboardService:
         
         return results
 
+    def get_deviations_graph_all_branches(
+        self,
+        hospital_id: Optional[int] = None,
+        role: Optional[str] = None,
+    ) -> Dict:
+        query = text("""
+        WITH branch_list AS (
+            SELECT
+                b.branch_id,
+                b.branch_name
+            FROM
+                hospital_branches b
+            WHERE
+                b.hospital_id = :hospital_id
+        ),
+        alert_list AS (
+            SELECT DISTINCT
+                k.alert_name
+            FROM
+                kpi_config k
+            WHERE
+                k.hospital_id = :hospital_id
+                AND k.alert_name IS NOT NULL
+        ),
+        deviation_counts AS (
+            SELECT
+                t.branch_id,
+                k.alert_name,
+                COUNT(r.id) AS deviation_count
+            FROM
+                readings r
+            JOIN
+                kpi_config k ON r.kpi_config_id = k.id
+            JOIN
+                tanks t ON r.tank_id = t.tank_id
+            WHERE
+                r.deviation = TRUE
+                AND r.hospital_id = :hospital_id
+            GROUP BY
+                t.branch_id, k.alert_name
+        )
+        SELECT
+            bl.branch_name,
+            al.alert_name,
+            COALESCE(dc.deviation_count, 0) AS deviation_count
+        FROM
+            branch_list bl
+        CROSS JOIN
+            alert_list al
+        LEFT JOIN
+            deviation_counts dc
+            ON dc.branch_id = bl.branch_id
+            AND dc.alert_name = al.alert_name
+        ORDER BY
+            bl.branch_name, al.alert_name;
+        """)
+
+        results = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
+        return results
+
+        
     def get_deviations_graph(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get deviations graph data for IVF dashboard.
