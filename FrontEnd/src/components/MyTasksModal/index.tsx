@@ -20,7 +20,7 @@ export interface MyTask {
   assignedTo: string;
   dueDate: string;
   priority: 'Low' | 'Medium' | 'High';
-  status: 'Not started' | 'In progress' | 'Done';
+  status: 'Not started' | 'In progress' | 'Done' | 'Cancelled';
 }
 
 interface MyTasksModalProps {
@@ -70,7 +70,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     assigneeId: '', // User ID for API
     dueDate: '',
     priority: 'Medium' as 'Low' | 'Medium' | 'High',
-    status: 'Not started' as 'Not started' | 'In progress' | 'Done'
+    status: 'Not started' as 'Not started' | 'In progress' | 'Done' | 'Cancelled'
   });
   const [editedTask, setEditedTask] = useState<MyTask | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -387,7 +387,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const uniqueAssignedBy = Array.from(new Set(tasksArray.map(t => t.assigneeBy).filter(Boolean))).sort();
   const uniqueAssignedTo = Array.from(new Set(tasksArray.map(t => t.assignedTo).filter(Boolean))).sort();
   const priorities: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
-  const statuses: ('Not started' | 'In progress' | 'Done')[] = ['Not started', 'In progress', 'Done'];
+  const statuses: ('Not started' | 'In progress' | 'Done' | 'Cancelled')[] = ['Not started', 'In progress', 'Done', 'Cancelled'];
 
   // Helper function to check if task is created by current user
   const isTaskCreatedByMe = (task: MyTask): boolean => {
@@ -408,7 +408,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   const getEditableFields = (task: MyTask): Set<string> => {
     if (isTaskCreatedByMe(task)) {
       // Creator can edit all fields except "Assigned by" and "Patient ID"
-      return new Set(['taskName', 'description', 'assignedTo', 'dueDate', 'priority', 'status']);
+      return new Set(['status']);
     } else if (isTaskAssignedToMe(task)) {
       // Assignee can only edit status
       return new Set(['status']);
@@ -1108,7 +1108,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                       <select
                         value={displayTask.status}
                         onChange={(e) => {
-                          const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done';
+                          const newStatus = e.target.value as 'Not started' | 'In progress' | 'Done' | 'Cancelled';
                           handleEditInputChange('status', newStatus);
                         }}
                         className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
@@ -1128,6 +1128,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         <option value="Not started" style={{ backgroundColor: '#f3f4f6', color: '#1f2937' }}>Not started</option>
                         <option value="In progress" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>In progress</option>
                         <option value="Done" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Done</option>
+                        <option value="Cancelled" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>Cancelled</option>
                       </select>
                     </div>
                   ) : (
