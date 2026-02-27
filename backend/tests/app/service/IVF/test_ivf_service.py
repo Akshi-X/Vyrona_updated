@@ -216,14 +216,12 @@ def test_get_active_tanks_no_branch_filter(ivf_service, db_session, mock_tank):
     # Mock branch
     branch_id = 1
     branch_name = "Test Branch"
-    
-    # Mock query result
-    query = MagicMock()
-    query.join.return_value = query
-    query.filter.return_value = query
-    query.all.return_value = [(mock_tank, branch_id, branch_name)]
-    
-    db_session.query.return_value = query
+    mock_tank.updated_at = datetime(2026, 2, 26, 10, 30, 0)
+    mock_tank.created_at = datetime(2026, 2, 26, 9, 0, 0)
+
+    db_session.execute.return_value.fetchall.return_value = [
+        (mock_tank, branch_id, branch_name, 0, None, None)
+    ]
     
     result = ivf_service.get_active_tanks()
     
@@ -231,53 +229,51 @@ def test_get_active_tanks_no_branch_filter(ivf_service, db_session, mock_tank):
     assert "total" in result
     assert result["total"] == 1
     assert len(result["branches"]) == 1
+    assert result["branches"][0]["tanks"][0]["updated_at"] is None
 
 
 def test_get_active_tanks_with_branch_filter(ivf_service, db_session, mock_tank):
     """Test getting active tanks with branch filter"""
     branch_id = 1
     branch_name = "Test Branch"
-    
-    query = MagicMock()
-    query.join.return_value = query
-    query.filter.return_value = query
-    query.all.return_value = [(mock_tank, branch_id, branch_name)]
-    
-    db_session.query.return_value = query
+    mock_tank.updated_at = datetime(2026, 2, 26, 10, 30, 0)
+    mock_tank.created_at = datetime(2026, 2, 26, 9, 0, 0)
+
+    db_session.execute.return_value.fetchall.return_value = [
+        (mock_tank, branch_id, branch_name, 0, None, None)
+    ]
     
     result = ivf_service.get_active_tanks(branch_name="Test Branch")
     
     assert result["total"] == 1
     assert len(result["branches"]) == 1
+    assert result["branches"][0]["tanks"][0]["updated_at"] is None
 
 
 def test_get_active_tanks_with_refill_log(ivf_service, db_session, mock_tank):
     """Test getting active tanks with refill log"""
     branch_id = 1
     branch_name = "Test Branch"
-    
-    query = MagicMock()
-    query.join.return_value = query
-    query.filter.return_value = query
-    query.all.return_value = [(mock_tank, branch_id, branch_name)]
-    
-    db_session.query.return_value = query
+    mock_tank.updated_at = datetime(2026, 2, 26, 10, 30, 0)
+    mock_tank.created_at = datetime(2026, 2, 26, 9, 0, 0)
+    latest_refill_date = date(2026, 2, 25)
+    latest_refill_time = time(8, 45, 0)
+
+    db_session.execute.return_value.fetchall.return_value = [
+        (mock_tank, branch_id, branch_name, 0, latest_refill_date, latest_refill_time)
+    ]
     
     result = ivf_service.get_active_tanks()
     
     assert result["total"] == 1
     assert len(result["branches"]) == 1
     assert result["branches"][0]["tanks"][0]["updated_at"] is not None
+    assert result["branches"][0]["tanks"][0]["updated_at"].date() == latest_refill_date
 
 
 def test_get_active_tanks_empty_results(ivf_service, db_session):
     """Test getting active tanks when no tanks exist"""
-    query = MagicMock()
-    query.join.return_value = query
-    query.filter.return_value = query
-    query.all.return_value = []
-    
-    db_session.query.return_value = query
+    db_session.execute.return_value.fetchall.return_value = []
     
     result = ivf_service.get_active_tanks()
     

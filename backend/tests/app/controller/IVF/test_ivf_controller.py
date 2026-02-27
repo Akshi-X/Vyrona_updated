@@ -140,9 +140,11 @@ def test_get_active_canisters_success(app, monkeypatch):
                 "branch_name": "Test Branch",
                 "tanks": [
                     {
+                        "tank_id": 1,
                         "tank_code": "T1",
                         "status": "safe",
-                        "updated_at": "2024-01-15T10:30:00Z"
+                        "updated_at": "2024-01-15T10:30:00Z",
+                        "deviations": 0
                     }
                 ]
             }

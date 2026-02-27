@@ -76,6 +76,50 @@ const toValidLatLng = (latitude: unknown, longitude: unknown): google.maps.LatLn
   return { lat, lng };
 };
 
+const normalizeBranchName = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+const normalizeTankStatus = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+const toDeviationCount = (value: unknown): number => {
+  const count = Number(value);
+  return Number.isFinite(count) ? count : 0;
+};
+
+const aggregateBranchStatusFromTanks = (tanks: any[]): string => {
+  const hasDeviation = (tanks || []).some((tank) => toDeviationCount(tank?.deviations) > 0);
+  if (hasDeviation) return 'critical';
+
+  const normalizedStatuses = new Set(
+    (tanks || []).map((tank) =>
+      normalizeTankStatus(tank?.status ?? tank?.canister_status),
+    ),
+  );
+
+  if (normalizedStatuses.has('critical')) return 'critical';
+  if (normalizedStatuses.has('risk')) return 'risk';
+  return 'safe';
+};
+
+const getBranchStatusMapFromActiveCanisters = (payload: any): Map<string, string> => {
+  const statusMap = new Map<string, string>();
+  const branches = Array.isArray(payload?.branches) ? payload.branches : [];
+
+  branches.forEach((branch: any) => {
+    const branchKey = normalizeBranchName(branch?.branch_name);
+    if (!branchKey) return;
+
+    const tanks = Array.isArray(branch?.tanks)
+      ? branch.tanks
+      : Array.isArray(branch?.canisters)
+        ? branch.canisters
+        : [];
+
+    statusMap.set(branchKey, aggregateBranchStatusFromTanks(tanks));
+  });
+
+  return statusMap;
+};
+
 const darkWorldStyle: google.maps.MapTypeStyle[] = [
 
   // Continents (land) solid black
@@ -204,7 +248,24 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
       // Fetch IVF Control Tower data for inbound
       (async () => {
         try {
-          const data = await shipmentService.getIVFControlTower();
+          const [controlTowerResult, activeCanistersResult] = await Promise.allSettled([
+            shipmentService.getIVFControlTower(),
+            shipmentService.getActiveCanisters(),
+          ]);
+
+          if (controlTowerResult.status !== 'fulfilled') {
+            throw controlTowerResult.reason;
+          }
+
+          const data = controlTowerResult.value;
+          const branchStatusByName = activeCanistersResult.status === 'fulfilled'
+            ? getBranchStatusMapFromActiveCanisters(activeCanistersResult.value)
+            : new Map<string, string>();
+
+          if (activeCanistersResult.status === 'rejected') {
+            console.warn('Failed to load IVF active canisters for branch status override:', (activeCanistersResult as PromiseRejectedResult).reason?.message);
+          }
+
           if (mounted && data.states) {
             // Extract highest branch count country
             const highestCountry = data.highest_branch_count_country || null;
@@ -219,8 +280,12 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                   branch?.geoLocation?.longitude,
                 );
                 if (!validLocation) return;
+                const branchStatusOverride = branchStatusByName.get(
+                  normalizeBranchName(branch?.branch_name),
+                );
                 branches.push({
                   ...branch,
+                  branch_status: branchStatusOverride || branch?.branch_status || 'safe',
                   geoLocation: {
                     latitude: validLocation.lat,
                     longitude: validLocation.lng,
