@@ -5,34 +5,26 @@ class KPI_ALERTS:
 
     def check_deviation_from_thresholds(kpi_value, kpi_configs: list[dict])-> list[str,int,str]:
         """Check if a KPI value deviates from its configured thresholds and determine alert level also return if alert is active based on the status in the config."""
-        alert_level = None
+        alert_level = KPI_ALERTS.NO_ALERT
         kpi_config_id = None
         send_alert = None
 
         for config in kpi_configs:
-            min_threshold = config.get("min")
-            max_threshold = config.get("max")
+            min_threshold = float(config.get("min")) if config.get("min") is not None else None
+            max_threshold = float(config.get("max")) if config.get("max") is not None else None
             alert = config.get("alert_type") # This is will be either "soft_alert" or "critical_alert" based on how the KPI config is set up in the database
             status = config.get("status")
 
             #Check if the value deviates from the range (min<=value<=max) 
-            #If there is deviation and is the alert_level is None then set to the alert type defined in the config (can be either soft or critical)
+            #If there is deviation and is the alert_level is NO_ALERT then set to the alert type defined in the config (can be either soft or critical)
             #If there is deviation and alert level is already soft alert and the alert type defined in the config is critical alert then upgrade the alert level to critical alert.
-            if alert_level is None:
-                if min_threshold is not None and kpi_value < min_threshold:
+            if alert_level == KPI_ALERTS.NO_ALERT:
+                if (min_threshold is not None and kpi_value < min_threshold) or (max_threshold is not None and kpi_value > max_threshold):
                     alert_level = alert 
-                    kpi_config_id = config.get("id")
-                    send_alert = status
-                if max_threshold is not None and kpi_value > max_threshold:
-                    alert_level = alert
                     kpi_config_id = config.get("id")
                     send_alert = status
             elif alert_level == KPI_ALERTS.SOFT_ALERT and alert == KPI_ALERTS.CRITICAL_ALERT:
-                if min_threshold is not None and kpi_value < min_threshold:
-                    alert_level = alert 
-                    kpi_config_id = config.get("id")
-                    send_alert = status
-                if max_threshold is not None and kpi_value > max_threshold:
+                if (min_threshold is not None and kpi_value < min_threshold) or (max_threshold is not None and kpi_value > max_threshold):
                     alert_level = alert
                     kpi_config_id = config.get("id")
                     send_alert = status
