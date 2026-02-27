@@ -226,8 +226,20 @@ def get_deviations_graph(
     - Manager/Admin (IVF): Cumulative deviations per site with top deviation type
     """
     try:
+        branch_id, role = get_dashboard_branch_filter(request)
+        role_normalized = role.title() if role else None
         service = IVFDashboardService(db)
-        result = service.get_branch_deviations(hospital_id=request.state.current_user.hospital_id)
+        if role_normalized == "User":
+            result = service.get_branch_deviations(
+                hospital_id=request.state.current_user.hospital_id,
+                branch_id=branch_id,
+                role=role,
+            )
+        else:
+            result = service.get_deviations_graph_all_branches(
+                hospital_id=request.state.current_user.hospital_id,
+                role=role,
+            )
         
         return result
     except HTTPException:
