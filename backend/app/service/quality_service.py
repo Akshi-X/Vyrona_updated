@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from fastapi.responses import Response
 
@@ -784,6 +784,69 @@ class QualityService:
                     self.db.flush()
                     created += 1
         return {"updated": updated, "created": created}
+
+    def get_last_n_readings_per_kpi(self, tank_id: int, n: int):
+        db = self.db
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=Readings.kpi_config_id,
+                order_by=Readings.timestamp.desc()
+            )
+            .label("rn")
+        )
+
+        subquery = (
+            db.query(
+                Readings.id,
+                row_number
+            )
+            .filter(Readings.tank_id == tank_id)
+            .subquery()
+        )
+
+        valid_ids = (
+            db.query(subquery.c.id)
+            .filter(subquery.c.rn <= n)
+            .subquery()
+        )
+
+        results = (
+            db.query(
+                Readings.kpi_config_id,
+                Readings.kpi_value,
+                Readings.timestamp,
+                KpiConfig.name,
+                KpiConfig.unit,
+                Tank.tank_id,
+                Tank.tank_code,
+            )
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .join(Tank, Readings.tank_id == Tank.tank_id)
+            .filter(Readings.id.in_(valid_ids))
+            .order_by(Readings.kpi_config_id, Readings.timestamp.desc())
+            .all()
+        )
+
+        if not results:
+            return None
+
+        # Shape the response
+        kpis = defaultdict(list)
+        tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
+
+        for row in results:
+            kpis[row.kpi_config_id].append({
+                "name": row.name,
+                "value": float(row.kpi_value),
+                "unit": row.unit,
+                "timestamp": row.timestamp,
+            })
+
+        return {
+            **tank_info,
+            "kpis": [reading for readings in kpis.values() for reading in readings]  # list of lists, each inner list = N readings for a KPI
+        }
 
     def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
         """
