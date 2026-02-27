@@ -183,6 +183,7 @@ def get_tank_kpi_history(
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
+    
     # Prefer Redis (live buffer), then DB (readings table)
     history = quality_service.get_tank_kpi_redis_history(tank_id, limit=limit)
     if not history:
