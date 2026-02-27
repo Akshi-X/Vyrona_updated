@@ -416,12 +416,12 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         <div className="flex flex-col gap-3 justify-start pt-6">
           <KpiTile
             icon={<LockIcon className="text-[#6B1176]" />}
-            label="Lid Status"
+            label="Lid State"
             value={lidLabel}
           />
           <KpiTile
             icon={<ThermometerIcon className="text-[#6B1176]" />}
-            label="Internal Temp"
+            label="Internal Temperature"
             value={formatTemp(tempInternal)}
           />
         </div>
@@ -572,7 +572,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               opacity="0.7"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
-              LN2 Level
+              LN2
             </text>
           </svg>
         </div>
@@ -581,17 +581,17 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         <div className="flex flex-col gap-3 pt-6">
           <KpiTile
             icon={<SunIcon className="text-[#6B1176]" />}
-            label="External Temp"
+            label="External Temperature"
             value={formatTemp(tempExternal)}
           />
           <KpiTile
             icon={<EvaporationIcon className="text-[#6B1176]" />}
-            label="LN2 Evaporation Rate"
+            label="Evaporation Rate"
             value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
           />
           <KpiTile
             icon={<ShockIcon className="text-[#6B1176]" />}
-            label="Shock"
+            label="Shock Detection"
             value={shock != null ? String(shock) : '—'}
           />
         </div>
