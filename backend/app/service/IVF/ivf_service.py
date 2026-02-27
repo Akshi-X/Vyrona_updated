@@ -1022,9 +1022,7 @@ class IVFService:
                 goblet_q = goblet_q.filter(PatientCrylockInfo.branch_id == branch_id)
             goblet_rows = goblet_q.group_by(PatientCrylockInfo.goblet_color).all()
             goblet_colors = sorted([r[0] for r in goblet_rows if r[0]])
-            goblet_color_counts = {r[0]: r[1] for r in goblet_rows if r[0]}
-
-            # Cryolock colors: filter by branch_name, status, goblet
+            goblet_color_counts = {r[0]: r[1] for r in goblet_rows if r[0]}            # Cryolock colors: filter by branch_name, status, goblet
             crylock_q = (
                 self.db.query(PatientCrylockInfo.crylock_color, func.count(PatientCrylockInfo.id).label("cnt"))
                 .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)

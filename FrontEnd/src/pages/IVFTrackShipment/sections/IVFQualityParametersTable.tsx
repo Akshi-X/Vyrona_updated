@@ -174,11 +174,18 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     const l1Entry = entries.find(([name]) => name.toLowerCase().includes('l1'))?.[1];
     const l2Entry = entries.find(([name]) => name.toLowerCase().includes('l2'))?.[1];
 
-    // Preferred mapping:
-    // - L1 from LN2 L1 max
-    // - L2 from LN2 L1 min (fallback to LN2 L2 max)
+    // New structure: LN2 L2 (0–L2-1, critical), LN2 L1 (L2–L1, soft)
     const nextL1 = toFiniteNumber(l1Entry?.max) ?? toFiniteNumber(l2Entry?.min);
     const nextL2 = toFiniteNumber(l1Entry?.min) ?? toFiniteNumber(l2Entry?.max);
+
+    // Legacy: single "LN2 Level" band with min/max as L2/L1
+    if (nextL1 == null && nextL2 == null && entries.length > 0) {
+      const legacy = entries[0][1] as Record<string, unknown>;
+      return {
+        l1: clampPercent(toFiniteNumber(legacy?.max)),
+        l2: clampPercent(toFiniteNumber(legacy?.min)),
+      };
+    }
 
     return {
       l1: clampPercent(nextL1),
