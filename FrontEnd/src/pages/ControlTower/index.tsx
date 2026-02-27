@@ -8,6 +8,26 @@ import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 
+const toDeviationCount = (value: unknown): number => {
+  const count = Number(value);
+  return Number.isFinite(count) ? count : 0;
+};
+
+const deriveInboundStatus = (statusValue: unknown, deviationsValue: unknown): 'Safe' | 'Risk' | 'Critical' => {
+  if (toDeviationCount(deviationsValue) > 0) return 'Critical';
+
+  const status = String(statusValue ?? '').trim().toLowerCase();
+  if (status === 'critical') return 'Critical';
+  if (status === 'risk') return 'Risk';
+  return 'Safe';
+};
+
+const formatSensorLabel = (countValue: unknown): string => {
+  const count = toDeviationCount(countValue);
+  if (count === 0) return 'SAFE';
+  return count === 1 ? '1 sensor' : `${count} sensors`;
+};
+
 const ControlTower = () => {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +67,7 @@ const ControlTower = () => {
     branchName: string;
     branchId: string;
     status: string;
+    deviations?: number;
     date: string;
   }>>([]);
   const [loadingCanisters, setLoadingCanisters] = useState(false);
@@ -169,23 +190,18 @@ const ControlTower = () => {
           branchName: string;
           branchId: string;
           status: string;
+          deviations?: number;
           date: string;
         }> = [];
 
         // Handle flat format (canisters array) - legacy format
         if (data.canisters && Array.isArray(data.canisters)) {
           flattenedCanisters = data.canisters.map((canister: any) => {
-            // Normalize status
-            let statusText = 'Safe';
-            const status = canister.status?.toLowerCase() || '';
-            if (status === 'risk' || status === 'critical') {
-              statusText = status === 'critical' ? 'Critical' : 'Risk';
-            } else if (status === 'safe') {
-              statusText = 'Safe';
-            }
+            const deviationCount = toDeviationCount(canister.deviations);
+            const statusText = deriveInboundStatus(canister.status, deviationCount);
 
             // Format date - handle null updated_at
-            let date = '-';
+            let date = 'NA';
             if (canister.updated_at) {
               const d = new Date(canister.updated_at);
               if (!isNaN(d.getTime())) {
@@ -200,6 +216,7 @@ const ControlTower = () => {
               branchName: 'N/A', // Flat format doesn't have branch info
               branchId: 'N/A', // Flat format doesn't have branch info
               status: statusText,
+              deviations: deviationCount,
               date: date,
             };
           });
@@ -211,20 +228,15 @@ const ControlTower = () => {
             if (branch.tanks && Array.isArray(branch.tanks)) {
               return branch.tanks.map((tank: any) => {
                 // Format date
-                let date = '-';
+                let date = 'NA';
                 if (tank.updated_at) {
                   const d = new Date(tank.updated_at);
                   if (!isNaN(d.getTime())) {
                     date = d.toLocaleDateString('en-GB');
                   }
                 }
-                let statusText = 'Safe';
-                const status = tank.status?.toLowerCase() || '';
-                if (status === 'risk' || status === 'critical') {
-                  statusText = status === 'critical' ? 'Critical' : 'Risk';
-                } else if (status === 'safe') {
-                  statusText = 'Safe';
-                }
+                const deviationCount = toDeviationCount(tank.deviations);
+                const statusText = deriveInboundStatus(tank.status, deviationCount);
 
                 return {
                   id: `tank-${branch.branch_name || 'N/A'}-${tank.tank_code || ''}`,
@@ -233,7 +245,7 @@ const ControlTower = () => {
                   branchId: String(branch.branch_id ?? tank.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: statusText,
-                  deviations: tank.deviations,
+                  deviations: deviationCount,
                   date: date,
                 };
               });
@@ -241,17 +253,11 @@ const ControlTower = () => {
             // Legacy format: branches with canisters
             else if (branch.canisters && Array.isArray(branch.canisters)) {
               return branch.canisters.map((canister: any) => {
-                // Normalize status
-                let statusText = 'Safe';
-                const status = canister.canister_status?.toLowerCase() || '';
-                if (status === 'risk' || status === 'critical') {
-                  statusText = status === 'critical' ? 'Critical' : 'Risk';
-                } else if (status === 'safe') {
-                  statusText = 'Safe';
-                }
+                const deviationCount = toDeviationCount(canister.deviations);
+                const statusText = deriveInboundStatus(canister.canister_status, deviationCount);
 
                 // Format date
-                let date = '-';
+                let date = 'NA';
                 if (canister.updated_at) {
                   const d = new Date(canister.updated_at);
                   if (!isNaN(d.getTime())) {
@@ -266,6 +272,7 @@ const ControlTower = () => {
                   branchId: String(canister.effective_branch_id ?? branch.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
                   status: statusText,
+                  deviations: deviationCount,
                   date: date,
                 };
               });
@@ -740,10 +747,10 @@ const ControlTower = () => {
                 <h2 className="font-bold text-black text-base mb-2">
                 {isIvfUser ? 'Active Containers' : 'Active Routes'}
                 </h2>
-                <div className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
+                <div className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                   <div className="text-left">{isIvfUser ? 'Containers #' : 'Routes ID'}</div>
-                  <div className="text-left">Status</div>
-                  <div className="text-left">Date</div>
+                  <div className="text-center">Deviation</div>
+                  <div className="text-center">{isIvfUser ? 'Last Refill Date' : 'Date'}</div>
                 </div>
                 <div 
                   className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -789,7 +796,7 @@ const ControlTower = () => {
                       return (
                         <div 
                           key={route?.id ?? Math.random()} 
-                          className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                          className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                           onClick={handleRouteClick}
                         >
                           <div className="min-w-0 text-left overflow-hidden">
@@ -823,7 +830,7 @@ const ControlTower = () => {
                               <div className="text-[10px] text-gray-400 truncate">{route?.supplyChain}</div>
                             )}
                           </div>
-                          <div className={`text-left text-xs font-medium ${statusColor}`}>{statusText}</div>
+                          <div className={`text-center text-xs font-medium ${statusColor}`}>{statusText}</div>
                           <div className="text-left text-xs font-bold text-gray-600 truncate">{route?.date || '-'}</div>
                         </div>
                       );
@@ -832,13 +839,11 @@ const ControlTower = () => {
                       {/* Display Canisters (IVF users only) */}
                       {isIvfUser && filteredCanisters && filteredCanisters.length > 0 && (
                         filteredCanisters.map((canister) => {
-                          const statusColor = canister.status === 'Safe'
-                            ? 'text-[#00B050]'
-                            : canister.status === 'Risk'
-                              ? 'text-[#FF0000]'
-                              : canister.status === 'Critical'
-                                ? 'text-[#FF0000]'
-                                : 'text-gray-500';
+                          const deviationCount = toDeviationCount(canister.deviations);
+                          const sensorLabel = formatSensorLabel(deviationCount);
+                          const pillClass = deviationCount > 0
+                            ? 'border-[#FECACA] bg-[#FEF3F2] text-[#B42318]'
+                            : 'border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]';
                           const handleCanisterClick = (e: React.MouseEvent) => {
                             // Don't navigate if clicking on the link
                             if ((e.target as HTMLElement).tagName === 'A') {
@@ -852,7 +857,7 @@ const ControlTower = () => {
                           return (
                             <div 
                               key={canister.id} 
-                              className="grid grid-cols-[150px_70px_90px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                              className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                               onClick={handleCanisterClick}
                             >
                               <div className="min-w-0 text-left overflow-hidden">
@@ -872,22 +877,24 @@ const ControlTower = () => {
                                     }}
                                   >
                                     Container {canister.canisterId}
-                                    {canister.tankId && canister.tankId !== 'N/A' ? ` - ${canister.tankId}` : ''}
                                   </Link>
                                 ) : (
                                   <span className="text-[#6b1176] text-xs font-bold">
                                     Container {canister.canisterId}
-                                    {canister.tankId && canister.tankId !== 'N/A' ? ` - ${canister.tankId}` : ''}
                                   </span>
                                 )}
                                 {canister.branchName && canister.branchName !== 'N/A' && (
                                   <div className="text-xs text-gray-900 leading-snug">
-                                    <div className="truncate">{canister.branchName} - {canister.branchId}</div>
+                                    <div className="truncate">{canister.branchName}</div>
                                   </div>
                                 )}
                               </div>
-                              <div className={`text-left text-xs font-medium ${statusColor}`}>{canister.status}</div>
-                              <div className="text-left text-xs font-bold text-gray-600 truncate">{canister.date || '-'}</div>
+                              <div className="text-center">
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${pillClass}`}>
+                                  {sensorLabel}
+                                </span>
+                              </div>
+                              <div className="text-center text-xs font-bold text-gray-600 truncate">{canister.date || 'NA'}</div>
                             </div>
                           );
                         })
@@ -926,9 +933,3 @@ const ControlTower = () => {
 };
 
 export default ControlTower;
-
-
-
-
-
-
