@@ -381,7 +381,6 @@ class CriticalAlertService:
         deviations = self.db.query(Readings).filter(
             Readings.tank_id == tank_id,
             Readings.deviation == True,
-            Readings.deviation_alert_sent == False,
             Readings.checked == None,
         ).all()
 
