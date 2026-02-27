@@ -27,7 +27,7 @@ export const KPI_TABS = [
   { id: 'temp_internal', label: 'Temp Internal', unit: '°C' },
   { id: 'ln2_level', label: 'LN2 Level', unit: '%' },
   { id: 'ln2_evaporation_rate', label: 'Evaporation Rate', unit: 'kg/h' },
-  { id: 'tive_battery_level', label: 'Battery Level', unit: '%' },
+  { id: 'tive_battery_percentage', label: 'Battery Level', unit: '%' },
   { id: 'ln2_lid_state', label: 'Lid Status', unit: '' },
   { id: 'shock', label: 'Shock', unit: '' },
 ] as const;
@@ -283,7 +283,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         if (keys.length > 0) {
           const tabs = keys.map((name) => ({
             id: name,
-            label: kpiNameToLabel(name),
+            label: KPI_TABS.find((t) => t.id === name)?.label ?? kpiNameToLabel(name),
             unit: DEFAULT_TAB_UNIT_MAP[name] || '',
           }));
           setKpiTabs(tabs);
