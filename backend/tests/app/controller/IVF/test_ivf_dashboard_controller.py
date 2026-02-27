@@ -3,7 +3,7 @@ Unit tests for IVF Dashboard Controller
 """
 import pytest
 from unittest.mock import MagicMock, Mock, patch
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from datetime import datetime
 
@@ -312,3 +312,61 @@ def test_get_outbound_shipments_success(app, monkeypatch):
     if response.status_code == 200:
         data = response.json()
         assert data["total_outbound_shipments"] == 15
+
+
+# ==========================================
+# Tests for get_deviations_graph endpoint
+# ==========================================
+
+def test_get_deviations_graph_user_uses_branch_id(monkeypatch):
+    """User role should call branch deviations with the user's branch_id."""
+    mock_request = MagicMock()
+    mock_request.state.current_user = MagicMock(hospital_id=99)
+    mock_db = MagicMock()
+
+    mock_service = MagicMock()
+    mock_service.get_branch_deviations.return_value = []
+
+    monkeypatch.setattr(
+        ivf_dashboard_controller,
+        "get_dashboard_branch_filter",
+        MagicMock(return_value=(17, "User")),
+    )
+    monkeypatch.setattr(
+        ivf_dashboard_controller,
+        "IVFDashboardService",
+        MagicMock(return_value=mock_service),
+    )
+
+    result = ivf_dashboard_controller.get_deviations_graph(
+        request=mock_request,
+        db=mock_db,
+    )
+
+    assert result == []
+    mock_service.get_branch_deviations.assert_called_once_with(
+        hospital_id=99,
+        branch_id=17,
+        role="User",
+    )
+
+
+def test_get_deviations_graph_user_without_branch_forbidden(monkeypatch):
+    """User role without branch assignment should be blocked."""
+    mock_request = MagicMock()
+    mock_request.state.current_user = MagicMock(hospital_id=99)
+    mock_db = MagicMock()
+
+    monkeypatch.setattr(
+        ivf_dashboard_controller,
+        "get_dashboard_branch_filter",
+        MagicMock(return_value=(None, "User")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        ivf_dashboard_controller.get_deviations_graph(
+            request=mock_request,
+            db=mock_db,
+        )
+
+    assert exc_info.value.status_code == 403

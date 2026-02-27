@@ -885,7 +885,8 @@ class IVFService:
                     "goblet_color": row.goblet_color or "",
                     "cryolock_color": row.crylock_color or "",
                     "date_of_vitrification": row.date_of_vitrification,
-                    "description": description
+                    "description": description,
+                    "site_name": row.branch_name or ""
                 }
                 
                 # Role-based field visibility
@@ -893,8 +894,7 @@ class IVFService:
                     # User role: Include embryo_grading (not available in current model, return empty)
                     tracking_data["embryo_grading"] = ""
                 else:
-                    # Manager/Admin roles: Include site_name and shipment status.
-                    tracking_data["site_name"] = row.branch_name or ""
+                    # Manager/Admin roles: Include shipment status.
                     tracking_data["status"] = tracking_status or ""
                 
                 # Append the tracking data to the list

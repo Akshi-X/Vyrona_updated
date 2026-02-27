@@ -346,7 +346,11 @@ def get_embryo_tracking_filters(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/embryo_tracking", response_model=EmbryoTrackingResponse)
+@router.get(
+    "/embryo_tracking",
+    response_model=EmbryoTrackingResponse,
+    response_model_exclude_none=True
+)
 def get_embryo_tracking(
     request: Request,
     branch_name: Optional[str] = Query(None, description="Optional branch/site name filter"),
@@ -430,6 +434,13 @@ def get_embryo_tracking(
     try:
         # Get branch filter info for IVF department users
         branch_id, role = get_branch_filter_info(request)
+
+        # User role must always be scoped to an assigned branch.
+        if role == "User" and branch_id is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: User account is not associated with any branch"
+            )
         
         service = IVFService(db)
         tracking_data = service.get_embryo_tracking(
@@ -994,4 +1005,3 @@ def get_in_transit_crylocks(
     except Exception as e:
         logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")
-
