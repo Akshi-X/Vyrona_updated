@@ -621,7 +621,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
               >
 
-                <div className="text-[12px] font-medium text-[#FFFFFF]">Load Routes</div>
+                <div className="text-[12px] font-medium text-[#FFFFFF]">Load Branches</div>
 
               </button>
 
