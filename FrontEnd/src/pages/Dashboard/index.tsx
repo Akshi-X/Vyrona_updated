@@ -166,6 +166,15 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
+  console.log(
+      ivfOutboundShipments,
+  loadingIvfOutboundShipments,
+  ivfOutboundShipmentsError,
+  ivfTotalDeviations,
+  loadingIvfTotalDeviations,
+  ivfTotalDeviationsError,
+  )
+
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
     containers: string[];
