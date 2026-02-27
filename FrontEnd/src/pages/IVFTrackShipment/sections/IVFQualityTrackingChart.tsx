@@ -26,9 +26,9 @@ export const KPI_TABS = [
   { id: 'temp_external', label: 'Temp External', unit: '°C' },
   { id: 'temp_internal', label: 'Temp Internal', unit: '°C' },
   { id: 'ln2_level', label: 'LN2 Level', unit: '%' },
-  { id: 'evaporation_rate', label: 'Evaporation Rate', unit: 'kg/h' },
-  { id: 'battery_level', label: 'Battery Level', unit: '%' },
-  { id: 'lid_status', label: 'Lid Status', unit: '' },
+  { id: 'ln2_evaporation_rate', label: 'Evaporation Rate', unit: 'kg/h' },
+  { id: 'tive_battery_level', label: 'Battery Level', unit: '%' },
+  { id: 'ln2_lid_state', label: 'Lid Status', unit: '' },
   { id: 'shock', label: 'Shock', unit: '' },
 ] as const;
 

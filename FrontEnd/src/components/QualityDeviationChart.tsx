@@ -31,7 +31,8 @@ interface QualityDeviationChartProps {
 export default function QualityDeviationChart({ containers, metrics }: QualityDeviationChartProps) {
   const REQUIRED_METRIC_ORDER = [
     'Lid State',
-    'LN2 Level',
+    'LN2 L1',
+    'LN2 L2',
     'Evaporation Rate',
     'Internal Temperature',
     'External Temperature',
