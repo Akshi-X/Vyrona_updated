@@ -219,7 +219,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                 return (
                   <tr key={index} className="text-black text-[14px] h-[56px] hover:bg-gray-50">
                     <td className="px-3 py-2 whitespace-nowrap">{row.hisNumber || '-'} </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.cryolockNum || '-'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{row.cryolockNum?.split("/").pop() || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.canisterNum || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.caneCode || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
