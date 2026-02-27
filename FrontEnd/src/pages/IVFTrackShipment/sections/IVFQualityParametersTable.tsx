@@ -197,7 +197,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     if (!kpis?.length) return;
     let hasAnyUpdate = false;
     const ln2 = kpis.find((k) => k.name === 'ln2_level');
-    const bat = kpis.find((k) => k.name === 'battery_level');
+    const bat = kpis.find((k) => k.name === 'tive_battery_level');
     const value = ln2?.value ?? bat?.value;
     if (value !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
       setLevel(Math.min(100, Math.max(0, value)));
@@ -207,7 +207,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
       hasAnyUpdate = true;
     }
-    const evap = kpis.find((k) => k.name === 'evaporation_rate');
+    const evap = kpis.find((k) => k.name === 'ln2_evaporation_rate');
     if (evap?.value !== undefined && typeof evap.value === 'number' && !Number.isNaN(evap.value)) {
       setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
       hasAnyUpdate = true;
@@ -222,7 +222,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       setTempInternal(int.value);
       hasAnyUpdate = true;
     }
-    const lid = kpis.find((k) => k.name === 'lid_status');
+    const lid = kpis.find((k) => k.name === 'ln2_lid_status');
     if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
