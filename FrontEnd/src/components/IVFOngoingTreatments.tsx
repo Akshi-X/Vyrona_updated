@@ -56,7 +56,7 @@ const tableHeaders: TableHeader[] = [
   { label: "Cryolock Color", hasFilter: true, filterKey: 'cryolockColor' },
   { label: "Date of Vitrification" },
   { label: "Site Name", hasFilter: true, filterKey: 'siteName' },
-  { label: "Status", hasFilter: true, filterKey: 'status' },
+  //{ label: "Status", hasFilter: true, filterKey: 'status' },
 ];
 
 const defaultFilterOptions: EmbryoTrackingFilterOptions = {
@@ -390,7 +390,7 @@ export function IVFOngoingTreatments({
                       <td className="px-4 py-3 text-xs">{treatment.cryolockColor || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.dateOfVitrification || '-'}</td>
                       <td className="px-4 py-3 text-xs">{treatment.siteName || '-'}</td>
-                      <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td>
+                      {/* <td className="px-4 py-3 text-xs">{treatment.status || '-'}</td> */}
                     </tr>
                   ))}
                   {isLoadingMore && (

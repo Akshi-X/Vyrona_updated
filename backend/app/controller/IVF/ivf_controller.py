@@ -452,59 +452,28 @@ def get_embryo_tracking(
 @router.get("/canisters/{tank_code}/check", response_model=CanisterCheckResponse)
 def check_tank_exists(
     tank_code: str = Path(..., description="Tank code to check (e.g., 'T1')"),
+    branch_id: Optional[int] = Query(None, description="Optional branch ID to filter tanks by branch"),
     request: Request = None,
     db: Session = Depends(get_db)
 ):
     """
-    Check if a tank exists in the system by tank code for the current logged-in user's branch.
+    Check if a tank exists in the system by tank code.
     
-    This endpoint allows users to verify if a tank code exists before performing operations.
-    Role-based access:
-    - User (IVF): Only see tanks from their assigned branch
-    - Manager (IVF): See tanks from all branches
-    - Admin: See tanks from all branches
-    
-    Path Parameters:
-    - tank_code: Tank code to check (e.g., 'T1')
-    
-    Response:
-    - exists: Boolean indicating if the tank exists
-    - canister_number: The tank code that was checked (kept as canister_number for backward compatibility)
-    - canister_id: Tank ID if exists (null if not found) - kept as canister_id for backward compatibility
-    - is_active: Whether the tank is active (null if not found)
-    - canister_status: Always null for tanks (kept for backward compatibility)
-    - message: Descriptive message about the result
-    
-    Example Response (exists):
-    {
-        "exists": true,
-        "canister_number": "T1",
-        "canister_id": 1,
-        "is_active": true,
-        "canister_status": null,
-        "message": "Tank T1 exists and is active"
-    }
-    
-    Example Response (not exists):
-    {
-        "exists": false,
-        "canister_number": "T999",
-        "canister_id": null,
-        "is_active": null,
-        "canister_status": null,
-        "message": "Tank T999 does not exist"
-    }
+    When branch_id query param is provided, the query filters by that branch directly
+    (ignoring role-based branch resolution). Otherwise falls back to JWT-derived branch
+    for regular users.
     """
     try:
-        # Get branch filter info for IVF department users
-        branch_id, role = get_branch_filter_info(request) if request else (None, None)
+        effective_branch_id = branch_id
+
+        if effective_branch_id is None:
+            jwt_branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+            effective_branch_id = jwt_branch_id
         
-        # Query tank by tank_code
         query = db.query(Tank).filter(Tank.tank_code == tank_code)
         
-        # Apply branch filter if provided (User role only)
-        if branch_id is not None:
-            query = query.filter(Tank.branch_id == branch_id)
+        if effective_branch_id is not None:
+            query = query.filter(Tank.branch_id == effective_branch_id)
         
         tank = query.first()
         

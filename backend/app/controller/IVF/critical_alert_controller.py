@@ -5,7 +5,7 @@ Handles API endpoints for critical alerts in IVF system
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path
 from sqlalchemy.orm import Session
 from typing import Optional
-
+from pydantic import BaseModel
 from app.config.database import get_db
 from app.models.IVF.tank_model import Tank
 from app.service.IVF.critical_alert_service import CriticalAlertService
@@ -116,11 +116,12 @@ def acknowledge_alert(
             raise HTTPException(status_code=e.status_code, detail=e.message)
         raise HTTPException(status_code=500, detail=f"Error acknowledging alert: {str(e)}")
 
-class DeviationAlertKPICheckModel:
-    tank_id = int
-@router.post("/check_kpi", response_model=CriticalAlertListResponse)
+class CheckKpiRequest(BaseModel):
+    tank_id: int | None = None
+
+@router.post("/check_kpi")
 def check_and_create_kpi_deviation_alerts(
-    tank_id: int = None,
+    payload: CheckKpiRequest,
     request: Request = None,
     db: Session = Depends(get_db),
 ):
@@ -136,6 +137,7 @@ def check_and_create_kpi_deviation_alerts(
 
     try:
         service = CriticalAlertService(db)
+        tank_id = payload.tank_id
         if tank_id:
             alerts = service.check_and_create_alert_for_kpi_deviations(tank_id)
 
