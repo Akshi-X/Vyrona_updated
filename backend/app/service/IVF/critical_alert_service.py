@@ -690,11 +690,11 @@ class CriticalAlertService:
         managers = (
             self.db.query(User)
             .filter(
-                User.department == "IVF",
-                User.role == "Manager",
-                User.branch_id.in_(branch_ids),
-                User.status == True,
-                User.approved_status == ApprovalStatus.APPROVED
+            User.department == "IVF",
+            User.role.in_(["Manager", "Admin"]),
+            User.branch_id.in_(branch_ids),
+            User.status == True,
+            User.approved_status == ApprovalStatus.APPROVED
             )
             .all()
         )
