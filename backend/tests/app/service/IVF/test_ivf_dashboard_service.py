@@ -506,6 +506,44 @@ def test_get_deviations_graph_manager_role(dashboard_service, db_session):
 
 
 # ==========================================
+# Tests for get_branch_deviations
+# ==========================================
+
+def test_get_branch_deviations_user_branch_filtered(dashboard_service, db_session):
+    """User role should fetch deviations only for the assigned branch."""
+    execute_result = MagicMock()
+    execute_result.mappings.return_value.fetchall.return_value = []
+    db_session.execute.return_value = execute_result
+
+    dashboard_service.get_branch_deviations(
+        hospital_id=10,
+        branch_id=17,
+        role="User",
+    )
+
+    _, params = db_session.execute.call_args[0]
+    assert params["hospital_id"] == 10
+    assert params["branch_id"] == 17
+
+
+def test_get_branch_deviations_manager_not_branch_filtered(dashboard_service, db_session):
+    """Manager role should fetch deviations across all branches."""
+    execute_result = MagicMock()
+    execute_result.mappings.return_value.fetchall.return_value = []
+    db_session.execute.return_value = execute_result
+
+    dashboard_service.get_branch_deviations(
+        hospital_id=10,
+        branch_id=17,
+        role="Manager",
+    )
+
+    _, params = db_session.execute.call_args[0]
+    assert params["hospital_id"] == 10
+    assert params["branch_id"] is None
+
+
+# ==========================================
 # Tests for get_total_deviations
 # ==========================================
 

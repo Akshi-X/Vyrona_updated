@@ -1294,7 +1294,8 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setShowOutboundQualityTracking(true);
+                                // setShowOutboundQualityTracking(true);
+                                // Disable
                               }}
                             >
                               <img

@@ -333,6 +333,36 @@ def test_get_embryo_tracking_error(app, monkeypatch):
     assert "error" in response.json()["detail"].lower()
 
 
+def test_get_embryo_tracking_user_without_branch_forbidden(app, monkeypatch):
+    """User role without branch_id must be denied for embryo tracking."""
+    mock_service = MagicMock()
+
+    monkeypatch.setattr(
+        ivf_controller,
+        "IVFService",
+        MagicMock(return_value=mock_service)
+    )
+
+    # Simulate IVF User with no branch assignment.
+    monkeypatch.setattr(
+        ivf_controller,
+        "get_branch_filter_info",
+        lambda x: (None, "User")
+    )
+
+    def override_get_db():
+        yield MagicMock()
+
+    app.dependency_overrides[ivf_controller.get_db] = override_get_db
+
+    client = TestClient(app)
+    response = client.get("/ivf/embryo_tracking")
+
+    assert response.status_code == 403
+    assert "not associated with any branch" in response.json()["detail"]
+    mock_service.get_embryo_tracking.assert_not_called()
+
+
 def test_get_ivf_storage_forbidden_for_non_arc_hospital(app):
     """Storage endpoint should deny non-ARC hospital users."""
     hospital = Mock()

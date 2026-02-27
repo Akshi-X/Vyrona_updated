@@ -374,9 +374,13 @@ def test_get_embryo_tracking_no_branch_filter(ivf_service, db_session):
     # Mock complex query with multiple joins
     embryo_query = MagicMock()
     embryo_query.join.return_value = embryo_query
+    embryo_query.outerjoin.return_value = embryo_query
     embryo_query.filter.return_value = embryo_query
     embryo_query.group_by.return_value = embryo_query
     embryo_query.order_by.return_value = embryo_query
+    embryo_query.count.return_value = 1
+    embryo_query.offset.return_value = embryo_query
+    embryo_query.limit.return_value = embryo_query
     
     # Create mock row objects
     mock_row = Mock()
@@ -394,22 +398,21 @@ def test_get_embryo_tracking_no_branch_filter(ivf_service, db_session):
     
     embryo_query.all.return_value = [mock_row]
     
-    # Mock shipment query
-    shipment_query = MagicMock()
-    shipment_query.join.return_value = shipment_query
-    shipment_query.filter.return_value = shipment_query
-    shipment_query.order_by.return_value = shipment_query
-    shipment_query.first.return_value = None
+    # Mock latest shipments subquery builder
+    latest_shipments_query = MagicMock()
+    latest_shipments_query.filter.return_value = latest_shipments_query
+    latest_shipments_query.group_by.return_value = latest_shipments_query
+    latest_shipments_query.subquery.return_value = MagicMock()
     
     query_call_count = [0]
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
-        # First call is the main embryo query
+        # First call builds latest_shipments_subq
         if query_call_count[0] == 1:
-            return embryo_query
-        # Second call is shipment query
+            return latest_shipments_query
+        # Second call is the main embryo query
         elif query_call_count[0] == 2:
-            return shipment_query
+            return embryo_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
@@ -419,6 +422,7 @@ def test_get_embryo_tracking_no_branch_filter(ivf_service, db_session):
     assert "data" in result
     assert "total" in result
     assert isinstance(result["data"], list)
+    assert result["data"][0]["site_name"] == "Test Branch"
 
 
 def test_get_embryo_tracking_with_branch_filter(ivf_service, db_session):
@@ -426,9 +430,13 @@ def test_get_embryo_tracking_with_branch_filter(ivf_service, db_session):
     # Mock complex query with multiple joins
     embryo_query = MagicMock()
     embryo_query.join.return_value = embryo_query
+    embryo_query.outerjoin.return_value = embryo_query
     embryo_query.filter.return_value = embryo_query
     embryo_query.group_by.return_value = embryo_query
     embryo_query.order_by.return_value = embryo_query
+    embryo_query.count.return_value = 1
+    embryo_query.offset.return_value = embryo_query
+    embryo_query.limit.return_value = embryo_query
     
     # Create mock row objects
     mock_row = Mock()
@@ -446,22 +454,21 @@ def test_get_embryo_tracking_with_branch_filter(ivf_service, db_session):
     
     embryo_query.all.return_value = [mock_row]
     
-    # Mock shipment query
-    shipment_query = MagicMock()
-    shipment_query.join.return_value = shipment_query
-    shipment_query.filter.return_value = shipment_query
-    shipment_query.order_by.return_value = shipment_query
-    shipment_query.first.return_value = None
+    # Mock latest shipments subquery builder
+    latest_shipments_query = MagicMock()
+    latest_shipments_query.filter.return_value = latest_shipments_query
+    latest_shipments_query.group_by.return_value = latest_shipments_query
+    latest_shipments_query.subquery.return_value = MagicMock()
     
     query_call_count = [0]
     def query_side_effect(*args, **kwargs):
         query_call_count[0] += 1
-        # First call is the main embryo query
+        # First call builds latest_shipments_subq
         if query_call_count[0] == 1:
-            return embryo_query
-        # Second call is shipment query
+            return latest_shipments_query
+        # Second call is the main embryo query
         elif query_call_count[0] == 2:
-            return shipment_query
+            return embryo_query
         return MagicMock()
     
     db_session.query.side_effect = query_side_effect
@@ -471,3 +478,4 @@ def test_get_embryo_tracking_with_branch_filter(ivf_service, db_session):
     assert "data" in result
     assert "total" in result
     assert isinstance(result["data"], list)
+    assert result["data"][0]["site_name"] == "Test Branch"

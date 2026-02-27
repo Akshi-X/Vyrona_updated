@@ -197,7 +197,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     if (!kpis?.length) return;
     let hasAnyUpdate = false;
     const ln2 = kpis.find((k) => k.name === 'ln2_level');
-    const bat = kpis.find((k) => k.name === 'tive_battery_level');
+    const bat = kpis.find((k) => k.name === 'tive_battery_percentage');
     const value = ln2?.value ?? bat?.value;
     if (value !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
       setLevel(Math.min(100, Math.max(0, value)));
@@ -222,7 +222,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       setTempInternal(int.value);
       hasAnyUpdate = true;
     }
-    const lid = kpis.find((k) => k.name === 'ln2_lid_status');
+    const lid = kpis.find((k) => k.name === 'ln2_lid_state');
     if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
@@ -561,7 +561,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               fill="#6B1176"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
-              {levelPercent != null ? `${Math.round(levelPercent)}%` : '—'}
+              {levelPercent != null ? `${Math.round(levelPercent)}L` : '—'}
             </text>
             <text
               x="100"

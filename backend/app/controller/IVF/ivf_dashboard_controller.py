@@ -228,6 +228,11 @@ def get_deviations_graph(
     try:
         branch_id, role = get_dashboard_branch_filter(request)
         role_normalized = role.title() if role else None
+        if role_normalized == "User" and branch_id is None:
+            raise HTTPException(
+                status_code=403,
+                detail="User does not have an assigned branch",
+            )
         service = IVFDashboardService(db)
         if role_normalized == "User":
             result = service.get_branch_deviations(
