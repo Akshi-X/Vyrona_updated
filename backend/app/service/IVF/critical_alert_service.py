@@ -7,6 +7,7 @@ import threading
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
+from anyio import current_time
 from sqlalchemy import and_, or_, desc, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -256,12 +257,13 @@ class CriticalAlertService:
         tank_id: int,
         source: AlertSource,
         alert_type: AlertType,
-        occurred_at: datetime
+        occurred_at: datetime,
+        extra_info: Optional[str] = None
     ) -> str:
         """Generate deduplication key to prevent alert spam"""
         # Use date (YYYY-MM-DD) to allow one alert per day per tank+source+type
         date_str = occurred_at.strftime('%Y-%m-%d')
-        return f"{tank_id}:{source.value}:{alert_type.value}:{date_str}"
+        return f"{tank_id}:{source.value}:{alert_type.value}:{date_str}:{extra_info or ''}"
     
     def _create_alert(
         self,
@@ -271,14 +273,15 @@ class CriticalAlertService:
         severity: AlertSeverity,
         message: str,
         occurred_at: datetime,
-        triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM
+        triggered_by: AlertTriggeredBy = AlertTriggeredBy.SYSTEM,
+        extra_info: Optional[str] = None
     ) -> CriticalAlert:
         """Create a new alert if it doesn't already exist (using dedup_key)"""
         # Get hospital and branch info
         hospital_id, branch_id = self._get_tank_hospital_branch(tank_id)
         
         # Generate deduplication key
-        dedup_key = self._generate_dedup_key(tank_id, source, alert_type, occurred_at)
+        dedup_key = self._generate_dedup_key(tank_id, source, alert_type, occurred_at, extra_info=extra_info)
         
         # Check if similar active alert already exists using dedup_key
         existing_alert = (
@@ -382,33 +385,62 @@ class CriticalAlertService:
             Readings.checked == None,
         ).all()
 
+        logger.info("Deviation count for tank_id=%s: %s", tank_id, len(deviations))
+
         alerts_created = []
+
+        checked_kpi_configs = []
 
         for deviation in deviations:
             kpi_config = self.db.query(KpiConfig).filter(
                 KpiConfig.id == deviation.kpi_config_id,
             ).first()
-            if not kpi_config:
+            logger.info("Processing deviation id=%s for tank_id=%s: kpi_config_id=%s, deviation=%s", deviation.id, tank_id, deviation.kpi_config_id, deviation.deviation)
+            if not kpi_config or kpi_config.id in checked_kpi_configs:
                 deviation.checked = True
                 continue
+            
+            ## Check if last alert created for this config is not acknowledged and occurred within last 1 hours, 
+            # if yes skip creating new alert to avoid alert spam
+            last_alert = self.db.query(CriticalAlert).filter(
+                CriticalAlert.tank_id == tank_id,
+                CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                CriticalAlert.dedup_key.like(f":{kpi_config.id}%"),
+                CriticalAlert.status != AlertStatus.ACKNOWLEDGED.value
+            ).order_by(CriticalAlert.created_at.desc()).first()
+            
+            if last_alert and (current_time() - last_alert.created_at).total_seconds() < 3600:  # 1 hour in seconds
+                logger.info("Skipping alert creation for kpi_config_id=%s as last alert was created within 1 hour", kpi_config.id)
+                deviation.checked = True
+                continue
+
+            tank_code = self.db.query(Tank.tank_code).filter(Tank.tank_id == tank_id).scalar()
+            branch_name = self.db.query(HospitalBranch.branch_name).filter(HospitalBranch.branch_id == deviation.branch_id).scalar()
 
             alert = self._create_alert(
                     tank_id=tank_id,
                     alert_type=AlertType.DEVIATION_ALERT,
                     source=AlertSource.KPI,
                     severity=AlertSeverity.LOW if kpi_config.alert_type == "soft_alert" else AlertSeverity.HIGH,
-                    message=f'{kpi_config.alert_name} is deviated at {deviation.value}.',
+                    message=f'{kpi_config.alert_name} is deviated to {deviation.kpi_value} in {branch_name} branch for {tank_code} tank',
                     occurred_at=deviation.timestamp,
-                    triggered_by=AlertTriggeredBy.SYSTEM
+                    triggered_by=AlertTriggeredBy.SYSTEM,
+                    extra_info=str(kpi_config.id)  # Include kpi_config_id in dedup_key for better tracking
                 )
             
+            alert.branch_id = deviation.branch_id  # Set branch_id on alert for better filtering and notification targeting
+            alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
+
             if kpi_config.alert_type == "critical_alert":
                 self._send_alert_email(alert)
             
-            deviation.alert_id = alert.id
-
+            deviation.alert_id = alert.alert_id
+            deviation.checked = True
+            checked_kpi_configs.append(kpi_config.id)
             alerts_created.append(alert)
+        logger.info("Alert creation complete for tank_id=%s: %s alert(s) created/updated", tank_id, len(alerts_created))    
         self.db.commit()
+        #self.db.rollback()  # Rollback since we are not actually creating alerts in this method, just checking and simulating alert creation for KPI deviations
 
         return alerts_created
     
