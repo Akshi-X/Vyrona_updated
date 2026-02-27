@@ -1420,8 +1420,8 @@ class QualityTrackingService:
                     status_code=HTTPStatus.NOT_FOUND
                 )
             
-            # Update the cryolock color
-            cryolock.cryolock_color = color_update.cryolock_color
+            # Persist to DB column name used by PatientCrylockInfo model
+            cryolock.crylock_color = color_update.cryolock_color
             cryolock.updated_by = updated_by
             
             self.db.commit()
