@@ -148,6 +148,9 @@ def sync_ivf_schema():
         # kpi_config: columns for limits/units (unit, alert_type may be missing on older DBs)
         db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS unit VARCHAR(64)"))
         db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS alert_type VARCHAR(100)"))
+        # Add 'Cancelled' to task status enum
+        db.execure(text("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'Cancelled'") )
+        
         db.commit()
         logger.info("IVF schema sync completed")
     except Exception as e:

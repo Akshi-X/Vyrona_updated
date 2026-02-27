@@ -166,6 +166,15 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
+  console.log(
+      ivfOutboundShipments,
+  loadingIvfOutboundShipments,
+  ivfOutboundShipmentsError,
+  ivfTotalDeviations,
+  loadingIvfTotalDeviations,
+  ivfTotalDeviationsError,
+  )
+
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
     containers: string[];
@@ -1079,7 +1088,7 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Outbound Shipments Section */}
-                  {false && <section>
+                  <section>
                     <h2 className="font-semibold text-black text-base mb-4">Shipment Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
@@ -1092,11 +1101,12 @@ export default function Dashboard({ }: DashboardProps) {
                             Total Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {loadingIvfOutboundShipments
+                            0
+                            {/* {loadingIvfOutboundShipments
                               ? '--'
                               : ivfOutboundShipmentsError
                                 ? '0'
-                                : `${ivfOutboundShipments ?? 0}`}
+                                : `${ivfOutboundShipments ?? 0}`} */}
                           </div>
                         </div>
                       </div>
@@ -1111,16 +1121,16 @@ export default function Dashboard({ }: DashboardProps) {
                           Deviations
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            {loadingIvfTotalDeviations
+                            0{/* {loadingIvfTotalDeviations
                               ? '--'
                               : ivfTotalDeviationsError
                                 ? '0'
-                                : `${ivfTotalDeviations ?? 0}`}
+                                : `${ivfTotalDeviations ?? 0}`} */}
                           </div>
                         </div>
                       </div>
                     </div>
-                  </section>}
+                  </section>
                 </div>
 
                 {/* Right Column */}
