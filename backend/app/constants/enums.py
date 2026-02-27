@@ -165,6 +165,7 @@ class TaskStatus(str, Enum):
     DONE = "Done"
     IN_PROGRESS = "In progress"
     NOT_STARTED = "Not started"
+    CANCELLED="Cancelled"
 
     @classmethod
     def list(cls):
