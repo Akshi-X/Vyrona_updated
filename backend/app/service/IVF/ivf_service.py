@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, time
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -12,6 +12,7 @@ from ...models.readings_model import Readings
 from ...constants.enums import CanisterStatus
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.hospital_model import Hospital
+from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
@@ -148,7 +149,7 @@ class IVFService:
                 - branch_name: Branch name
                 - tanks: List of active tanks with:
                     - tank_code: Tank code (e.g., 'T1')
-                    - updated_at: Last updated date and time from tanks table updated_at
+                    - updated_at: Latest refill log datetime (refill_date/refill_time); null if no refill logs exist
                     - status: Tank status (safe, risk, critical)
             - total: Total number of active tanks across all branches
         """
@@ -179,16 +180,37 @@ class IVFService:
                 .subquery()
             )
 
+            # Latest refill log (date/time) per tank
+            latest_refill_subq = (
+                select(
+                    CanisterLn2Log.tank_id,
+                    CanisterLn2Log.refill_date,
+                    CanisterLn2Log.refill_time
+                )
+                .where(CanisterLn2Log.refill_date.isnot(None))
+                .distinct(CanisterLn2Log.tank_id)
+                .order_by(
+                    CanisterLn2Log.tank_id,
+                    desc(CanisterLn2Log.refill_date),
+                    desc(CanisterLn2Log.refill_time),
+                    desc(CanisterLn2Log.created_at)
+                )
+                .subquery()
+            )
+
             # Main query
             stmt = (
                 select(
                     Tank,
                     HospitalBranch.branch_id,
                     HospitalBranch.branch_name,
-                    func.coalesce(deviations_subq.c.total_deviations, 0).label("total_deviations")
+                    func.coalesce(deviations_subq.c.total_deviations, 0).label("total_deviations"),
+                    latest_refill_subq.c.refill_date.label("latest_refill_date"),
+                    latest_refill_subq.c.refill_time.label("latest_refill_time")
                 )
                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                 .outerjoin(deviations_subq, deviations_subq.c.tank_id == Tank.tank_id)
+                .outerjoin(latest_refill_subq, latest_refill_subq.c.tank_id == Tank.tank_id)
                 .where(Tank.is_active == True)
             )
 
@@ -209,8 +231,14 @@ class IVFService:
             branches_dict = defaultdict(lambda: {"branch_id": None, "branch_name": None, "tanks": []})
             total_tanks = 0
 
-            for tank, branch_id_val, branch_name_val, total_deviations in results:
+            for tank, branch_id_val, branch_name_val, total_deviations, latest_refill_date, latest_refill_time in results:
                 calculated_status = "critical" if total_deviations > 0 else "safe"
+                latest_activity_at = None
+                if latest_refill_date:
+                    latest_activity_at = datetime.combine(
+                        latest_refill_date,
+                        latest_refill_time or time.min
+                    )
 
                 # Apply status filter post-query (since it's computed)
                 if status is not None and calculated_status != status.value:
@@ -223,7 +251,7 @@ class IVFService:
                 branches_dict[branch_id_val]["tanks"].append({
                     "tank_id": tank.tank_id,
                     "tank_code": tank.tank_code or "",
-                    "updated_at": tank.updated_at or tank.created_at,
+                    "updated_at": latest_activity_at,
                     "status": calculated_status,
                     "deviations": total_deviations
                 })
