@@ -421,7 +421,13 @@ class IVFDashboardService:
             "total_outbound_shipments": total_shipments
         }
 
-    def get_branch_deviations(self, hospital_id: Optional[int] = None) -> Dict:
+    def get_branch_deviations(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+        role: Optional[str] = None,
+    ) -> Dict:
+        filter_branch_id = self._get_branch_filter(branch_id, role)
         query = text("""
         SELECT
             b.branch_name,
@@ -438,11 +444,18 @@ class IVFDashboardService:
         WHERE
             r.deviation = TRUE
             AND r.hospital_id = :hospital_id
+            AND (:branch_id IS NULL OR b.branch_id = :branch_id)
         GROUP BY
             b.branch_name, k.id, k.alert_name;
         """)
 
-        results = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
+        results = self.db.execute(
+            query,
+            {
+                "hospital_id": hospital_id,
+                "branch_id": filter_branch_id,
+            },
+        ).mappings().fetchall()
 
         
         return results
