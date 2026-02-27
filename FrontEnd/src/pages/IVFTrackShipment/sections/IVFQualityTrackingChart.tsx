@@ -23,13 +23,13 @@ ChartJS.register(
 );
 
 export const KPI_TABS = [
-  { id: 'temp_external', label: 'Temp External', unit: '°C' },
-  { id: 'temp_internal', label: 'Temp Internal', unit: '°C' },
-  { id: 'ln2_level', label: 'LN2 Level', unit: '%' },
+  { id: 'temp_external', label: 'External Temperature', unit: '°C' },
+  { id: 'temp_internal', label: 'Internal Temperature', unit: '°C' },
+  { id: 'ln2_level', label: 'LN2', unit: '%' },
   { id: 'ln2_evaporation_rate', label: 'Evaporation Rate', unit: 'kg/h' },
   { id: 'tive_battery_percentage', label: 'Battery Level', unit: '%' },
-  { id: 'ln2_lid_state', label: 'Lid Status', unit: '' },
-  { id: 'shock', label: 'Shock', unit: '' },
+  { id: 'ln2_lid_state', label: 'Lid State', unit: '' },
+  { id: 'shock', label: 'Shock Detection', unit: '' },
 ] as const;
 
 export type KpiTabId = (typeof KPI_TABS)[number]['id'];
@@ -42,6 +42,16 @@ const DEFAULT_TAB_UNIT_MAP = KPI_TABS.reduce<Record<string, string>>((acc, tab) 
   acc[tab.id] = tab.unit;
   return acc;
 }, {});
+
+const KPI_ORDER = [
+  'temp_external',
+  'temp_internal',
+  'ln2_level',
+  'ln2_evaporation_rate',
+  'tive_battery_percentage',
+  'ln2_lid_state',
+  'shock',
+] as const;
 
 const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -162,9 +172,11 @@ const formatTimeLabel = (timestamp: string): string => {
 };
 
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {
-  const k = reading.kpis.find((x) => x.name === kpiName);
+  const k =
+    reading.kpis.find((x) => x.name === kpiName) ??
+    (kpiName === 'ln2_lid_state' ? reading.kpis.find((x) => x.name === 'lid_state') : null);
   if (k == null || typeof k.value !== 'number' || isNaN(k.value)) return null;
-  if (kpiName === 'lid_state') {
+  if (kpiName === 'lid_state' || kpiName === 'ln2_lid_state') {
     // Enforce binary display: 0 = Close, 1 = Open.
     return k.value >= 1 ? 1 : 0;
   }
@@ -173,10 +185,29 @@ function getKpiValue(reading: KpiReading, kpiName: string): number | null {
 
 /** Build display label from KPI name (e.g. temp_external -> Temp External). */
 function kpiNameToLabel(name: string): string {
+  const labelMap: Record<string, string> = {
+    temp_internal: 'Internal Temperature',
+    temp_external: 'External Temperature',
+    shock: 'Shock Detection',
+    tive_battery_percentage: 'Battery Level',
+    ln2_level: 'LN2',
+    ln2_evaporation_rate: 'Evaporation Rate',
+    ln2_lid_state: 'Lid State',
+  };
+  if (labelMap[name]) return labelMap[name];
+
   return name
     .split('_')
     .map((w) => (w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
     .join(' ');
+}
+
+function getKpiLabelFromLimits(limitGroup: unknown, kpiName: string): string {
+  if (limitGroup && typeof limitGroup === 'object') {
+    const names = Object.keys(limitGroup as Record<string, unknown>).filter(Boolean);
+    if (names.length > 0) return names[0];
+  }
+  return kpiNameToLabel(kpiName);
 }
 
 interface IVFQualityTrackingChartProps {
@@ -196,10 +227,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const reconnectDelay = 3000;
 
   const [kpiReadings, setKpiReadings] = useState<KpiReading[]>([]);
-  /** Tabs from DB (kpi_config) when available; otherwise fallback to KPI_TABS. */
-  const [kpiTabs, setKpiTabs] = useState<Array<{ id: string; label: string; unit: string }>>([...KPI_TABS]);
-  const [activeTab, setActiveTab] = useState<string>('temp_external');
+  /** Tabs strictly from DB kpi_config; until loaded, keep null-state. */
+  const [kpiTabs, setKpiTabs] = useState<Array<{ id: string; label: string; unit: string }>>([]);
+  const [activeTab, setActiveTab] = useState<string>('');
   const [kpiThresholds, setKpiThresholds] = useState<KpiThresholdMap>({});
+  const [hasLoadedKpiConfig, setHasLoadedKpiConfig] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasReceivedData, setHasReceivedData] = useState(false);
@@ -248,9 +280,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   // Reset tabs when canister changes (until new config loads)
   useEffect(() => {
     if (!tankId) return;
-    setKpiTabs([...KPI_TABS]);
+    setHasLoadedKpiConfig(false);
+    setKpiTabs([]);
     setKpiThresholds({});
-    setActiveTab('temp_external');
+    setActiveTab('');
   }, [tankId]);
 
   // Fetch KPI config (limits + units) for tabs and visualization; prefer over kpi_history's kpi_config
@@ -259,7 +292,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     ivfService
       .getTankKpiConfig(tankId)
       .then((res) => {
-        if (!isMountedRef.current || !res?.kpi_limits) return;
+        if (!isMountedRef.current) return;
+        if (!res?.kpi_limits) {
+          setHasLoadedKpiConfig(true);
+          return;
+        }
         const thresholdMap = Object.entries(res.kpi_limits as Record<string, unknown>).reduce<KpiThresholdMap>(
           (acc, [kpiName, limitGroup]) => {
             acc[kpiName] = extractThresholdConfigFromKpiLimits(kpiName, limitGroup);
@@ -268,51 +305,37 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           {}
         );
         setKpiThresholds(thresholdMap);
-        const order = [
-          'temp_external',
-          'temp_internal',
-          'ln2_level',
-          'ln2_evaporation_rate',
-          'tive_battery_level',
-          'lid_state',
-          'shock',
-        ];
         const keys = Object.keys(res.kpi_limits).sort(
-          (a, b) => (order.indexOf(a) >= 0 ? order.indexOf(a) : order.length) - (order.indexOf(b) >= 0 ? order.indexOf(b) : order.length)
+          (a, b) =>
+            (KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number]) >= 0
+              ? KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number])
+              : KPI_ORDER.length) -
+            (KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number]) >= 0
+              ? KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number])
+              : KPI_ORDER.length)
         );
-        if (keys.length > 0) {
-          const tabs = keys.map((name) => ({
-            id: name,
-            label: KPI_TABS.find((t) => t.id === name)?.label ?? kpiNameToLabel(name),
-            unit: DEFAULT_TAB_UNIT_MAP[name] || '',
-          }));
-          setKpiTabs(tabs);
-          setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? current));
-        }
+        const tabs = keys.map((name) => ({
+          id: name,
+          label: getKpiLabelFromLimits((res.kpi_limits as Record<string, unknown>)[name], name) || 'null',
+          unit: DEFAULT_TAB_UNIT_MAP[name] || '',
+        }));
+        setKpiTabs(tabs);
+        setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? ''));
+        setHasLoadedKpiConfig(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setHasLoadedKpiConfig(true);
+      });
   }, [tankId]);
 
-  // Fetch KPI history (past data); tabs may already be set from kpi-config
+  // Fetch KPI history (past data)
   useEffect(() => {
     if (!tankId) return;
     ivfService
       .getKpiHistory(tankId, MAX_DATA_POINTS)
       .then((res) => {
         if (!isMountedRef.current) return;
-        // Fallback: use history's kpi_config for tabs only when config endpoint didn't set them (still default)
-        if (res?.kpi_config?.length) {
-          const tabs = res.kpi_config.map((k) => ({
-            id: k.name,
-            label: kpiNameToLabel(k.name),
-            unit: k.unit || '',
-          }));
-          setKpiTabs((prev) => {
-            const isDefault = prev.length === KPI_TABS.length && prev[0]?.id === KPI_TABS[0].id;
-            return isDefault ? tabs : prev;
-          });
-          setActiveTab((current) => (tabs.some((t) => t.id === current) ? current : tabs[0]?.id ?? current));
-        }
         if (res?.history?.length) {
           setKpiReadings((prev) => {
             const byTs = new Map<string, KpiReading>();
@@ -466,7 +489,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal ?? 0, unit: '°C' },
                 { name: 'ln2_level', value: parsed.ln2_level ?? 0, unit: '%' },
                 { name: 'ln2_evaporation_rate', value: parsed.ln2_evaporation_rate ?? 0, unit: 'kg/day' },
-                { name: 'tive_battery_level', value: parsed.tive_battery_percentage ?? 0, unit: '%' },
+                { name: 'tive_battery_percentage', value: parsed.tive_battery_percentage ?? 0, unit: '%' },
               ];
               const reading: KpiReading = {
                 tank_id: parsed.tank_id ?? 0,
@@ -651,7 +674,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const v = context.parsed?.y;
               if (v == null) return '';
               const label = context.dataset.label || '';
-              if (activeTab === 'lid_state') {
+              if (activeTab === 'lid_state' || activeTab === 'ln2_lid_state') {
                 return `${label}: ${v >= 1 ? 'Open (1)' : 'Close (0)'}`;
               }
               return `${label}: ${typeof v === 'number' ? (Math.round(v * 100) / 100).toFixed(2) : v}`;
@@ -669,15 +692,15 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         },
         y: {
           // Keep binary ticks at 0/1, but add headroom for visual breathing space.
-          min: activeTab === 'lid_state' ? -0.2 : (minY != null ? minY - padding : undefined),
-          max: activeTab === 'lid_state' ? 1.2 : (maxY != null ? maxY + padding : undefined),
+          min: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? -0.2 : (minY != null ? minY - padding : undefined),
+          max: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? 1.2 : (maxY != null ? maxY + padding : undefined),
           grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
           ticks: {
             color: '#6B6B6B',
             font: { size: 10 },
-            stepSize: activeTab === 'lid_state' ? 1 : undefined,
+            stepSize: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? 1 : undefined,
             callback: (value: string | number) => {
-              if (activeTab !== 'lid_state') {
+              if (activeTab !== 'lid_state' && activeTab !== 'ln2_lid_state') {
                 const numericValue = Number(value);
                 if (!Number.isFinite(numericValue)) return String(value);
                 // Avoid float artifacts like 0.45000000000000007.
@@ -715,20 +738,24 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
       {/* KPI Tabs (from DB kpi_config when available) */}
       <div className="flex gap-1 mb-3 flex-wrap">
-        {kpiTabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-              activeTab === tab.id
-                ? 'bg-purple-100 border-purple-300 text-purple-900'
-                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {!hasLoadedKpiConfig ? (
+          <span className="text-xs text-[#7C7C7C]">Loading...</span>
+        ) : (
+          kpiTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-purple-100 border-purple-300 text-purple-900'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))
+        )}
       </div>
 
       {error && !isConnected && (
@@ -740,7 +767,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       <div className="min-h-[260px] flex-1 w-full min-w-0 relative">
         {!hasData ? (
           <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
-            {!isConnected || wsRef.current?.readyState !== WebSocket.OPEN
+            {!hasLoadedKpiConfig
+              ? 'Loading...'
+              : !isConnected || wsRef.current?.readyState !== WebSocket.OPEN
               ? 'Connecting...'
               : isConnected && !hasReceivedData
                 ? 'No data available'
