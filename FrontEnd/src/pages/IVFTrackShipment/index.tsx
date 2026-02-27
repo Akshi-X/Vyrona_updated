@@ -55,9 +55,10 @@ export default function IVFTrackShipmentPage() {
         ).length;
     }, [tankId, wsUnreadMessages]);
     
-    const criticalAlertsCount = criticalAlerts.length;
-    const myTasksCount = myTasks.length;
-
+    const criticalAlertsCount = criticalAlerts.filter(alert => alert.acknowledged_at == null).length;
+    const myTasksCount = myTasks.filter(
+        task => task.status === 'Not started' || task.status === 'In progress'
+      ).length;
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
