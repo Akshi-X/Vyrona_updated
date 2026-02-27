@@ -520,42 +520,56 @@ export default function AlertSetting() {
     const useMultiFlow = selectedContainers.length > 1 || configList.length === 0;
     if (useMultiFlow) {
       // For multi-container OR single container with no existing config: use multiDraftConfig to build configs for all KPIs that have values
-      const configsToApply = ALL_KPI_NAMES
-        .map((kpiName) => {
-          const d = getMultiDraft(kpiName);
-          const metadata = getKpiMetadata(kpiName);
-          const inputType = getKpiInputType(kpiName);
-          
-          // Handle special cases
-          let minVal = d.min ?? null;
-          let maxVal = d.max ?? null;
-          
-          // For battery, max is always 100
-          if (inputType === 'battery' && minVal !== null) {
-            maxVal = 100;
+      const configsToApply: Array<{
+        kpi_name: string;
+        alert_name: string | null;
+        min: number | null;
+        max: number | null;
+        unit: string | null;
+        alert_type: string | null;
+      }> = [];
+      for (const kpiName of ALL_KPI_NAMES) {
+        const d = getMultiDraft(kpiName);
+        const metadata = getKpiMetadata(kpiName);
+        const inputType = getKpiInputType(kpiName);
+
+        // LN2 Level: store as two bands — LN2 L2 (0 to L2-1, critical), LN2 L1 (L2 to L1, soft)
+        if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) {
+          const l2 = d.min ?? 60;
+          const l1 = d.max ?? 100;
+          if (d.min !== null || d.max !== null || d.alert_type != null) {
+            const l2Max = Math.max(0, l2 - 1);
+            configsToApply.push(
+              { kpi_name: 'ln2_level', alert_name: 'LN2 L2', min: 0, max: l2Max, unit: '%', alert_type: 'critical' },
+              { kpi_name: 'ln2_level', alert_name: 'LN2 L1', min: l2, max: l1, unit: '%', alert_type: 'soft' },
+            );
           }
-          
-          // For lid_state, convert state to min/max
-          if (inputType === 'lid_state' && d.lid_state) {
-            const values = lidStateToValues(d.lid_state);
-            minVal = values.min;
-            maxVal = values.max;
-          }
-          
-          // Only include if at least one value is set
-          if (minVal !== null || maxVal !== null || d.alert_type !== undefined) {
-            return {
-              kpi_name: kpiName,
-              alert_name: metadata.label,
-              min: minVal,
-              max: maxVal,
-              unit: metadata.unit ?? null,
-              alert_type: d.alert_type ?? null,
-            };
-          }
-          return null;
-        })
-        .filter((c): c is NonNullable<typeof c> => c !== null);
+          continue;
+        }
+
+        let minVal = d.min ?? null;
+        let maxVal = d.max ?? null;
+
+        if (inputType === 'battery' && minVal !== null) {
+          maxVal = 100;
+        }
+        if (inputType === 'lid_state' && d.lid_state) {
+          const values = lidStateToValues(d.lid_state);
+          minVal = values.min;
+          maxVal = values.max;
+        }
+
+        if (minVal !== null || maxVal !== null || d.alert_type !== undefined) {
+          configsToApply.push({
+            kpi_name: kpiName,
+            alert_name: metadata.label,
+            min: minVal,
+            max: maxVal,
+            unit: metadata.unit ?? null,
+            alert_type: d.alert_type ?? null,
+          });
+        }
+      }
 
       if (configsToApply.length === 0) return;
 
@@ -834,8 +848,11 @@ export default function AlertSetting() {
                           // Validation
                           const validation = getKpiValidation(kpiName, minVal, maxVal);
                           
-                          const isAlertEnabled = typeVal && typeVal !== '';
-                          const isCritical = typeVal === 'critical';
+                          // LN2 Level: enabled when L2 or L1 is set (bands are fixed: L2 critical, L1 soft)
+                          const isAlertEnabled = kpiName === KPI_NAMES.IVF_LN2_LEVEL
+                            ? (minVal !== null || maxVal !== null)
+                            : (typeVal && typeVal !== '');
+                          const isCritical = kpiName === KPI_NAMES.IVF_LN2_LEVEL ? false : typeVal === 'critical';
                           
                           // Check if any value is set (for showing clear button)
                           const hasAnyValue = minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== '';
@@ -963,6 +980,53 @@ export default function AlertSetting() {
                                           <span className="text-xs text-gray-400">{metadata.unit}</span>
                                         )}
                                       </div>
+                                    ) : kpiName === KPI_NAMES.IVF_LN2_LEVEL ? (
+                                      /* LN2 Level: L2 (critical band 0–L2-1), L1 (soft band L2–L1) */
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.min = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={0}
+                                            max={100}
+                                            value={minVal != null ? minVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (v !== null && (v < 0 || v > 100)) v = Math.max(0, Math.min(100, v));
+                                              setMultiDraft(kpiName, { min: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'min')}
+                                            placeholder="L2"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            ref={(el) => { refs.max = el; }}
+                                            type="number"
+                                            step="any"
+                                            min={0}
+                                            max={100}
+                                            value={maxVal != null ? maxVal : ''}
+                                            onChange={(e) => {
+                                              let v = e.target.value === '' ? null : Number(e.target.value);
+                                              if (v !== null && (v < 0 || v > 100)) v = Math.max(0, Math.min(100, v));
+                                              setMultiDraft(kpiName, { max: v });
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, kpiKey, 'max')}
+                                            placeholder="L1"
+                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                          />
+                                          {metadata.unit && (
+                                            <span className="text-xs text-gray-400">{metadata.unit}</span>
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-400 shrink-0">L2: critical, L1: soft</span>
+                                      </>
                                     ) : (
                                       /* Standard/Temperature/Percentage inputs */
                                       <>
@@ -1008,30 +1072,32 @@ export default function AlertSetting() {
                                         </div>
                                       </>
                                     )}
-                                    <select
-                                      ref={(el) => { refs.alertType = el; }}
-                                      value={typeVal ?? ''}
-                                      onChange={(e) => {
-                                        const v = e.target.value === '' ? null : e.target.value;
-                                        setMultiDraft(kpiName, { alert_type: v });
-                                      }}
-                                      disabled={!canEnableAlert}
-                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                        !canEnableAlert
-                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                          : isAlertEnabled
-                                            ? isCritical
-                                              ? 'border-red-200 bg-red-50 text-red-700'
-                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                            : 'border-gray-200 bg-white text-gray-500'
-                                      }`}
-                                    >
-                                      {alertTypeOptions.map((opt) => (
-                                        <option key={opt.label} value={opt.value ?? ''}>
-                                          {opt.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                                    {kpiName !== KPI_NAMES.IVF_LN2_LEVEL && (
+                                      <select
+                                        ref={(el) => { refs.alertType = el; }}
+                                        value={typeVal ?? ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value === '' ? null : e.target.value;
+                                          setMultiDraft(kpiName, { alert_type: v });
+                                        }}
+                                        disabled={!canEnableAlert}
+                                        className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
+                                          !canEnableAlert
+                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : isAlertEnabled
+                                              ? isCritical
+                                                ? 'border-red-200 bg-red-50 text-red-700'
+                                                : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                              : 'border-gray-200 bg-white text-gray-500'
+                                        }`}
+                                      >
+                                        {alertTypeOptions.map((opt) => (
+                                          <option key={opt.label} value={opt.value ?? ''}>
+                                            {opt.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1270,7 +1336,10 @@ export default function AlertSetting() {
                       )}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex justify-end">
-                      <button
+                      {!(saveAllLoading ||
+                          (selectedContainers.length > 1 || configList.length === 0
+                            ? Object.keys(multiDraftConfig).length === 0
+                            : Object.keys(draftConfig).length === 0)) && <button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={
@@ -1295,7 +1364,7 @@ export default function AlertSetting() {
                             Save Changes
                           </>
                         )}
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 )}

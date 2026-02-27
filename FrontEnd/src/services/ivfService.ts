@@ -286,9 +286,10 @@ export class IvfService extends BaseApiService {
     );
   }
 
-  async checkCanisterExists(canisterId: string | number): Promise<CanisterCheckResponse> {
+  async checkCanisterExists(canisterId: string | number, branchId?: number | null): Promise<CanisterCheckResponse> {
+    const params = branchId != null ? `?branch_id=${encodeURIComponent(branchId)}` : '';
     return await this.request<CanisterCheckResponse>(
-      `/api/ivf/canisters/${encodeURIComponent(canisterId)}/check`,
+      `/api/ivf/canisters/${encodeURIComponent(canisterId)}/check${params}`,
       { method: 'GET' }
     );
   }

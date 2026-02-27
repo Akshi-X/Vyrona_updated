@@ -177,7 +177,7 @@ const ControlTower = () => {
           flattenedCanisters = data.canisters.map((canister: any) => {
             // Normalize status
             let statusText = 'Safe';
-            const status = canister.canister_status?.toLowerCase() || '';
+            const status = canister.status?.toLowerCase() || '';
             if (status === 'risk' || status === 'critical') {
               statusText = status === 'critical' ? 'Critical' : 'Risk';
             } else if (status === 'safe') {
@@ -218,6 +218,13 @@ const ControlTower = () => {
                     date = d.toLocaleDateString('en-GB');
                   }
                 }
+                let statusText = 'Safe';
+                const status = tank.status?.toLowerCase() || '';
+                if (status === 'risk' || status === 'critical') {
+                  statusText = status === 'critical' ? 'Critical' : 'Risk';
+                } else if (status === 'safe') {
+                  statusText = 'Safe';
+                }
 
                 return {
                   id: `tank-${branch.branch_name || 'N/A'}-${tank.tank_code || ''}`,
@@ -225,7 +232,8 @@ const ControlTower = () => {
                   tankId: String(tank.tank_id ?? 'N/A'),
                   branchId: String(branch.branch_id ?? tank.branch_id ?? 'N/A'),
                   branchName: branch.branch_name || 'N/A',
-                  status: 'Safe', // Default status since tanks don't have status in API response
+                  status: statusText,
+                  deviations: tank.deviations,
                   date: date,
                 };
               });

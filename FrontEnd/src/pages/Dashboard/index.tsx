@@ -684,19 +684,47 @@ export default function Dashboard({ }: DashboardProps) {
       try {
         const response = await ivfService.getDeviationsGraph();
         if (!cancelled && response && Array.isArray(response)) {
-          // Unique branch names (x-axis)
-          const containers = Array.from(new Set(response.map(item => item.branch_name)));
-          // Unique alert names (series)
-          const alertNames = Array.from(new Set(response.map(item => item.alert_name)));
-          const colorPalette = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
-          // For each alert_name, build a series with data for each branch
-          const metrics = alertNames.map((alertName, idx) => ({
+          const REQUIRED_ALERTS = [
+            'Lid State',
+            'LN2 Level',
+            'Evaporation Rate',
+            'Internal Temperature',
+            'External Temperature',
+            'Shock Detection',
+          ];
+
+          const branchNamesFromData = response
+            .map((item) => item?.branch_name?.trim())
+            .filter((name): name is string => typeof name === 'string' && name.length > 0);
+
+          // Show all branches returned by deviations API.
+          const containers = Array.from(new Set(branchNamesFromData)).sort((a, b) => a.localeCompare(b));
+
+          // Sum duplicate rows from API by (branch_name, alert_name).
+          const deviationMap = new Map<string, number>();
+          response.forEach((item) => {
+            const branchName = (item?.branch_name ?? '').trim();
+            const alertName = (item?.alert_name ?? '').trim();
+            const count = Number(item?.deviation_count ?? 0);
+            if (!branchName || !alertName || !Number.isFinite(count)) return;
+            const key = `${branchName}__${alertName}`;
+            deviationMap.set(key, (deviationMap.get(key) ?? 0) + count);
+          });
+
+          const responseAlerts = response
+            .map((item) => item?.alert_name)
+            .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+          const orderedAlerts = Array.from(new Set([...REQUIRED_ALERTS, ...responseAlerts]));
+
+          // Keep color assignment deterministic; chart component also maps by name.
+          const colorPalette = ['#A78BFA', '#60A5FA', '#F59E0B', '#10B981', '#F97316', '#EC4899', '#94A3B8'];
+          const metrics = orderedAlerts.map((alertName, idx) => ({
             name: alertName,
             color: colorPalette[idx % colorPalette.length],
-            data: containers.map(branchName => {
-              const found = response.find(item => item.branch_name === branchName && item.alert_name === alertName);
-              return found ? found.deviation_count : 0;
-            })
+            data: containers.map((branchName) => {
+              const key = `${branchName}__${alertName}`;
+              return deviationMap.get(key) ?? 0;
+            }),
           }));
           setIvfQualityDeviationChart({ containers, metrics });
         }

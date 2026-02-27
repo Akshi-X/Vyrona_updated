@@ -170,7 +170,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     setCanisterCheckMessage(null);
 
     try {
-      const response: CanisterCheckResponse = await ivfService.checkCanisterExists(trimmed);
+      const response: CanisterCheckResponse = await ivfService.checkCanisterExists(trimmed, selectedBranchId);
       setCanisterCheckMessage(response.message);
       if (!response.exists) {
         setCanisterCheckError(response.message);

@@ -3,8 +3,11 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 import logging
 
-from sqlalchemy import and_, case, desc, func, or_
+from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.orm import Session
+
+from ...models.kpi_config_model import KpiConfig
+from ...models.readings_model import Readings
 
 from ...constants.enums import CanisterStatus
 from ...models.IVF.hospital_branch_model import HospitalBranch
@@ -151,71 +154,90 @@ class IVFService:
         """
         try:
             
-            # Query active tanks with branch information
-            query = (
-                self.db.query(
-                    Tank,
-                    HospitalBranch.branch_id,
-                    HospitalBranch.branch_name
+            
+            # Subquery: latest deviation per (tank_id, kpi_config_id)
+            readings_subq = (
+                select(
+                    Readings.tank_id,
+                    Readings.kpi_config_id,
+                    Readings.deviation
                 )
-                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
-                .filter(Tank.is_active == True)
+                .distinct(Readings.tank_id, Readings.kpi_config_id)
+                .order_by(Readings.tank_id, Readings.kpi_config_id, desc(Readings.timestamp))
+                .subquery()
             )
 
-            # Scope by hospital when provided
-            if hospital_id is not None:
-                query = query.filter(HospitalBranch.hospital_id == hospital_id)
+            # Aggregate deviations per tank
+            deviations_subq = (
+                select(
+                    readings_subq.c.tank_id,
+                    func.count()
+                    .filter(readings_subq.c.deviation == True)
+                    .label("total_deviations")
+                )
+                .group_by(readings_subq.c.tank_id)
+                .subquery()
+            )
 
-            # Scope by branch when provided
+            # Main query
+            stmt = (
+                select(
+                    Tank,
+                    HospitalBranch.branch_id,
+                    HospitalBranch.branch_name,
+                    func.coalesce(deviations_subq.c.total_deviations, 0).label("total_deviations")
+                )
+                .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .outerjoin(deviations_subq, deviations_subq.c.tank_id == Tank.tank_id)
+                .where(Tank.is_active == True)
+            )
+
+            # Optional filters
+            if hospital_id is not None:
+                stmt = stmt.where(HospitalBranch.hospital_id == hospital_id)
+
             if branch_id is not None:
-                query = query.filter(Tank.branch_id == branch_id)
-            
-            # Apply branch name filter if provided (backward-compatible)
+                stmt = stmt.where(Tank.branch_id == branch_id)
+
             if branch_name is not None:
-                query = query.filter(HospitalBranch.branch_name == branch_name)
-            
-            # Apply status filter if provided
-            if status is not None:
-                query = query.filter(Tank.status == status)
-            
-            results = query.all()
-            
-            # Group tanks by branch
-            branches_dict = defaultdict(lambda: {
-                "branch_id": None,
-                "branch_name": None,
-                "tanks": []
-            })
-            
+                stmt = stmt.where(HospitalBranch.branch_name == branch_name)
+
+            # Execute
+            results = self.db.execute(stmt).fetchall()
+
+            # Group by branch
+            branches_dict = defaultdict(lambda: {"branch_id": None, "branch_name": None, "tanks": []})
             total_tanks = 0
-            
-            for tank, branch_id_val, branch_name_val in results:
-                # Initialize branch if not already in dict
+
+            for tank, branch_id_val, branch_name_val, total_deviations in results:
+                calculated_status = "critical" if total_deviations > 0 else "safe"
+
+                # Apply status filter post-query (since it's computed)
+                if status is not None and calculated_status != status.value:
+                    continue
+
                 if branches_dict[branch_id_val]["branch_id"] is None:
                     branches_dict[branch_id_val]["branch_id"] = branch_id_val
                     branches_dict[branch_id_val]["branch_name"] = branch_name_val or "Unknown"
-                
-                tank_data = {
+
+                branches_dict[branch_id_val]["tanks"].append({
                     "tank_id": tank.tank_id,
                     "tank_code": tank.tank_code or "",
                     "updated_at": tank.updated_at or tank.created_at,
-                    "status": tank.status
-                }
-                
-                branches_dict[branch_id_val]["tanks"].append(tank_data)
+                    "status": calculated_status,
+                    "deviations": total_deviations
+                })
                 total_tanks += 1
-            
-            # Convert to list and sort by branch name
+
             branches_list = sorted(
                 list(branches_dict.values()),
                 key=lambda x: x["branch_name"]
             )
-            
+
             return {
                 "branches": branches_list,
                 "total": total_tanks
             }
-            
         except Exception as e:
             raise Exception(f"Error fetching active tanks: {str(e)}")
     
@@ -1000,9 +1022,7 @@ class IVFService:
                 goblet_q = goblet_q.filter(PatientCrylockInfo.branch_id == branch_id)
             goblet_rows = goblet_q.group_by(PatientCrylockInfo.goblet_color).all()
             goblet_colors = sorted([r[0] for r in goblet_rows if r[0]])
-            goblet_color_counts = {r[0]: r[1] for r in goblet_rows if r[0]}
-
-            # Cryolock colors: filter by branch_name, status, goblet
+            goblet_color_counts = {r[0]: r[1] for r in goblet_rows if r[0]}            # Cryolock colors: filter by branch_name, status, goblet
             crylock_q = (
                 self.db.query(PatientCrylockInfo.crylock_color, func.count(PatientCrylockInfo.id).label("cnt"))
                 .join(Tank, PatientCrylockInfo.tank_id == Tank.tank_id)
