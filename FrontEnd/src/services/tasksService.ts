@@ -5,6 +5,7 @@
 
 import { BaseApiService } from './baseApiService';
 
+export type TaskStatus = 'Not started' | 'In progress' | 'Done' | 'Cancelled';
 export interface Task {
   id: number;
   task_name: string;
@@ -28,7 +29,7 @@ export interface Task {
   tank_code?: string | null;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
-  status: 'Not started' | 'In progress' | 'Done';
+  status: TaskStatus;
   created_at: string;
   updated_at?: string;
   permissions?: {
@@ -111,7 +112,7 @@ export class TasksService extends BaseApiService {
     tank_id?: number;
     due_date?: string;
     priority: 'Low' | 'Medium' | 'High';
-    status?: 'Not started' | 'In progress' | 'Done';
+    status?: TaskStatus;
   }): Promise<TaskMutationResponse> {
     return await this.request<TaskMutationResponse>('/api/tasks', {
       method: 'POST',
@@ -131,7 +132,7 @@ export class TasksService extends BaseApiService {
     tank_id?: number;
     due_date?: string;
     priority?: 'Low' | 'Medium' | 'High';
-    status?: 'Not started' | 'In progress' | 'Done';
+    status?: TaskStatus;
   }): Promise<TaskMutationResponse> {
     return await this.request<TaskMutationResponse>(`/api/tasks/${taskId}`, {
       method: 'PUT',
@@ -142,7 +143,7 @@ export class TasksService extends BaseApiService {
   /**
    * Update task status
    */
-  async updateTaskStatus(taskId: number, status: 'Not started' | 'In progress' | 'Done'): Promise<TaskMutationResponse> {
+  async updateTaskStatus(taskId: number, status: TaskStatus): Promise<TaskMutationResponse> {
     return await this.request<TaskMutationResponse>(`/api/tasks/${taskId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),

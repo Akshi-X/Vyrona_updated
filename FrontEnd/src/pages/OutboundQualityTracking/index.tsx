@@ -377,7 +377,7 @@ export default function OutboundQualityTrackingPage() {
                             tank_code?: string;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
-                            status?: 'Not started' | 'In progress' | 'Done';
+                            status?: import('../../services/tasksService').TaskStatus;
                         } = {};
 
                         // Check if task was created by current user - they can edit all fields
@@ -417,7 +417,7 @@ export default function OutboundQualityTrackingPage() {
                         } else {
                             // Assignee can only update status - use dedicated status update endpoint
                             if (task.status) {
-                                await tasksService.updateTaskStatus(taskId, task.status);
+                                await tasksService.updateTaskStatus(taskId, task.status as import('../../services/tasksService').TaskStatus);
                                 // Refresh tasks after update
                                 fetchMyTasks();
                                 return; // Early return since we've handled the update
