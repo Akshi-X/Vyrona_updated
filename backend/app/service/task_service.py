@@ -43,7 +43,11 @@ from app.utils.utils import get_user_by_id, normalize_role_to_title_case
 from app.utils.user_helpers import is_hospital_department
 
 
-def _resolve_tank_code_to_id(tank_code: str, db: Session) -> int:
+def _resolve_tank_code_to_id(
+    tank_code: str,
+    db: Session,
+    current_user: Optional[User] = None
+) -> int:
     """
     Resolve tank_code (string) to tank_id (int) for internal database operations.
     
@@ -58,18 +62,42 @@ def _resolve_tank_code_to_id(tank_code: str, db: Session) -> int:
         TaskInvalidPatientException: If tank not found
     """
     tank_code_str = str(tank_code).strip()
-    tank = db.query(Tank).filter(Tank.tank_code == tank_code_str).first()
-    if not tank and tank_code_str.isdigit():
+
+    # Prefer current user's branch when available (hospital users).
+    if current_user and current_user.branch_id is not None:
+        branch_match = (
+            db.query(Tank)
+            .filter(
+                Tank.tank_code == tank_code_str,
+                Tank.branch_id == current_user.branch_id
+            )
+            .first()
+        )
+        if branch_match:
+            return branch_match.tank_id
+
+    matches = db.query(Tank).filter(Tank.tank_code == tank_code_str).all()
+    if len(matches) == 1:
+        return matches[0].tank_id
+    if len(matches) > 1:
+        raise TaskInvalidPatientException(
+            patient_id=f"Multiple tanks found for code '{tank_code}'. Please provide tank_id."
+        )
+
+    # Backward compatibility: allow numeric tank identifier in tank_code field.
+    if tank_code_str.isdigit():
         tank = db.query(Tank).filter(Tank.tank_id == int(tank_code_str)).first()
-    if not tank:
-        raise TaskInvalidPatientException(patient_id=f"Tank with code '{tank_code}' not found")
-    return tank.tank_id
+        if tank:
+            return tank.tank_id
+
+    raise TaskInvalidPatientException(patient_id=f"Tank with code '{tank_code}' not found")
 
 
 def _resolve_tank_identifier_to_id(
     db: Session,
     tank_id: Optional[int] = None,
-    tank_code: Optional[str] = None
+    tank_code: Optional[str] = None,
+    current_user: Optional[User] = None
 ) -> int:
     """
     Resolve tank_id/tank_code to canonical tank_id.
@@ -82,7 +110,7 @@ def _resolve_tank_identifier_to_id(
         return tank.tank_id
 
     if tank_code:
-        return _resolve_tank_code_to_id(tank_code, db)
+        return _resolve_tank_code_to_id(tank_code, db, current_user=current_user)
 
     raise TaskInvalidPatientException(patient_id="Either tank_id or tank_code is required for IVF flow")
 
@@ -142,6 +170,7 @@ def _build_task_response(task: Tasks, current_user: User, db: Session) -> TaskRe
         created_by=creator_info,
         patient_id=task.patient_id,
         tank_code=tank_code,
+        tank_id=task.tank_id,
         due_date=task.due_date,
         priority=task.priority,
         status=task.status,
@@ -226,7 +255,8 @@ def create_task(
             tank_id = _resolve_tank_identifier_to_id(
                 db=db,
                 tank_id=request.tank_id,
-                tank_code=request.tank_code
+                tank_code=request.tank_code,
+                current_user=current_user
             )
         
         # Create task
@@ -608,7 +638,8 @@ def update_task(
             tank_id = _resolve_tank_identifier_to_id(
                 db=db,
                 tank_id=request.tank_id,
-                tank_code=request.tank_code
+                tank_code=request.tank_code,
+                current_user=current_user
             )
             task.tank_id = tank_id
             task.patient_id = None  # Clear patient_id when setting tank_id

@@ -184,20 +184,86 @@ def get_tank_kpi_history(
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     
-    # Prefer Redis (live buffer), then DB (readings table)
-    history = quality_service.get_tank_kpi_redis_history(tank_id, limit=limit)
-    if not history:
-        history = quality_service.get_tank_kpi_history(tank_id, limit=limit)
-    # Derive KPI config (tabs) from DB/Redis data: unique (name, unit) in order of first appearance
-    seen = {}
+    # Build per-KPI readings (last N per KPI config) from DB
+    per_kpi = quality_service.get_last_n_readings_per_kpi(tank_id, limit) or {}
+
+    # Build latest reading map per KPI name
+    latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
+    latest_by_name = {}
+    for item in (latest_readings.get("kpis") or []):
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        latest_by_name[name] = {
+            "value": item.get("value"),
+            "timestamp": item.get("timestamp"),
+            "unit": item.get("unit") or "",
+        }
+
+    # Build kpi_config from configured KPI rows (value rows only: alert_name is null)
+    # and attach latest reading fields for each configured KPI.
+    raw_config_rows = quality_service.list_kpi_config_by_tank(tank_id)
+    seen_names = set()
     kpi_config = []
-    for entry in history:
-        for k in (entry.get("kpis") or []):
-            name = (k.get("name") or "").strip()
-            if name and name not in seen:
-                seen[name] = True
-                kpi_config.append({"name": name, "unit": k.get("unit") or ""})
-    return {"tank_code": tank.tank_code or f"T{tank_id}", "tank_id": tank_id, "history": history, "kpi_config": kpi_config}
+    for row in raw_config_rows:
+        if not row.get("status"):
+            continue
+        if row.get("alert_name") is not None:
+            continue
+        name = (row.get("kpi_name") or "").strip()
+        if not name or name in seen_names:
+            continue
+        seen_names.add(name)
+        latest = latest_by_name.get(name, {})
+        kpi_config.append(
+            {
+                "name": name,
+                "unit": row.get("unit") or latest.get("unit") or "",
+                "latest_value": latest.get("value"),
+                "latest_timestamp": latest.get("timestamp"),
+            }
+        )
+
+    # KPI-wise grouped series for easier per-KPI graph rendering
+    # Built from DB helper that returns last N readings per KPI config.
+    kpi_series = {}
+    for item in (per_kpi.get("kpis") or []):
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        if name not in kpi_series:
+            kpi_series[name] = []
+        kpi_series[name].append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "unit": item.get("unit") or "",
+            }
+        )
+
+    # get_last_n_readings_per_kpi returns latest-first per KPI; reverse each list to oldest->latest.
+    for name in list(kpi_series.keys()):
+        kpi_series[name].reverse()
+
+    # Fallback when no value-rows exist in kpi_config table: derive tabs from kpi_series keys.
+    if not kpi_config:
+        for name, points in kpi_series.items():
+            latest = points[-1] if points else {}
+            kpi_config.append(
+                {
+                    "name": name,
+                    "unit": latest.get("unit") or "",
+                    "latest_value": latest.get("value"),
+                    "latest_timestamp": latest.get("timestamp"),
+                }
+            )
+
+    return {
+        "tank_code": tank.tank_code or f"T{tank_id}",
+        "tank_id": tank_id,
+        "kpi_config": kpi_config,
+        "kpi_series": kpi_series,
+    }
 
 
 @router.post("/tanks/{tank_code}/kpi-readings")

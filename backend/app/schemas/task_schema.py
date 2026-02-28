@@ -156,6 +156,7 @@ class TaskResponse(BaseModel):
     created_by: TaskCreatorInfo
     patient_id: Optional[str]  # For CGT flow
     tank_code: Optional[str]  # For IVF flow (e.g., "T1")
+    tank_id: Optional[int]  # For IVF flow (internal tank ID)
     due_date: Optional[datetime]
     priority: TaskPriority
     status: TaskStatus
@@ -232,4 +233,3 @@ class DeleteTaskResponse(BaseModel):
     """Response schema after deleting a task"""
     message: str
     task_id: int
-

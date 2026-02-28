@@ -13,6 +13,7 @@ export interface MyTask {
   patientId: string;
   canisterNumber?: string;
   tankCode?: string;
+  tankId?: number;
   assigneeId?: string; // user_id (stored for update calls)
   taskName: string;
   description: string;
@@ -38,6 +39,7 @@ interface MyTasksModalProps {
   userRole?: string; // User's role for role-based access control
   defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
   defaultCanisterNumber?: string; // Default canister number to pre-fill when adding a new IVF task
+  defaultTankId?: number; // Default tank ID for exact IVF task mapping
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -53,7 +55,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
   onTaskCreated,
   userRole = '',
   defaultPatientId = '',
-  defaultCanisterNumber = ''
+  defaultCanisterNumber = '',
+  defaultTankId
 }) => {
   const isUserRole = userRole?.toLowerCase() === 'user';
   const isIvfVariant = variant === 'ivf';
@@ -154,6 +157,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     
     setIsSaving(true);
     try {
+      const normalizedCanisterNumber = newTask.canisterNumber.trim();
+      const normalizedTankId =
+        isIvfVariant && Number.isFinite(defaultTankId) ? Number(defaultTankId) : undefined;
+
       // Map frontend fields to API format
       // assignee_id should be the user_id (string) to assign the task to
       // For now, we default to current user (self-assignment)
@@ -162,7 +169,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         description: newTask.description.trim(),
         assignee_id: newTask.assigneeId || currentUserId, // Use assigneeId or fallback to current user
         patient_id: isIvfVariant ? undefined : (newTask.patientId.trim() || undefined),
-        tank_code: isIvfVariant ? (newTask.canisterNumber.trim() || undefined) : undefined,
+        tank_id: isIvfVariant ? normalizedTankId : undefined,
+        tank_code: isIvfVariant && normalizedTankId === undefined ? (normalizedCanisterNumber || undefined) : undefined,
         due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : undefined,
         priority: newTask.priority,
         status: newTask.status as 'Not started' | 'In progress' | 'Done'

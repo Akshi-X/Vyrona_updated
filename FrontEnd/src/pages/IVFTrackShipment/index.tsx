@@ -59,6 +59,9 @@ export default function IVFTrackShipmentPage() {
     const myTasksCount = myTasks.filter(
         task => task.status === 'Not started' || task.status === 'In progress'
       ).length;
+    const routeTankCode = tankId && !/^\d+$/.test(tankId) ? tankId : '';
+    const routeTankId = tankId && /^\d+$/.test(tankId) ? Number(tankId) : undefined;
+    const resolvedTankCode = headerTankCode && headerTankCode !== '-' ? headerTankCode : routeTankCode;
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
         try {
@@ -389,11 +392,16 @@ export default function IVFTrackShipmentPage() {
                 onClose={() => setShowMyTasks(false)}
                 tasks={myTasks.map(task => {
                     try {
+                        const displayTankCode =
+                            (task.tank_code && String(task.tank_code).trim()) ||
+                            resolvedTankCode ||
+                            '';
                         return {
                             id: task.id.toString(),
                             patientId: task.patient_id || 'N/A',
-                            tankCode: task.tank_code || undefined,
-                            canisterNumber: task.canister_number || tankId || 'N/A',
+                            tankCode: displayTankCode || undefined,
+                            tankId: task.tank_id ?? routeTankId,
+                            canisterNumber: task.canister_number || displayTankCode || 'N/A',
                             taskName: task.task_name,
                             description: task.description || '',
                             assigneeBy: task.created_by 
@@ -408,11 +416,16 @@ export default function IVFTrackShipmentPage() {
                         };
                     } catch (error) {
                         console.error('Error transforming task:', task, error);
+                        const displayTankCode =
+                            (task?.tank_code && String(task.tank_code).trim()) ||
+                            resolvedTankCode ||
+                            '';
                         return {
                             id: task.id?.toString() || 'unknown',
                             patientId: task.patient_id || 'N/A',
-                            tankCode: task.tank_code || undefined,
-                            canisterNumber: task.canister_number || tankId || 'N/A',
+                            tankCode: displayTankCode || undefined,
+                            tankId: task?.tank_id ?? routeTankId,
+                            canisterNumber: task.canister_number || displayTankCode || 'N/A',
                             taskName: task.task_name || 'Unknown Task',
                             description: task.description || '',
                             assigneeBy: 'Unknown',
@@ -428,7 +441,8 @@ export default function IVFTrackShipmentPage() {
                 currentUserName={currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : ''}
                 currentUserId={currentUserId}
                 userRole={userRole || currentUser?.role || ''}
-                defaultCanisterNumber={tankId || ''}
+                defaultCanisterNumber={resolvedTankCode || ''}
+                defaultTankId={routeTankId}
                 onTaskCreated={() => {
                     // Refresh tasks after creation
                     fetchMyTasks();
@@ -454,6 +468,7 @@ export default function IVFTrackShipmentPage() {
                             assignee_id?: string;
                             patient_id?: string;
                             tank_code?: string;
+                            tank_id?: number;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
                             status?: import('../../services/tasksService').TaskStatus;
@@ -473,7 +488,12 @@ export default function IVFTrackShipmentPage() {
                             }
 
                             // IVF tasks are tank-scoped; CGT tasks are patient-scoped
-                            if (task.canisterNumber && task.canisterNumber !== 'N/A') {
+                            const targetTankId = task.tankId ?? routeTankId;
+                            if (targetTankId !== undefined) {
+                                updateData.tank_id = targetTankId;
+                                updateData.tank_code = undefined;
+                                updateData.patient_id = undefined;
+                            } else if (task.canisterNumber && task.canisterNumber !== 'N/A') {
                                 updateData.tank_code = String(task.canisterNumber);
                                 updateData.patient_id = undefined;
                             } else {
