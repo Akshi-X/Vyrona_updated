@@ -58,7 +58,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
     label: 'LN2',
     description: 'Liquid nitrogen level monitoring for cryogenic safety',
     icon: <WaterDropIcon sx={{ fontSize: 20 }} />,
-    unit: '%',
+    unit: 'Ln2 in kg',
   },
   [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]: {
     label: 'Evaporation Rate',
