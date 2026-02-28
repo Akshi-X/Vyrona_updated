@@ -816,7 +816,7 @@ export default function Dashboard({ }: DashboardProps) {
               ? `Canister ${ivfAlert.canister_id}`
               : 'N/A'),
         message: ivfAlert.message,
-        timestamp: new Date(ivfAlert.occurred_at).toLocaleString(),
+        timestamp: new Date(ivfAlert.occurred_at+"Z").toLocaleString(),
         status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
       };
     } else {
