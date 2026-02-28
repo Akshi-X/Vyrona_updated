@@ -381,8 +381,7 @@ class CriticalAlertService:
         deviations = self.db.query(Readings).filter(
             Readings.tank_id == tank_id,
             Readings.deviation == True,
-            Readings.checked == None,
-            Readings.deviation_alert_sent == False,
+            Readings.checked.is_(None) | (Readings.checked == False),
         ).all()
 
         logger.info("Deviation count for tank_id=%s: %s", tank_id, len(deviations))
