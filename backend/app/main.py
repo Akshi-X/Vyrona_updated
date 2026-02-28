@@ -121,9 +121,9 @@ async def startup_event():
     
 #     # Step 1: Create database tables first
 #     logger.info("Creating database tables...")
-    create_tables()
-    # Run schema sync/init migrations (safe/idempotent)
-    create_admin()
+    # create_tables()
+    # # Run schema sync/init migrations (safe/idempotent)
+    # create_admin()
     
 #     # Step 2: Create pharma admin users
 #     logger.info("Creating pharma admin users...")
