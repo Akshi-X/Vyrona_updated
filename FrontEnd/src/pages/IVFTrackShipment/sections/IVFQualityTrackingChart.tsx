@@ -25,7 +25,7 @@ ChartJS.register(
 export const KPI_TABS = [
   { id: 'temp_external', label: 'External Temperature', unit: '°C' },
   { id: 'temp_internal', label: 'Internal Temperature', unit: '°C' },
-  { id: 'ln2_level', label: 'LN2', unit: '%' },
+  { id: 'ln2_level', label: 'LN2', unit: 'kg' },
   { id: 'ln2_evaporation_rate', label: 'Evaporation Rate', unit: 'kg/h' },
   { id: 'tive_battery_percentage', label: 'Battery Level', unit: '%' },
   { id: 'ln2_lid_state', label: 'Lid State', unit: '' },

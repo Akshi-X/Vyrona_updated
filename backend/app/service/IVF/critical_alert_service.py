@@ -382,6 +382,7 @@ class CriticalAlertService:
             Readings.tank_id == tank_id,
             Readings.deviation == True,
             Readings.checked == None,
+            Readings.deviation_alert_sent == False,
         ).all()
 
         logger.info("Deviation count for tank_id=%s: %s", tank_id, len(deviations))
@@ -421,12 +422,20 @@ class CriticalAlertService:
             tank_code = self.db.query(Tank.tank_code).filter(Tank.tank_id == tank_id).scalar()
             branch_name = self.db.query(HospitalBranch.branch_name).filter(HospitalBranch.branch_id == deviation.branch_id).scalar()
 
+            # Frame message
+            message = f'{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank'
+            if(kpi_config.kpi_name == "ln2_lid_state"):
+                message = f'{kpi_config.alert_name} is {"OPEN" if deviation.kpi_value == 1 else "CLOSED"} in {branch_name} branch for {tank_code} tank'
+
+            if(kpi_config.kpi_name == "ln2_level"):
+                message = f'{kpi_config.alert_name} crossed L2 in {branch_name} branch for {tank_code} tank'
+
             alert = self._create_alert(
                     tank_id=tank_id,
                     alert_type=AlertType.DEVIATION_ALERT,
                     source=AlertSource.KPI,
                     severity=AlertSeverity.LOW if kpi_config.alert_type == "soft" else AlertSeverity.HIGH,
-                    message=f'{kpi_config.alert_name} is deviated to {round(deviation.kpi_value, 2)} in {branch_name} branch for {tank_code} tank',
+                    message=message,
                     occurred_at=deviation.timestamp,
                     triggered_by=AlertTriggeredBy.SYSTEM,
                     extra_info=str(kpi_config.id)  # Include kpi_config_id in dedup_key for better tracking
