@@ -371,7 +371,7 @@ export default function IVFTrackShipmentPage() {
                             ? a.canister_number
                             : `Canister ${a.canister_id}`,
                     message: a.message,
-                    timestamp: new Date(a.occurred_at).toLocaleString(),
+                    timestamp: new Date(a.occurred_at+"Z").toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
