@@ -440,16 +440,18 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     v != null ? `${v.toFixed(1)}°C` : '—';
   const lidLabel = lidStatus == null ? '—' : lidStatus === 1 ? 'Open' : 'Closed';
 
+  const levelActualPercent = levelPercent != null ? Math.round((levelPercent/34.894)*100) : null;
+
   // Tank dimensions for fill calculation
   const tankBodyTop = 50;
   const tankBodyHeight = 220;
   const tankBodyBottom = tankBodyTop + tankBodyHeight;
-  const fillHeight = (tankBodyHeight * (levelPercent ?? 0)) / 100;
+  const fillHeight = (tankBodyHeight * (levelActualPercent ?? 0)) / 100;
   const liquidSurfaceY = tankBodyBottom - fillHeight;
-  
+
   // L1/L2 level marker positions (calculate Y from percentage)
   const l1Y = l1 != null ? tankBodyBottom - (tankBodyHeight * l1) / 100 : null;
-  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * l2) / 100 : null;
+  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * (100-((34.894-l2)/34.894)*100)) / 100 : null;
   
   // Alert color based on level thresholds
   const alertColor = levelPercent == null
@@ -632,7 +634,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               fill="#6B1176"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
-              {levelPercent != null ? `${Math.round(levelPercent)}L` : '—'}
+              {levelPercent != null ? `${Math.round((levelPercent/34.894)*100)}%` : '—'}
             </text>
             <text
               x="100"
