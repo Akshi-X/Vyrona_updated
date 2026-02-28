@@ -399,24 +399,29 @@ class CriticalAlertService:
                 deviation.checked = True
                 continue
             
-            ## Check if last alert created for this config is not acknowledged and occurred within last 1 hours, 
-            # if yes skip creating new alert to avoid alert spam
+            ## Check if last alert created/updated for this config is not acknowledged and occurred within last 1 hour, 
+            # if yes skip creating new alert to avoid alert spam.
+            # Use COALESCE(updated_at, created_at) so that dedup-updates (which only set updated_at)
+            # correctly reset the 1-hour cooldown window.
+            last_activity_col = func.coalesce(CriticalAlert.updated_at, CriticalAlert.created_at)
             last_alert = self.db.query(CriticalAlert).filter(
                 CriticalAlert.tank_id == tank_id,
                 CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
                 CriticalAlert.dedup_key.like(f"%:{kpi_config.id}"),
                 CriticalAlert.status != AlertStatus.ACKNOWLEDGED.value
-            ).order_by(CriticalAlert.created_at.desc()).first()
+            ).order_by(last_activity_col.desc()).first()
             
             now = datetime.now(timezone.utc)
-            # Ensure timezone-aware comparison
-            if last_alert and last_alert.created_at:
-                created_at = last_alert.created_at if last_alert.created_at.tzinfo else last_alert.created_at.replace(tzinfo=timezone.utc)
-                if (now - created_at).total_seconds() < 3600:  # 1 hour in seconds
-                    logger.info("Skipping alert creation for kpi_config_id=%s as last alert was created within 1 hour", kpi_config.id)
-                    deviation.checked = True
-                    checked_kpi_configs.append(kpi_config.id)
-                    continue
+            # Ensure timezone-aware comparison using the most recent timestamp (updated_at or created_at)
+            if last_alert:
+                last_alert_time = last_alert.updated_at or last_alert.created_at
+                if last_alert_time:
+                    last_alert_time = last_alert_time if last_alert_time.tzinfo else last_alert_time.replace(tzinfo=timezone.utc)
+                    if (now - last_alert_time).total_seconds() < 3600:  # 1 hour in seconds
+                        logger.info("Skipping alert creation for kpi_config_id=%s as last alert was created/updated within 1 hour", kpi_config.id)
+                        deviation.checked = True
+                        checked_kpi_configs.append(kpi_config.id)
+                        continue
 
             tank_code = self.db.query(Tank.tank_code).filter(Tank.tank_id == tank_id).scalar()
             branch_name = self.db.query(HospitalBranch.branch_name).filter(HospitalBranch.branch_id == deviation.branch_id).scalar()
@@ -751,7 +756,9 @@ class CriticalAlertService:
         for user in all_users:
             try:
                 subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
-                
+                ist = timezone(timedelta(hours=5, minutes=30))
+                utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)  # mark as UTC
+                timestamp_string =utc_time.astimezone(ist).strftime('%Y-%m-%d %H:%M:%S IST')
                 if template:
                     html_body = template.render(
                         subject=subject,
@@ -761,7 +768,7 @@ class CriticalAlertService:
                         tank_code=tank_code,
                         branch_name=branch.branch_name or "N/A",
                         message=alert.message,
-                        occurred_at=alert.occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                        occurred_at=timestamp_string,
                         acknowledge_url=alerts_url,
                         severity_class=severity_class
                     )
@@ -776,7 +783,7 @@ class CriticalAlertService:
                         <p><strong>Tank:</strong> {tank_code}</p>
                         <p><strong>Branch:</strong> {branch.branch_name or 'N/A'}</p>
                         <p><strong>Message:</strong> {alert.message}</p>
-                        <p><strong>Occurred At:</strong> {alert.occurred_at.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+                        <p><strong>Occurred At:</strong> {timestamp_string}</p>
                         <br/>
                         <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
                             View Alerts
