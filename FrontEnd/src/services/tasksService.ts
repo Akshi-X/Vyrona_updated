@@ -27,6 +27,7 @@ export interface Task {
   patient_id?: string;
   canister_number?: string | null;
   tank_code?: string | null;
+  tank_id?: number | null;
   due_date?: string;
   priority: 'Low' | 'Medium' | 'High';
   status: TaskStatus;

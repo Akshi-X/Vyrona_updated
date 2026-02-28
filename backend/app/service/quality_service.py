@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
@@ -816,7 +817,7 @@ class QualityService:
                 Readings.kpi_config_id,
                 Readings.kpi_value,
                 Readings.timestamp,
-                KpiConfig.name,
+                KpiConfig.kpi_name,
                 KpiConfig.unit,
                 Tank.tank_id,
                 Tank.tank_code,
@@ -831,21 +832,22 @@ class QualityService:
         if not results:
             return None
 
-        # Shape the response
+        # Shape response grouped by KPI config id (latest first per KPI config)
         kpis = defaultdict(list)
         tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
 
         for row in results:
+            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
             kpis[row.kpi_config_id].append({
-                "name": row.name,
+                "name": row.kpi_name,
                 "value": float(row.kpi_value),
-                "unit": row.unit,
-                "timestamp": row.timestamp,
+                "unit": row.unit or "",
+                "timestamp": ts,
             })
 
         return {
             **tank_info,
-            "kpis": [reading for readings in kpis.values() for reading in readings]  # list of lists, each inner list = N readings for a KPI
+            "kpis": [reading for readings in kpis.values() for reading in readings],
         }
 
     def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
@@ -1301,4 +1303,3 @@ def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish:
         logger.debug(f"Pushed tank KPI to Redis for tank {tank_code} (id={tank_id})")
     except Exception as e:
         logger.warning(f"Failed to push tank KPI to Redis: {e}")
-

@@ -51,6 +51,7 @@ export default function OutboundQualityTrackingPage() {
     
     const criticalAlertsCount = criticalAlerts.length;
     const myTasksCount = myTasks.length;
+    const routeTankId = canisterId && /^\d+$/.test(canisterId) ? Number(canisterId) : undefined;
 
     const fetchCriticalAlerts = async () => {
         setLoadingAlerts(true);
@@ -314,6 +315,7 @@ export default function OutboundQualityTrackingPage() {
                             id: task.id.toString(),
                             patientId: task.patient_id || 'N/A',
                             tankCode: task.tank_code || undefined,
+                            tankId: task.tank_id ?? routeTankId,
                             canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name,
                             description: task.description || '',
@@ -333,6 +335,7 @@ export default function OutboundQualityTrackingPage() {
                             id: task.id?.toString() || 'unknown',
                             patientId: task.patient_id || 'N/A',
                             tankCode: task.tank_code || undefined,
+                            tankId: task?.tank_id ?? routeTankId,
                             canisterNumber: task.canister_number || canisterId || 'N/A',
                             taskName: task.task_name || 'Unknown Task',
                             description: task.description || '',
@@ -350,6 +353,7 @@ export default function OutboundQualityTrackingPage() {
                 currentUserId={currentUserId}
                 userRole={userRole || currentUser?.role || ''}
                 defaultCanisterNumber={canisterId || ''}
+                defaultTankId={routeTankId}
                 onTaskCreated={() => {
                     // Refresh tasks after creation
                     fetchMyTasks();
@@ -375,6 +379,7 @@ export default function OutboundQualityTrackingPage() {
                             assignee_id?: string;
                             patient_id?: string;
                             tank_code?: string;
+                            tank_id?: number;
                             due_date?: string;
                             priority?: 'Low' | 'Medium' | 'High';
                             status?: import('../../services/tasksService').TaskStatus;
@@ -394,7 +399,12 @@ export default function OutboundQualityTrackingPage() {
                             }
 
                             // IVF tasks are tank-scoped; CGT tasks are patient-scoped
-                            if (task.canisterNumber && task.canisterNumber !== 'N/A') {
+                            const targetTankId = task.tankId ?? routeTankId;
+                            if (targetTankId !== undefined) {
+                                updateData.tank_id = targetTankId;
+                                updateData.tank_code = undefined;
+                                updateData.patient_id = undefined;
+                            } else if (task.canisterNumber && task.canisterNumber !== 'N/A') {
                                 updateData.tank_code = String(task.canisterNumber);
                                 updateData.patient_id = undefined;
                             } else {
@@ -449,4 +459,3 @@ export default function OutboundQualityTrackingPage() {
         </div>
     );
 }
-

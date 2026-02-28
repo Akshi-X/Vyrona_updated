@@ -374,14 +374,20 @@ export class IvfService extends BaseApiService {
   async getKpiHistory(tankId: string | number, limit = 50): Promise<{
     tank_code: string;
     tank_id: number;
-    history: Array<{
-      tank_id: number;
-      tank_code: string;
-      timestamp: string;
-      kpis: Array<{ name: string; value: number; unit: string }>;
+    kpi_series: Record<
+      string,
+      Array<{
+        timestamp: string;
+        value: number;
+        unit: string;
+      }>
+    >;
+    kpi_config?: Array<{
+      name: string;
+      unit: string;
+      latest_value?: number | null;
+      latest_timestamp?: string | null;
     }>;
-    /** KPI tabs derived from DB (unique name + unit in order of first appearance). */
-    kpi_config?: Array<{ name: string; unit: string }>;
   }> {
     return await this.request(
       `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history?limit=${limit}`,
@@ -843,4 +849,3 @@ export class IvfService extends BaseApiService {
 }
 
 export const ivfService = new IvfService();
-
