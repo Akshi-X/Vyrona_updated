@@ -1894,7 +1894,8 @@ class QualityTrackingService:
         tank_code: Optional[str] = None
     ) -> Response:
         """
-        Export deviations from the readings table combined with KPI config to Excel format.
+        Export deviations from the readings table combined with KPI config to Excel format,
+        along with refill logs in a second sheet.
         
         Args:
             tank_id: Tank ID to export deviations for
@@ -1904,7 +1905,9 @@ class QualityTrackingService:
             tank_code: Optional tank code for display
             
         Returns:
-            FastAPI Response with Excel file containing readings deviations
+            FastAPI Response with Excel file containing two sheets:
+            - Sheet 1: Readings Deviations
+            - Sheet 2: Refill Logs
             
         Raises:
             AppException: If export fails or tank not found
@@ -1947,10 +1950,13 @@ class QualityTrackingService:
             if month is not None:
                 # Export specific month
                 start_datetime = datetime(year, month, 1, 0, 0, 0)
+                start_date = date(year, month, 1)
                 if month == 12:
                     end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                    end_date = date(year + 1, 1, 1)
                 else:
                     end_datetime = datetime(year, month + 1, 1, 0, 0, 0)
+                    end_date = date(year, month + 1, 1)
                 date_range_str = f"{year}-{month:02d}"
                 # Format month-year for metadata
                 month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -1959,9 +1965,14 @@ class QualityTrackingService:
                 # Export entire year
                 start_datetime = datetime(year, 1, 1, 0, 0, 0)
                 end_datetime = datetime(year + 1, 1, 1, 0, 0, 0)
+                start_date = date(year, 1, 1)
+                end_date = date(year + 1, 1, 1)
                 date_range_str = str(year)
                 date_range_display = str(year)
             
+            # ============================================
+            # SHEET 1: READINGS DEVIATIONS
+            # ============================================
             # Query readings with deviations joined with KPI config
             deviations_query = (
                 self.db.query(
@@ -2024,10 +2035,70 @@ class QualityTrackingService:
                     "Alert Sent": "Yes" if reading.deviation_alert_sent else "No"
                 })
             
-            # Create DataFrame
-            deviations_df = pd.DataFrame(deviations_data)
+            # ============================================
+            # SHEET 2: REFILL LOGS
+            # ============================================
+            refill_logs_query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.tank_id == tank_id,
+                    CanisterLn2Log.refill_date >= start_date,
+                    CanisterLn2Log.refill_date < end_date
+                )
+            )
             
-            # Ensure sheet is created even if empty
+            if branch_id is not None:
+                refill_logs_query = refill_logs_query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            refill_logs_query = refill_logs_query.order_by(
+                CanisterLn2Log.refill_date,
+                CanisterLn2Log.refill_time
+            )
+            
+            refill_logs = refill_logs_query.all()
+            
+            # Prepare refill logs data
+            refill_logs_data = []
+            for log in refill_logs:
+                refill_logs_data.append({
+                    "Refill Date": log.refill_date.strftime("%Y-%m-%d") if log.refill_date else "",
+                    "Refill Time": log.refill_time.strftime("%H:%M:%S") if log.refill_time else "",
+                    "Cryoshipper": log.cryoshipper or "",
+                    "Disinfected Shipper/Infected Tank Description": log.disinfected_shipper_infected_tank_description or "",
+                    "Reservoir": log.reservoir or "",
+                    "LN2 Ordered Date": log.ln2_ordered_date.strftime("%Y-%m-%d") if log.ln2_ordered_date else "",
+                    "LN2 Received Date": log.ln2_received_date.strftime("%Y-%m-%d") if log.ln2_received_date else "",
+                    "Description": log.description or "",
+                    "Refilled By": log.refilled_by or ""
+                })
+            
+            # Get current year total refill log count (for metadata)
+            current_year = datetime.now().year
+            current_year_start = date(current_year, 1, 1)
+            current_year_end = date(current_year + 1, 1, 1)
+            
+            current_year_total_query = (
+                self.db.query(CanisterLn2Log)
+                .filter(
+                    CanisterLn2Log.tank_id == tank_id,
+                    CanisterLn2Log.refill_date >= current_year_start,
+                    CanisterLn2Log.refill_date < current_year_end
+                )
+            )
+            
+            if branch_id is not None:
+                current_year_total_query = current_year_total_query.filter(CanisterLn2Log.branch_id == branch_id)
+            
+            current_year_total = current_year_total_query.count()
+            
+            # ============================================
+            # CREATE EXCEL FILE WITH TWO SHEETS
+            # ============================================
+            # Create DataFrames
+            deviations_df = pd.DataFrame(deviations_data)
+            refill_logs_df = pd.DataFrame(refill_logs_data)
+            
+            # Ensure sheets are created even if empty
             if deviations_df.empty:
                 deviations_df = pd.DataFrame(columns=[
                     "Date", "Time", "Tank Code", "Branch Name", "Device ID",
@@ -2036,10 +2107,21 @@ class QualityTrackingService:
                     "Alert Type", "Alert Sent"
                 ])
             
+            if refill_logs_df.empty:
+                refill_logs_df = pd.DataFrame(columns=[
+                    "Refill Date", "Refill Time", "Cryoshipper",
+                    "Disinfected Shipper/Infected Tank Description",
+                    "Reservoir", "LN2 Ordered Date", "LN2 Received Date",
+                    "Description", "Refilled By"
+                ])
+            
             # Create Excel file in memory
             output = io.BytesIO()
             
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                # ============================================
+                # SHEET 1: READINGS DEVIATIONS
+                # ============================================
                 # Write metadata
                 metadata_data = [
                     ["Tank Code", display_tank_code],
@@ -2052,7 +2134,7 @@ class QualityTrackingService:
                 # Write deviations data starting from row 5
                 deviations_df.to_excel(writer, sheet_name='Readings Deviations', index=False, startrow=4)
                 
-                # Format sheet
+                # Format deviations sheet
                 worksheet = writer.sheets['Readings Deviations']
                 if Font and PatternFill and Alignment:
                     brand_purple = "6B1176"
@@ -2077,7 +2159,7 @@ class QualityTrackingService:
                             cell.font = data_header_font
                             cell.alignment = Alignment(horizontal="center", vertical="center")
                 
-                # Auto-adjust column widths
+                # Auto-adjust column widths for deviations
                 for column in worksheet.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
@@ -2089,6 +2171,59 @@ class QualityTrackingService:
                             pass
                     adjusted_width = min(max_length + 2, 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
+                
+                # ============================================
+                # SHEET 2: REFILL LOGS
+                # ============================================
+                # Write metadata for refill logs
+                refill_metadata_data = [
+                    ["Tank Code", display_tank_code],
+                    ["Year" if month is None else "Month-Year", date_range_display],
+                    ["Current Year Total", str(current_year_total)]
+                ]
+                refill_metadata_df = pd.DataFrame(refill_metadata_data)
+                refill_metadata_df.to_excel(writer, sheet_name='Refill Logs', index=False, header=False, startrow=0)
+                
+                # Write refill logs data starting from row 5
+                refill_logs_df.to_excel(writer, sheet_name='Refill Logs', index=False, startrow=4)
+                
+                # Format refill logs sheet
+                refill_worksheet = writer.sheets['Refill Logs']
+                if Font and PatternFill and Alignment:
+                    brand_purple = "6B1176"
+                    metadata_label_font = Font(bold=True, color=brand_purple, size=11)
+                    metadata_value_font = Font(bold=True, color=brand_purple, size=11)
+                    
+                    for row_idx in range(1, 4):
+                        for col_idx, cell in enumerate(refill_worksheet[row_idx]):
+                            if col_idx == 0:
+                                cell.font = metadata_label_font
+                            else:
+                                cell.font = metadata_value_font
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    data_header_fill = PatternFill(start_color=brand_purple, end_color=brand_purple, fill_type="solid")
+                    data_header_font = Font(bold=True, color="FFFFFF", size=11)
+                    
+                    # Only format header row if there are columns
+                    if len(refill_logs_df.columns) > 0:
+                        for cell in refill_worksheet[5]:
+                            cell.fill = data_header_fill
+                            cell.font = data_header_font
+                            cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+                # Auto-adjust column widths for refill logs
+                for column in refill_worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    refill_worksheet.column_dimensions[column_letter].width = adjusted_width
             
             output.seek(0)
             excel_content = output.read()
@@ -2111,7 +2246,7 @@ class QualityTrackingService:
             
             logger.info(
                 f"Exported readings deviations for tank {display_tank_code} ({date_range_str}): "
-                f"{len(deviations_data)} deviations"
+                f"{len(deviations_data)} deviations, {len(refill_logs_data)} refill logs"
             )
             
             return response
