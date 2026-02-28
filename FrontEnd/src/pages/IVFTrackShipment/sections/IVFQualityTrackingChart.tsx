@@ -218,6 +218,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
+  const latestKpiTimestampRef = useRef<Record<string, number>>({});
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
@@ -280,6 +281,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   // Reset tabs when canister changes (until new config loads)
   useEffect(() => {
     if (!tankId) return;
+    latestKpiTimestampRef.current = {};
     setHasLoadedKpiConfig(false);
     setKpiTabs([]);
     setKpiThresholds({});
@@ -336,38 +338,62 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       .getKpiHistory(tankId, MAX_DATA_POINTS)
       .then((res) => {
         if (!isMountedRef.current) return;
-        if (res?.history?.length) {
+        const series = res?.kpi_series || {};
+        const entries = Object.entries(series);
+        if (entries.length > 0) {
           setKpiReadings((prev) => {
             const byTs = new Map<string, KpiReading>();
-            const normalize = (r: any): KpiReading | null => {
-              const kpis = r.kpis ?? [];
-              if (!kpis.length) return null;
-              const timestamp = r.timestamp ?? (kpis[0] && typeof kpis[0].timestamp === 'string' ? kpis[0].timestamp : null);
-              if (!timestamp) return null;
-              const normalizedKpis = kpis.map((k: { name?: string; value?: number; unit?: string }) => ({
-                name: k.name ?? '',
-                value: typeof k.value === 'number' ? k.value : 0,
-                unit: k.unit ?? '',
-              }));
-              return {
-                tank_id: r.tank_id ?? 0,
-                tank_code: r.tank_code ?? '',
-                timestamp,
-                kpis: normalizedKpis,
+            const appendKpiPoint = (kpiName: string, point: { timestamp?: string; value?: number; unit?: string }) => {
+              const timestamp = typeof point.timestamp === 'string' ? point.timestamp : '';
+              if (!timestamp) return;
+              const value = typeof point.value === 'number' ? point.value : Number(point.value ?? 0);
+              if (Number.isNaN(value)) return;
+              const existing = byTs.get(timestamp);
+              const nextKpi = {
+                name: kpiName,
+                value,
+                unit: point.unit ?? '',
               };
+              if (existing) {
+                const filtered = existing.kpis.filter((k) => k.name !== kpiName);
+                existing.kpis = [...filtered, nextKpi];
+                byTs.set(timestamp, existing);
+              } else {
+                byTs.set(timestamp, {
+                  tank_id: res?.tank_id ?? 0,
+                  tank_code: res?.tank_code ?? '',
+                  timestamp,
+                  kpis: [nextKpi],
+                });
+              }
             };
-            [...(res.history || []), ...prev].forEach((r) => {
-              const reading = normalize(r);
-              if (reading) byTs.set(reading.timestamp, reading);
+
+            // Preserve existing readings first, then merge series snapshot.
+            prev.forEach((reading) => {
+              if (reading?.timestamp) byTs.set(reading.timestamp, reading);
             });
+            entries.forEach(([kpiName, points]) => {
+              (points || []).forEach((point) => appendKpiPoint(kpiName, point));
+            });
+
             const merged = Array.from(byTs.values()).sort(
               (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
             );
+            // Seed latest timestamp watermark per KPI from initial snapshot.
+            merged.forEach((reading) => {
+              const tsMs = parseTimestamp(reading.timestamp)?.getTime();
+              if (!Number.isFinite(tsMs)) return;
+              reading.kpis.forEach((k) => {
+                if (!k?.name) return;
+                const prevTs = latestKpiTimestampRef.current[k.name];
+                if (prevTs == null || (tsMs as number) > prevTs) {
+                  latestKpiTimestampRef.current[k.name] = tsMs as number;
+                }
+              });
+            });
             return merged.slice(-MAX_DATA_POINTS);
           });
           setHasReceivedData(true);
-          const last = res.history[res.history.length - 1];
-          void last;
         }
       })
       .catch(() => {});
@@ -440,25 +466,48 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               Array.isArray(parsed.kpis) &&
               parsed.kpis.length > 0;
             if (isTankKpi) {
-              const timestamp =
-                parsed.timestamp ??
-                (parsed.kpis[0] && typeof parsed.kpis[0].timestamp === 'string' ? parsed.kpis[0].timestamp : null);
-              if (!timestamp) return;
-              const normalizedKpis = parsed.kpis.map((k: { name?: string; value?: number; unit?: string }) => ({
-                name: k.name ?? '',
-                value: typeof k.value === 'number' ? k.value : 0,
-                unit: k.unit ?? '',
-              }));
-              const reading: KpiReading = {
-                tank_id: parsed.tank_id ?? 0,
-                tank_code: parsed.tank_code,
-                timestamp,
-                kpis: normalizedKpis,
-              };
+              const groupedByTimestamp = new Map<string, Array<{ name: string; value: number; unit: string }>>();
+              parsed.kpis.forEach((k: { name?: string; value?: number; unit?: string; timestamp?: string }) => {
+                const name = k?.name ?? '';
+                if (!name) return;
+                const value = typeof k.value === 'number' ? k.value : Number(k?.value);
+                if (!Number.isFinite(value)) return;
+                const ts =
+                  (typeof k?.timestamp === 'string' && k.timestamp.trim()) ||
+                  (typeof parsed?.timestamp === 'string' && parsed.timestamp.trim()) ||
+                  '';
+                if (!ts) return;
+                const tsMs = parseTimestamp(ts)?.getTime();
+                if (!Number.isFinite(tsMs)) return;
+                const prevTs = latestKpiTimestampRef.current[name];
+                if (prevTs != null && (tsMs as number) <= prevTs) return;
+                latestKpiTimestampRef.current[name] = tsMs as number;
+                if (!groupedByTimestamp.has(ts)) groupedByTimestamp.set(ts, []);
+                groupedByTimestamp.get(ts)!.push({
+                  name,
+                  value: Number(value),
+                  unit: k?.unit ?? '',
+                });
+              });
+              if (groupedByTimestamp.size === 0) return;
               setHasReceivedData(true);
               setKpiReadings((prev) => {
                 const byTs = new Map(prev.map((r) => [r.timestamp, r]));
-                byTs.set(reading.timestamp, reading);
+                groupedByTimestamp.forEach((incomingKpis, ts) => {
+                  const existing = byTs.get(ts);
+                  if (existing) {
+                    const incomingNames = new Set(incomingKpis.map((k) => k.name));
+                    const filteredExisting = existing.kpis.filter((k) => !incomingNames.has(k.name));
+                    byTs.set(ts, { ...existing, kpis: [...filteredExisting, ...incomingKpis] });
+                    return;
+                  }
+                  byTs.set(ts, {
+                    tank_id: parsed.tank_id ?? 0,
+                    tank_code: parsed.tank_code,
+                    timestamp: ts,
+                    kpis: incomingKpis,
+                  });
+                });
                 const merged = Array.from(byTs.values()).sort(
                   (a, b) =>
                     (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
@@ -484,17 +533,27 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               parsed.tank_id != null &&
               String(parsed.tank_id) === tankId
             ) {
-              const kpis = [
+              const ts = typeof parsed.timestamp === 'string' ? parsed.timestamp : '';
+              const tsMs = parseTimestamp(ts)?.getTime();
+              if (!ts || !Number.isFinite(tsMs)) return;
+              const rawKpis = [
                 { name: 'temp_external', value: parsed.temp_external ?? parsed.frequency_results?.temp_external ?? 0, unit: '°C' },
                 { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal ?? 0, unit: '°C' },
                 { name: 'ln2_level', value: parsed.ln2_level ?? 0, unit: '%' },
                 { name: 'ln2_evaporation_rate', value: parsed.ln2_evaporation_rate ?? 0, unit: 'kg/day' },
                 { name: 'tive_battery_percentage', value: parsed.tive_battery_percentage ?? 0, unit: '%' },
               ];
+              const kpis = rawKpis.filter((k) => {
+                const prevTs = latestKpiTimestampRef.current[k.name];
+                if (prevTs != null && (tsMs as number) <= prevTs) return false;
+                latestKpiTimestampRef.current[k.name] = tsMs as number;
+                return true;
+              });
+              if (kpis.length === 0) return;
               const reading: KpiReading = {
                 tank_id: parsed.tank_id ?? 0,
                 tank_code: parsed.tank_code || tankId,
-                timestamp: parsed.timestamp,
+                timestamp: ts,
                 kpis,
               };
               setHasReceivedData(true);

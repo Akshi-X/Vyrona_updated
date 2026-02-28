@@ -699,8 +699,9 @@ export default function Dashboard({ }: DashboardProps) {
         const response = await ivfService.getDeviationsGraph();
         if (!cancelled && response && Array.isArray(response)) {
           const REQUIRED_ALERTS = [
+            'Battery Level',
             'Lid State',
-            'LN2 Level',
+            'LN2',
             'Evaporation Rate',
             'Internal Temperature',
             'External Temperature',
@@ -1948,4 +1949,3 @@ export default function Dashboard({ }: DashboardProps) {
     </div>
   );
 }
-

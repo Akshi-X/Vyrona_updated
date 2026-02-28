@@ -148,8 +148,15 @@ def sync_ivf_schema():
         # kpi_config: columns for limits/units (unit, alert_type may be missing on older DBs)
         db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS unit VARCHAR(64)"))
         db.execute(text("ALTER TABLE kpi_config ADD COLUMN IF NOT EXISTS alert_type VARCHAR(100)"))
-        # Add 'Cancelled' to task status enum
-        db.execure(text("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'Cancelled'") )
+        # tasks: ensure IVF tank linkage column exists for task scoping
+        db.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tank_id INTEGER REFERENCES tanks(tank_id)"))
+
+        # Add 'Cancelled' to task status enum (PostgreSQL only)
+        try:
+            if db.get_bind().dialect.name == "postgresql":
+                db.execute(text("ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS 'Cancelled'"))
+        except Exception as enum_err:
+            logger.warning(f"TaskStatus enum sync skipped: {enum_err}")
         
         db.commit()
         logger.info("IVF schema sync completed")

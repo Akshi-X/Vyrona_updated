@@ -74,7 +74,7 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         
         # Send OTP via email BEFORE committing
         # If email fails, transaction will rollback
-        send_otp_email(email, otp_code) # TODO:DevlopmentUncomment
+        # send_otp_email(email, otp_code) # TODO:DevlopmentUncomment
         
         # Email sent successfully, NOW commit the transaction
         db.commit()

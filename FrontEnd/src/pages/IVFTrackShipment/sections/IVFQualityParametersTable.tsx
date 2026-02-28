@@ -114,6 +114,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
+  const latestKpiTimestampRef = useRef<Record<string, number>>({});
 
   const [level, setLevel] = useState<number | null>(null);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
@@ -160,6 +161,13 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const clampPercent = (value: number | null): number | null =>
     value == null ? null : Math.min(100, Math.max(0, value));
 
+  const parseTimestampToMs = (timestamp?: string): number | null => {
+    if (!timestamp || typeof timestamp !== 'string') return null;
+    const normalized = timestamp.trim().replace(' ', 'T');
+    const parsed = new Date(normalized).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   const extractLn2Thresholds = (kpiLimits: unknown): { l1: number | null; l2: number | null } => {
     const ln2Level =
       kpiLimits && typeof kpiLimits === 'object'
@@ -193,43 +201,87 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     };
   };
 
-  const setLevelFromKpis = (kpis: Array<{ name: string; value: number; unit: string }> | undefined) => {
+  const setLevelFromKpis = (
+    kpis: Array<{ name: string; value: number; unit: string; timestamp?: string }> | undefined
+  ) => {
     if (!kpis?.length) return;
+    const latestIncomingByName = new Map<
+      string,
+      { name: string; value: number; unit: string; timestamp: string; tsMs: number }
+    >();
+    for (const kpi of kpis) {
+      if (typeof kpi?.name !== 'string' || !kpi.name) continue;
+      if (typeof kpi?.value !== 'number' || Number.isNaN(kpi.value)) continue;
+      const tsMs = parseTimestampToMs(kpi.timestamp);
+      if (tsMs == null) continue;
+      const ts = (kpi.timestamp || '').trim();
+      if (!ts) continue;
+      const existing = latestIncomingByName.get(kpi.name);
+      if (!existing || tsMs > existing.tsMs) {
+        latestIncomingByName.set(kpi.name, {
+          name: kpi.name,
+          value: kpi.value,
+          unit: kpi.unit || '',
+          timestamp: ts,
+          tsMs,
+        });
+      }
+    }
+    if (latestIncomingByName.size === 0) return;
+
+    const getFresh = (name: string) => {
+      const incoming = latestIncomingByName.get(name);
+      if (!incoming) return null;
+      const prevTs = latestKpiTimestampRef.current[name];
+      if (prevTs != null && incoming.tsMs <= prevTs) return null;
+      latestKpiTimestampRef.current[name] = incoming.tsMs;
+      return incoming;
+    };
+
     let hasAnyUpdate = false;
-    const ln2 = kpis.find((k) => k.name === 'ln2_level');
-    const bat = kpis.find((k) => k.name === 'tive_battery_percentage');
-    const value = ln2?.value ?? bat?.value;
-    if (value !== undefined && typeof value === 'number' && !Number.isNaN(value)) {
-      setLevel(Math.min(100, Math.max(0, value)));
+
+    const ln2 = getFresh('ln2_level');
+    if (ln2) {
+      setLevel(Math.min(100, Math.max(0, ln2.value)));
       hasAnyUpdate = true;
     }
-    if (bat?.value !== undefined && typeof bat.value === 'number' && !Number.isNaN(bat.value)) {
+
+    const bat = getFresh('tive_battery_percentage');
+    if (bat) {
       setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
+      if (!ln2) {
+        setLevel(Math.min(100, Math.max(0, bat.value)));
+      }
       hasAnyUpdate = true;
     }
-    const evap = kpis.find((k) => k.name === 'ln2_evaporation_rate');
-    if (evap?.value !== undefined && typeof evap.value === 'number' && !Number.isNaN(evap.value)) {
+
+    const evap = getFresh('ln2_evaporation_rate');
+    if (evap) {
       setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
       hasAnyUpdate = true;
     }
-    const ext = kpis.find((k) => k.name === 'temp_external');
-    if (ext?.value !== undefined && typeof ext.value === 'number' && !Number.isNaN(ext.value)) {
+
+    const ext = getFresh('temp_external');
+    if (ext) {
       setTempExternal(ext.value);
       hasAnyUpdate = true;
     }
-    const int = kpis.find((k) => k.name === 'temp_internal');
-    if (int?.value !== undefined && typeof int.value === 'number' && !Number.isNaN(int.value)) {
+
+    const int = getFresh('temp_internal');
+    if (int) {
       setTempInternal(int.value);
       hasAnyUpdate = true;
     }
-    const lid = kpis.find((k) => k.name === 'ln2_lid_state');
-    if (lid?.value !== undefined && typeof lid.value === 'number' && !Number.isNaN(lid.value)) {
+
+    const lid = getFresh('ln2_lid_state');
+    if (lid) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
       hasAnyUpdate = true;
     }
-    const sh = kpis.find((k) => k.name === 'shock');
-    if (sh?.value !== undefined && typeof sh.value === 'number' && !Number.isNaN(sh.value)) {
+
+    const sh = getFresh('shock');
+    if (sh) {
       setShock(sh.value);
       hasAnyUpdate = true;
     }
@@ -288,18 +340,24 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   useEffect(() => {
     if (!normalizedTankId) return;
+    latestKpiTimestampRef.current = {};
     ivfService.getKpiHistory(normalizedTankId, 50).then((res) => {
-      if (!isMountedRef.current || !res?.history?.length) return;
-      const sortedHistory = [...res.history].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-      const latestByKpi = new Map<string, { name: string; value: number; unit: string }>();
-      for (const item of sortedHistory) {
-        if (!Array.isArray(item.kpis)) continue;
-        for (const kpi of item.kpis) {
-          latestByKpi.set(kpi.name, kpi);
-        }
-      }
+      if (!isMountedRef.current || !res?.kpi_series) return;
+      const latestByKpi = new Map<string, { name: string; value: number; unit: string; timestamp: string }>();
+      Object.entries(res.kpi_series).forEach(([name, points]) => {
+        if (!Array.isArray(points) || points.length === 0) return;
+        const latest = points[points.length - 1];
+        const numericValue = typeof latest?.value === 'number' ? latest.value : Number(latest?.value);
+        if (!Number.isFinite(numericValue)) return;
+        if (typeof latest?.timestamp !== 'string' || !latest.timestamp.trim()) return;
+        latestByKpi.set(name, {
+          name,
+          value: numericValue,
+          unit: latest?.unit || '',
+          timestamp: latest.timestamp,
+        });
+      });
+      if (latestByKpi.size === 0) return;
       setLevelFromKpis(Array.from(latestByKpi.values()));
     }).catch(() => {});
   }, [normalizedTankId]);
@@ -328,13 +386,26 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         const data: any = JSON.parse(event.data);
         if (data.type === 'subscription_confirmed') return;
         if (data.type === 'error') return;
-        const incomingKpis: Array<{ name: string; value: number; unit: string }> | null =
+        const incomingKpis: Array<{ name: string; value: number; unit: string; timestamp?: string }> | null =
           Array.isArray(data.kpis)
-            ? data.kpis
+            ? data.kpis.map((k: any) => ({
+                name: typeof k?.name === 'string' ? k.name : '',
+                value: typeof k?.value === 'number' ? k.value : Number(k?.value),
+                unit: typeof k?.unit === 'string' ? k.unit : '',
+                timestamp:
+                  typeof k?.timestamp === 'string'
+                    ? k.timestamp
+                    : (typeof data?.timestamp === 'string' ? data.timestamp : undefined),
+              }))
             : (typeof data.kpi_name === 'string' &&
                 typeof data.kpi_value === 'number' &&
                 !Number.isNaN(data.kpi_value))
-              ? [{ name: data.kpi_name, value: data.kpi_value, unit: data.kpi_unit || '' }]
+              ? [{
+                  name: data.kpi_name,
+                  value: data.kpi_value,
+                  unit: data.kpi_unit || '',
+                  timestamp: typeof data.timestamp === 'string' ? data.timestamp : undefined,
+                }]
               : null;
 
         const messageMatchesTank =

@@ -30,20 +30,20 @@ interface QualityDeviationChartProps {
 
 export default function QualityDeviationChart({ containers, metrics }: QualityDeviationChartProps) {
   const REQUIRED_METRIC_ORDER = [
+    'Battery Level',
     'Lid State',
-    'LN2 L1',
-    'LN2 L2',
+    'LN2',
     'Evaporation Rate',
     'Internal Temperature',
     'External Temperature',
+    'Shock Detection',
   ];
 
-  // Fixed color palette matching design (LN2 L1/L2 use LN2 family colors)
+  // Fixed color palette matching current KPI names from API
   const getColorForMetric = (name: string): string => {
     const key = name.toLowerCase();
+    if (key.includes('battery')) return '#94A3B8';
     if (key.includes('lid')) return '#A78BFA';
-    if (key === 'ln2 l1') return '#60A5FA';
-    if (key === 'ln2 l2') return '#38BDF8';
     if (key.includes('ln2')) return '#60A5FA';
     if (key.includes('evaporation')) return '#F59E0B';
     if (key.includes('internal temperature')) return '#EA580C';
@@ -202,7 +202,7 @@ export default function QualityDeviationChart({ containers, metrics }: QualityDe
 
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex flex-col">
-      <h3 className="font-semibold text-black text-base text-[16px] mb-2">Quality deviation</h3>
+      <h3 className="font-semibold text-black text-base text-[16px] mb-2">Deviation Distribution (Site Level)</h3>
 
       {/* Legend above the graph - single row, wraps on small screens */}
       <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 mb-3 sm:gap-x-5 md:gap-x-6">
