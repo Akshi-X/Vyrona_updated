@@ -1,91 +1,224 @@
-import { createBrowserRouter } from 'react-router-dom'
-import Login from '../pages/Login'
-import Signup from '../pages/Signup'
-import TrackAndTrace from '../pages/TrackAndTrace'
-import TrackPage from '../pages/Track'
-import IVFTrackShipmentPage from '../pages/IVFTrackShipment'
-import OutboundQualityTrackingPage from '../pages/OutboundQualityTracking'
-import UserProfilePage from '../pages/UserProfilePage'
-import Support from '../pages/Support'
-import NotFound from '../pages/NotFound'
-import VerifyOtp from '../pages/Verify'
-import Dashboard from '../pages/Dashboard'
-import Database from '../pages/Database'
-import ControlTower from '../pages/ControlTower/index'
-import AlertSetting from '../pages/AlertSetting'
-import { ApprovalLayout } from '../components/ApprovalLayout'
-import ForgotPassword from '../pages/ForgotPassword'
-import ResetPassword from '../pages/ResetPassword'
-import SuccessAlert from '../pages/SuccessAlert'
-import { RoleBasedRoute } from '../components/RoleBasedRoute'
-import { AuthRedirect } from '../components/AuthRedirect'
+import { createBrowserRouter } from "react-router-dom";
+import Login from "../pages/Login";
+import Signup from "../pages/Signup";
+import TrackAndTrace from "../pages/TrackAndTrace";
+import TrackPage from "../pages/Track";
+import IVFTrackShipmentPage from "../pages/IVFTrackShipment";
+import OutboundQualityTrackingPage from "../pages/OutboundQualityTracking";
+import UserProfilePage from "../pages/UserProfilePage";
+import Support from "../pages/Support";
+import NotFound from "../pages/NotFound";
+import VerifyOtp from "../pages/Verify";
+import Dashboard from "../pages/Dashboard";
+import Database from "../pages/Database";
+import ControlTower from "../pages/ControlTower/index";
+import AlertSetting from "../pages/AlertSetting";
+import { ApprovalLayout } from "../components/ApprovalLayout";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+import SuccessAlert from "../pages/SuccessAlert";
+import { RoleBasedRoute } from "../components/RoleBasedRoute";
+import { AuthRedirect } from "../components/AuthRedirect";
+import { VariantRoute } from "../components/VariantRoute";
 
-// Wrapper components to ensure context is available
-const DashboardWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']}>
-    <Dashboard />
-  </RoleBasedRoute>
-)
+/**
+ * Dashboard with variant support
+ * If the user's hospital has a custom Dashboard variant, it will be rendered.
+ * Otherwise, the default Dashboard component is used.
+ */
+const DashboardWithVariant = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]}>
+        <VariantRoute
+            routePath="/dashboard"
+            defaultComponent={<Dashboard />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
+/**
+ * Database with role-based access
+ * No variant support needed for this route currently
+ */
 const DatabaseWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
-    <Database />
-  </RoleBasedRoute>
-)
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
+        <Database />
+    </RoleBasedRoute>
+);
 
-const ControlTowerWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} requireControlTower={true}>
-    <ControlTower />
-  </RoleBasedRoute>
-)
+/**
+ * Control Tower with variant support
+ * Hospitals can have custom Control Tower layouts
+ */
+const ControlTowerWithVariant = () => (
+    <RoleBasedRoute
+        restrictedRoles={["mygrape_admin"]}
+        requireControlTower={true}
+    >
+        <VariantRoute
+            routePath="/control-tower"
+            defaultComponent={<ControlTower />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
-const TrackPageWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
-    <TrackPage />
-  </RoleBasedRoute>
-)
+/**
+ * Track page with variant support
+ * Supports parameterized route /track/:patientId
+ * Hospitals can have custom tracking UIs
+ */
+const TrackPageWithVariant = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
+        <VariantRoute
+            routePath="/track/:patientId"
+            defaultComponent={<TrackPage />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
-const IVFTrackShipmentWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={false}>
-    <IVFTrackShipmentPage />
-  </RoleBasedRoute>
-)
+/**
+ * IVF Track Shipment with variant support
+ */
+const IVFTrackShipmentWithVariant = () => (
+    <RoleBasedRoute
+        restrictedRoles={["mygrape_admin"]}
+        restrictIVFAdmin={false}
+    >
+        <VariantRoute
+            routePath="/ivf-track-shipment"
+            defaultComponent={<IVFTrackShipmentPage />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
-const OutboundQualityTrackingWithAuth = () => (
-  <RoleBasedRoute restrictedRoles={['mygrape_admin']} restrictIVFAdmin={true}>
-    <OutboundQualityTrackingPage />
-  </RoleBasedRoute>
-)
+/**
+ * IVF Track Shipment with tank ID parameter
+ */
+const IVFTrackShipmentWithTankVariant = () => (
+    <RoleBasedRoute
+        restrictedRoles={["mygrape_admin"]}
+        restrictIVFAdmin={false}
+    >
+        <VariantRoute
+            routePath="/ivf-track-shipment/:tankId"
+            defaultComponent={<IVFTrackShipmentPage />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
+/**
+ * Outbound Quality Tracking with variant support
+ */
+const OutboundQualityTrackingWithVariant = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
+        <VariantRoute
+            routePath="/outbound-quality-tracking"
+            defaultComponent={<OutboundQualityTrackingPage />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
+
+/**
+ * Outbound Quality Tracking with canister ID parameter
+ */
+const OutboundQualityTrackingWithCanisterVariant = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={true}>
+        <VariantRoute
+            routePath="/outbound-quality-tracking/:canisterId"
+            defaultComponent={<OutboundQualityTrackingPage />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
+
+/**
+ * Alert Setting with role-based access
+ * Only Managers and Admins can access this
+ */
 const AlertSettingWithAuth = () => (
-  <RoleBasedRoute allowedRoles={['Manager', 'Admin']}>
-    <AlertSetting />
-  </RoleBasedRoute>
-)
+    <RoleBasedRoute allowedRoles={["Manager", "Admin"]}>
+        <VariantRoute
+            routePath="/alert-setting"
+            defaultComponent={<AlertSetting />}
+            showDefaultWhileLoading={true}
+        />
+    </RoleBasedRoute>
+);
 
+/**
+ * Application Router Configuration
+ *
+ * Routes are organized into categories:
+ * 1. Public routes (no auth required)
+ * 2. Auth routes (login, signup, password reset)
+ * 3. Protected routes with variant support
+ * 4. Protected routes without variant support
+ *
+ * ADDING VARIANT SUPPORT TO A ROUTE:
+ * 1. Wrap the component with <VariantRoute>
+ * 2. Set routePath to match the route pattern
+ * 3. Set defaultComponent to the default page component
+ * 4. Optionally set showDefaultWhileLoading for better UX
+ *
+ * CREATING A VARIANT:
+ * 1. Create component in src/variants/hospital-{id}/{ComponentName}.tsx
+ * 2. Add database mapping: INSERT INTO ui_route_variants
+ *    (hospital_id, route_path, component_key) VALUES (id, '/route', 'ComponentNameHospital{id}')
+ */
 export const router = createBrowserRouter([
-  { path: '/', element: <AuthRedirect /> },
-  { path: '/login', element: <Login /> },
-  { path: '/signup', element: <Signup /> },
-  { path: '/track-and-trace', element: <TrackAndTrace /> },
-  { path: '/user-profile', element: <UserProfilePage /> },
-  { path: '/support', element: <Support /> },
-  { path: '/success', element: <SuccessAlert /> },
-  { path: '/verify-otp', element: <VerifyOtp /> },
-  { path: '/forgot-password', element: <ForgotPassword /> },
-  { path: '/reset-password', element: <ResetPassword /> },
-  { path: '/dashboard', element: <DashboardWithAuth /> },
-  { path: '/database', element: <DatabaseWithAuth /> },
-  { path: '/control-tower', element: <ControlTowerWithAuth /> },
-  { path: '/track/:patientId', element: <TrackPageWithAuth /> },
-  { path: '/ivf-track-shipment/:tankId', element: <IVFTrackShipmentWithAuth /> },
-  { path: '/ivf-track-shipment', element: <IVFTrackShipmentWithAuth /> },
-  { path: '/outbound-quality-tracking/:canisterId', element: <OutboundQualityTrackingWithAuth /> },
-  { path: '/outbound-quality-tracking', element: <OutboundQualityTrackingWithAuth /> },
-  { path: '/approval', element: <ApprovalLayout /> },
-  { path: '/approval-screen', element: <ApprovalLayout /> },
-  { path: '/alert-setting', element: <AlertSettingWithAuth /> },
-  { path: '*', element: <NotFound /> },
-])
+    // ============================================================
+    // PUBLIC / AUTH ROUTES (No variant support needed)
+    // ============================================================
+    { path: "/", element: <AuthRedirect /> },
+    { path: "/login", element: <Login /> },
+    { path: "/signup", element: <Signup /> },
+    { path: "/verify-otp", element: <VerifyOtp /> },
+    { path: "/forgot-password", element: <ForgotPassword /> },
+    { path: "/reset-password", element: <ResetPassword /> },
+    { path: "/success", element: <SuccessAlert /> },
 
-export default router
+    // ============================================================
+    // PROTECTED ROUTES WITH VARIANT SUPPORT
+    // These routes can have hospital-specific custom UIs
+    // ============================================================
+    { path: "/dashboard", element: <DashboardWithVariant /> },
+    { path: "/control-tower", element: <ControlTowerWithVariant /> },
+    { path: "/track/:patientId", element: <TrackPageWithVariant /> },
+    {
+        path: "/ivf-track-shipment/:tankId",
+        element: <IVFTrackShipmentWithTankVariant />,
+    },
+    { path: "/ivf-track-shipment", element: <IVFTrackShipmentWithVariant /> },
+    {
+        path: "/outbound-quality-tracking/:canisterId",
+        element: <OutboundQualityTrackingWithCanisterVariant />,
+    },
+    {
+        path: "/outbound-quality-tracking",
+        element: <OutboundQualityTrackingWithVariant />,
+    },
+    { path: "/alert-setting", element: <AlertSettingWithAuth /> },
+
+    // ============================================================
+    // PROTECTED ROUTES WITHOUT VARIANT SUPPORT
+    // These routes use the same UI for all hospitals
+    // ============================================================
+    { path: "/database", element: <DatabaseWithAuth /> },
+    { path: "/track-and-trace", element: <TrackAndTrace /> },
+    { path: "/user-profile", element: <UserProfilePage /> },
+    { path: "/support", element: <Support /> },
+    { path: "/approval", element: <ApprovalLayout /> },
+    { path: "/approval-screen", element: <ApprovalLayout /> },
+
+    // ============================================================
+    // FALLBACK ROUTE
+    // ============================================================
+    { path: "*", element: <NotFound /> },
+]);
+
+export default router;
