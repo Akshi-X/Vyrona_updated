@@ -57,8 +57,26 @@ class KPI_NAMES:
         else:
             return ""
 
+# ---------------------------------------------------------------------------
+# KPI history aggregation buckets (duration in minutes). Used when returning
+# static chart data for 1H / 24H / 7D so the DB does AVG per bucket efficiently.
+# Change these to adjust bucket sizes (e.g. 5 min for 1H, 1 hour for 24H).
+# ---------------------------------------------------------------------------
+# 1-minute buckets → used for 1-hour range (up to ~60 points)
+AGG_BUCKET_MINUTES_1H = 1
+# 30-minute buckets → used for 24-hour range (up to ~48 points)
+AGG_BUCKET_MINUTES_24H = 30
+# 12-hour buckets (duration in minutes) → used for 7-day range (up to ~14 points)
+AGG_BUCKET_MINUTES_7D = 12 * 60  # 720
+
+
 class KPIConstants:
     KPI_NAMES = KPI_NAMES
     KPI_ALERTS = KPI_ALERTS
 
     KPI_READINGS_BROADCAST_CHANNEL = "tank_kpi_readings_channel"  # Redis pub/sub channel for broadcasting KPI readings to all subscribers (e.g., real-time dashboard updates)
+
+    # Aggregation bucket sizes (minutes) for chart ranges; see AGG_BUCKET_* above.
+    AGG_BUCKET_MINUTES_1H = AGG_BUCKET_MINUTES_1H
+    AGG_BUCKET_MINUTES_24H = AGG_BUCKET_MINUTES_24H
+    AGG_BUCKET_MINUTES_7D = AGG_BUCKET_MINUTES_7D
