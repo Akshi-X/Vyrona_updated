@@ -370,8 +370,9 @@ export class IvfService extends BaseApiService {
 
   /**
    * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
+   * No limit param; backend uses duration_minutes only (10=10M, 60=1H, 1440=24H, 10080=7D). Omit for LIVE.
    */
-  async getKpiHistory(tankId: string | number, limit = 50): Promise<{
+  async getKpiHistory(tankId: string | number, durationMinutes?: number): Promise<{
     tank_code: string;
     tank_id: number;
     kpi_series: Record<
@@ -389,8 +390,13 @@ export class IvfService extends BaseApiService {
       latest_timestamp?: string | null;
     }>;
   }> {
+    const params = new URLSearchParams();
+    if (durationMinutes != null && durationMinutes > 0) {
+      params.set('duration_minutes', String(durationMinutes));
+    }
+    const qs = params.toString();
     return await this.request(
-      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history?limit=${limit}`,
+      `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history${qs ? `?${qs}` : ''}`,
       { method: 'GET' }
     );
   }
