@@ -39,7 +39,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         # Get path and method
         path = request.url.path
         method = request.method
-        
+
+        # Exclude health check — let it hit the route
+        if path == "/health":
+            return await call_next(request)
+
         # Only validate specific endpoints
         if method == "POST":
             # Validate based on endpoint
