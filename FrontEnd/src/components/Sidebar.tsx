@@ -15,6 +15,8 @@ import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.sv
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
+import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
+import IncubatorQualityTrackingIcon from "../assets/DashBoardIcons/IncubatorQualityTracking.svg";
 
 interface SidebarProps {
   onLogout: () => void;
@@ -75,13 +77,15 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     }
   }, [isAuthenticated]);
 
-  // Base navigation items (Dashboard, Database, Control Tower, Pending approvals, Alert Configuration)
+  // Base navigation items (Dashboard, Database, Control Tower, Pending approvals, Alert Configuration, Embryo Grading, Incubator Tracking)
   const allNavigationItems = [
     { icon: DashboardIconWhite, label: "Dashboard", path: "/dashboard" },
     { icon: DatabaseIconWhite, label: "Database", path: "/database" },
     { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
     { icon: MyTasksIcon, label: "Pending approvals", path: "/approval" },
-    { icon: CriticalAlertsIcon, label: "Alert Configuration", path: "/alert-setting" }
+    { icon: CriticalAlertsIcon, label: "Alert Configuration", path: "/alert-setting" },
+    { icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
+    { icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
   ];
 
   // Filter nav by role/department: Database hidden for IVF; Control Tower hidden for IVF User; Pending approvals only for Admin/Pharma_admin; Alert Setting only for IVF Manager/Admin
@@ -100,6 +104,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // IVF User (H.User) has no Control Tower access – hide from sidebar
     if (isIVF && item.label === "Control Tower" && userRole === "User") {
       return false;
+    }
+    // Embryo Grading and Incubator Tracking: show for IVF department only
+    if (item.label === "Embryo Grading" || item.label === "Incubator Tracking") {
+      return isIVF;
     }
     return true;
   });
@@ -141,6 +149,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             ? (location.pathname === "/approval" || location.pathname === "/approval-screen")
             : item.path === "/alert-setting"
             ? location.pathname === "/alert-setting"
+            : item.path === "/incubator-tracking"
+            ? location.pathname === "/incubator-tracking" || location.pathname.startsWith("/incubator-tracking/")
             : location.pathname === item.path;
           const iconSrc = (() => {
             if (item.label === "Dashboard") {
@@ -155,7 +165,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             return item.icon;
           })();
           const iconStyle =
-            (item.label === "Pending approvals" || item.label === "Alert Configuration") && !isActive
+            (item.label === "Pending approvals" || item.label === "Alert Configuration" || item.label === "Embryo Grading" || item.label === "Incubator Tracking") && !isActive
               ? { filter: "brightness(0) saturate(100%) invert(100%)" }
               : undefined;
           return (
