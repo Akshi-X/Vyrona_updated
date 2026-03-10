@@ -10,3 +10,8 @@ from .ivf_shipment_model import IVFShipment
 from .patient_crylock_info_model import PatientCrylockInfo
 from .critical_alert_model import CriticalAlert, AlertType, AlertSource, AlertTriggeredBy, AlertSeverity, AlertStatus
 
+# Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
+# Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with
+# InvalidRequestError: 'UIRouteVariant' failed to locate a name.
+from app.models.ui_route_variant_model import UIRouteVariant  # noqa: F401
+

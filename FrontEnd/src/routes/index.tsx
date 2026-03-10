@@ -13,6 +13,9 @@ import Dashboard from "../pages/Dashboard";
 import Database from "../pages/Database";
 import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
+import EmbryoGradingPage from "../pages/EmbryoGrading";
+import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
+import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
 import { ApprovalLayout } from "../components/ApprovalLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
@@ -137,6 +140,33 @@ const OutboundQualityTrackingWithCanisterVariant = () => (
 );
 
 /**
+ * Embryo Grading - IVF page
+ */
+const EmbryoGradingWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <EmbryoGradingPage />
+    </RoleBasedRoute>
+);
+
+/**
+ * Incubator Tracking dashboard - list of incubator cards
+ */
+const IncubatorTrackingWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <IncubatorTrackingDashboardPage />
+    </RoleBasedRoute>
+);
+
+/**
+ * Incubator detail page - /incubator-tracking/:id (like ivf-track-shipment/:tankId)
+ */
+const IncubatorDetailWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <IncubatorDetailPage />
+    </RoleBasedRoute>
+);
+
+/**
  * Alert Setting with role-based access
  * Only Managers and Admins can access this
  */
@@ -203,6 +233,9 @@ export const router = createBrowserRouter([
         element: <OutboundQualityTrackingWithVariant />,
     },
     { path: "/alert-setting", element: <AlertSettingWithAuth /> },
+    { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+    { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
+    { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
 
     // ============================================================
     // PROTECTED ROUTES WITHOUT VARIANT SUPPORT
