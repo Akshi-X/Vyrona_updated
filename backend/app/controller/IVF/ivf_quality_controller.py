@@ -6,12 +6,18 @@ Separate from CGT quality monitoring to maintain isolation
 import asyncio
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path, Body
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.service.redis_service import get_redis, get_ln2_pubsub, get_tank_kpi_pubsub
 from app.service.quality_service import QualityService, push_tank_kpi_to_redis, append_tank_kpi_snapshot_to_db
+from app.constants.kpi_constants import (
+    AGG_BUCKET_MINUTES_1H,
+    AGG_BUCKET_MINUTES_24H,
+    AGG_BUCKET_MINUTES_7D,
+)
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
 from app.utils.websocket_manager import ConnectionManager
@@ -162,15 +168,26 @@ def get_tank_kpi_config(
     return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
 
 
+# Duration minutes for static aggregated ranges (1H, 24H, 7D). LIVE = no duration, raw (default cap applied in code).
+DURATION_1H = 60
+DURATION_24H = 1440
+DURATION_7D = 10080
+# Default max readings for LIVE (raw) when no duration_minutes; no limit param in API.
+DEFAULT_LIVE_READINGS_CAP = 200
+
+
 @router.get("/tanks/{tank_id}/kpi-history")
 def get_tank_kpi_history(
     tank_id: int = Path(..., description="Tank ID"),
-    limit: int = Query(50, ge=1, le=200),
+    duration_minutes: Optional[int] = Query(
+        None,
+        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (30min buckets), 10080=7D (12h buckets). 10=10M raw.",
+    ),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get KPI readings history for Quality Tracking tabbed graph (past data)."""
+    """Get KPI history. LIVE (no duration)=raw last N (capped in code). Static 1H/24H/7D=aggregated in DB. 10M=raw by timestamp. No limit query param."""
     branch_id, role = get_branch_filter_info(request) if request else (None, None)
     query = db.query(Tank).filter(Tank.tank_id == tank_id)
     if role != "Admin" and branch_id is not None:
@@ -183,13 +200,46 @@ def get_tank_kpi_history(
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
-    
-    # Build per-KPI readings (last N per KPI config) from DB
-    per_kpi = quality_service.get_last_n_readings_per_kpi(tank_id, limit) or {}
+
+    since = datetime.now(timezone.utc) - timedelta(minutes=duration_minutes) if duration_minutes else None
+
+    # Static aggregated ranges: efficient AVG in DB, no limit
+    if duration_minutes == DURATION_1H:
+        per_kpi = quality_service.get_tank_kpi_history_aggregated(
+            tank_id, since, AGG_BUCKET_MINUTES_1H
+        ) or {}
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_24H:
+        per_kpi = quality_service.get_tank_kpi_history_aggregated(
+            tank_id, since, AGG_BUCKET_MINUTES_24H
+        ) or {}
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_7D:
+        per_kpi = quality_service.get_tank_kpi_history_aggregated(
+            tank_id, since, AGG_BUCKET_MINUTES_7D
+        ) or {}
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    # 10M or other short duration: raw by timestamp
+    elif duration_minutes is not None and duration_minutes > 0:
+        per_kpi = quality_service.get_readings_per_kpi_since(tank_id, since) or {}
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = False
+    # LIVE: raw last N (cap applied in code; no limit in API)
+    else:
+        per_kpi = quality_service.get_last_n_readings_per_kpi(tank_id, DEFAULT_LIVE_READINGS_CAP) or {}
+        latest_readings_raw = None
+        aggregated_order_asc = False
 
     # Build latest reading map per KPI name
-    latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
+    if latest_readings_raw is not None:
+        latest_readings = latest_readings_raw
+    else:
+        latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
     latest_by_name = {}
+    # Raw desc: first per name is latest. Aggregated asc: last per name is latest. Overwrite so last wins.
     for item in (latest_readings.get("kpis") or []):
         name = (item.get("name") or "").strip()
         if not name:
@@ -241,9 +291,10 @@ def get_tank_kpi_history(
             }
         )
 
-    # get_last_n_readings_per_kpi returns latest-first per KPI; reverse each list to oldest->latest.
-    for name in list(kpi_series.keys()):
-        kpi_series[name].reverse()
+    # Raw per-KPI returns latest-first; reverse to oldest->latest. Aggregated is already oldest-first.
+    if not aggregated_order_asc:
+        for name in list(kpi_series.keys()):
+            kpi_series[name].reverse()
 
     # Fallback when no value-rows exist in kpi_config table: derive tabs from kpi_series keys.
     if not kpi_config:

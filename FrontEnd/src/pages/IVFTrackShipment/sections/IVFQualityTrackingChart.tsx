@@ -146,29 +146,71 @@ interface KpiReading {
   kpis: Array<{ name: string; value: number; unit: string }>;
 }
 
-const MAX_DATA_POINTS = 50;
+/** Max readings to keep in state so 7D range has enough; display filters by time window. */
+const MAX_READINGS_CAP = 250;
 /** Extra slots at end of timeline so the curve doesn't end at the right edge (responsive "beyond end"). */
 const TIMELINE_BUFFER_SLOTS = 4;
 
+/** Time range: LIVE = last 10 min only (WebSocket). Others = static fetch from DB (1H/24H/7D = aggregated). */
+const LIVE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const TIME_RANGES = [
+  { id: 'LIVE' as const, label: 'LIVE', windowMs: LIVE_WINDOW_MS, durationMinutes: undefined },
+  { id: '1H' as const, label: '1H', windowMs: 60 * 60 * 1000, durationMinutes: 60 },
+  { id: '24H' as const, label: '24H', windowMs: 24 * 60 * 60 * 1000, durationMinutes: 1440 },
+  { id: '7D' as const, label: '7D', windowMs: 7 * 24 * 60 * 60 * 1000, durationMinutes: 10080 },
+] as const;
+export type TimeRangeId = (typeof TIME_RANGES)[number]['id'];
+
+/** Parse timestamp; treat ISO strings without timezone as UTC so we can show locale time. */
 const parseTimestamp = (timestamp: string): Date | null => {
   try {
     if (!timestamp) return null;
     const normalized = timestamp.trim().replace(' ', 'T');
-    const parsed = new Date(normalized);
+    // If no timezone suffix (Z or ±HH:MM), assume UTC so display in locale is correct
+    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(normalized);
+    const toParse = hasTimezone ? normalized : `${normalized}${normalized.endsWith('Z') ? '' : 'Z'}`;
+    const parsed = new Date(toParse);
     return isNaN(parsed.getTime()) ? null : parsed;
   } catch {
     return null;
   }
 };
 
-const formatTimeLabel = (timestamp: string): string => {
+/** Format timestamp for axis: time (HH:MM); for 7D only, two lines: date then time. */
+const formatTimeLabel = (timestamp: string, timeRange?: TimeRangeId): string => {
   const date = parseTimestamp(timestamp);
   if (!date) return timestamp;
+  if (timeRange === '7D') {
+    const datePart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const timePart = date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${datePart}, ${timePart}`;
+  }
   return date.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   });
+};
+
+/** Format timestamp as date + time (for tooltip hover); no seconds. */
+const formatDateTimeLabel = (timestamp: string): string => {
+  const date = parseTimestamp(timestamp);
+  if (!date) return timestamp;
+  const datePart = date.toLocaleDateString(undefined, {
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return `${datePart}, ${timePart}`;
 };
 
 function getKpiValue(reading: KpiReading, kpiName: string): number | null {
@@ -224,10 +266,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const isMountedRef = useRef(true);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
+  const timeRangeRef = useRef<TimeRangeId>('LIVE');
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
 
   const [kpiReadings, setKpiReadings] = useState<KpiReading[]>([]);
+  /** Time range: 1H / 24H / 7D; drives API fetch and chart window; live data still appends. */
+  const [timeRange, setTimeRange] = useState<TimeRangeId>('LIVE');
   /** Tabs strictly from DB kpi_config; until loaded, keep null-state. */
   const [kpiTabs, setKpiTabs] = useState<Array<{ id: string; label: string; unit: string }>>([]);
   const [activeTab, setActiveTab] = useState<string>('');
@@ -236,6 +281,19 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasReceivedData, setHasReceivedData] = useState(false);
+  const [isRangeLoading, setIsRangeLoading] = useState(false);
+
+  const timeRangeConfig = TIME_RANGES.find((r) => r.id === timeRange) ?? TIME_RANGES[0];
+  timeRangeRef.current = timeRange;
+  /** LIVE = last 10 min; 1H/24H/7D = filter by time window. */
+  const displayReadings = useMemo(() => {
+    if (timeRangeConfig.windowMs == null) return kpiReadings;
+    const windowStart = Date.now() - timeRangeConfig.windowMs;
+    return kpiReadings.filter((r) => {
+      const t = parseTimestamp(r.timestamp)?.getTime();
+      return t != null && t >= windowStart;
+    });
+  }, [kpiReadings, timeRange, timeRangeConfig.windowMs]);
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -331,16 +389,20 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       });
   }, [tankId]);
 
-  // Fetch KPI history (past data)
+  // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated (no limit in backend).
   useEffect(() => {
     if (!tankId) return;
+    const rangeConfig = TIME_RANGES.find((r) => r.id === timeRange);
+    const durationMinutes = rangeConfig?.durationMinutes;
     ivfService
-      .getKpiHistory(tankId, MAX_DATA_POINTS)
+      .getKpiHistory(tankId, durationMinutes)
       .then((res) => {
         if (!isMountedRef.current) return;
+        setIsRangeLoading(false);
         const series = res?.kpi_series || {};
         const entries = Object.entries(series);
         if (entries.length > 0) {
+          const isStaticRange = durationMinutes != null && durationMinutes > 0;
           setKpiReadings((prev) => {
             const byTs = new Map<string, KpiReading>();
             const appendKpiPoint = (kpiName: string, point: { timestamp?: string; value?: number; unit?: string }) => {
@@ -368,10 +430,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               }
             };
 
-            // Preserve existing readings first, then merge series snapshot.
-            prev.forEach((reading) => {
-              if (reading?.timestamp) byTs.set(reading.timestamp, reading);
-            });
+            // Static range (1H/24H/7D): use only API data so x-axis matches selected window. LIVE: merge with prev.
+            if (!isStaticRange) {
+              prev.forEach((reading) => {
+                if (reading?.timestamp) byTs.set(reading.timestamp, reading);
+              });
+            }
             entries.forEach(([kpiName, points]) => {
               (points || []).forEach((point) => appendKpiPoint(kpiName, point));
             });
@@ -379,7 +443,6 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             const merged = Array.from(byTs.values()).sort(
               (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
             );
-            // Seed latest timestamp watermark per KPI from initial snapshot.
             merged.forEach((reading) => {
               const tsMs = parseTimestamp(reading.timestamp)?.getTime();
               if (!Number.isFinite(tsMs)) return;
@@ -391,15 +454,19 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 }
               });
             });
-            return merged.slice(-MAX_DATA_POINTS);
+            return isStaticRange ? merged : merged.slice(-MAX_READINGS_CAP);
           });
           setHasReceivedData(true);
+        } else {
+          setIsRangeLoading(false);
         }
       })
-      .catch(() => {});
-  }, [tankId]);
+      .catch(() => {
+        if (isMountedRef.current) setIsRangeLoading(false);
+      });
+  }, [tankId, timeRange]);
 
-  // WebSocket for live KPI updates
+  // WebSocket connected for all time ranges; live data applied to chart only when range is LIVE.
   useEffect(() => {
     isMountedRef.current = true;
     reconnectAttemptsRef.current = 0; // fresh attempts when canister or token changes
@@ -439,7 +506,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           setHasReceivedData(false);
           if (ws.readyState === WebSocket.OPEN && tankId) {
             const numericTankId = Number(tankId);
-            ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId }));
+            const live = timeRangeRef.current === 'LIVE';
+            ws.send(JSON.stringify({ tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId, live }));
           }
         };
 
@@ -459,13 +527,16 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               return;
             }
 
-            // Tank KPI update for current canister: accept any message with tank_code + kpis (no type check)
+            // Tank KPI update for current canister: accept any message with tank_id + kpis (match by tank_id only)
+            const normalizedTankId = tankId != null ? String(tankId) : '';
             const isTankKpi =
               parsed.tank_id != null &&
-              String(parsed.tank_id) === tankId &&
+              String(parsed.tank_id) === normalizedTankId &&
               Array.isArray(parsed.kpis) &&
               parsed.kpis.length > 0;
             if (isTankKpi) {
+              // Only accept live socket data when range is LIVE; ignore for 1H / 24H / 7D (static API only)
+              if (timeRangeRef.current !== 'LIVE') return;
               const groupedByTimestamp = new Map<string, Array<{ name: string; value: number; unit: string }>>();
               parsed.kpis.forEach((k: { name?: string; value?: number; unit?: string; timestamp?: string }) => {
                 const name = k?.name ?? '';
@@ -491,6 +562,38 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               });
               if (groupedByTimestamp.size === 0) return;
               setHasReceivedData(true);
+              // When kpi_config didn't load (e.g. tank not in DB), derive tabs from incoming KPI names so chart can show data
+              setKpiTabs((currentTabs) => {
+                if (currentTabs.length > 0) return currentTabs;
+                const names = new Set<string>();
+                parsed.kpis.forEach((k: { name?: string }) => {
+                  if (typeof k?.name === 'string' && k.name.trim()) names.add(k.name.trim());
+                });
+                if (names.size === 0) return currentTabs;
+                const sorted = Array.from(names).sort(
+                  (a, b) =>
+                    (KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number]) >= 0
+                      ? KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number])
+                      : KPI_ORDER.length) -
+                    (KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number]) >= 0
+                      ? KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number])
+                      : KPI_ORDER.length)
+                );
+                const tabs = sorted.map((id) => ({
+                  id,
+                  label: id
+                    .split('_')
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                    .join(' '),
+                  unit: DEFAULT_TAB_UNIT_MAP[id] ?? '',
+                }));
+                return tabs;
+              });
+              setActiveTab((current) => {
+                if (current && parsed.kpis.some((k: { name?: string }) => k?.name === current)) return current;
+                const first = parsed.kpis[0]?.name;
+                return typeof first === 'string' && first.trim() ? first.trim() : current;
+              });
               setKpiReadings((prev) => {
                 const byTs = new Map(prev.map((r) => [r.timestamp, r]));
                 groupedByTimestamp.forEach((incomingKpis, ts) => {
@@ -512,7 +615,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                   (a, b) =>
                     (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
                 );
-                return merged.slice(-MAX_DATA_POINTS);
+                return merged.slice(-MAX_READINGS_CAP);
               });
               return;
             }
@@ -531,8 +634,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               hasTs &&
               hasTemp &&
               parsed.tank_id != null &&
-              String(parsed.tank_id) === tankId
+              String(parsed.tank_id) === normalizedTankId
             ) {
+              if (timeRangeRef.current !== 'LIVE') return; // only apply live updates when LIVE
               const ts = typeof parsed.timestamp === 'string' ? parsed.timestamp : '';
               const tsMs = parseTimestamp(ts)?.getTime();
               if (!ts || !Number.isFinite(tsMs)) return;
@@ -564,7 +668,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                   (a, b) =>
                     (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
                 );
-                return merged.slice(-MAX_DATA_POINTS);
+                return merged.slice(-MAX_READINGS_CAP);
               });
             }
           } catch (err) {
@@ -624,11 +728,29 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     };
   }, [tankId, token]);
 
+  // Tell server to send socket data only when LIVE; stop sending when 1H/24H/7D
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !tankId) return;
+    const live = timeRange === 'LIVE';
+    if (live) {
+      const numericTankId = Number(tankId);
+      ws.send(
+        JSON.stringify({
+          tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId,
+          live: true,
+        })
+      );
+    } else {
+      ws.send(JSON.stringify({ live: false }));
+    }
+  }, [timeRange, tankId]);
+
   const chartData = useMemo(() => {
-    const sorted = [...kpiReadings].sort(
+    const sorted = [...displayReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
-    const labels = sorted.map((r) => formatTimeLabel(r.timestamp));
+    const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
     const values = sorted.map((r) => getKpiValue(r, activeTab));
     const tab = kpiTabs.find((t) => t.id === activeTab);
     const unit = tab?.unit ?? '';
@@ -684,10 +806,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     });
 
     return { labels: bufferLabels, datasets };
-  }, [kpiReadings, activeTab, kpiTabs, kpiThresholds]);
+  }, [displayReadings, activeTab, kpiTabs, kpiThresholds, timeRange]);
 
   const chartOptions = useMemo(() => {
-    const sorted = [...kpiReadings].sort(
+    const sorted = [...displayReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
     const values = sorted.map((r) => getKpiValue(r, activeTab)).filter((v): v is number => v != null);
@@ -721,13 +843,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             title: (items: any[]) => {
               if (!items?.length) return '';
               const idx = items[0].dataIndex;
-              const sorted = [...kpiReadings].sort(
+              const sorted = [...displayReadings].sort(
                 (a, b) =>
                   (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
               );
               if (idx >= sorted.length) return '';
               const r = sorted[idx];
-              return r ? formatTimeLabel(r.timestamp) : '';
+              return r ? formatDateTimeLabel(r.timestamp) : '';
             },
             label: (context: any) => {
               const v = context.parsed?.y;
@@ -776,9 +898,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         },
       },
     };
-  }, [kpiReadings, activeTab, kpiTabs, kpiThresholds]);
+  }, [displayReadings, activeTab, kpiTabs, kpiThresholds]);
 
-  const hasData = kpiReadings.length > 0;
+  const hasData = displayReadings.length > 0;
 
   return (
     <div className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
@@ -835,8 +957,62 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 : 'Waiting for data...'}
           </div>
         ) : (
-          <Line data={chartData} options={chartOptions as any} />
+          <>
+            <Line data={chartData} options={chartOptions as any} />
+            {isRangeLoading && (
+              <div
+                className="absolute inset-0 bg-white/75 flex items-center justify-center z-10"
+                aria-hidden="true"
+              >
+                <svg
+                  className="animate-spin h-8 w-8 text-[#6B1176]"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  aria-label="Loading"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+            )}
+          </>
         )}
+      </div>
+
+      {/* Time range toggle: fetch from API for range; live data still appends */}
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+        <span className="text-xs text-[#7C7C7C] mr-1">Range:</span>
+        <div className="flex rounded-md border border-gray-200 overflow-hidden bg-gray-50">
+          {TIME_RANGES.map((range) => (
+            <button
+              key={range.id}
+              type="button"
+              onClick={() => {
+                if (range.id !== timeRange) setIsRangeLoading(true);
+                setTimeRange(range.id);
+              }}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                timeRange === range.id
+                  ? 'bg-[#6B1176] text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
