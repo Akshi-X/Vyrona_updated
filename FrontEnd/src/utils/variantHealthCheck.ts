@@ -7,9 +7,9 @@
  * 3. Components can be loaded without errors
  *
  * USAGE:
- * - Run automatically in development mode on app startup
- * - Can be triggered manually via browser console: window.__checkVariantHealth()
- * - Should be run in staging before deployments
+ * - In dev, init runs quick registry check only; no automatic server call
+ * - Trigger full health check manually via browser console: window.__checkVariantHealth()
+ * - Run in staging before deployments if needed
  *
  * SECURITY NOTE:
  * - This utility should ONLY run in development/staging environments
@@ -244,32 +244,26 @@ export function quickRegistryCheck(): {
 /**
  * Initialize health check in development mode.
  * Call this from main.tsx or App.tsx in development.
+ * Does NOT auto-call the server; use window.__checkVariantHealth() in console to run manually.
  */
 export function initializeHealthCheck(): void {
   if (import.meta.env.PROD) {
     return;
   }
 
-  // Run quick registry check immediately
+  // Run quick registry check immediately (no HTTP)
   const quickResult = quickRegistryCheck();
   console.log(
     `[Variant Registry] Initialized with ${quickResult.componentCount} components`
   );
 
-  // Expose health check function globally for debugging
+  // Expose health check function globally for manual runs only (no automatic server hit)
   if (typeof window !== 'undefined') {
     (window as unknown as { __checkVariantHealth: typeof runHealthCheckWithLogging }).__checkVariantHealth = runHealthCheckWithLogging;
     console.log(
-      '[Variant Health Check] Run window.__checkVariantHealth() to perform full health check'
+      '[Variant Health Check] Run window.__checkVariantHealth() to perform full health check (manual only)'
     );
   }
-
-  // Run full health check after a delay (allows app to initialize)
-  setTimeout(() => {
-    runHealthCheckWithLogging().catch((error) => {
-      console.error('[Variant Health Check] Failed to run:', error);
-    });
-  }, 3000);
 }
 
 export default {
