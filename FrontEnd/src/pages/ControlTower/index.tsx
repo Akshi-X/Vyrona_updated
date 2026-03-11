@@ -2,7 +2,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Sidebar } from '../../components/Sidebar';
-import Header from '../../components/Header';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
@@ -39,7 +38,7 @@ const ControlTower = () => {
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [direction, setDirection] = useState<'inbound' | 'outbound'>('inbound');
   const [department, setDepartment] = useState<string | null>(null);
-  const [userInitials, setUserInitials] = useState<string>('');
+  const [_userInitials, setUserInitials] = useState<string>('');
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
@@ -442,24 +441,9 @@ const ControlTower = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden ml-60">
-        <Header
-          title=""
-          showBackButton={false}
-          className=""
-          offsetLeft="15rem"
-          rightContent={(
-            <div 
-              className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-              onClick={() => navigate('/user-profile')}
-              title="Go to User Profile"
-            >
-              <span className="text-white text-xs font-semibold">{userInitials}</span>
-            </div>
-          )}
-        />
-
+        
         {/* Control Tower Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10" >
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-black text-2xl">
               Control Tower

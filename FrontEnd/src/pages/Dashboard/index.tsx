@@ -29,7 +29,6 @@ import TreatmentsCountIcon from '../../assets/DashBoardIcons/Treatments_Count.sv
 import PatientCountIcon from '../../assets/DashBoardIcons/Patient_Count.svg';
 import TrackingShipmentIcon from '../../assets/DashBoardIcons/TrackShipment.svg';
 import AftercareIcon from '../../assets/DashBoardIcons/AfterCare.svg';
-import Header from '../../components/Header';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
 import RiskIcon from '../../assets/DashBoardIcons/Risk.svg';
 import ComplianceIcon from '../../assets/DashBoardIcons/Compliance.svg';
@@ -41,7 +40,6 @@ import NextIcon from '../../assets/DashBoardIcons/NextIcon.svg';
 import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
-import OutboundQualityTrackingIcon from '../../assets/DashBoardIcons/OutboundQualityTracking.svg';
 import OutboundModelIcon from '../../assets/OutboundModel.svg';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
@@ -51,6 +49,7 @@ import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLos
 import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
+import { Microscope } from 'lucide-react';
 
 interface StakeholderChat {
   id: string;
@@ -93,8 +92,13 @@ export default function Dashboard({ }: DashboardProps) {
   // WebSocket for unread chat count (tagged messages only)
   const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket();
 
-  // User initials for avatar
-  const [userInitials, setUserInitials] = useState<string>('');
+  // User initials for avatar (set for potential future use)
+  const [_userInitials, setUserInitials] = useState<string>('');
+  // User first and last name for greeting
+  const [userFirstName, setUserFirstName] = useState<string>('');
+  const [userLastName, setUserLastName] = useState<string>('');
+  // Workspace label (hospital name or pharma company name) for header above greeting
+  const [userWorkspaceName, setUserWorkspaceName] = useState<string>('');
   // User department (CGT or IVF) - initialize from localStorage
   const [userDepartment, setUserDepartment] = useState<string | null>(() => {
     try {
@@ -365,7 +369,10 @@ export default function Dashboard({ }: DashboardProps) {
         const last = profile.last_name?.trim?.() || '';
         const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
         setUserInitials(initials);
-        
+        setUserFirstName(first);
+        setUserLastName(last);
+        setUserWorkspaceName(profile.company_name?.trim() || '');
+
         // Get department (CGT or IVF) - check localStorage first, then API
         let department: string | null = null;
         try {
@@ -391,6 +398,9 @@ export default function Dashboard({ }: DashboardProps) {
           }
         } catch {}
         setUserInitials('U');
+        setUserFirstName('');
+        setUserLastName('');
+        setUserWorkspaceName('');
       }
     };
     if (isAuthenticated) {
@@ -970,27 +980,11 @@ export default function Dashboard({ }: DashboardProps) {
           height: '100vh'
         }}
       >
-        <Header
-          title=""
-          showBackButton={false}
-          className=""
-          offsetLeft="15rem"
-          rightContent={(
-            <div
-              className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-              onClick={() => navigate('/user-profile')}
-              title="Go to User Profile"
-            >
-              <span className="text-white text-xs font-semibold">{userInitials}</span>
-            </div>
-          )}
-        />
 
         {/* Dashboard Content */}
         <div 
-          className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" 
+          className="flex-1 p-6 pt-10 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" 
           style={{ 
-            paddingTop: 'calc(63px + 1rem)',
             touchAction: 'pan-y',
             overscrollBehaviorX: 'none',
             overscrollBehaviorY: 'auto',
@@ -1001,11 +995,88 @@ export default function Dashboard({ }: DashboardProps) {
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
-              <div className="flex gap-6  flex-col lg:flex-row">
-                {/* Left Column */}
-                <div className="flex-1 flex flex-col gap-6 min-w-0">
-                  <h1 className="font-semibold text-black text-lg">Monthly Summary</h1>
+              {/* Single row: greeting (left) + alerts (right); on mobile: alerts on top, greeting below */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                {/* Greeting - below alerts on mobile, left on desktop */}
+                <div className="order-2 lg:order-1 flex flex-col gap-0.5">
+                  <p className="text-sm text-gray-500 font-normal min-h-[1.25rem]">
+                    {userWorkspaceName || '\u00A0'}
+                  </p>
+                  {(() => {
+                    const hour = new Date().getHours();
+                    const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+                    const displayName = [userFirstName, userLastName].filter(Boolean).join(' ') || 'User';
+                    return (
+                      <p className="text-black font-semibold text-xl">
+                        Good {greeting}, {displayName}
+                      </p>
+                    );
+                  })()}
+                </div>
+                {/* Critical Alerts, Stakeholder Chats, My Tasks - on top on mobile, right on desktop */}
+                <section className="order-1 lg:order-2 w-full lg:w-auto">
+                  <div className="flex justify-end gap-8">
+                    {/* Critical Alerts */}
+                    <div className="relative group">
+                      <img
+                        className="w-[25px] h-[25px] cursor-pointer"
+                        alt="Critical Alerts"
+                        src={CriticalAlertsIcon}
+                        onClick={() => {
+                          fetchCriticalAlerts();
+                          setShowCriticalAlerts(true);
+                        }}
+                      />
+                      {criticalAlertsCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                          <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Stakeholder Chats */}
+                    <div className="relative group">
+                      <img
+                        className="w-[25px] h-[25px] cursor-pointer"
+                        alt="Stakeholder Chats"
+                        src={StakeholderChatsIcon}
+                        onClick={() => {
+                          refreshUnread();
+                          fetchStakeholderChats();
+                          setShowStakeholderChats(true);
+                        }}
+                      />
+                      {stakeholderChatCount > 0 && (
+                        <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
+                          stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
+                        }`}>
+                          <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* My Tasks */}
+                    <div className="relative group">
+                      <img
+                        className="w-[25px] h-[25px] cursor-pointer"
+                        alt="My Tasks"
+                        src={MyTasksIcon}
+                        onClick={() => {
+                          fetchMyTasks();
+                          setShowMyTasks(true);
+                        }}
+                      />
+                      {myTasksCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                          <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              </div>
 
+              <div className="flex gap-6 flex-col lg:flex-row">
+                {/* Left Column - Volume, Performance, Shipment sections */}
+                <div className="flex-1 flex flex-col gap-6 min-w-0">
                   {/* Volume Section */}
                   <section>
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
@@ -1141,73 +1212,12 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
                 </div>
 
-                {/* Right Column */}
+                {/* Right Column - Monthly Summary + Quality Tracking cards */}
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
-                  {/* Notifications Section - Fixed at top */}
-                  <section className="w-full">
-                    <div className="flex justify-end gap-8">
-                      {/* Critical Alerts */}
-                      <div className="relative group">
-                        <img
-                          className="w-[25px] h-[25px] cursor-pointer"
-                          alt="Critical Alerts"
-                          src={CriticalAlertsIcon}
-                          onClick={() => {
-                            fetchCriticalAlerts();
-                            setShowCriticalAlerts(true);
-                          }}
-                        />
-                        {criticalAlertsCount > 0 && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Stakeholder Chats */}
-                      <div className="relative group">
-                        <img
-                          className="w-[25px] h-[25px] cursor-pointer"
-                          alt="Stakeholder Chats"
-                          src={StakeholderChatsIcon}
-                          onClick={() => {
-                            refreshUnread();
-                            fetchStakeholderChats();
-                            setShowStakeholderChats(true);
-                          }}
-                        />
-                        {stakeholderChatCount > 0 && (
-                          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
-                            stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
-                          }`}>
-                            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* My Tasks */}
-                      <div className="relative group">
-                        <img
-                          className="w-[25px] h-[25px] cursor-pointer"
-                          alt="My Tasks"
-                          src={MyTasksIcon}
-                          onClick={() => {
-                            fetchMyTasks();
-                            setShowMyTasks(true);
-                          }}
-                        />
-                        {myTasksCount > 0 && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
+                  {/* <h1 className="font-semibold text-black text-lg">Monthly Summary</h1> */}
                   {/* Quality Tracking Links - Above the chart */}
                   <section>
-                    <div className="flex gap-6 mt-11">
+                    <div className="flex gap-6 mt-10">
                       {/* Container Quality Tracking */}
                           <div 
                             className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
@@ -1263,37 +1273,28 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
 
-                      {/* Outbound Quality Tracking */}
+                      {/* Embryo Grading */}
                       <div 
-                        className="flex-1 bg-[#6B1176] rounded-lg  hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
+                        className="flex-1 bg-[#6B1176] rounded-lg hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
-                          // setShowOutboundQualityTracking(true);
-                          // Disable
+                          // Embryo Grading: no redirect for now
                         }}
                       >
                         {/* Background Graphic - Subtle Icon */}
-                        <div className="absolute bottom-0  hover:bg-[#7a1a88] right-0 opacity-5 translate-x-[30%] translate-y-[20%]">
-                          <img
-                            className="w-24 h-24"
-                            alt="Outbound Quality Tracking background"
-                            src={OutboundQualityTrackingIcon}
-                          />
+                        <div className="absolute bottom-0 right-0 opacity-5 translate-x-[0%] translate-y-[15%]">
+                          <Microscope className="w-24 h-24 text-white" strokeWidth={1.5} />
                         </div>
                         
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
-                            <img
-                              className="w-[18px] h-[18px]"
-                              alt="Outbound Quality Tracking"
-                              src={OutboundQualityTrackingIcon}
-                            />
+                            <Microscope className="w-[18px] h-[18px] text-white" strokeWidth={2} />
                           </div>
                           
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
-                            Outbound <br /> Quality Tracking
+                            Embryo <br /> Grading
                           </div>
                           
                           {/* Arrow Button at Bottom Right */}
@@ -1302,8 +1303,7 @@ export default function Dashboard({ }: DashboardProps) {
                               className="w-[26px] h-[24px] bg-[#9C3AA6] rounded-tl-lg flex items-center justify-center transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // setShowOutboundQualityTracking(true);
-                                // Disable
+                                // Embryo Grading: no redirect for now
                               }}
                             >
                               <img

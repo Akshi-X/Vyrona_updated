@@ -717,25 +717,44 @@ def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
     Returns:
         UserProfileResponse DTO with all profile fields
     """
-    # Get company name from pharma table
-    pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
-    company_name = pharma.pharma_name if pharma else None
-    
-    # Build response object
+    # Workspace label: pharma company name or hospital name (for profile/UI "workspace" line)
+    company_name = None
+    if user.pharma_id is not None:
+        pharma = db.query(Pharma).filter(Pharma.id == user.pharma_id).first()
+        company_name = pharma.pharma_name if pharma else None
+    elif getattr(user, "hospital_id", None) is not None:
+        hospital = db.query(Hospital).filter(Hospital.hospital_id == user.hospital_id).first()
+        company_name = hospital.hospital_name if hospital else None
+
+    # Serialise enum to str for response (same pattern as elsewhere: e.g. critical_alert_service uses .value)
+    approved_status_str = (
+        user.approved_status.value
+        if hasattr(user.approved_status, "value")
+        else str(user.approved_status or "")
+    )
+
+    # User model has nullable columns; pass concrete values so response schema (str/int/bool) is satisfied
+    first_name = user.first_name or ""
+    last_name = user.last_name or ""
+    email = user.email or ""
+    role = normalize_role_to_title_case(user.role) if user.role is not None else "User"
+    session_timeout = 30 if user.session_timeout is None else user.session_timeout
+    status = False if user.status is None else user.status
+
     response = UserProfileResponse(
         user_id=user.user_id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        role=normalize_role_to_title_case(user.role),
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
         pharma_id=user.pharma_id,
         company_name=company_name,
-        approved_status=user.approved_status,
-        status=user.status,
-        session_timeout=user.session_timeout,
+        approved_status=approved_status_str,
+        status=status,
+        session_timeout=session_timeout,
         last_login=user.last_login,
         created_at=user.created_at,
-        updated_at=user.updated_at
+        updated_at=user.updated_at,
     )
     return response
 
