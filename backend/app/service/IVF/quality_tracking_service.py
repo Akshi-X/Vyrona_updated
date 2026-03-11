@@ -56,6 +56,7 @@ from ...schemas.IVF.quality_tracking_schema import (
     RefillLogListResponse,
     RefillLogResponse,
     RefillLogStatusUpdate,
+    RefillLogUpdate,
 )
 from ...service.iot_service import IoTService
 
@@ -417,6 +418,68 @@ class QualityTrackingService:
             logger.error(f"Error updating refill log status: {str(e)}", exc_info=True)
             raise AppException(
                 message=f"Failed to update refill log status: {str(e)}",
+                error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+
+    def update_refill_log_for_tank(
+        self,
+        tank_id: int,
+        log_id: int,
+        update_data: RefillLogUpdate,
+        updated_by: Optional[str] = None,
+        branch_id: Optional[int] = None
+    ) -> RefillLogResponse:
+        """
+        Update editable fields (status, reservoir, ln2_ordered_date, ln2_received_date)
+        of a refill log. Only provided (non-None) fields are applied.
+        Validates that the log belongs to the specified tank.
+        """
+        try:
+            query = self.db.query(CanisterLn2Log).filter(
+                CanisterLn2Log.log_id == log_id,
+                CanisterLn2Log.tank_id == tank_id
+            )
+
+            if branch_id is not None:
+                query = query.filter(CanisterLn2Log.branch_id == branch_id)
+
+            refill_log = query.first()
+            if not refill_log:
+                raise AppException(
+                    message=f"Refill log with ID {log_id} not found in tank",
+                    error_code=ErrorMessages.NOT_FOUND,
+                    status_code=HTTPStatus.NOT_FOUND
+                )
+
+            if 'status' in update_data.model_fields_set and update_data.status is not None:
+                refill_log.status = update_data.status
+            if 'reservoir' in update_data.model_fields_set:
+                refill_log.reservoir = update_data.reservoir or None
+            if 'ln2_ordered_date' in update_data.model_fields_set:
+                refill_log.ln2_ordered_date = update_data.ln2_ordered_date
+            if 'ln2_received_date' in update_data.model_fields_set:
+                refill_log.ln2_received_date = update_data.ln2_received_date
+
+            refill_log.updated_by = updated_by
+
+            self.db.commit()
+            self.db.refresh(refill_log)
+
+            logger.info(
+                "Updated refill log | log_id=%s tank_id=%s",
+                log_id,
+                tank_id,
+            )
+
+            return RefillLogResponse.model_validate(refill_log)
+        except AppException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating refill log: {str(e)}", exc_info=True)
+            raise AppException(
+                message=f"Failed to update refill log: {str(e)}",
                 error_code=ErrorMessages.INTERNAL_SERVER_ERROR,
                 status_code=HTTPStatus.INTERNAL_SERVER_ERROR
             )

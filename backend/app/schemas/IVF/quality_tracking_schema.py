@@ -43,6 +43,14 @@ class RefillLogStatusUpdate(BaseModel):
     status: TaskStatus = Field(..., description="Updated status of the refill log")
 
 
+class RefillLogUpdate(BaseModel):
+    """Schema for updating editable fields of a refill log"""
+    status: Optional[TaskStatus] = Field(None, description="Updated status of the refill log")
+    reservoir: Optional[str] = Field(None, description="Reservoir name")
+    ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
+    ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
+
+
 class RefillLogResponse(RefillLogBase):
     """Schema for refill log response"""
     log_id: int = Field(..., description="Refill log ID")
