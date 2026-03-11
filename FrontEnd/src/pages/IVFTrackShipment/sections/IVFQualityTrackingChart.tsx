@@ -81,23 +81,50 @@ const extractThresholdConfigFromKpiLimits = (
   // - LN2 L2.max (59)  => ignored
   if (kpiName === 'ln2_level') {
     const groups = limitGroup as Record<string, any>;
-    const l1 = groups['LN2 L1'] ?? groups['ln2 l1'] ?? null;
-    const l2 = groups['LN2 L2'] ?? groups['ln2 l2'] ?? null;
-
-    const l1Max = toFiniteNumber(l1?.max);
-    const l1Min = toFiniteNumber(l1?.min);
-    const l2Min = toFiniteNumber(l2?.min);
-
     const lines: KpiThresholdLine[] = [];
-    if (l1Max != null) lines.push({ kind: 'max', value: l1Max, label: 'L1' });
-    if (l1Min != null) lines.push({ kind: 'min', value: l1Min, label: 'L2' });
-    if (l2Min != null) lines.push({ kind: 'min', value: l2Min, label: 'L3' });
+    const seen = new Set<string>();
 
-    return {
-      min: lines.length ? Math.min(...lines.map((line) => line.value)) : null,
-      max: lines.length ? Math.max(...lines.map((line) => line.value)) : null,
-      lines,
+    const pushLine = (kind: 'min' | 'max', value: unknown, label: string) => {
+      const parsed = toFiniteNumber(value);
+      if (parsed == null) return;
+      const key = `${label}:${parsed}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      lines.push({ kind, value: parsed, label });
     };
+
+    // Shape A: named bands (e.g. "LN2 L1", "LN2 L2")
+    const entries = Object.entries(groups);
+    const l1Entry = entries.find(([name]) => name.toLowerCase().includes('l1'))?.[1] ?? null;
+    const l2Entry = entries.find(([name]) => name.toLowerCase().includes('l2'))?.[1] ?? null;
+    const l3Entry = entries.find(([name]) => name.toLowerCase().includes('l3'))?.[1] ?? null;
+
+    // Match Current Quality Status mapping so markers align between cards
+    // L1 from L1.max (or L2.min fallback), L2 from L1.min (or L2.max fallback)
+    pushLine('max', l1Entry?.max ?? l2Entry?.min, 'L1');
+    pushLine('min', l1Entry?.min ?? l2Entry?.max, 'L2');
+    pushLine('min', l2Entry?.min ?? l3Entry?.max ?? l3Entry?.min, 'L3');
+
+    // Shape B: compact object fields (l1/l2/critical)
+    pushLine('max', groups?.l1?.max, 'L1');
+    pushLine('min', groups?.l1?.min, 'L2');
+    pushLine('min', groups?.l2?.max, 'L2');
+    pushLine('min', groups?.l2?.min, 'L3');
+    pushLine('min', groups?.critical?.max, 'Critical');
+
+    // Shape C: flat min/max fallback
+    if (lines.length === 0) {
+      pushLine('max', groups?.max, 'L1');
+      pushLine('min', groups?.min, 'L2');
+    }
+
+    if (lines.length > 0) {
+      return {
+        min: Math.min(...lines.map((line) => line.value)),
+        max: Math.max(...lines.map((line) => line.value)),
+        lines,
+      };
+    }
   }
 
   const lines: KpiThresholdLine[] = [];
@@ -392,13 +419,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated (no limit in backend).
   useEffect(() => {
     if (!tankId) return;
+    setIsRangeLoading(true);
     const rangeConfig = TIME_RANGES.find((r) => r.id === timeRange);
     const durationMinutes = rangeConfig?.durationMinutes;
     ivfService
       .getKpiHistory(tankId, durationMinutes)
       .then((res) => {
         if (!isMountedRef.current) return;
-        setIsRangeLoading(false);
         const series = res?.kpi_series || {};
         const entries = Object.entries(series);
         if (entries.length > 0) {
@@ -457,11 +484,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             return isStaticRange ? merged : merged.slice(-MAX_READINGS_CAP);
           });
           setHasReceivedData(true);
-        } else {
-          setIsRangeLoading(false);
         }
       })
       .catch(() => {
+      })
+      .finally(() => {
         if (isMountedRef.current) setIsRangeLoading(false);
       });
   }, [tankId, timeRange]);
@@ -947,15 +974,41 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
       <div className="min-h-[260px] flex-1 w-full min-w-0 relative">
         {!hasData ? (
-          <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
-            {!hasLoadedKpiConfig
-              ? 'Loading...'
-              : !isConnected || wsRef.current?.readyState !== WebSocket.OPEN
-              ? 'Connecting...'
-              : isConnected && !hasReceivedData
-                ? 'No data available'
-                : 'Waiting for data...'}
-          </div>
+          isRangeLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <svg
+                className="animate-spin h-8 w-8 text-[#6B1176]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-label="Loading"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
+              {!hasLoadedKpiConfig
+                ? 'Loading...'
+                : !isConnected || wsRef.current?.readyState !== WebSocket.OPEN
+                ? 'Connecting...'
+                : isConnected && !hasReceivedData
+                  ? 'No data available'
+                  : 'Waiting for data...'}
+            </div>
+          )
         ) : (
           <>
             <Line data={chartData} options={chartOptions as any} />

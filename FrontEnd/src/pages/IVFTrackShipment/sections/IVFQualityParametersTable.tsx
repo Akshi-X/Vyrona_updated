@@ -463,7 +463,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         : '#22C55E'; // Green if at or above L1
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
@@ -484,7 +484,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex items-start justify-center gap-1 ">
+      <div className="flex-1 min-h-0 flex items-start justify-center gap-1 overflow-y-auto">
         {/* Left KPI Tiles */}
         <div className="flex flex-col gap-3 justify-start pt-6">
           <KpiTile

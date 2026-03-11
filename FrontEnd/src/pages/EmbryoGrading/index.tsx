@@ -354,9 +354,9 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Main Content Grid - Matching Control Tower Layout */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_544px] gap-6 min-h-0 items-start">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
             {/* Left Panel - Filters and Embryo List */}
-            <div className="flex flex-col gap-6 min-w-0">
+            <div className="flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
               {/* Filters Section */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
@@ -492,7 +492,7 @@ export default function EmbryoGradingPage() {
               </div>
 
               {/* Active Embryos List */}
-              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden h-[544px]`}>
+              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-1 flex flex-col overflow-hidden min-h-80`}>
                 <h2 className="font-bold text-black text-base mb-2">
                   Active Embryos
                 </h2>
@@ -551,7 +551,7 @@ export default function EmbryoGradingPage() {
             </div>
 
             {/* Right Panel - Grading Details */}
-            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2">
+            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Embryo Grading Details</h2>
