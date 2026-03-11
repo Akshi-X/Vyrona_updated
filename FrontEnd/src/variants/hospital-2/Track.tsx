@@ -232,7 +232,7 @@ const DetailRow: React.FC<DetailRowProps> = ({ label, value }) => (
 );
 
 const TimelineTab: React.FC = () => {
-  const timelineEvents = [
+  const timelineEvents: TimelineEventProps['event'][] = [
     {
       id: 1,
       time: '2024-06-14 09:00',
