@@ -15,6 +15,7 @@ from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.schemas.IVF.quality_tracking_schema import (
     RefillLogCreate,
     RefillLogStatusUpdate,
+    RefillLogUpdate,
     RefillLogResponse,
     RefillLogListResponse,
     IVFCanisterTrackingResponse,
@@ -123,6 +124,36 @@ def get_refill_logs_by_container(
         raise
     except Exception as e:
         logger.error(f"Error in get_refill_logs_by_container endpoint: {str(e)}", exc_info=True)
+        raise
+
+
+@router.patch("/tanks/{tank_id}/refill-logs/{log_id}", response_model=RefillLogResponse)
+def update_refill_log(
+    tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
+    log_id: int = Path(..., description="Refill log ID"),
+    branch_id_override: Optional[int] = Query(None, description="Optional branch ID override (Managers only)"),
+    update_data: RefillLogUpdate = ...,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update editable fields of a refill log entry:
+    status, reservoir, ln2_ordered_date, ln2_received_date.
+    Only fields that are explicitly provided are updated.
+    """
+    try:
+        branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
+        quality_tracking_service = QualityTrackingService(db)
+        return quality_tracking_service.update_refill_log_for_tank(
+            tank_id=tank_id,
+            log_id=log_id,
+            update_data=update_data,
+            updated_by=current_user.email if current_user else None,
+            branch_id=branch_id
+        )
+    except Exception as e:
+        logger.error(f"Error in update_refill_log endpoint: {str(e)}", exc_info=True)
         raise
 
 
