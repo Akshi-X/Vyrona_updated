@@ -15,8 +15,8 @@ import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.sv
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
-import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
-import IncubatorQualityTrackingIcon from "../assets/DashBoardIcons/IncubatorQualityTracking.svg";
+//import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
+//import IncubatorQualityTrackingIcon from "../assets/DashBoardIcons/IncubatorQualityTracking.svg";
 
 interface SidebarProps {
     onLogout: () => void;
