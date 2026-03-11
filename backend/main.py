@@ -43,6 +43,7 @@ from app.controller.IVF import (
     quality_tracking_controller,
 )
 from app.init_db import init_db as create_admin
+from app.init_db import sync_ivf_schema
 from app.middleware.exception_handler import (
     exception_handler_middleware,
     setup_exception_handlers,
@@ -153,6 +154,8 @@ async def startup_event():
     #     # Step 1: Create database tables first
     #     logger.info("Creating database tables...")
     # create_tables()
+    # Run schema sync/init migrations (safe/idempotent)
+    sync_ivf_schema()
 
     #     # Step 2: Create pharma admin users
     #     logger.info("Creating pharma admin users...")
@@ -239,7 +242,6 @@ app.include_router(
 def health_check():
     """Health check endpoint with database and Redis connection status."""
     return HealthCheckResponse(**get_health_response())
-    
 
 
 if __name__ == "__main__":
