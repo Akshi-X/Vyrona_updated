@@ -725,6 +725,7 @@ class IVFService:
     def get_embryo_tracking(
         self,
         branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
         user_role: Optional[str] = None,
         branch_name: Optional[str] = None,
         status: Optional[str] = None,
@@ -825,9 +826,11 @@ class IVFService:
             )
             
             # Apply branch filter only for User role (Manager and Admin see all branches)
-            # branch_id is None for Manager/Admin roles, so they see all branches
+            # When branch_id is None, scope by hospital_id so Manager/Admin see only their hospital
             if branch_id is not None:
                 query = query.filter(PatientCrylockInfo.branch_id == branch_id)
+            elif hospital_id is not None:
+                query = query.filter(HospitalBranch.hospital_id == hospital_id)
             
             # Apply optional branch/site name filter
             normalized_branch_name = branch_name.strip() if branch_name else None
@@ -917,6 +920,7 @@ class IVFService:
     def get_embryo_tracking_filters(
         self,
         branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
         branch_name: Optional[str] = None,
         status: Optional[str] = None,
         crylock_color: Optional[str] = None,
@@ -946,6 +950,8 @@ class IVFService:
             def _apply_filters(q, apply_branch_name: bool, apply_status: bool, apply_goblet: bool, apply_crylock: bool):
                 if branch_id is not None:
                     q = q.filter(PatientCrylockInfo.branch_id == branch_id)
+                elif hospital_id is not None:
+                    q = q.filter(HospitalBranch.hospital_id == hospital_id)
                 if apply_branch_name and branch_name and branch_name.strip():
                     q = q.filter(func.lower(HospitalBranch.branch_name) == func.lower(branch_name.strip()))
                 if apply_crylock and crylock_color and crylock_color.strip():
@@ -1020,6 +1026,8 @@ class IVFService:
             site_q = _apply_filters(site_q, False, True, True, True)
             if branch_id is not None:
                 site_q = site_q.filter(PatientCrylockInfo.branch_id == branch_id)
+            elif hospital_id is not None:
+                site_q = site_q.filter(HospitalBranch.hospital_id == hospital_id)
             site_rows = site_q.group_by(HospitalBranch.branch_name).all()
             site_names = sorted([r[0] for r in site_rows if r[0]])
             site_name_counts = {r[0]: r[1] for r in site_rows if r[0]}

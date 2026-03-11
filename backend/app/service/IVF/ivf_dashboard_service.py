@@ -122,7 +122,7 @@ class IVFDashboardService:
         # Default: no filtering
         return None
     
-    def get_total_embryos_cryolocks(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_total_embryos_cryolocks(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get total count of embryos and cryolocks.
         
@@ -137,6 +137,7 @@ class IVFDashboardService:
         
         Args:
             branch_id: Optional branch ID to filter by
+            hospital_id: Optional hospital ID to scope results (when branch_id not set, e.g. Manager/Admin)
             role: User's role to determine filtering
             
         Returns:
@@ -155,6 +156,11 @@ class IVFDashboardService:
         # Apply branch filtering if needed
         if filter_branch_id is not None:
             cryolock_query = cryolock_query.filter(PatientCrylockInfo.branch_id == filter_branch_id)
+        elif hospital_id is not None:
+            cryolock_query = (
+                cryolock_query.join(HospitalBranch, PatientCrylockInfo.branch_id == HospitalBranch.branch_id)
+                .filter(HospitalBranch.hospital_id == hospital_id)
+            )
         
         total_cryolocks = cryolock_query.scalar() or 0
         
@@ -169,7 +175,7 @@ class IVFDashboardService:
             "total_embryos_cryolocks": total_embryos_cryolocks
         }
     
-    def get_total_containers(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_total_containers(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get total number of tanks.
         
@@ -180,6 +186,7 @@ class IVFDashboardService:
         
         Args:
             branch_id: Optional branch ID to filter by
+            hospital_id: Optional hospital ID to scope results (when branch_id not set)
             role: User's role to determine filtering
             
         Returns:
@@ -194,9 +201,14 @@ class IVFDashboardService:
             .filter(Tank.is_active == True)
         )
         
-        # Apply branch filtering if needed
+        # Apply branch or hospital filtering if needed
         if filter_branch_id is not None:
             tank_query = tank_query.filter(Tank.branch_id == filter_branch_id)
+        elif hospital_id is not None:
+            tank_query = (
+                tank_query.join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                .filter(HospitalBranch.hospital_id == hospital_id)
+            )
         
         total_containers = tank_query.scalar() or 0
         
@@ -204,7 +216,7 @@ class IVFDashboardService:
             "total_containers": total_containers
         }
     
-    def get_quality_deviations_flagged(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_quality_deviations_flagged(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get count of quality deviations flagged.
         
@@ -218,6 +230,7 @@ class IVFDashboardService:
         
         Args:
             branch_id: Optional branch ID to filter by
+            hospital_id: Optional hospital ID to scope results (when branch_id not set)
             role: User's role to determine filtering
             
         Returns:
@@ -239,12 +252,18 @@ class IVFDashboardService:
             func.count(IVFQualityLog.id).label("total_quality_deviations"),
         ).filter(base_filter)
         
-        # Apply branch filtering if needed (ivf_quality_log is tank-level monitoring)
+        # Apply branch or hospital filtering if needed (ivf_quality_log is tank-level monitoring)
         if filter_branch_id is not None:
             q = (
                 q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
                  .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                  .filter(HospitalBranch.branch_id == filter_branch_id)
+            )
+        elif hospital_id is not None:
+            q = (
+                q.join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
+                 .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                 .filter(HospitalBranch.hospital_id == hospital_id)
             )
         
         row = q.first()
@@ -256,7 +275,7 @@ class IVFDashboardService:
             "ln2_level_deviations": 0,
         }
     
-    def get_top_deviation_driver(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_top_deviation_driver(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get top deviation driver.
         
@@ -275,6 +294,7 @@ class IVFDashboardService:
         
         Args:
             branch_id: Optional branch ID to filter by
+            hospital_id: Optional hospital ID to scope results (when branch_id not set)
             role: User's role to determine filtering
             
         Returns:
@@ -283,7 +303,7 @@ class IVFDashboardService:
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
         
-        # Helper function to build query with optional branch filtering
+        # Helper function to build query with optional branch/hospital filtering
         # Join through: IVFQualityLog -> Tank -> Branch (tank-level monitoring)
         def build_query(deviation_filter):
             query = (
@@ -291,13 +311,19 @@ class IVFDashboardService:
                 .filter(deviation_filter)
             )
             
-            # Apply branch filtering if needed
             if filter_branch_id is not None:
                 query = (
                     query
                     .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
                     .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
                     .filter(HospitalBranch.branch_id == filter_branch_id)
+                )
+            elif hospital_id is not None:
+                query = (
+                    query
+                    .join(Tank, IVFQualityLog.tank_id == Tank.tank_id)
+                    .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+                    .filter(HospitalBranch.hospital_id == hospital_id)
                 )
             
             return query
@@ -366,7 +392,7 @@ class IVFDashboardService:
             "deviations_by_kpi": deviations
         }
     
-    def get_outbound_shipments(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_outbound_shipments(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
         """
         Get count of outbound shipments.
         
@@ -379,10 +405,11 @@ class IVFDashboardService:
         
         Role-based filtering:
         - User role: Counts shipments where source_branch_id OR destination_branch_id matches user's branch
-        - Manager/Admin role: Counts all outbound shipments across all branches
+        - Manager/Admin role: Counts outbound shipments for their hospital only (when hospital_id provided)
         
         Args:
             branch_id: Optional branch ID to filter by
+            hospital_id: Optional hospital ID to scope results (when branch_id not set)
             role: User's role to determine filtering
             
         Returns:
@@ -401,13 +428,22 @@ class IVFDashboardService:
             )
         )
         
-        # Apply branch filtering if needed (for User role)
+        # Apply branch or hospital filtering if needed
         if filter_branch_id is not None:
-            # Count shipments where either source OR destination branch matches user's branch
             shipment_query = shipment_query.filter(
                 or_(
                     IVFShipment.source_branch_id == filter_branch_id,
                     IVFShipment.destination_branch_id == filter_branch_id
+                )
+            )
+        elif hospital_id is not None:
+            branch_ids_subq = (
+                self.db.query(HospitalBranch.branch_id).filter(HospitalBranch.hospital_id == hospital_id).subquery()
+            )
+            shipment_query = shipment_query.filter(
+                or_(
+                    IVFShipment.source_branch_id.in_(branch_ids_subq),
+                    IVFShipment.destination_branch_id.in_(branch_ids_subq)
                 )
             )
         

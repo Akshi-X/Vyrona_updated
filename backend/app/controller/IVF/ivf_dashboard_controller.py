@@ -65,9 +65,10 @@ def get_total_embryos_cryolocks(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         
         service = IVFDashboardService(db)
-        result = service.get_total_embryos_cryolocks(branch_id=branch_id, role=role)
+        result = service.get_total_embryos_cryolocks(branch_id=branch_id, hospital_id=hospital_id, role=role)
         
         return TotalEmbryosCryolocksResponse(**result)
     except HTTPException:
@@ -96,9 +97,10 @@ def get_total_containers(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         
         service = IVFDashboardService(db)
-        result = service.get_total_containers(branch_id=branch_id, role=role)
+        result = service.get_total_containers(branch_id=branch_id, hospital_id=hospital_id, role=role)
         
         return TotalContainersResponse(**result)
     except HTTPException:
@@ -128,9 +130,10 @@ def get_quality_deviations_flagged(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         
         service = IVFDashboardService(db)
-        result = service.get_quality_deviations_flagged(branch_id=branch_id, role=role)
+        result = service.get_quality_deviations_flagged(branch_id=branch_id, hospital_id=hospital_id, role=role)
         
         return QualityDeviationsFlaggedResponse(**result)
     except HTTPException:
@@ -162,9 +165,10 @@ def get_top_deviation_driver(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         
         service = IVFDashboardService(db)
-        result = service.get_top_deviation_driver(branch_id=branch_id, role=role)
+        result = service.get_top_deviation_driver(branch_id=branch_id, hospital_id=hospital_id, role=role)
         
         return TopDeviationDriverResponse(**result)
     except HTTPException:
@@ -195,9 +199,10 @@ def get_outbound_shipments(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         
         service = IVFDashboardService(db)
-        result = service.get_outbound_shipments(branch_id=branch_id, role=role)
+        result = service.get_outbound_shipments(branch_id=branch_id, hospital_id=hospital_id, role=role)
         
         return OutboundShipmentsResponse(**result)
     except HTTPException:
