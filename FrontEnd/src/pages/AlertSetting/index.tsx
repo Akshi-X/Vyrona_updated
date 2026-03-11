@@ -4,15 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import { ivfService, type IvfBranch, type KpiConfigRow, type KpiConfigPayload } from '../../services/ivfService';
 import { shipmentService } from '../../services/shipmentService';
-import DeviceThermostatIcon from '@mui/icons-material/DeviceThermostat';
-import ThermostatAutoIcon from '@mui/icons-material/ThermostatAuto';
-import WaterDropIcon from '@mui/icons-material/WaterDrop';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import BoltIcon from '@mui/icons-material/Bolt';
-import BatteryChargingFullIcon from '@mui/icons-material/BatteryChargingFull';
-import SensorDoorIcon from '@mui/icons-material/SensorDoor';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import ClearIcon from '@mui/icons-material/Clear';
+import { Thermometer, Droplets, TrendingUp, Zap, Battery, DoorOpen, Info, X, Bell, Mail, ThermometerSun, Minus, ChevronDown, Loader2 } from 'lucide-react';
 
 interface ContainerRow {
   tank_id: number;
@@ -45,43 +37,43 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
   [KPI_NAMES.IVF_TEMPERATURE_INTERNAL]: {
     label: 'Internal Temperature',
     description: 'Monitor the internal tank temperature for safe storage conditions',
-    icon: <DeviceThermostatIcon sx={{ fontSize: 20 }} />,
+    icon: <Thermometer size={20} />,
     unit: '°C',
   },
   [KPI_NAMES.IVF_TEMPERATURE_EXTERNAL]: {
     label: 'External Temperature',
     description: 'Track ambient temperature around the storage container',
-    icon: <ThermostatAutoIcon sx={{ fontSize: 20 }} />,
+    icon: <ThermometerSun size={20} />,
     unit: '°C',
   },
   [KPI_NAMES.IVF_LN2_LEVEL]: {
     label: 'LN2',
     description: 'Liquid nitrogen level monitoring for cryogenic safety',
-    icon: <WaterDropIcon sx={{ fontSize: 20 }} />,
+    icon: <Droplets size={20} />,
     unit: 'Ln2 in kg',
   },
   [KPI_NAMES.IVF_LN2_EVAPORATION_RATE]: {
     label: 'Evaporation Rate',
     description: 'Track LN2 evaporation rate to predict refill schedules',
-    icon: <TrendingUpIcon sx={{ fontSize: 20 }} />,
+    icon: <TrendingUp size={20} />,
     unit: '%/day',
   },
   [KPI_NAMES.IVF_SHOCK]: {
     label: 'Shock Detection',
     description: 'Alert for physical impacts or sudden movements',
-    icon: <BoltIcon sx={{ fontSize: 20 }} />,
+    icon: <Zap size={20} />,
     unit: 'g',
   },
   [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]: {
     label: 'Battery Level',
     description: 'Monitor device battery to ensure continuous tracking',
-    icon: <BatteryChargingFullIcon sx={{ fontSize: 20 }} />,
+    icon: <Battery size={20} />,
     unit: '%',
   },
   [KPI_NAMES.IVF_LN2_LID_STATE]: {
     label: 'Lid State',
     description: 'Monitor container lid open/close status for security',
-    icon: <SensorDoorIcon sx={{ fontSize: 20 }} />,
+    icon: <DoorOpen size={20} />,
   },
 };
 
@@ -89,7 +81,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
 const DEFAULT_KPI_METADATA: KpiMetadata = {
   label: 'Custom Alert',
   description: 'Custom monitoring parameter',
-  icon: <InfoOutlinedIcon sx={{ fontSize: 20 }} />,
+  icon: <Info size={20} />,
 };
 
 // Helper to get KPI metadata
@@ -222,6 +214,20 @@ export default function AlertSetting() {
   const [branchFilter, setBranchFilter] = useState<string>('All');
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      const isInsideDropdown = target.closest('.dropdown-button') || target.closest('.dropdown-menu');
+      if (!isInsideDropdown) {
+        setOpenDropdowns({});
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [containers, setContainers] = useState<ContainerRow[]>([]);
   const [containersLoading, setContainersLoading] = useState(false);
   const [containersError, setContainersError] = useState<string | null>(null);
@@ -800,7 +806,37 @@ export default function AlertSetting() {
                 style={{ scrollbarWidth: 'thin' }}
               >
                 {containersLoading && (
-                  <div className="p-4 text-xs text-gray-500">Loading...</div>
+                  <div className="flex-1 flex flex-col min-h-[280px] divide-y divide-gray-100">
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 items-center gap-2"
+                      >
+                        <div className="min-w-0 overflow-hidden space-y-2">
+                          <div className="relative overflow-hidden h-3.5 w-24 rounded-md bg-gray-200">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                            />
+                          </div>
+                          <div className="relative overflow-hidden h-3 w-20 rounded-md bg-gray-100">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08 + 0.05}s` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-center">
+                          <div className="relative overflow-hidden w-4 h-4 rounded border border-gray-200 bg-gray-100">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 {!containersLoading && containersError && (
                   <div className="p-4 text-xs text-red-600">{containersError}</div>
@@ -879,7 +915,7 @@ export default function AlertSetting() {
                 {configLoading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center text-gray-400">
-                      <div className="animate-spin w-8 h-8 border-2 border-[#6b1176] border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <Loader2 className="animate-spin w-8 h-8 text-[#6b1176] mx-auto mb-2" />
                       <p className="text-sm">Loading configuration...</p>
                     </div>
                   </div>
@@ -927,10 +963,10 @@ export default function AlertSetting() {
                             >
                               <div className="flex items-center gap-4">
                                 <div
-                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transform ${
+                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
                                     isAlertEnabled
                                       ? isCritical
-                                        ? 'bg-red-100 text-red-600'
+                                        ? 'bg-red-100 text-red-500'
                                         : 'bg-[#F2E4FF] text-[#6b1176]'
                                       : 'bg-[#F2E4FF] text-[#6b1176]'
                                   }`}
@@ -948,33 +984,17 @@ export default function AlertSetting() {
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                      {/* Clear button */}
-                                      {hasAnyValue && (
-                                        <button
-                                          type="button"
-                                          onClick={() => clearMultiDraft(kpiName)}
-                                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                                          title="Clear configuration"
-                                        >
-                                          <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
-                                        </button>
-                                      )}
-                                      <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700">
+                                      <div className="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                                        <Minus size={10} />
                                         Unset
-                                      </span>
+                                      </div>
                                       {isAlertEnabled ? (
-                                        <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
+                                        <div className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${
                                           isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
                                         }`}>
-                                          <svg
-                                            className={`w-5 h-5 ${isCritical ? 'text-red-600' : 'text-[#6b1176]'}`}
-                                            viewBox="0 0 24 24"
-                                            fill="currentColor"
-                                          >
-                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
-                                          </svg>
-                                          <span className="mx-2 text-xs">
-                                            {isCritical ? "Email Alert" : "Soft Alert"}
+                                          {isCritical ? <Mail size={16} className="text-red-500" /> : <Bell size={16} className="text-[#6b1176]" />}
+                                          <span className="mx-1.5 text-[10px]">
+                                            {isCritical ? "Email Alert Enabled" : "Notification only"}
                                           </span>
                                         </div>
                                       ) : (
@@ -983,9 +1003,20 @@ export default function AlertSetting() {
                                             <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
                                           </svg>
                                           <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                            <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
                                           </div>
                                         </div>
+                                      )}
+                                      {/* Clear button */}
+                                      {hasAnyValue && (
+                                        <button
+                                          type="button"
+                                          onClick={() => clearMultiDraft(kpiName)}
+                                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                                          title="Clear configuration"
+                                        >
+                                          <X size={18} className="text-gray-500" />
+                                        </button>
                                       )}
                                     </div>
                                   </div>
@@ -999,21 +1030,37 @@ export default function AlertSetting() {
                                     {/* Lid State - special select input */}
                                     {inputType === 'lid_state' ? (
                                       <div className="flex items-center gap-2">
-                                        <select
-                                          ref={(el) => { refs.min = el; }}
-                                          value={lidStateVal}
-                                          onChange={(e) => {
-                                            setMultiDraft(kpiName, { lid_state: e.target.value });
-                                          }}
-                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
-                                          className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                        >
-                                          {LID_STATE_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                              {opt.label}
-                                            </option>
-                                          ))}
-                                        </select>
+                                        <div className="relative w-48">
+                                          <button
+                                            type="button"
+                                            className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
+                                            onClick={() => setOpenDropdowns(prev => ({ ...prev, [`multi-lid-${kpiName}`]: !prev[`multi-lid-${kpiName}`] }))}
+                                          >
+                                            <span>
+                                              {LID_STATE_OPTIONS.find(opt => opt.value === lidStateVal)?.label || 'Select'}
+                                            </span>
+                                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`multi-lid-${kpiName}`] ? 'rotate-180' : ''}`} />
+                                          </button>
+                                          {openDropdowns[`multi-lid-${kpiName}`] && (
+                                            <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                              {LID_STATE_OPTIONS.map((opt) => (
+                                                <button
+                                                  key={opt.value}
+                                                  type="button"
+                                                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                                    opt.value === lidStateVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                                  }`}
+                                                  onClick={() => {
+                                                    setMultiDraft(kpiName, { lid_state: opt.value });
+                                                    setOpenDropdowns(prev => ({ ...prev, [`multi-lid-${kpiName}`]: false }));
+                                                  }}
+                                                >
+                                                  {opt.label}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     ) : inputType === 'battery' ? (
                                       /* Battery - only min input, max is always 100 */
@@ -1110,30 +1157,47 @@ export default function AlertSetting() {
                                         </div>
                                       </>
                                     )}
-                                    <select
-                                      ref={(el) => { refs.alertType = el; }}
-                                      value={typeVal ?? ''}
-                                      onChange={(e) => {
-                                        const v = e.target.value === '' ? null : e.target.value;
-                                        setMultiDraft(kpiName, { alert_type: v });
-                                      }}
-                                      disabled={!canEnableAlert}
-                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                        !canEnableAlert
-                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                          : isAlertEnabled
-                                            ? isCritical
-                                              ? 'border-red-200 bg-red-50 text-red-700'
-                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                            : 'border-gray-200 bg-white text-gray-500'
-                                      }`}
-                                    >
-                                      {alertTypeOptions.map((opt) => (
-                                        <option key={opt.label} value={opt.value ?? ''}>
-                                          {opt.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                                    <div className="relative flex-1 min-w-[140px]">
+                                      <button
+                                        type="button"
+                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                          !canEnableAlert
+                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : isAlertEnabled
+                                              ? isCritical
+                                                ? 'border-red-200 bg-red-50 text-red-700'
+                                                : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                              : 'border-gray-200 bg-white text-gray-500'
+                                        }`}
+                                        disabled={!canEnableAlert}
+                                        onClick={() => setOpenDropdowns(prev => ({ ...prev, [`multi-${kpiName}`]: !prev[`multi-${kpiName}`] }))}
+                                      >
+                                        <span>
+                                          {typeVal ? alertTypeOptions.find(opt => opt.value === typeVal)?.label || 'No Alert' : 'No Alert'}
+                                        </span>
+                                        <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`multi-${kpiName}`] ? 'rotate-180' : ''}`} />
+                                      </button>
+                                      {openDropdowns[`multi-${kpiName}`] && (
+                                        <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                          {alertTypeOptions.map((opt) => (
+                                            <button
+                                              key={opt.label}
+                                              type="button"
+                                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                                opt.value === typeVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                              }`}
+                                              onClick={() => {
+                                                const v = opt.value === '' ? null : opt.value;
+                                                setMultiDraft(kpiName, { alert_type: v });
+                                                setOpenDropdowns(prev => ({ ...prev, [`multi-${kpiName}`]: false }));
+                                              }}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1180,10 +1244,10 @@ export default function AlertSetting() {
                               <div className="flex items-center gap-4">
                                 {/* Icon */}
                                 <div
-                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transform ${
+                                  className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
                                     isAlertEnabled
                                       ? isCritical
-                                        ? 'bg-red-100 text-red-600'
+                                        ? 'bg-red-100 text-red-500'
                                         : 'bg-[#F2E4FF] text-[#6b1176]'
                                       : 'bg-[#F2E4FF] text-[#6b1176]'
                                   }`}
@@ -1205,29 +1269,14 @@ export default function AlertSetting() {
 
                                     {/* Alert Toggle Icon + Clear Button */}
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                      {/* Clear button */}
-                                      <button
-                                        type="button"
-                                        onClick={() => clearDraft(r.id)}
-                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                                        title="Clear configuration"
-                                      >
-                                        <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
-                                      </button>
                                       {isAlertEnabled ? (
-                                        <div className={`w-auto pl-2 h-8 rounded-lg flex items-center justify-center ${
+                                        <div className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${
                                           isCritical ? 'bg-red-100' : 'bg-[#F2E4FF]'
                                         }`}>
-                                          <svg
-                                            className={`w-5 h-5 ${isCritical ? 'text-red-600' : 'text-[#6b1176]'}`}
-                                            viewBox="0 0 24 24"
-                                            fill="currentColor"
-                                          >
-                                            <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
-                                          </svg>
-                                          <span className="mx-2 text-xs">
-                                            {isCritical ? "Email Alert Enabled" : ""}
-                                          </span> 
+                                          {isCritical ? <Mail size={16} className="text-red-500" /> : <Bell size={16} className="text-[#6b1176]" />}
+                                          <span className="mx-1.5 text-[10px]">
+                                            {isCritical ? "Email Alert Enabled" : "Notification only"}
+                                          </span>
                                         </div>
                                       ) : (
                                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
@@ -1235,10 +1284,19 @@ export default function AlertSetting() {
                                             <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
                                           </svg>
                                           <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                            <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
                                           </div>
                                         </div>
                                       )}
+                                      {/* Clear button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => clearDraft(r.id)}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                                        title="Clear configuration"
+                                      >
+                                        <X size={18} className="text-gray-500" />
+                                      </button>
                                     </div>
                                   </div>
 
@@ -1252,21 +1310,37 @@ export default function AlertSetting() {
                                     {/* Lid State - special select input */}
                                     {inputType === 'lid_state' ? (
                                       <div className="flex items-center gap-2">
-                                        <select
-                                          ref={(el) => { refs.min = el; }}
-                                          value={lidStateVal}
-                                          onChange={(e) => {
-                                            setDraft(r.id, { lid_state: e.target.value });
-                                          }}
-                                          onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
-                                          className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                        >
-                                          {LID_STATE_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                              {opt.label}
-                                            </option>
-                                          ))}
-                                        </select>
+                                        <div className="relative w-48">
+                                          <button
+                                            type="button"
+                                            className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
+                                            onClick={() => setOpenDropdowns(prev => ({ ...prev, [`single-lid-${r.id}`]: !prev[`single-lid-${r.id}`] }))}
+                                          >
+                                            <span>
+                                              {LID_STATE_OPTIONS.find(opt => opt.value === lidStateVal)?.label || 'Select'}
+                                            </span>
+                                            <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`single-lid-${r.id}`] ? 'rotate-180' : ''}`} />
+                                          </button>
+                                          {openDropdowns[`single-lid-${r.id}`] && (
+                                            <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                              {LID_STATE_OPTIONS.map((opt) => (
+                                                <button
+                                                  key={opt.value}
+                                                  type="button"
+                                                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                                    opt.value === lidStateVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                                  }`}
+                                                  onClick={() => {
+                                                    setDraft(r.id, { lid_state: opt.value });
+                                                    setOpenDropdowns(prev => ({ ...prev, [`single-lid-${r.id}`]: false }));
+                                                  }}
+                                                >
+                                                  {opt.label}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     ) : inputType === 'battery' || r.kpi_name === KPI_NAMES.IVF_LN2_LEVEL ? (
                                       /* Battery - only min input, max is always 100 */
@@ -1340,30 +1414,47 @@ export default function AlertSetting() {
                                     )}
 
                                     {/* Alert Type Select */}
-                                    <select
-                                      ref={(el) => { refs.alertType = el; }}
-                                      value={typeVal ?? ''}
-                                      onChange={(e) => {
-                                        const v = e.target.value === '' ? null : e.target.value;
-                                        setDraft(r.id, { alert_type: v });
-                                      }}
-                                      disabled={!canEnableAlert}
-                                      className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                        !canEnableAlert
-                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                          : isAlertEnabled
-                                            ? isCritical
-                                              ? 'border-red-200 bg-red-50 text-red-700'
-                                              : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
-                                            : 'border-gray-200 bg-white text-gray-500'
-                                      }`}
-                                    >
-                                      {alertTypeOptions.map((opt) => (
-                                        <option key={opt.label} value={opt.value ?? ''}>
-                                          {opt.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                                    <div className="relative flex-1 min-w-[140px]">
+                                      <button
+                                        type="button"
+                                        className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                          !canEnableAlert
+                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : isAlertEnabled
+                                              ? isCritical
+                                                ? 'border-red-200 bg-red-50 text-red-700'
+                                                : 'border-[#E7D4F0] bg-[#F7ECFF] text-[#6b1176]'
+                                              : 'border-gray-200 bg-white text-gray-500'
+                                        }`}
+                                        disabled={!canEnableAlert}
+                                        onClick={() => setOpenDropdowns(prev => ({ ...prev, [`single-${r.id}`]: !prev[`single-${r.id}`] }))}
+                                      >
+                                        <span>
+                                          {typeVal ? alertTypeOptions.find(opt => opt.value === typeVal)?.label || 'No Alert' : 'No Alert'}
+                                        </span>
+                                        <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`single-${r.id}`] ? 'rotate-180' : ''}`} />
+                                      </button>
+                                      {openDropdowns[`single-${r.id}`] && (
+                                        <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                          {alertTypeOptions.map((opt) => (
+                                            <button
+                                              key={opt.label}
+                                              type="button"
+                                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                                opt.value === typeVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                              }`}
+                                              onClick={() => {
+                                                const v = opt.value === '' ? null : opt.value;
+                                                setDraft(r.id, { alert_type: v });
+                                                setOpenDropdowns(prev => ({ ...prev, [`single-${r.id}`]: false }));
+                                              }}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1385,7 +1476,7 @@ export default function AlertSetting() {
                           return (
                             <div key={`missing-${kpiName}`} className="relative rounded-xl border-2 border-gray-200 bg-gray-50/30 p-5 transition-all duration-200">
                               <div className="flex items-center gap-4">
-                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 bg-[#F2E4FF] text-[#6b1176]">
                                   {metadata.icon}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1402,12 +1493,13 @@ export default function AlertSetting() {
                                           <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
                                         </svg>
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                          <div className="w-7 h-0.5 bg-red-500 transform rotate-45 rounded"></div>
+                                          <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
                                         </div>
                                       </div>
-                                      <span className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700">
+                                      <div className="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                                        <Minus size={10} />
                                         Unset
-                                      </span>
+                                      </div>
                                       {(minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== '') && (
                                         <button
                                           type="button"
@@ -1415,7 +1507,7 @@ export default function AlertSetting() {
                                           className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
                                           title="Clear configuration"
                                         >
-                                          <ClearIcon sx={{ fontSize: 18 }} className="text-gray-500" />
+                                          <X size={18} className="text-gray-500" />
                                         </button>
                                       )}
                                     </div>
@@ -1424,17 +1516,37 @@ export default function AlertSetting() {
                               </div>
                               <div className="flex items-center gap-3 mt-4">
                                 {inputType === 'lid_state' ? (
-                                  <select
-                                    ref={(el) => { refs.min = el; }}
-                                    value={lidStateVal}
-                                    onChange={(e) => setMultiDraft(kpiName, { lid_state: e.target.value })}
-                                    onKeyDown={(e) => handleKeyDown(e, kpiKey, 'lidState')}
-                                    className="w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                  >
-                                    {LID_STATE_OPTIONS.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                  </select>
+                                  <div className="relative w-48">
+                                    <button
+                                      type="button"
+                                      className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
+                                      onClick={() => setOpenDropdowns(prev => ({ ...prev, [`single-missing-lid-${kpiName}`]: !prev[`single-missing-lid-${kpiName}`] }))}
+                                    >
+                                      <span>
+                                        {LID_STATE_OPTIONS.find(opt => opt.value === lidStateVal)?.label || 'Select'}
+                                      </span>
+                                      <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`single-missing-lid-${kpiName}`] ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {openDropdowns[`single-missing-lid-${kpiName}`] && (
+                                      <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                        {LID_STATE_OPTIONS.map((opt) => (
+                                          <button
+                                            key={opt.value}
+                                            type="button"
+                                            className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                              opt.value === lidStateVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                            }`}
+                                            onClick={() => {
+                                              setMultiDraft(kpiName, { lid_state: opt.value });
+                                              setOpenDropdowns(prev => ({ ...prev, [`single-missing-lid-${kpiName}`]: false }));
+                                            }}
+                                          >
+                                            {opt.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 ) : inputType === 'battery' || kpiName === KPI_NAMES.IVF_LN2_LEVEL ? (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs text-gray-500">Alert below</span>
@@ -1492,24 +1604,43 @@ export default function AlertSetting() {
                                     {metadata.unit && <span className="text-xs text-gray-400">{metadata.unit}</span>}
                                   </>
                                 )}
-                                <select
-                                  ref={(el) => { refs.alertType = el; }}
-                                  value={typeVal ?? ''}
-                                  onChange={(e) => {
-                                    const v = e.target.value === '' ? null : e.target.value;
-                                    setMultiDraft(kpiName, { alert_type: v });
-                                  }}
-                                  disabled={!canEnableAlert}
-                                  className={`flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#6b1176] focus:border-transparent ${
-                                    !canEnableAlert
-                                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                      : 'border-gray-200 bg-white text-gray-700'
-                                  }`}
-                                >
-                                  {alertTypeOptions.map((opt) => (
-                                    <option key={opt.label} value={opt.value ?? ''}>{opt.label}</option>
-                                  ))}
-                                </select>
+                                <div className="relative flex-1 min-w-[140px]">
+                                  <button
+                                    type="button"
+                                    className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
+                                      !canEnableAlert
+                                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : 'border-gray-200 bg-white text-gray-700'
+                                    }`}
+                                    disabled={!canEnableAlert}
+                                    onClick={() => setOpenDropdowns(prev => ({ ...prev, [`single-missing-${kpiName}`]: !prev[`single-missing-${kpiName}`] }))}
+                                  >
+                                    <span>
+                                      {typeVal ? alertTypeOptions.find(opt => opt.value === typeVal)?.label || 'No Alert' : 'No Alert'}
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${openDropdowns[`single-missing-${kpiName}`] ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  {openDropdowns[`single-missing-${kpiName}`] && (
+                                    <div className="dropdown-menu absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                      {alertTypeOptions.map((opt) => (
+                                        <button
+                                          key={opt.label}
+                                          type="button"
+                                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                            opt.value === typeVal ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                                          }`}
+                                          onClick={() => {
+                                            const v = opt.value === '' ? null : opt.value;
+                                            setMultiDraft(kpiName, { alert_type: v });
+                                            setOpenDropdowns(prev => ({ ...prev, [`single-missing-${kpiName}`]: false }));
+                                          }}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
