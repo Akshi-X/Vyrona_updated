@@ -216,9 +216,9 @@ export function IVFOngoingTreatments({
       )}
       <div
         ref={scrollContainerRef}
-          className="h-full min-h-80 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          className="h-80 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        <table className="min-w-max w-full">
+        <table className="min-w-max w-full ">
             <thead className="sticky top-0 z-10">
              <tr className="bg-[#FDF4FF]">
                {tableHeaders.map((header, index) => {

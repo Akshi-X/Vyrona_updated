@@ -489,7 +489,7 @@ const ControlTower = () => {
           {/* Main Content Grid */}
           <div className="flex-1 h-full grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
             {/* Left Panel - Filters and Routes */}
-            <div className="flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
+            <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
               {/* Filters Section */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
@@ -950,7 +950,7 @@ const ControlTower = () => {
             </div>
 
             {/* Right Panel - Map Visualization */}
-            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
+            <div className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
               <ControlTowerMap 
                 filters={{
                   selectedRegion,

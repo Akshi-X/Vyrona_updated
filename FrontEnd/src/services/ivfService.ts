@@ -749,26 +749,46 @@ export class IvfService extends BaseApiService {
         );
     }
 
-    /**
-     * Update refill log status for a specific log
-     * @param tank_code - The tank code (e.g., "T1", "T10")
-     * @param logId - The refill log ID
-     * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
-     */
-    async updateRefillLogStatus(
-        tank_code: string | number,
-        logId: number,
-        status: string,
-    ): Promise<RefillLogItem> {
-        return await this.patch<RefillLogItem>(
-            this.withBranchId(
-                `/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}/status`,
-            ),
-            {
-                status: status,
-            },
-        );
+  /**
+   * Update refill log status for a specific log
+   * @param tank_code - The tank code (e.g., "T1", "T10")
+   * @param logId - The refill log ID
+   * @param status - The status value to set (e.g., "Done", "In progress", "Not started")
+   */
+  async updateRefillLogStatus(
+    tank_code: string | number,
+    logId: number,
+    status: string
+  ): Promise<RefillLogItem> {
+    return await this.patch<RefillLogItem>(
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}/status`),
+      {
+        status: status,
+      }
+    );
+  }
+
+  /**
+   * Update multiple fields of a refill log entry (status, reservoir, LN2 dates).
+   * @param tank_code - The tank code
+   * @param logId - The refill log ID
+   * @param data - Fields to update
+   */
+  async updateRefillLog(
+    tank_code: string | number,
+    logId: number,
+    data: {
+      status?: string;
+      reservoir?: string | null;
+      ln2_ordered_date?: string | null;
+      ln2_received_date?: string | null;
     }
+  ): Promise<RefillLogItem> {
+    return await this.patch<RefillLogItem>(
+      this.withBranchId(`/api/quality-tracking/tanks/${tank_code}/refill-logs/${logId}`),
+      data
+    );
+  }
 
     /**
      * Create a new refill log for a tank

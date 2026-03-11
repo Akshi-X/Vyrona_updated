@@ -25,6 +25,9 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
   const [error, setError] = useState<string | null>(null);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editStatus, setEditStatus] = useState<string>('');
+  const [editReservoir, setEditReservoir] = useState<string>('');
+  const [editLn2OrderedDate, setEditLn2OrderedDate] = useState<string>('');
+  const [editLn2ReceivedDate, setEditLn2ReceivedDate] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -115,6 +118,9 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
   const startEditing = useCallback((index: number, row: RefillLogItem) => {
     setEditingRowIndex(index);
     setEditStatus(row.status || '');
+    setEditReservoir(row.reservoir ?? '');
+    setEditLn2OrderedDate(row.ln2_ordered_date ?? '');
+    setEditLn2ReceivedDate(row.ln2_received_date ?? '');
     setSaveError(null);
     setEditingStatusDropdownIndex(index);
   }, []);
@@ -122,6 +128,9 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
   const cancelEditing = useCallback(() => {
     setEditingRowIndex(null);
     setEditStatus('');
+    setEditReservoir('');
+    setEditLn2OrderedDate('');
+    setEditLn2ReceivedDate('');
     setSaveError(null);
     setEditingStatusDropdownIndex(null);
   }, []);
@@ -139,8 +148,18 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
         return;
       }
 
-      if (editStatus === originalRow.status) {
-        // No changes to save
+      // Normalize nulls to empty strings for comparison
+      const origReservoir = originalRow.reservoir ?? '';
+      const origLn2Ordered = originalRow.ln2_ordered_date ?? '';
+      const origLn2Received = originalRow.ln2_received_date ?? '';
+
+      const hasChanges =
+        editStatus !== originalRow.status ||
+        editReservoir !== origReservoir ||
+        editLn2OrderedDate !== origLn2Ordered ||
+        editLn2ReceivedDate !== origLn2Received;
+
+      if (!hasChanges) {
         cancelEditing();
         return;
       }
@@ -154,24 +173,29 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
       setSaveError(null);
 
       try {
-        await ivfService.updateRefillLogStatus(canisterNumber, originalRow.log_id, editStatus.trim());
-
-        // Update local state
-        const updatedRows = [...rows];
-        updatedRows[index] = {
-          ...updatedRows[index],
+        const updated = await ivfService.updateRefillLog(canisterNumber, originalRow.log_id, {
           status: editStatus.trim(),
-        };
+          reservoir: editReservoir.trim() || null,
+          ln2_ordered_date: editLn2OrderedDate || null,
+          ln2_received_date: editLn2ReceivedDate || null,
+        });
+
+        // Merge returned data into local state
+        const updatedRows = [...rows];
+        updatedRows[index] = { ...updatedRows[index], ...updated };
         setRows(updatedRows);
         setEditingRowIndex(null);
         setEditStatus('');
+        setEditReservoir('');
+        setEditLn2OrderedDate('');
+        setEditLn2ReceivedDate('');
       } catch (e: any) {
-        setSaveError(e?.message || 'Failed to save status');
+        setSaveError(e?.message || 'Failed to save changes');
       } finally {
         setSaving(false);
       }
     },
-    [canisterNumber, rows, editStatus, cancelEditing]
+    [canisterNumber, rows, editStatus, editReservoir, editLn2OrderedDate, editLn2ReceivedDate, cancelEditing]
   );
 
   const handleAddClick = useCallback(() => {
@@ -320,8 +344,6 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refill Time</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Refilled By</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Description</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Cryoshipper</th>
-              <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Infected Shipper</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">Reservoir</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Ordered Date</th>
               <th className="px-3 py-2 text-left whitespace-nowrap h-[56px]">LN2 Received Date</th>
@@ -333,9 +355,9 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
             {loading ? (
               Array.from({ length: 6 }, (_, i) => (
                 <tr key={i} className="text-black text-[14px] h-[56px] bg-white">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((col) => (
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((col) => (
                     <td key={col} className="px-3 py-2 whitespace-nowrap">
-                      <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${[75, 55, 70, 80, 70, 70, 60, 95, 95, 55, 40][col - 1]}px` }}>
+                      <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${[75, 55, 70, 80, 60, 95, 95, 55, 40][col - 1]}px` }}>
                         <div
                           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
                           style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
@@ -347,7 +369,7 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
               ))
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px] bg-white">
-                <td className="px-3 py-2 text-red-600" colSpan={11}>
+                <td className="px-3 py-2 text-red-600" colSpan={9}>
                   {error}
                 </td>
               </tr>
@@ -401,28 +423,6 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
                         placeholder="Enter description"
                         required
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
-                        value={newRefillLog.cryoshipper}
-                        onChange={(e) =>
-                          setNewRefillLog({ ...newRefillLog, cryoshipper: e.target.value })
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
-                        placeholder="Enter cryoshipper"
-                      />
-                    </td>
-                    <td className="px-3 py-2 h-[56px]">
-                      <input
-                        type="text"
-                        value={newRefillLog.disinfected_shipper_infected_tank_description}
-                        onChange={(e) =>
-                          setNewRefillLog({ ...newRefillLog, disinfected_shipper_infected_tank_description: e.target.value })
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
-                        placeholder="Enter description"
                       />
                     </td>
                     <td className="px-3 py-2 h-[56px]">
@@ -531,7 +531,7 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                 )}
                 {rows.length === 0 && !isAdding ? (
                   <tr className="text-black text-[14px] h-[56px] bg-white">
-                    <td className="px-3 py-2 text-gray-500" colSpan={11}>
+                    <td className="px-3 py-2 text-gray-500" colSpan={9}>
                       No refill logs found
                     </td>
                   </tr>
@@ -544,11 +544,43 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                     <td className="px-3 py-2 h-[56px]">{row.refill_time || '-'}</td>
                     <td className="px-3 py-2 h-[56px]">{row.refilled_by || '-'}</td>
                     <td className="px-3 py-2 h-[56px]">{row.description || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.cryoshipper || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.disinfected_shipper_infected_tank_description || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.reservoir || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.ln2_ordered_date || '-'}</td>
-                    <td className="px-3 py-2 h-[56px]">{row.ln2_received_date || '-'}</td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editReservoir}
+                          onChange={(e) => setEditReservoir(e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                          placeholder="Enter reservoir"
+                        />
+                      ) : (
+                        row.reservoir || '-'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editLn2OrderedDate}
+                          onChange={(e) => setEditLn2OrderedDate(e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        />
+                      ) : (
+                        row.ln2_ordered_date || '-'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 h-[56px]">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editLn2ReceivedDate}
+                          onChange={(e) => setEditLn2ReceivedDate(e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#6B1176] text-sm"
+                        />
+                      ) : (
+                        row.ln2_received_date || '-'
+                      )}
+                    </td>
                     <td className="px-3 py-2 h-[56px]">
                       {isEditing ? (
                         <div
