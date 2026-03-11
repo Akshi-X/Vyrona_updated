@@ -196,11 +196,20 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           </thead>
           <tbody>
             {loading ? (
-              <tr className="text-black text-[14px] h-[56px]">
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500" colSpan={8}>
-                  Loading...
-                </td>
-              </tr>
+              Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} className="text-black text-[14px] h-[56px] bg-white">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((col) => (
+                    <td key={col} className="px-3 py-2 whitespace-nowrap">
+                      <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${col === 1 ? 60 : col === 3 ? 50 : col === 6 ? 70 : col === 7 ? 90 : 45}px` }}>
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                          style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                        />
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px]">
                 <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={8}>

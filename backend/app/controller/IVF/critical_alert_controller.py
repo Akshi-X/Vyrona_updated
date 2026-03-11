@@ -70,8 +70,9 @@ def get_hospital_alerts(
     """
     try:
         branch_id, role = get_branch_filter_info(request)
+        hospital_id = getattr(getattr(request.state, "current_user", None), "hospital_id", None)
         service = CriticalAlertService(db)
-        result = service.get_hospital_alerts(branch_id=branch_id, role=role, status=status)
+        result = service.get_hospital_alerts(branch_id=branch_id, hospital_id=hospital_id, role=role, status=status)
         return result
     except HTTPException:
         raise

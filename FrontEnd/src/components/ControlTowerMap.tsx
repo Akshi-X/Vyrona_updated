@@ -587,7 +587,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
   return (
 
-    <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[400px] lg:h-[868px]">
+    <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[60vh] min-h-[420px] lg:h-full lg:min-h-[544px]">
 
       <div className="absolute inset-0 bg-[#272626]">
 
