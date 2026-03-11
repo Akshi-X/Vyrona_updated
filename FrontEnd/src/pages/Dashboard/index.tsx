@@ -1384,11 +1384,11 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section className="flex flex-1 min-h-0">
-                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 w-full h-full min-h-0">
+              <section className="w-full">
+                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
-                  <div className="w-full flex-1 flex flex-col min-h-0">
+                  <div className="w-full">
                     <div className="mb-2">
                       <div className="relative overflow-hidden h-4 w-32 rounded-md bg-gray-200">
                         <div
@@ -1397,7 +1397,7 @@ export default function Dashboard({ }: DashboardProps) {
                         />
                       </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto min-h-80">
+                    <div>
                       <table className="min-w-max w-full">
                         <thead className="sticky top-0 z-10">
                           <tr className="bg-[#FDF4FF]">
@@ -1434,8 +1434,8 @@ export default function Dashboard({ }: DashboardProps) {
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
                 ) : (
-                  <div className="w-full flex-1 flex flex-col min-h-0">
-                    <div className="flex-1 overflow-y-auto min-h-80">
+                  <div className="w-full">
+                    <div>
                       <IVFOngoingTreatments
                       treatments={ivfEmbryoTracking}
                       hasMore={ivfEmbryoTrackingHasMore}
