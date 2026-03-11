@@ -1523,13 +1523,14 @@ class CriticalAlertService:
     def get_hospital_alerts(
         self,
         branch_id: Optional[int] = None,
+        hospital_id: Optional[int] = None,
         role: Optional[str] = None,
         status: Optional[AlertStatus] = None,
     ) -> HospitalAlertsResponse:
         """
         Get all alerts for hospital.
-        - Manager: all branches in hospital
-        - User: only their branch
+        - User: only their branch (branch_id from token)
+        - Manager/Admin: all branches in their hospital (hospital_id from token)
         """
         # Build query
         query = (
@@ -1538,22 +1539,12 @@ class CriticalAlertService:
             .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
         )
 
-        # Apply branch filter based on role
+        # Apply branch or hospital filter based on role
         if role and role == "User" and branch_id:
             query = query.filter(HospitalBranch.branch_id == branch_id)
-        elif role and role == "Manager":
-            # Manager sees all branches in their hospital
-            # Get hospital_id from branch_id
-            if branch_id:
-                branch = (
-                    self.db.query(HospitalBranch)
-                    .filter(HospitalBranch.branch_id == branch_id)
-                    .first()
-                )
-                if branch:
-                    query = query.filter(
-                        HospitalBranch.hospital_id == branch.hospital_id
-                    )
+        elif hospital_id is not None:
+            # Manager/Admin: scope to branches of this hospital (hospital_id from token)
+            query = query.filter(HospitalBranch.hospital_id == hospital_id)
 
         # Apply status filter
         if status:

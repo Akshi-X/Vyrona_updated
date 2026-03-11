@@ -334,9 +334,11 @@ def get_embryo_tracking_filters(
     """
     try:
         branch_id, _ = get_branch_filter_info(request)
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         service = IVFService(db)
         return service.get_embryo_tracking_filters(
             branch_id=branch_id,
+            hospital_id=hospital_id,
             branch_name=branch_name,
             status=status,
             crylock_color=crylock_color,
@@ -442,9 +444,11 @@ def get_embryo_tracking(
                 detail="Access denied: User account is not associated with any branch"
             )
         
+        hospital_id = getattr(request.state.current_user, "hospital_id", None)
         service = IVFService(db)
         tracking_data = service.get_embryo_tracking(
             branch_id=branch_id,
+            hospital_id=hospital_id,
             user_role=role,
             branch_name=branch_name,
             status=status,
