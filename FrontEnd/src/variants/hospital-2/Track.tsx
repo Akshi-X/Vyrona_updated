@@ -250,50 +250,50 @@ const DetailRow: React.FC<DetailRowProps> = ({ label, value }) => (
 );
 
 const TimelineTab: React.FC = () => {
-    const timelineEvents = [
-        {
-            id: 1,
-            time: "2024-06-14 09:00",
-            event: "Shipment created",
-            location: "ARC Chennai",
-            status: "completed",
-        },
-        {
-            id: 2,
-            time: "2024-06-14 10:30",
-            event: "Package picked up",
-            location: "ARC Chennai Lab",
-            status: "completed",
-        },
-        {
-            id: 3,
-            time: "2024-06-14 14:00",
-            event: "In transit to airport",
-            location: "Chennai",
-            status: "completed",
-        },
-        {
-            id: 4,
-            time: "2024-06-14 18:00",
-            event: "Flight departed",
-            location: "Chennai Airport",
-            status: "current",
-        },
-        {
-            id: 5,
-            time: "2024-06-15 08:00",
-            event: "Arrival at destination",
-            location: "Mumbai Airport",
-            status: "pending",
-        },
-        {
-            id: 6,
-            time: "2024-06-15 14:00",
-            event: "Delivery to clinic",
-            location: "ARC Mumbai",
-            status: "pending",
-        },
-    ] as const;
+  const timelineEvents: TimelineEventProps['event'][] = [
+    {
+      id: 1,
+      time: '2024-06-14 09:00',
+      event: 'Shipment created',
+      location: 'ARC Chennai',
+      status: 'completed',
+    },
+    {
+      id: 2,
+      time: '2024-06-14 10:30',
+      event: 'Package picked up',
+      location: 'ARC Chennai Lab',
+      status: 'completed',
+    },
+    {
+      id: 3,
+      time: '2024-06-14 14:00',
+      event: 'In transit to airport',
+      location: 'Chennai',
+      status: 'completed',
+    },
+    {
+      id: 4,
+      time: '2024-06-14 18:00',
+      event: 'Flight departed',
+      location: 'Chennai Airport',
+      status: 'current',
+    },
+    {
+      id: 5,
+      time: '2024-06-15 08:00',
+      event: 'Arrival at destination',
+      location: 'Mumbai Airport',
+      status: 'pending',
+    },
+    {
+      id: 6,
+      time: '2024-06-15 14:00',
+      event: 'Delivery to clinic',
+      location: 'ARC Mumbai',
+      status: 'pending',
+    },
+  ];
 
     return (
         <div>

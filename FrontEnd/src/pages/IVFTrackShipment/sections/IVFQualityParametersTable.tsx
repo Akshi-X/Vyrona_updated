@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { BatteryWarning } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authUtils } from '../../../utils/auth';
 import { ivfService } from '../../../services/ivfService';
@@ -91,17 +92,29 @@ interface KpiTileProps {
   icon: React.ReactNode;
   label: string;
   value: string;
+  tooltip?: string;
+  muted?: boolean;
 }
 
-const KpiTile = ({ icon, label, value }: KpiTileProps) => (
-  <div className="bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full">
-    <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
-      {icon}
+const KpiTile = ({ icon, label, value, tooltip, muted = false }: KpiTileProps) => (
+  <div className="relative group w-full @max-[505px]:w-[150px]">
+    <div className={`bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px] ${muted ? 'opacity-75' : ''}`}>
+      <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[11px] text-gray-500 font-medium">{label}</span>
+        <span className={`text-[15px] font-semibold ${muted ? 'text-gray-400' : 'text-black'}`}>{value}</span>
+      </div>
     </div>
-    <div className="flex flex-col">
-      <span className="text-[11px] text-gray-500 font-medium">{label}</span>
-      <span className="text-[15px] font-semibold text-black">{value}</span>
-    </div>
+    {tooltip && (
+      <div className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-60 -translate-x-1/2 rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-center opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
+        <div className="text-xs font-semibold text-black">
+          {tooltip}
+        </div>
+        <div className="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+      </div>
+    )}
   </div>
 );
 
@@ -110,6 +123,9 @@ const KpiTile = ({ icon, label, value }: KpiTileProps) => (
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
 export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableProps) {
+  const BATTERY_DEAD_THRESHOLD_MS = 5 * 60 * 1000;
+  const batteryDeadTooltip = 'Charge your device to show Internal Temperature, External Temperature, Shock Detection';
+
   const normalizedTankId = tankId != null ? String(tankId) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -118,6 +134,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   const [level, setLevel] = useState<number | null>(null);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [batteryTimestampMs, setBatteryTimestampMs] = useState<number | null>(null);
   const [evaporationRate, setEvaporationRate] = useState<{ value: number; unit: string } | null>(null);
   const [tempExternal, setTempExternal] = useState<number | null>(null);
   const [tempInternal, setTempInternal] = useState<number | null>(null);
@@ -239,55 +256,62 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     };
 
     let hasAnyUpdate = false;
+    let latestFreshTimestampMs: number | null = null;
+
+    const trackFreshTimestamp = (tsMs: number) => {
+      hasAnyUpdate = true;
+      latestFreshTimestampMs = latestFreshTimestampMs == null ? tsMs : Math.max(latestFreshTimestampMs, tsMs);
+    };
 
     const ln2 = getFresh('ln2_level');
     if (ln2) {
       setLevel(Math.min(100, Math.max(0, ln2.value)));
-      hasAnyUpdate = true;
+      trackFreshTimestamp(ln2.tsMs);
     }
 
     const bat = getFresh('tive_battery_percentage');
     if (bat) {
       setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
+      setBatteryTimestampMs(bat.tsMs);
       if (!ln2) {
         setLevel(Math.min(100, Math.max(0, bat.value)));
       }
-      hasAnyUpdate = true;
+      trackFreshTimestamp(bat.tsMs);
     }
 
     const evap = getFresh('ln2_evaporation_rate');
     if (evap) {
       setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
-      hasAnyUpdate = true;
+      trackFreshTimestamp(evap.tsMs);
     }
 
     const ext = getFresh('temp_external');
     if (ext) {
       setTempExternal(ext.value);
-      hasAnyUpdate = true;
+      trackFreshTimestamp(ext.tsMs);
     }
 
     const int = getFresh('temp_internal');
     if (int) {
       setTempInternal(int.value);
-      hasAnyUpdate = true;
+      trackFreshTimestamp(int.tsMs);
     }
 
     const lid = getFresh('ln2_lid_state');
     if (lid) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
-      hasAnyUpdate = true;
+      trackFreshTimestamp(lid.tsMs);
     }
 
     const sh = getFresh('shock');
     if (sh) {
       setShock(sh.value);
-      hasAnyUpdate = true;
+      trackFreshTimestamp(sh.tsMs);
     }
     // Update last sync time
-    if (hasAnyUpdate) {
-      setLastUpdateAt(Date.now());
+    if (hasAnyUpdate && latestFreshTimestampMs != null) {
+      setLastUpdateAt(latestFreshTimestampMs);
     }
   };
 
@@ -307,14 +331,24 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     return () => window.clearInterval(timer);
   }, []);
 
+  const batteryStatusTimestampMs = batteryTimestampMs ?? lastUpdateAt;
+  const isBatteryLoading = batteryStatusTimestampMs == null && batteryLevel == null;
   const minutesSinceUpdate =
-    lastUpdateAt == null ? null : Math.floor(Math.max(0, nowTs - lastUpdateAt) / 60000);
+    batteryStatusTimestampMs == null ? null : Math.floor(Math.max(0, nowTs - batteryStatusTimestampMs) / 60000);
+  const batteryDead =
+    batteryStatusTimestampMs != null &&
+    nowTs - batteryStatusTimestampMs >= BATTERY_DEAD_THRESHOLD_MS;
+  const showBatteryDeadState = !isBatteryLoading && (batteryDead || batteryLevel == null);
   const timeAgoColorClass =
-    minutesSinceUpdate == null
+    isBatteryLoading
+      ? 'text-gray-400'
+      : batteryDead
+      ? 'text-red-600'
+      : minutesSinceUpdate == null
       ? 'text-gray-500'
-      : minutesSinceUpdate < 60
+      : minutesSinceUpdate <= 120
         ? 'text-green-600'
-        : 'text-orange-500';
+        : 'text-yellow-500';
 
   useEffect(() => {
     if (!normalizedTankId) {
@@ -439,6 +473,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const formatTemp = (v: number | null) =>
     v != null ? `${v.toFixed(1)}°C` : '—';
   const lidLabel = lidStatus == null ? '—' : lidStatus === 1 ? 'Open' : 'Closed';
+  const internalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempInternal);
+  const externalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempExternal);
+  const shockValue = showBatteryDeadState ? '—' : shock != null ? String(shock) : '—';
+  const deadBatteryTileTooltip = showBatteryDeadState ? batteryDeadTooltip : undefined;
 
   const levelActualPercent = levelPercent != null ? Math.round((levelPercent/34.894)*100) : null;
 
@@ -463,20 +501,41 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         : '#22C55E'; // Green if at or above L1
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
+    <div className="@container bg-white border border-[#E7E1E1] rounded-lg p-4 flex flex-col gap-4 h-full min-h-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-black text-[16px]">Current Quality Status</h3>
         <div className="flex items-center justify-end gap-5 flex-wrap ml-auto">
           {/* Battery */}
           <div className="flex items-center gap-1.5">
-          <div className={`text-xs pr-2  ${timeAgoColorClass}`}>
-            {formatTimeAgo(lastUpdateAt)}
-          </div>
-            {batteryLevel != null ? (
-              <BatteryIcon level={batteryLevel} />
+          <div className="pr-2">
+            {isBatteryLoading ? (
+              <div className="relative overflow-hidden h-3.5 w-16 rounded-md bg-gray-200">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" style={{ width: '50%' }} />
+              </div>
             ) : (
-              <span className="text-sm font-medium text-black">—</span>
+              <div className={`text-xs ${timeAgoColorClass}`}>
+                {formatTimeAgo(batteryStatusTimestampMs)}
+              </div>
+            )}
+          </div>
+            {isBatteryLoading ? (
+              <div className="relative overflow-hidden h-5 w-[58px] rounded-md bg-gray-200">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" style={{ width: '50%' }} />
+              </div>
+            ) : showBatteryDeadState ? (
+              <div className="relative group flex items-center gap-1.5 rounded-full border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1">
+                <BatteryWarning className="h-4 w-4 text-[#DC2626]" />
+                <span className="text-xs font-semibold text-[#DC2626]">Battery Dead</span>
+                <div className="absolute right-0 top-full z-50 mt-2 w-max max-w-[280px] rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
+                  <div className="text-xs font-semibold text-black">
+                    {batteryDeadTooltip}
+                  </div>
+                  <div className="absolute bottom-full right-5 h-0 w-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                </div>
+              </div>
+            ) : (
+              <BatteryIcon level={batteryLevel ?? 0} />
             )}
           </div>
           
@@ -484,9 +543,9 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex-1 min-h-0 flex items-start justify-center gap-1 overflow-y-auto">
+      <div className="flex items-start justify-center gap-1 @max-[505px]:flex-col @max-[505px]:items-center @max-[505px]:gap-3">
         {/* Left KPI Tiles */}
-        <div className="flex flex-col gap-3 justify-start pt-6">
+        <div className="flex flex-col gap-3 justify-start pt-6 @max-[505px]:order-2 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
           <KpiTile
             icon={<LockIcon className="text-[#6B1176]" />}
             label="Lid State"
@@ -495,12 +554,14 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           <KpiTile
             icon={<ThermometerIcon className="text-[#6B1176]" />}
             label="Internal Temperature"
-            value={formatTemp(tempInternal)}
+            value={internalTemperatureValue}
+            tooltip={deadBatteryTileTooltip}
+            muted={showBatteryDeadState}
           />
         </div>
 
         {/* Tank SVG */}
-        <div className="shrink-0">
+        <div className="shrink-0 @max-[505px]:order-1">
           <svg
             width="220"
             height="320"
@@ -651,11 +712,13 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         </div>
 
         {/* Right KPI Tiles */}
-        <div className="flex flex-col gap-3 pt-6">
+        <div className="flex flex-col gap-3 pt-6 @max-[505px]:order-3 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
           <KpiTile
             icon={<SunIcon className="text-[#6B1176]" />}
             label="External Temperature"
-            value={formatTemp(tempExternal)}
+            value={externalTemperatureValue}
+            tooltip={deadBatteryTileTooltip}
+            muted={showBatteryDeadState}
           />
           <KpiTile
             icon={<EvaporationIcon className="text-[#6B1176]" />}
@@ -665,7 +728,9 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           <KpiTile
             icon={<ShockIcon className="text-[#6B1176]" />}
             label="Shock Detection"
-            value={shock != null ? String(shock) : '—'}
+            value={shockValue}
+            tooltip={deadBatteryTileTooltip}
+            muted={showBatteryDeadState}
           />
         </div>
       </div>
