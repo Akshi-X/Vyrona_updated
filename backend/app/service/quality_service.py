@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, text
 
 from fastapi.responses import Response
 
@@ -28,6 +28,11 @@ from app.service.redis_service import get_redis, get_pubsub, reset_redis_connect
 from app.config.database import SessionLocal
 from app.exceptions.patient_exceptions import PatientNotFoundException
 from app.constants.app_constants import COMMON_API_HEADERS, QUALITY_EXPORT_DEFAULT_MINUTES
+from app.constants.kpi_constants import (
+    AGG_BUCKET_MINUTES_1H,
+    AGG_BUCKET_MINUTES_24H,
+    AGG_BUCKET_MINUTES_7D,
+)
 from app.exceptions.quality_exceptions import (
     QualityCsvExportException,
     QualityDataNotFoundException,
@@ -849,6 +854,90 @@ class QualityService:
             **tank_info,
             "kpis": [reading for readings in kpis.values() for reading in readings],
         }
+
+    def get_readings_per_kpi_since(self, tank_id: int, since: datetime):
+        """
+        Get all KPI readings for a tank where timestamp >= since (for duration-based x-axis).
+        Returns same shape as get_last_n_readings_per_kpi: { tank_id, tank_code, kpis: [{ name, value, unit, timestamp }] }.
+        """
+        db = self.db
+        results = (
+            db.query(
+                Readings.kpi_config_id,
+                Readings.kpi_value,
+                Readings.timestamp,
+                KpiConfig.kpi_name,
+                KpiConfig.unit,
+                Tank.tank_id,
+                Tank.tank_code,
+            )
+            .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
+            .join(Tank, Readings.tank_id == Tank.tank_id)
+            .filter(Readings.tank_id == tank_id, Readings.timestamp >= since)
+            .order_by(Readings.timestamp.desc())
+            .all()
+        )
+        if not results:
+            return None
+        kpis = []
+        tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
+        for row in results:
+            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
+            kpis.append({
+                "name": row.kpi_name,
+                "value": float(row.kpi_value),
+                "unit": row.unit or "",
+                "timestamp": ts,
+            })
+        return {**tank_info, "kpis": kpis}
+
+    def get_tank_kpi_history_aggregated(
+        self, tank_id: int, since: datetime, bucket_minutes: int
+    ) -> Optional[dict]:
+        """
+        Efficient DB aggregation: group readings by time bucket, AVG(kpi_value) per bucket.
+        Returns same shape as get_last_n_readings_per_kpi: { tank_id, tank_code, kpis: [{ name, value, unit, timestamp }] }.
+        bucket_minutes: bucket size in minutes (e.g. 1 for 1H range, 30 for 24H, 720 for 7D).
+        No limit; suitable for large ranges (1H / 24H / 7D) so chart gets few points from DB.
+        """
+        bucket_seconds = bucket_minutes * 60
+        # PostgreSQL: floor epoch to bucket boundary, then to_timestamp
+        sql = text("""
+            SELECT
+                to_timestamp(
+                    floor(extract(epoch from r.timestamp AT TIME ZONE 'UTC') / :bucket_sec) * :bucket_sec
+                ) AT TIME ZONE 'UTC' AS bucket_start,
+                k.kpi_name,
+                k.unit,
+                AVG(r.kpi_value)::double precision AS avg_value
+            FROM readings r
+            JOIN kpi_config k ON r.kpi_config_id = k.id
+            WHERE r.tank_id = :tank_id AND r.timestamp >= :since
+            GROUP BY bucket_start, k.id, k.kpi_name, k.unit
+            ORDER BY bucket_start ASC
+        """)
+        try:
+            rows = self.db.execute(
+                sql,
+                {"tank_id": tank_id, "since": since, "bucket_sec": bucket_seconds},
+            ).fetchall()
+        except Exception as e:
+            logger.error(f"Error in get_tank_kpi_history_aggregated: {e}", exc_info=True)
+            return None
+        if not rows:
+            return None
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        tank_code = (tank.tank_code or f"T{tank_id}") if tank else f"T{tank_id}"
+        kpis = []
+        for row in rows:
+            ts = row.bucket_start.isoformat() if hasattr(row.bucket_start, "isoformat") else str(row.bucket_start)
+            kpis.append({
+                "name": row.kpi_name or "",
+                "value": float(row.avg_value) if row.avg_value is not None else 0,
+                "unit": row.unit or "",
+                "timestamp": ts,
+            })
+        return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
 
     def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
         """

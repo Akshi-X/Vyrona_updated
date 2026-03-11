@@ -106,7 +106,7 @@ DB_POOL_SIZE = 25  # Increased from 15 for better concurrency
 DB_MAX_OVERFLOW = 15  # Increased from 10 for peak load handling
 DB_POOL_TIMEOUT = 30  # Seconds to wait for connection from pool
 DB_POOL_RECYCLE = 3600  # Recycle connections after 1 hour
-DB_ECHO = True  # SQL logging
+DB_ECHO = False  # SQL logging
 
 # ============================================
 # LOGGING

@@ -31,7 +31,11 @@ class PatientValidationMiddleware(BaseHTTPMiddleware):
         # Get path and method
         path = request.url.path
         method = request.method
-        
+
+        # Exclude health check — let it hit the route
+        if path == "/health":
+            return await call_next(request)
+
         # Only validate patient endpoints
         if "/api/patients" in path:
             # Validate based on endpoint and method

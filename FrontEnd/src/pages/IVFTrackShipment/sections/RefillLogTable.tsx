@@ -331,11 +331,20 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
           </thead>
           <tbody>
             {loading ? (
-              <tr className="text-black text-[14px] h-[56px] bg-white">
-                <td className="px-3 py-2 text-gray-500" colSpan={11}>
-                  Loading...
-                </td>
-              </tr>
+              Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} className="text-black text-[14px] h-[56px] bg-white">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((col) => (
+                    <td key={col} className="px-3 py-2 whitespace-nowrap">
+                      <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${[75, 55, 70, 80, 70, 70, 60, 95, 95, 55, 40][col - 1]}px` }}>
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                          style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                        />
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : error ? (
               <tr className="text-black text-[14px] h-[56px] bg-white">
                 <td className="px-3 py-2 text-red-600" colSpan={11}>
