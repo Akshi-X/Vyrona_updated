@@ -3,33 +3,54 @@ IVF Quality Monitoring Controller
 Handles WebSocket and REST endpoints for real-time IVF canister quality monitoring
 Separate from CGT quality monitoring to maintain isolation
 """
+
 import asyncio
 import json
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Request, Path, Body
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from sqlalchemy.orm import Session
 
-from app.service.redis_service import get_redis, get_ln2_pubsub, get_tank_kpi_pubsub
-from app.service.quality_service import QualityService, push_tank_kpi_to_redis, append_tank_kpi_snapshot_to_db
-from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.auth.auth import verify_websocket_token
-from app.utils.websocket_manager import ConnectionManager
-from app.config.database import get_db, SessionLocal
-from app.service.quality_service import push_ivf_quality_to_redis
-from app.models.user_model import User
-from app.models.IVF.tank_model import Tank
+from app.config.database import SessionLocal, get_db
+from app.constants.kpi_constants import (
+    AGG_BUCKET_MINUTES_1H,
+    AGG_BUCKET_MINUTES_7D,
+    AGG_BUCKET_MINUTES_24H,
+)
+from app.dependencies.auth_dependencies import get_current_user
+from app.exceptions import InvalidTokenException
+from app.models.IVF.device_model import Device
 from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
-from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
-from app.models.IVF.device_model import Device
-from app.utils.user_helpers import is_hospital_department
-from app.utils.ivf_helpers import get_branch_filter_info
-from app.dependencies.auth_dependencies import get_current_user
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from app.utils.user_helpers import is_specific_department
-from app.exceptions import InvalidTokenException
+from app.models.IVF.tank_model import Tank
+from app.models.user_model import User
+from app.service.IVF.quality_tracking_service import QualityTrackingService
+from app.service.quality_service import (
+    QualityService,
+    append_tank_kpi_snapshot_to_db,
+    push_ivf_quality_to_redis,
+    push_tank_kpi_to_redis,
+)
+from app.service.redis_service import get_ln2_pubsub, get_redis, get_tank_kpi_pubsub
+from app.utils.ivf_helpers import get_branch_filter_info
+from app.utils.user_helpers import is_hospital_department, is_specific_department
+from app.utils.websocket_manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -88,18 +109,26 @@ def get_quality_history(
         for rec in reversed(raw_records):
             p = rec.payload or {}
             if p.get("temp_internal") is not None and p.get("shock") is not None:
-                ts = rec.created_at.isoformat() if rec.created_at else (p.get("timestamp") or "")
+                ts = (
+                    rec.created_at.isoformat()
+                    if rec.created_at
+                    else (p.get("timestamp") or "")
+                )
                 hist_item = {
                     "tank_code": tank_code_str,
                     "tank_id": tank_id,
                     "timestamp": ts,
                     "temp_internal": float(p.get("temp_internal")),
-                    "temp_external": float(p["temp_external"]) if p.get("temp_external") is not None else None,
+                    "temp_external": float(p["temp_external"])
+                    if p.get("temp_external") is not None
+                    else None,
                     "shock": float(p.get("shock")),
                 }
                 if p.get("battery_percentage") is not None:
                     hist_item["battery_percentage"] = float(p["battery_percentage"])
-                push_ivf_quality_to_redis(tank_id, tank_code_str, hist_item, publish=False)
+                push_ivf_quality_to_redis(
+                    tank_id, tank_code_str, hist_item, publish=False
+                )
                 history.append(hist_item)
 
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
@@ -162,15 +191,26 @@ def get_tank_kpi_config(
     return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
 
 
+# Duration minutes for static aggregated ranges (1H, 24H, 7D). LIVE = no duration, raw (default cap applied in code).
+DURATION_1H = 60
+DURATION_24H = 1440
+DURATION_7D = 10080
+# Default max readings for LIVE (raw) when no duration_minutes; no limit param in API.
+DEFAULT_LIVE_READINGS_CAP = 200
+
+
 @router.get("/tanks/{tank_id}/kpi-history")
 def get_tank_kpi_history(
     tank_id: int = Path(..., description="Tank ID"),
-    limit: int = Query(50, ge=1, le=200),
+    duration_minutes: Optional[int] = Query(
+        None,
+        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (30min buckets), 10080=7D (12h buckets). 10=10M raw.",
+    ),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get KPI readings history for Quality Tracking tabbed graph (past data)."""
+    """Get KPI history. LIVE (no duration)=raw last N (capped in code). Static 1H/24H/7D=aggregated in DB. 10M=raw by timestamp. No limit query param."""
     branch_id, role = get_branch_filter_info(request) if request else (None, None)
     query = db.query(Tank).filter(Tank.tank_id == tank_id)
     if role != "Admin" and branch_id is not None:
@@ -183,14 +223,65 @@ def get_tank_kpi_history(
         quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
-    
-    # Build per-KPI readings (last N per KPI config) from DB
-    per_kpi = quality_service.get_last_n_readings_per_kpi(tank_id, limit) or {}
+
+    since = (
+        datetime.now(timezone.utc) - timedelta(minutes=duration_minutes)
+        if duration_minutes
+        else None
+    )
+
+    # Static aggregated ranges: efficient AVG in DB, no limit
+    if duration_minutes == DURATION_1H:
+        per_kpi = (
+            quality_service.get_tank_kpi_history_aggregated(
+                tank_id, since, AGG_BUCKET_MINUTES_1H
+            )
+            or {}
+        )
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_24H:
+        per_kpi = (
+            quality_service.get_tank_kpi_history_aggregated(
+                tank_id, since, AGG_BUCKET_MINUTES_24H
+            )
+            or {}
+        )
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    elif duration_minutes == DURATION_7D:
+        per_kpi = (
+            quality_service.get_tank_kpi_history_aggregated(
+                tank_id, since, AGG_BUCKET_MINUTES_7D
+            )
+            or {}
+        )
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = True
+    # 10M or other short duration: raw by timestamp
+    elif duration_minutes is not None and duration_minutes > 0:
+        per_kpi = quality_service.get_readings_per_kpi_since(tank_id, since) or {}
+        latest_readings_raw = per_kpi
+        aggregated_order_asc = False
+    # LIVE: raw last N (cap applied in code; no limit in API)
+    else:
+        per_kpi = (
+            quality_service.get_last_n_readings_per_kpi(
+                tank_id, DEFAULT_LIVE_READINGS_CAP
+            )
+            or {}
+        )
+        latest_readings_raw = None
+        aggregated_order_asc = False
 
     # Build latest reading map per KPI name
-    latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
+    if latest_readings_raw is not None:
+        latest_readings = latest_readings_raw
+    else:
+        latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
     latest_by_name = {}
-    for item in (latest_readings.get("kpis") or []):
+    # Raw desc: first per name is latest. Aggregated asc: last per name is latest. Overwrite so last wins.
+    for item in latest_readings.get("kpis") or []:
         name = (item.get("name") or "").strip()
         if not name:
             continue
@@ -227,7 +318,7 @@ def get_tank_kpi_history(
     # KPI-wise grouped series for easier per-KPI graph rendering
     # Built from DB helper that returns last N readings per KPI config.
     kpi_series = {}
-    for item in (per_kpi.get("kpis") or []):
+    for item in per_kpi.get("kpis") or []:
         name = (item.get("name") or "").strip()
         if not name:
             continue
@@ -241,9 +332,10 @@ def get_tank_kpi_history(
             }
         )
 
-    # get_last_n_readings_per_kpi returns latest-first per KPI; reverse each list to oldest->latest.
-    for name in list(kpi_series.keys()):
-        kpi_series[name].reverse()
+    # Raw per-KPI returns latest-first; reverse to oldest->latest. Aggregated is already oldest-first.
+    if not aggregated_order_asc:
+        for name in list(kpi_series.keys()):
+            kpi_series[name].reverse()
 
     # Fallback when no value-rows exist in kpi_config table: derive tabs from kpi_series keys.
     if not kpi_config:
@@ -276,6 +368,7 @@ def append_tank_kpi_reading(
 ):
     """Append a KPI snapshot (store in DB and push to Redis for live graph). Body: { tank_id?, tank_code?, timestamp, kpis: [{ name, value, unit }] }."""
     from datetime import datetime, timezone
+
     branch_id, role = get_branch_filter_info(request) if request else (None, None)
     tank_code_str = str(tank_code).strip()
     query = db.query(Tank).filter(Tank.tank_code == tank_code_str)
@@ -304,20 +397,34 @@ def append_tank_kpi_reading(
     kpis = list(body["kpis"]) if isinstance(body["kpis"], list) else []
     append_tank_kpi_snapshot_to_db(db, tank_id, tank_code_str, ts, kpis)
     db.commit()
-    payload = {"timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts), "kpis": kpis}
-    return {"tank_id": tank_id, "tank_code": tank_code_str, "timestamp": payload["timestamp"]}
+    payload = {
+        "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+        "kpis": kpis,
+    }
+    return {
+        "tank_id": tank_id,
+        "tank_code": tank_code_str,
+        "timestamp": payload["timestamp"],
+    }
 
 
 def _require_alert_setting_role(current_user: User) -> None:
     """Raise 403 if user is not IVF Manager or Admin (for Alert Setting CRUD)."""
-    if not is_specific_department(getattr(current_user, "department", None) or "", "IVF"):
-        raise HTTPException(status_code=403, detail="Access denied: Alert Setting is for IVF users only")
+    if not is_specific_department(
+        getattr(current_user, "department", None) or "", "IVF"
+    ):
+        raise HTTPException(
+            status_code=403, detail="Access denied: Alert Setting is for IVF users only"
+        )
     role = (getattr(current_user, "role", None) or "").strip()
     if hasattr(role, "value"):
         role = role.value
     role = (role or "").lower()
     if role not in ("manager", "admin"):
-        raise HTTPException(status_code=403, detail="Access denied: Alert Setting requires Manager or Admin role")
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Alert Setting requires Manager or Admin role",
+        )
 
 
 @router.get("/kpi-config/list")
@@ -339,7 +446,11 @@ def list_kpi_config(
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
-    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    branch = (
+        db.query(HospitalBranch)
+        .filter(HospitalBranch.branch_id == tank.branch_id)
+        .first()
+    )
     hospital_id = branch.hospital_id if branch else None
     return {
         "tank_id": tank_id,
@@ -369,9 +480,13 @@ def create_kpi_config(
         branch_id_val = int(body["branch_id"])
         tank_id = int(body["tank_id"])
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="hospital_id, branch_id, tank_id must be integers")
+        raise HTTPException(
+            status_code=400, detail="hospital_id, branch_id, tank_id must be integers"
+        )
     if branch_id is not None and branch_id_val != branch_id:
-        raise HTTPException(status_code=403, detail="Cannot create config for another branch")
+        raise HTTPException(
+            status_code=403, detail="Cannot create config for another branch"
+        )
     quality_service = QualityService(db)
     row = quality_service.create_kpi_config(
         hospital_id=hospital_id,
@@ -383,6 +498,9 @@ def create_kpi_config(
         max_val=body.get("max") if body.get("max") is not None else None,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
+        cooldown_minutes=int(body["cooldown_minutes"])
+        if body.get("cooldown_minutes") is not None
+        else None,
         status=body.get("status", True),
     )
     db.commit()
@@ -397,6 +515,9 @@ def create_kpi_config(
         "max": float(row.max) if row.max is not None else None,
         "unit": row.unit,
         "alert_type": row.alert_type,
+        "cooldown_minutes": int(row.cooldown_minutes)
+        if row.cooldown_minutes is not None
+        else 60,
         "status": bool(row.status),
     }
 
@@ -427,7 +548,9 @@ def bulk_upsert_kpi_config(
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="tank_ids must be integers")
     quality_service = QualityService(db)
-    result = quality_service.bulk_upsert_kpi_config(tank_ids=tank_ids, configs=configs, branch_id=branch_id)
+    result = quality_service.bulk_upsert_kpi_config(
+        tank_ids=tank_ids, configs=configs, branch_id=branch_id
+    )
     db.commit()
     return result
 
@@ -453,6 +576,9 @@ def update_kpi_config(
         max_val=body.get("max") if body.get("max") is not None else None,
         unit=body.get("unit"),
         alert_type=body.get("alert_type"),
+        cooldown_minutes=int(body["cooldown_minutes"])
+        if body.get("cooldown_minutes") is not None
+        else None,
         status=body.get("status"),
     )
     if not row:
@@ -469,6 +595,9 @@ def update_kpi_config(
         "max": float(row.max) if row.max is not None else None,
         "unit": row.unit,
         "alert_type": row.alert_type,
+        "cooldown_minutes": int(row.cooldown_minutes)
+        if row.cooldown_minutes is not None
+        else 60,
         "status": bool(row.status),
     }
 
@@ -491,7 +620,9 @@ def delete_kpi_config(
     return {"deleted": True, "id": config_id}
 
 
-def push_ln2_reading_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
+def push_ln2_reading_to_redis(
+    tank_id: int, tank_code: str, data: dict, publish: bool = True
+) -> None:
     """Push LN2 reading to Redis and optionally publish to ln2_readings_channel for live WebSocket.
     data may include: device_code (e.g. 'LN2-1'), device_id (alias, same value), timestamp,
     evaporation_rate_kg_per_h, ln2_mass_kg, etc. device_id/device_code = Device.device_code (string).
@@ -523,7 +654,9 @@ async def ln2_redis_listener():
                     pubsub = get_ln2_pubsub()
                     logger.info("LN2 Redis listener started")
                 except Exception as e:
-                    logger.error(f"Error connecting to LN2 Redis: {e}. Retrying in 5 seconds...")
+                    logger.error(
+                        f"Error connecting to LN2 Redis: {e}. Retrying in 5 seconds..."
+                    )
                     await asyncio.sleep(5)
                     continue
 
@@ -552,6 +685,7 @@ async def ln2_redis_listener():
 async def tank_kpi_redis_listener():
     """Listen for tank KPI readings from Redis and broadcast to IVF quality WS clients (Quality Tracking live graph)."""
     from app.service.redis_service import get_tank_kpi_pubsub
+
     loop = asyncio.get_event_loop()
     pubsub = None
     while True:
@@ -561,7 +695,9 @@ async def tank_kpi_redis_listener():
                     pubsub = get_tank_kpi_pubsub()
                     logger.info("Tank KPI Redis listener started")
                 except Exception as e:
-                    logger.error(f"Error connecting to tank KPI Redis: {e}. Retrying in 5 seconds...")
+                    logger.error(
+                        f"Error connecting to tank KPI Redis: {e}. Retrying in 5 seconds..."
+                    )
                     await asyncio.sleep(5)
                     continue
             message = await loop.run_in_executor(
@@ -578,7 +714,11 @@ async def tank_kpi_redis_listener():
                     # {"type": "message", "data": { ...actual payload... }}
                     # Unwrap this so ConnectionManager.broadcast sees tank_code/tank_id at top level.
                     parsed = json.loads(raw)
-                    if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed.get("data"), dict):
+                    if (
+                        isinstance(parsed, dict)
+                        and "data" in parsed
+                        and isinstance(parsed.get("data"), dict)
+                    ):
                         payload = parsed["data"]
                     else:
                         payload = parsed
@@ -593,17 +733,24 @@ async def tank_kpi_redis_listener():
                         await manager.broadcast(payload, db)
                         # Also broadcast to /api/kpi/ws clients (Quality Tracking chart)
                         from app.controller.kpi_controller import kpi_manager
+
                         n = len(kpi_manager.active_connections)
                         await kpi_manager.broadcast(payload, db)
-                        logger.info(f"Tank KPI broadcast to kpi/ws (active_connections={n})")
+                        logger.info(
+                            f"Tank KPI broadcast to kpi/ws (active_connections={n})"
+                        )
                     except Exception as e:
-                        logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
+                        logger.error(
+                            f"Error broadcasting tank KPI message: {e}", exc_info=True
+                        )
                     finally:
                         db.close()
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse tank KPI message: {e}")
                 except Exception as e:
-                    logger.error(f"Error broadcasting tank KPI message: {e}", exc_info=True)
+                    logger.error(
+                        f"Error broadcasting tank KPI message: {e}", exc_info=True
+                    )
         except Exception as e:
             logger.error(f"Error in tank_kpi_redis_listener: {e}")
             pubsub = None
@@ -614,22 +761,24 @@ async def tank_kpi_redis_listener():
 async def ivf_websocket_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for real-time IVF canister quality monitoring
-    
+
     Requires authentication token in query parameter: ?token=<jwt_token>
     Only accessible to users with IVF department
     """
     connection_id = None
-    
+
     try:
         # Accept connection first
         await websocket.accept()
-        logger.info(f"IVF WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
-        
+        logger.info(
+            f"IVF WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}"
+        )
+
         # Authenticate user - Get token from query parameter
         query_params = dict(websocket.query_params)
         token = query_params.get("token")
         logger.info(f"Token from query params: {'present' if token else 'missing'}")
-        
+
         # Get branch_id_override from query parameters (optional, only for Managers)
         branch_id_override = None
         branch_id_override_str = query_params.get("branch_id_override")
@@ -638,13 +787,17 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 branch_id_override = int(branch_id_override_str)
                 logger.info(f"branch_id_override provided: {branch_id_override}")
             except (ValueError, TypeError):
-                logger.warning(f"Invalid branch_id_override value: {branch_id_override_str}, ignoring")
-        
+                logger.warning(
+                    f"Invalid branch_id_override value: {branch_id_override_str}, ignoring"
+                )
+
         if not token:
             logger.warning("IVF WebSocket connection rejected: No token provided")
-            await websocket.close(code=1008, reason="Authentication required: No token provided")
+            await websocket.close(
+                code=1008, reason="Authentication required: No token provided"
+            )
             return
-        
+
         # Verify token using auth function
         try:
             auth_info = verify_websocket_token(token)
@@ -652,14 +805,20 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
             pharma_id = auth_info.get("pharma_id")  # May be None for IVF users
             logger.debug(f"Token verified: user_id={user_id}, pharma_id={pharma_id}")
         except InvalidTokenException as e:
-            logger.warning(f"IVF WebSocket connection rejected: Invalid token - {str(e)}")
+            logger.warning(
+                f"IVF WebSocket connection rejected: Invalid token - {str(e)}"
+            )
             await websocket.close(code=1008, reason=f"Invalid token: {str(e)}")
             return
         except Exception as e:
-            logger.error(f"IVF WebSocket token verification error: {type(e).__name__}: {str(e)}")
-            await websocket.close(code=1008, reason=f"Token verification failed: {str(e)}")
+            logger.error(
+                f"IVF WebSocket token verification error: {type(e).__name__}: {str(e)}"
+            )
+            await websocket.close(
+                code=1008, reason=f"Token verification failed: {str(e)}"
+            )
             return
-        
+
         # Get user from database to verify department and get branch_id/role
         db_temp = SessionLocal()
         try:
@@ -668,17 +827,22 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 logger.warning(f"User {user_id} not found in database")
                 await websocket.close(code=1008, reason="User not found")
                 return
-            
+
             # Verify user is from IVF department
             if not is_specific_department(user.department, "IVF"):
-                logger.warning(f"User {user_id} is not from IVF department (department: {user.department})")
-                await websocket.close(code=1008, reason="Access denied: This endpoint is for IVF users only")
+                logger.warning(
+                    f"User {user_id} is not from IVF department (department: {user.department})"
+                )
+                await websocket.close(
+                    code=1008,
+                    reason="Access denied: This endpoint is for IVF users only",
+                )
                 return
-            
-            role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+
+            role = user.role.value if hasattr(user.role, "value") else str(user.role)
             role_normalized = role  # Already in correct format from enum
             department = user.department
-            
+
             # Determine branch_id based on role and override
             # Managers can override, Users cannot override (always use their branch)
             if role_normalized == "Manager":
@@ -686,7 +850,9 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                     branch_id = branch_id_override
                     logger.info(f"Manager using branch_id_override: {branch_id}")
                 else:
-                    branch_id = user.branch_id  # Manager without override uses their own branch_id
+                    branch_id = (
+                        user.branch_id
+                    )  # Manager without override uses their own branch_id
                     logger.info(f"Manager using default branch_id: {branch_id}")
             elif role_normalized == "Admin":
                 branch_id = None  # Admin sees all branches (ignore override)
@@ -694,12 +860,16 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                 # User role: always use their branch (ignore override)
                 branch_id = user.branch_id
                 if branch_id_override is not None:
-                    logger.warning(f"User role cannot override branch_id, ignoring override: {branch_id_override}")
-            
-            logger.info(f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}, override={branch_id_override}")
+                    logger.warning(
+                        f"User role cannot override branch_id, ignoring override: {branch_id_override}"
+                    )
+
+            logger.info(
+                f"IVF user authenticated: user={user_id}, department={department}, branch={branch_id}, role={role_normalized}, override={branch_id_override}"
+            )
         finally:
             db_temp.close()
-        
+
         # Store connection info in connection manager for filtering
         connection_id = await manager.connect(websocket)
         manager.active_connections[connection_id]["pharma_id"] = pharma_id
@@ -707,11 +877,16 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
         manager.active_connections[connection_id]["branch_id"] = branch_id
         manager.active_connections[connection_id]["role"] = role_normalized
         manager.active_connections[connection_id]["department"] = department
-        
-        logger.info(f"IVF WebSocket authenticated: user={user_id}, branch={branch_id}, role={role_normalized}, connection={connection_id}")
-        
+
+        logger.info(
+            f"IVF WebSocket authenticated: user={user_id}, branch={branch_id}, role={role_normalized}, connection={connection_id}"
+        )
+
     except Exception as e:
-        logger.error(f"IVF WebSocket authentication error: {type(e).__name__}: {str(e)}", exc_info=True)
+        logger.error(
+            f"IVF WebSocket authentication error: {type(e).__name__}: {str(e)}",
+            exc_info=True,
+        )
         try:
             if connection_id:
                 manager.disconnect(connection_id)
@@ -719,15 +894,15 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
         except:
             pass
         return
-    
+
     try:
         # Create database session for validation
         db = SessionLocal()
-        
+
         try:
             quality_service = QualityService(db)
             quality_tracking_service = QualityTrackingService(db)
-            
+
             while True:
                 try:
                     # Wait for messages with timeout to avoid blocking
@@ -735,138 +910,178 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
                     try:
                         # Try to parse as JSON
                         message = json.loads(data)
-                        
+
                         # Handle IVF tank subscription - accept tank_code (e.g., "T1", "T2")
                         # Optional branch_id in message is Manager-only for branch+tank disambiguation.
                         if "tank_code" not in message or not message["tank_code"]:
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": "Subscription message must contain 'tank_code'"
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": "Subscription message must contain 'tank_code'",
+                                }
+                            )
                             continue
-                        
+
                         tank_code = message["tank_code"]
                         selected_branch_id = message.get("branch_id")
                         logger.info(f"Received tank_code: {tank_code}")
-                        
+
                         # Parse optional branch selection from the message.
                         if selected_branch_id is not None:
                             try:
                                 selected_branch_id = int(selected_branch_id)
                             except (TypeError, ValueError):
-                                await websocket.send_json({
-                                    "type": "error",
-                                    "message": "Invalid 'branch_id' in subscription message"
-                                })
+                                await websocket.send_json(
+                                    {
+                                        "type": "error",
+                                        "message": "Invalid 'branch_id' in subscription message",
+                                    }
+                                )
                                 continue
-                        
+
                         # Resolve tank_code to tank_id
                         try:
                             # Convert tank_code to string
                             tank_code_str = str(tank_code).strip()
-                            
+
                             # Determine effective branch for this subscription.
                             # - User: always constrained to their authorized branch.
                             # - Manager: can optionally scope by selected branch from message.
                             # - Admin: message branch selection is ignored.
                             effective_branch_id = branch_id
-                            if role_normalized == "Manager" and selected_branch_id is not None:
+                            if (
+                                role_normalized == "Manager"
+                                and selected_branch_id is not None
+                            ):
                                 effective_branch_id = selected_branch_id
-                            
+
                             # Find tank by tank_code and effective branch when available.
                             if effective_branch_id is not None:
-                                tank = db.query(Tank).filter(
-                                    Tank.tank_code == tank_code_str,
-                                    Tank.branch_id == effective_branch_id
-                                ).first()
+                                tank = (
+                                    db.query(Tank)
+                                    .filter(
+                                        Tank.tank_code == tank_code_str,
+                                        Tank.branch_id == effective_branch_id,
+                                    )
+                                    .first()
+                                )
                             else:
                                 # Admin without branch selection can access any tank.
                                 # If the same tank_code exists in multiple branches, force explicit branch selection.
-                                matching_tanks = db.query(Tank).filter(
-                                    Tank.tank_code == tank_code_str
-                                ).all()
+                                matching_tanks = (
+                                    db.query(Tank)
+                                    .filter(Tank.tank_code == tank_code_str)
+                                    .all()
+                                )
                                 if len(matching_tanks) > 1:
                                     raise Exception(
                                         f"Multiple branches have tank code '{tank_code}'. Please send 'branch_id' in subscription message."
                                     )
                                 tank = matching_tanks[0] if matching_tanks else None
-                            
+
                             if not tank:
-                                branch_hint = effective_branch_id if effective_branch_id is not None else branch_id
-                                raise Exception(f"Tank with code '{tank_code}' not found" + (f" in branch {branch_hint}" if branch_hint is not None else ""))
-                            
+                                branch_hint = (
+                                    effective_branch_id
+                                    if effective_branch_id is not None
+                                    else branch_id
+                                )
+                                raise Exception(
+                                    f"Tank with code '{tank_code}' not found"
+                                    + (
+                                        f" in branch {branch_hint}"
+                                        if branch_hint is not None
+                                        else ""
+                                    )
+                                )
+
                             tank_id = tank.tank_id
-                            
-                            logger.info(f"Resolved tank_code {tank_code} to tank_id {tank_id}")
+
+                            logger.info(
+                                f"Resolved tank_code {tank_code} to tank_id {tank_id}"
+                            )
                         except Exception as e:
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": f"Invalid tank code: {str(e)}"
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": f"Invalid tank code: {str(e)}",
+                                }
+                            )
                             continue
-                        
+
                         # Validate tank belongs to user's branch (if user is not admin)
                         try:
                             # Admin users (branch_id is None) can access all tanks.
                             # User/Manager users must match the effective branch used for this subscription.
-                            if role_normalized != "Admin" and effective_branch_id is not None:
-                                quality_service.validate_tank_belongs_to_branch(tank_id, effective_branch_id)
-                            
+                            if (
+                                role_normalized != "Admin"
+                                and effective_branch_id is not None
+                            ):
+                                quality_service.validate_tank_belongs_to_branch(
+                                    tank_id, effective_branch_id
+                                )
+
                             # Keep branch scoping aligned with the subscribed tank so websocket broadcast
                             # filtering sends data for the selected branch+tank combination.
                             manager.active_connections[connection_id]["branch_id"] = (
                                 None if role_normalized == "Admin" else tank.branch_id
                             )
-                            
+
                             # Client is subscribing to a tank (IVF) - track by tank_code
                             # Store tank_code as string
                             tank_code_for_sub = str(tank_code)
-                            
+
                             # Store subscription using tank_code (primary identifier)
-                            manager.set_tank_subscription(connection_id, tank_id, tank_code_for_sub)
-                            
+                            manager.set_tank_subscription(
+                                connection_id, tank_id, tank_code_for_sub
+                            )
+
                             # Get last 12 IVF telemetry records from DB for this tank+branch scope
                             ivf_history = quality_service.get_tank_telemetry_history(
-                                tank_id=tank_id,
-                                branch_id=tank.branch_id,
-                                limit=12
+                                tank_id=tank_id, branch_id=tank.branch_id, limit=12
                             )
-                            
+
                             # Get IVF geolocation records from database (using tank_id)
-                            ivf_geolocation_history = quality_service.get_tank_geolocation_history(tank_id, limit=100)
-                            
+                            ivf_geolocation_history = (
+                                quality_service.get_tank_geolocation_history(
+                                    tank_id, limit=100
+                                )
+                            )
+
                             # Send IVF geolocation history as a single array message
                             if ivf_geolocation_history:
-                                await websocket.send_json({
-                                    "type": "ivf_geolocation_history",
-                                    "tank_id": tank_id,
-                                    "tank_code": tank_code,  # Include tank_code in response
-                                    "geolocations": ivf_geolocation_history,
-                                    "count": len(ivf_geolocation_history)
-                                })
-                            
+                                await websocket.send_json(
+                                    {
+                                        "type": "ivf_geolocation_history",
+                                        "tank_id": tank_id,
+                                        "tank_code": tank_code,  # Include tank_code in response
+                                        "geolocations": ivf_geolocation_history,
+                                        "count": len(ivf_geolocation_history),
+                                    }
+                                )
+
                             # Send IVF quality history messages (oldest first, ascending order)
                             for historical_data in ivf_history:
                                 await websocket.send_json(historical_data)
-                            
+
                             # Send confirmation after history
-                            await websocket.send_json({
-                                "type": "subscription_confirmed",
-                                "tank_id": tank_id,
-                                "tank_code": tank_code,  # Include tank_code in response
-                                "branch_id": tank.branch_id,
-                                "device_data": {
-                                    "tive_device_id": tank.tive_device_id,
-                                    "tank_id_arc": tank.tank_id_arc
-                                },
-                                "history_count": len(ivf_history),
-                                "geolocation_count": len(ivf_geolocation_history)
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "subscription_confirmed",
+                                    "tank_id": tank_id,
+                                    "tank_code": tank_code,  # Include tank_code in response
+                                    "branch_id": tank.branch_id,
+                                    "device_data": {
+                                        "tive_device_id": tank.tive_device_id,
+                                        "tank_id_arc": tank.tank_id_arc,
+                                    },
+                                    "history_count": len(ivf_history),
+                                    "geolocation_count": len(ivf_geolocation_history),
+                                }
+                            )
                         except Exception as e:
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": f"Invalid tank: {str(e)}"
-                            })
+                            await websocket.send_json(
+                                {"type": "error", "message": f"Invalid tank: {str(e)}"}
+                            )
                     except json.JSONDecodeError:
                         # Not JSON, ignore
                         pass
@@ -883,7 +1098,9 @@ async def ivf_websocket_endpoint(websocket: WebSocket):
         manager.disconnect_by_websocket(websocket)
 
 
-def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, limit: int = 12) -> list:
+def _get_ln2_history_for_tank(
+    db: Session, tank_id: int, tank_code_str: str, limit: int = 12
+) -> list:
     """Get LN2 readings history for a tank.
 
     Strategy: fetch from both Redis and DB, merge, deduplicate by timestamp,
@@ -897,13 +1114,24 @@ def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, lim
     db_history = []
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
     if tank:
-        device_ids = [row[0] for row in db.query(Ln2IotDevice.device_id).filter(Ln2IotDevice.tank_id == tank_id).distinct().all()]
+        device_ids = [
+            row[0]
+            for row in db.query(Ln2IotDevice.device_id)
+            .filter(Ln2IotDevice.tank_id == tank_id)
+            .distinct()
+            .all()
+        ]
         if tank.tive_device_id:
-            dev = db.query(Device).filter(Device.device_code == tank.tive_device_id).first()
+            dev = (
+                db.query(Device)
+                .filter(Device.device_code == tank.tive_device_id)
+                .first()
+            )
             if dev and dev.id not in device_ids:
                 device_ids.append(dev.id)
         if device_ids:
-            from sqlalchemy import or_, desc
+            from sqlalchemy import desc, or_
+
             readings = (
                 db.query(Ln2Reading)
                 .filter(or_(*[Ln2Reading.device_id == d for d in device_ids]))
@@ -914,18 +1142,30 @@ def _get_ln2_history_for_tank(db: Session, tank_id: int, tank_code_str: str, lim
             for r in reversed(readings):
                 ts = r.reading_timestamp.isoformat() if r.reading_timestamp else ""
                 dev = db.query(Device).filter(Device.id == r.device_id).first()
-                dev_code = dev.device_code if dev and dev.device_code else str(r.device_id)
+                dev_code = (
+                    dev.device_code if dev and dev.device_code else str(r.device_id)
+                )
                 item = {
                     "tank_code": tank_code_str,
                     "tank_id": tank_id,
                     "device_code": dev_code,
                     "device_id": dev_code,
                     "timestamp": ts,
-                    "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h) if r.evaporation_rate_kg_per_h is not None else None,
-                    "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
-                    "raw_weight_kg": float(r.raw_weight_kg) if r.raw_weight_kg is not None else None,
-                    "ln2_level_pct": float(r.ln2_level_pct) if r.ln2_level_pct is not None else None,
-                    "ln2_volume_l": float(r.ln2_volume_l) if r.ln2_volume_l is not None else None,
+                    "evaporation_rate_kg_per_h": float(r.evaporation_rate_kg_per_h)
+                    if r.evaporation_rate_kg_per_h is not None
+                    else None,
+                    "ln2_mass_kg": float(r.ln2_mass_kg)
+                    if r.ln2_mass_kg is not None
+                    else None,
+                    "raw_weight_kg": float(r.raw_weight_kg)
+                    if r.raw_weight_kg is not None
+                    else None,
+                    "ln2_level_pct": float(r.ln2_level_pct)
+                    if r.ln2_level_pct is not None
+                    else None,
+                    "ln2_volume_l": float(r.ln2_volume_l)
+                    if r.ln2_volume_l is not None
+                    else None,
                     "sensor_status": r.sensor_status,
                     "lid_state": r.lid_state,
                     "refill_detected": r.refill_detected,
@@ -969,12 +1209,16 @@ async def ivf_ln2_websocket_endpoint(websocket: WebSocket):
     connection_id = None
     try:
         await websocket.accept()
-        logger.info(f"IVF LN2 WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}")
+        logger.info(
+            f"IVF LN2 WebSocket connection accepted from {websocket.client.host if websocket.client else 'unknown'}"
+        )
 
         query_params = dict(websocket.query_params)
         token = query_params.get("token")
         if not token:
-            await websocket.close(code=1008, reason="Authentication required: No token provided")
+            await websocket.close(
+                code=1008, reason="Authentication required: No token provided"
+            )
             return
 
         try:
@@ -984,7 +1228,9 @@ async def ivf_ln2_websocket_endpoint(websocket: WebSocket):
             await websocket.close(code=1008, reason=f"Invalid token: {str(e)}")
             return
         except Exception as e:
-            await websocket.close(code=1008, reason=f"Token verification failed: {str(e)}")
+            await websocket.close(
+                code=1008, reason=f"Token verification failed: {str(e)}"
+            )
             return
 
         db_temp = SessionLocal()
@@ -1014,32 +1260,61 @@ async def ivf_ln2_websocket_endpoint(websocket: WebSocket):
                     try:
                         message = json.loads(data)
                         if "tank_code" not in message or not message["tank_code"]:
-                            await websocket.send_json({"type": "error", "message": "Subscription must contain 'tank_code'"})
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": "Subscription must contain 'tank_code'",
+                                }
+                            )
                             continue
                         tank_code = message["tank_code"]
                         tank_code_str = str(tank_code).strip()
 
                         if role != "Admin" and branch_id is not None:
-                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str, Tank.branch_id == branch_id).first()
+                            tank = (
+                                db.query(Tank)
+                                .filter(
+                                    Tank.tank_code == tank_code_str,
+                                    Tank.branch_id == branch_id,
+                                )
+                                .first()
+                            )
                         else:
-                            tank = db.query(Tank).filter(Tank.tank_code == tank_code_str).first()
+                            tank = (
+                                db.query(Tank)
+                                .filter(Tank.tank_code == tank_code_str)
+                                .first()
+                            )
                         if not tank:
-                            await websocket.send_json({"type": "error", "message": f"Tank '{tank_code}' not found"})
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": f"Tank '{tank_code}' not found",
+                                }
+                            )
                             continue
                         tank_id = tank.tank_id
-                        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+                        quality_service.validate_tank_belongs_to_branch(
+                            tank_id, branch_id
+                        )
 
-                        ln2_manager.set_tank_subscription(connection_id, tank_id, tank_code_str)
-                        ln2_history = _get_ln2_history_for_tank(db, tank_id, tank_code_str, limit=12)
+                        ln2_manager.set_tank_subscription(
+                            connection_id, tank_id, tank_code_str
+                        )
+                        ln2_history = _get_ln2_history_for_tank(
+                            db, tank_id, tank_code_str, limit=12
+                        )
 
                         for h in ln2_history:
                             await websocket.send_json(h)
-                        await websocket.send_json({
-                            "type": "subscription_confirmed",
-                            "tank_id": tank_id,
-                            "tank_code": tank_code,
-                            "history_count": len(ln2_history),
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "subscription_confirmed",
+                                "tank_id": tank_id,
+                                "tank_code": tank_code,
+                                "history_count": len(ln2_history),
+                            }
+                        )
                     except json.JSONDecodeError:
                         pass
                 except asyncio.TimeoutError:

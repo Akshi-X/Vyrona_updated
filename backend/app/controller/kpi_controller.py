@@ -119,12 +119,19 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                     data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
                     try:
                         message = json.loads(data)
-                        tank_id = message.get("tank_id") if isinstance(message, dict) else None
+                        if not isinstance(message, dict):
+                            continue
+                        tank_id = message.get("tank_id")
+                        live_val = message.get("live")
+                        # Allow message with only "live" to pause/resume live pushes (no tank_id required)
                         if tank_id is None:
-                            await websocket.send_json({
-                                "type": "error",
-                                "message": "Subscription message must contain 'tank_id'",
-                            })
+                            if live_val is not None:
+                                kpi_manager.set_live(connection_id, bool(live_val))
+                            else:
+                                await websocket.send_json({
+                                    "type": "error",
+                                    "message": "Subscription message must contain 'tank_id'",
+                                })
                             continue
                         effective_branch_id = branch_id
                         selected_branch_id = message.get("branch_id")
@@ -142,26 +149,35 @@ async def kpi_websocket_endpoint(websocket: WebSocket):
                             continue
 
                         tank = db.query(Tank).filter(Tank.tank_id == tank_id_int).first()
-                        if not tank:
-                            await websocket.send_json({"type": "error", "message": "Invalid 'tank_id'"})
-                            continue
-
-                        tank_code_str = str(tank.tank_code).strip()
-                        try:
-                            if role != "Admin" and effective_branch_id is not None:
-                                quality_service.validate_tank_belongs_to_branch(tank.tank_id, effective_branch_id)
-                        except Exception as e:
-                            await websocket.send_json({"type": "error", "message": str(e)})
-                            continue
-
-                        kpi_manager.active_connections[connection_id]["branch_id"] = None if role == "Admin" else tank.branch_id
-                        kpi_manager.set_tank_subscription(connection_id, tank.tank_id, tank_code_str)
-                        await websocket.send_json({
-                            "type": "subscription_confirmed",
-                            "tank_id": tank.tank_id,
-                            "tank_code": tank_code_str,
-                            "branch_id": tank.branch_id,
-                        })
+                        if tank:
+                            tank_code_str = str(tank.tank_code).strip()
+                            try:
+                                if role != "Admin" and effective_branch_id is not None:
+                                    quality_service.validate_tank_belongs_to_branch(tank.tank_id, effective_branch_id)
+                            except Exception as e:
+                                await websocket.send_json({"type": "error", "message": str(e)})
+                                continue
+                            kpi_manager.active_connections[connection_id]["branch_id"] = None if role == "Admin" else tank.branch_id
+                            kpi_manager.set_tank_subscription(connection_id, tank.tank_id, tank_code_str)
+                            kpi_manager.set_live(connection_id, bool(message.get("live", True)))
+                            await websocket.send_json({
+                                "type": "subscription_confirmed",
+                                "tank_id": tank.tank_id,
+                                "tank_code": tank_code_str,
+                                "branch_id": tank.branch_id,
+                            })
+                        else:
+                            # Tank not in DB: still allow subscription so client receives broadcasts for this tank_id
+                            tank_code_str = (message.get("tank_code") or "").strip() or None
+                            kpi_manager.set_tank_subscription(connection_id, tank_id_int, tank_code_str)
+                            kpi_manager.set_live(connection_id, bool(message.get("live", True)))
+                            await websocket.send_json({
+                                "type": "subscription_confirmed",
+                                "tank_id": tank_id_int,
+                                "tank_code": tank_code_str or "",
+                                "branch_id": None,
+                            })
+                            logger.info(f"KPI WebSocket subscribed to tank_id={tank_id_int} (not in DB)")
                     except json.JSONDecodeError:
                         pass
                 except asyncio.TimeoutError:
