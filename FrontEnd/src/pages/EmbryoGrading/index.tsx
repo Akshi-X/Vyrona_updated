@@ -346,7 +346,7 @@ export default function EmbryoGradingPage() {
             <span className="text-white text-xs font-semibold">{userInitials}</span>
           </div>
         </header>
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" style={{ paddingTop: 'calc(63px + 1rem)' }}>
+        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-black text-2xl">
               Embryo Grading

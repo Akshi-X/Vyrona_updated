@@ -3,7 +3,7 @@ Response Schemas (DTOs)
 All API responses use proper Pydantic models for type safety
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -60,21 +60,20 @@ class HealthCheckResponse(BaseModel):
 
 
 class UserProfileResponse(BaseModel):
-    """User profile response."""
+    """User profile response. Required fields have defaults for DB nulls (e.g. legacy or hospital users)."""
     user_id: str
     email: str
-    first_name: str
-    last_name: str
-    role: str
-    pharma_id: Optional[int]
-    company_name: Optional[str]  # Will be populated from pharma table
-    approved_status: str
-    status: bool
-    session_timeout: int  # Auto-logout for security compliance
-    last_login: Optional[datetime]
-    # Audit trail fields for compliance
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    first_name: str = ""
+    last_name: str = ""
+    role: str = "User"
+    pharma_id: Optional[int] = None
+    company_name: Optional[str] = None  # Populated from pharma table for pharma users only
+    approved_status: str = "approved"
+    status: bool = False
+    session_timeout: int = Field(default=30, description="Session timeout in minutes")
+    last_login: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class UserPermissionsResponse(BaseModel):
