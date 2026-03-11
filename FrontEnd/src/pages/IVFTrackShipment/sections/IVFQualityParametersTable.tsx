@@ -123,7 +123,6 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false }: KpiTileProps) =
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
 export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableProps) {
-  const BATTERY_DEAD_THRESHOLD_PERCENT = 1;
   const BATTERY_DEAD_THRESHOLD_MS = 5 * 60 * 1000;
   const batteryDeadTooltip = 'Charge your device to show Internal Temperature, External Temperature, Shock Detection';
 
@@ -536,7 +535,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
                 </div>
               </div>
             ) : (
-              <BatteryIcon level={batteryLevel} />
+              <BatteryIcon level={batteryLevel ?? 0} />
             )}
           </div>
           
