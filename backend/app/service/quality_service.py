@@ -2,6 +2,7 @@
 Quality Monitoring Service
 Handles quality data retrieval and validation with pharma filtering
 """
+
 import asyncio
 import csv
 import io
@@ -9,153 +10,168 @@ import json
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Dict
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, text
+from typing import Dict, List, Optional
 
 from fastapi.responses import Response
+from sqlalchemy import and_, func, text
+from sqlalchemy.orm import Session
 
-from app.models.patient_model import Patient
-from app.models.user_model import User
-from app.models.geolocation_model import Geolocation
-from app.models.IVF.ivf_geolocation_model import IVFGeolocation
-from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
-from app.models.IVF.tank_model import Tank
-from app.models.IVF.hospital_branch_model import HospitalBranch
-from app.models import KpiConfig, Readings
-from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from app.service.redis_service import get_redis, get_pubsub, reset_redis_connection
 from app.config.database import SessionLocal
-from app.exceptions.patient_exceptions import PatientNotFoundException
-from app.constants.app_constants import COMMON_API_HEADERS, QUALITY_EXPORT_DEFAULT_MINUTES
+from app.constants.app_constants import (
+    COMMON_API_HEADERS,
+    QUALITY_EXPORT_DEFAULT_MINUTES,
+)
 from app.constants.kpi_constants import (
     AGG_BUCKET_MINUTES_1H,
-    AGG_BUCKET_MINUTES_24H,
     AGG_BUCKET_MINUTES_7D,
+    AGG_BUCKET_MINUTES_24H,
 )
+from app.exceptions.patient_exceptions import PatientNotFoundException
 from app.exceptions.quality_exceptions import (
     QualityCsvExportException,
     QualityDataNotFoundException,
     QualityServiceException,
     RedisConnectionException,
 )
+from app.models import KpiConfig, Readings
+from app.models.geolocation_model import Geolocation
+from app.models.IVF.hospital_branch_model import HospitalBranch
+from app.models.IVF.ivf_geolocation_model import IVFGeolocation
+from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from app.models.IVF.tank_model import Tank
+from app.models.patient_model import Patient
+from app.models.user_model import User
+from app.service.redis_service import get_pubsub, get_redis, reset_redis_connection
 
 logger = logging.getLogger(__name__)
 
 
 class QualityService:
     """Service for quality monitoring operations"""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
+
     def get_patients_with_quality_data(self, pharma_id: int) -> List[str]:
         """
         Get list of patient IDs from database that belong to the pharma
         and have quality data in Redis
-        
+
         Args:
             pharma_id: The pharma ID to filter patients
-            
+
         Returns:
             List of patient IDs
         """
         try:
             # Get all patients for this pharma from database
-            db_patients = self.db.query(Patient.id).filter(
-                Patient.pharma_id == pharma_id
-            ).all()
-            
+            db_patients = (
+                self.db.query(Patient.id).filter(Patient.pharma_id == pharma_id).all()
+            )
+
             db_patient_ids = [patient[0] for patient in db_patients]
-            
+
             # Get patient IDs from Redis that have quality data
             try:
                 r = get_redis()
-                redis_patient_ids = list(r.smembers('patients'))
+                redis_patient_ids = list(r.smembers("patients"))
             except Exception as e:
-                logger.warning(f"Redis not available: {e}. Returning only database patients.")
+                logger.warning(
+                    f"Redis not available: {e}. Returning only database patients."
+                )
                 redis_patient_ids = []
-            
+
             # Return intersection: patients that exist in both DB and Redis
             # This ensures we only return patients that belong to the pharma
             # and have quality data available
-            valid_patient_ids = [pid for pid in db_patient_ids if pid in redis_patient_ids]
-            
+            valid_patient_ids = [
+                pid for pid in db_patient_ids if pid in redis_patient_ids
+            ]
+
             return sorted(valid_patient_ids)
-            
+
         except Exception as e:
             logger.error(f"Error getting patients with quality data: {e}")
             raise
-    
-    def validate_patient_belongs_to_pharma(self, patient_id: str, pharma_id: int) -> bool:
+
+    def validate_patient_belongs_to_pharma(
+        self, patient_id: str, pharma_id: int
+    ) -> bool:
         """
         Validate that a patient belongs to the specified pharma
-        
+
         Args:
             patient_id: Patient ID to validate
             pharma_id: Pharma ID to check against
-            
+
         Returns:
             True if patient belongs to pharma, False otherwise
-            
+
         Raises:
             PatientNotFoundException: If patient doesn't exist
         """
         try:
-            patient = self.db.query(Patient).filter(
-                and_(Patient.id == patient_id, Patient.pharma_id == pharma_id)
-            ).first()
-            
+            patient = (
+                self.db.query(Patient)
+                .filter(and_(Patient.id == patient_id, Patient.pharma_id == pharma_id))
+                .first()
+            )
+
             if not patient:
                 raise PatientNotFoundException(
                     patient_id=patient_id,
-                    reason=f"Patient does not belong to pharma {pharma_id}"
+                    reason=f"Patient does not belong to pharma {pharma_id}",
                 )
-            
+
             return True
-            
+
         except PatientNotFoundException:
             raise
         except Exception as e:
             logger.error(f"Error validating patient belongs to pharma: {e}")
             raise
-    
-    def get_quality_history(self, pharma_id: int, patient_id: Optional[str] = None, limit: int = 20) -> List[Dict]:
+
+    def get_quality_history(
+        self, pharma_id: int, patient_id: Optional[str] = None, limit: int = 20
+    ) -> List[Dict]:
         """
         Get quality history for patients belonging to the pharma
-        
+
         Args:
             pharma_id: The pharma ID to filter patients
             patient_id: Optional specific patient ID
             limit: Maximum number of records to return
-            
+
         Returns:
             List of quality data dictionaries
         """
         try:
             r = get_redis()
-            
+
             if patient_id:
                 # Validate patient belongs to pharma
                 self.validate_patient_belongs_to_pharma(patient_id, pharma_id)
-                
+
                 # Get history for specific patient
-                history_key = f'quality_history:{patient_id}'
+                history_key = f"quality_history:{patient_id}"
                 history = r.lrange(history_key, 0, limit - 1)
                 quality_data = [json.loads(item) for item in history]
                 return quality_data
             else:
                 # Get all patients for this pharma from database
-                db_patients = self.db.query(Patient.id).filter(
-                    Patient.pharma_id == pharma_id
-                ).all()
-                
+                db_patients = (
+                    self.db.query(Patient.id)
+                    .filter(Patient.pharma_id == pharma_id)
+                    .all()
+                )
+
                 db_patient_ids = [patient[0] for patient in db_patients]
-                
+
                 # Get history for all pharma patients
                 all_history = []
                 for pid in db_patient_ids:
-                    history_key = f'quality_history:{pid}'
+                    history_key = f"quality_history:{pid}"
                     history = r.lrange(history_key, 0, limit - 1)
                     for item in history:
                         try:
@@ -163,46 +179,48 @@ class QualityService:
                             all_history.append(data)
                         except json.JSONDecodeError:
                             continue
-                
+
                 # Sort by timestamp (most recent first)
-                all_history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                all_history.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
                 return all_history[:limit]
-                
+
         except PatientNotFoundException:
             raise
         except Exception as e:
             logger.error(f"Error getting quality history: {e}")
             raise
-    
-    def get_latest_quality_data(self, patient_id: str, pharma_id: int) -> Optional[Dict]:
+
+    def get_latest_quality_data(
+        self, patient_id: str, pharma_id: int
+    ) -> Optional[Dict]:
         """
         Get the latest quality data for a specific patient
-        
+
         Args:
             patient_id: Patient ID
             pharma_id: Pharma ID for validation
-            
+
         Returns:
             Latest quality data dictionary or None
         """
         try:
             # Validate patient belongs to pharma
             self.validate_patient_belongs_to_pharma(patient_id, pharma_id)
-            
+
             r = get_redis()
-            history_key = f'quality_history:{patient_id}'
+            history_key = f"quality_history:{patient_id}"
             latest = r.lindex(history_key, 0)  # Get first (most recent) item
-            
+
             if latest:
                 return json.loads(latest)
             return None
-            
+
         except PatientNotFoundException:
             raise
         except Exception as e:
             logger.error(f"Error getting latest quality data: {e}")
             raise
-    
+
     @staticmethod
     def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
         """Parse timestamp strings into naive UTC datetime objects."""
@@ -243,7 +261,7 @@ class QualityService:
         self,
         patient_id: str,
         pharma_id: int,
-        duration_minutes: int = QUALITY_EXPORT_DEFAULT_MINUTES
+        duration_minutes: int = QUALITY_EXPORT_DEFAULT_MINUTES,
     ) -> Response:
         """
         Export quality data for a patient within the specified time range as CSV.
@@ -266,7 +284,7 @@ class QualityService:
         if duration_minutes <= 0 or duration_minutes > 1440:
             raise QualityServiceException(
                 operation="export_patient_quality_data_csv",
-                detail="duration_minutes must be between 1 and 1440"
+                detail="duration_minutes must be between 1 and 1440",
             )
 
         # Validate patient ownership
@@ -284,7 +302,9 @@ class QualityService:
             raw_history = redis_client.lrange(history_key, 0, -1)
         except Exception as exc:
             logger.error(f"Failed to read Redis history for {patient_id}: {exc}")
-            raise QualityCsvExportException(detail="Unable to read quality history from Redis") from exc
+            raise QualityCsvExportException(
+                detail="Unable to read quality history from Redis"
+            ) from exc
 
         if not raw_history:
             raise QualityDataNotFoundException(patient_id=patient_id)
@@ -296,7 +316,9 @@ class QualityService:
             try:
                 record = json.loads(item)
             except json.JSONDecodeError:
-                logger.warning(f"Skipping invalid JSON entry in quality history for patient {patient_id}")
+                logger.warning(
+                    f"Skipping invalid JSON entry in quality history for patient {patient_id}"
+                )
                 continue
 
             parsed_timestamp = self._parse_timestamp(record.get("timestamp"))
@@ -304,7 +326,7 @@ class QualityService:
                 logger.warning(
                     "Skipping record with unparseable timestamp for patient %s: %s",
                     patient_id,
-                    record.get("timestamp")
+                    record.get("timestamp"),
                 )
                 continue
 
@@ -317,7 +339,7 @@ class QualityService:
         if not filtered_records:
             raise QualityDataNotFoundException(
                 patient_id=patient_id,
-                detail=f"No quality data found in the last {duration_minutes} minutes."
+                detail=f"No quality data found in the last {duration_minutes} minutes.",
             )
 
         filtered_records.sort(key=lambda entry: entry.get("_parsed_timestamp"))
@@ -340,16 +362,18 @@ class QualityService:
             writer.writeheader()
 
             for record in filtered_records:
-                writer.writerow({
-                    "timestamp": record.get("timestamp"),
-                    "patient_id": record.get("patient_id"),
-                    "temperature": record.get("temperature"),
-                    "humidity": record.get("humidity"),
-                    "ph_level": record.get("ph_level"),
-                    "o2_level": record.get("o2_level"),
-                    "co2_level": record.get("co2_level"),
-                    "agitation": record.get("agitation"),
-                })
+                writer.writerow(
+                    {
+                        "timestamp": record.get("timestamp"),
+                        "patient_id": record.get("patient_id"),
+                        "temperature": record.get("temperature"),
+                        "humidity": record.get("humidity"),
+                        "ph_level": record.get("ph_level"),
+                        "o2_level": record.get("o2_level"),
+                        "co2_level": record.get("co2_level"),
+                        "agitation": record.get("agitation"),
+                    }
+                )
 
             csv_text = buffer.getvalue()
         except Exception as exc:
@@ -357,7 +381,7 @@ class QualityService:
                 "CSV export generation failed for patient %s: %s",
                 patient_id,
                 exc,
-                exc_info=True
+                exc_info=True,
             )
             raise QualityCsvExportException(detail=str(exc)) from exc
         finally:
@@ -367,7 +391,9 @@ class QualityService:
         for record in filtered_records:
             record.pop("_parsed_timestamp", None)
 
-        filename = f"{patient_id}_quality_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+        filename = (
+            f"{patient_id}_quality_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}UTC.csv"
+        )
         response = Response(content=csv_content, media_type="text/csv")
         response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
         for header, value in COMMON_API_HEADERS.items():
@@ -378,7 +404,7 @@ class QualityService:
     def check_redis_health(self) -> Dict[str, str]:
         """
         Check Redis connection health
-        
+
         Returns:
             Dictionary with status and connection info
         """
@@ -389,55 +415,59 @@ class QualityService:
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")
             return {"status": "unhealthy", "redis": "disconnected", "error": str(e)}
-    
-    def get_connections_for_pharma(self, pharma_id: int, connections_info: Dict, manager: 'ConnectionManager') -> Dict:
+
+    def get_connections_for_pharma(
+        self, pharma_id: int, connections_info: Dict, manager: "ConnectionManager"
+    ) -> Dict:
         """
         Filter WebSocket connections for a specific pharma
-        
+
         Args:
             pharma_id: The pharma ID to filter connections
             connections_info: Raw connections info from ConnectionManager
             manager: ConnectionManager instance to access active connections
-            
+
         Returns:
             Filtered connections info
         """
         try:
             filtered_connections = [
-                conn for conn in connections_info["connections"]
-                if manager.active_connections.get(conn["id"], {}).get("pharma_id") == pharma_id
+                conn
+                for conn in connections_info["connections"]
+                if manager.active_connections.get(conn["id"], {}).get("pharma_id")
+                == pharma_id
             ]
-            
+
             return {
                 "count": len(filtered_connections),
-                "connections": filtered_connections
+                "connections": filtered_connections,
             }
         except Exception as e:
             logger.error(f"Error filtering connections: {e}")
             raise QualityServiceException("get_connections_for_pharma", str(e))
-    
+
     def get_patient_redis_history(self, patient_id: str, limit: int = 12) -> List[dict]:
         """
         Get last N messages for a patient from Redis
-        
+
         Args:
             patient_id: Patient ID to get history for
             limit: Number of messages to retrieve (default: 12)
-        
+
         Returns:
             List of quality data dictionaries, oldest first (ascending order)
         """
         try:
             redis_client = get_redis()
             history_key = f"quality_history:{patient_id}"
-            
+
             # Get last N messages (0 to limit-1, since lrange is inclusive)
             # Redis lpush stores newest at index 0, so this gets newest first
             raw_history = redis_client.lrange(history_key, 0, limit - 1)
-            
+
             if not raw_history:
                 return []
-            
+
             # Parse JSON strings and return as list of dicts
             history = []
             for raw_data in raw_history:
@@ -445,82 +475,114 @@ class QualityService:
                     data = json.loads(raw_data)
                     history.append(data)
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse Redis message for patient {patient_id}: {e}")
+                    logger.warning(
+                        f"Failed to parse Redis message for patient {patient_id}: {e}"
+                    )
                     continue
-            
+
             # Reverse to get ascending order (oldest first)
             history.reverse()
-            
+
             return history
         except Exception as e:
-            logger.error(f"Error retrieving Redis history for patient {patient_id}: {e}")
+            logger.error(
+                f"Error retrieving Redis history for patient {patient_id}: {e}"
+            )
             return []
-    
-    def get_patient_geolocation_history(self, patient_id: str, limit: int = 100) -> List[dict]:
+
+    def get_patient_geolocation_history(
+        self, patient_id: str, limit: int = 100
+    ) -> List[dict]:
         """
         Get geolocation records for a patient from database
-        
+
         Args:
             patient_id: Patient ID to get geolocation history for
             limit: Maximum number of records to retrieve (default: 100)
-        
+
         Returns:
             List of geolocation dictionaries, oldest first (ascending order)
         """
         try:
             # Query geolocation records for the patient, ordered by id
-            geolocation_records = self.db.query(Geolocation).filter(
-                Geolocation.patient_id == patient_id
-            ).order_by(
-                Geolocation.id.asc()
-            ).limit(limit).all()
-            
+            geolocation_records = (
+                self.db.query(Geolocation)
+                .filter(Geolocation.patient_id == patient_id)
+                .order_by(Geolocation.id.asc())
+                .limit(limit)
+                .all()
+            )
+
             # Convert to dictionary format
             geolocation_data = []
             for record in geolocation_records:
-                geolocation_data.append({
-                    "type": "geolocation",
-                    "id": record.id,
-                    "shipment_id": record.shipment_id,
-                    "patient_id": record.patient_id,
-                    "telemetry_data_id": record.telemetry_data_id,
-                    "current_latitude": round(record.current_latitude, 2) if record.current_latitude is not None else None,
-                    "current_longitude": round(record.current_longitude, 2) if record.current_longitude is not None else None,
-                    "shipment_from_latitude": round(record.shipment_from_latitude, 2) if record.shipment_from_latitude is not None else None,
-                    "shipment_from_longitude": round(record.shipment_from_longitude, 2) if record.shipment_from_longitude is not None else None,
-                    "shipment_to_latitude": round(record.shipment_to_latitude, 2) if record.shipment_to_latitude is not None else None,
-                    "shipment_to_longitude": round(record.shipment_to_longitude, 2) if record.shipment_to_longitude is not None else None,
-                    "reading_timestamp": record.reading_timestamp.isoformat() if record.reading_timestamp else None,
-                    "created_at": record.created_at.isoformat() if record.created_at else None,
-                })
-            
+                geolocation_data.append(
+                    {
+                        "type": "geolocation",
+                        "id": record.id,
+                        "shipment_id": record.shipment_id,
+                        "patient_id": record.patient_id,
+                        "telemetry_data_id": record.telemetry_data_id,
+                        "current_latitude": round(record.current_latitude, 2)
+                        if record.current_latitude is not None
+                        else None,
+                        "current_longitude": round(record.current_longitude, 2)
+                        if record.current_longitude is not None
+                        else None,
+                        "shipment_from_latitude": round(
+                            record.shipment_from_latitude, 2
+                        )
+                        if record.shipment_from_latitude is not None
+                        else None,
+                        "shipment_from_longitude": round(
+                            record.shipment_from_longitude, 2
+                        )
+                        if record.shipment_from_longitude is not None
+                        else None,
+                        "shipment_to_latitude": round(record.shipment_to_latitude, 2)
+                        if record.shipment_to_latitude is not None
+                        else None,
+                        "shipment_to_longitude": round(record.shipment_to_longitude, 2)
+                        if record.shipment_to_longitude is not None
+                        else None,
+                        "reading_timestamp": record.reading_timestamp.isoformat()
+                        if record.reading_timestamp
+                        else None,
+                        "created_at": record.created_at.isoformat()
+                        if record.created_at
+                        else None,
+                    }
+                )
+
             return geolocation_data
         except Exception as e:
-            logger.error(f"Error retrieving geolocation history for patient {patient_id}: {e}")
+            logger.error(
+                f"Error retrieving geolocation history for patient {patient_id}: {e}"
+            )
             return []
-    
+
     def get_tank_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
         """
         Get last N messages for an IVF tank from Redis
-        
+
         Args:
             tank_id: Tank ID to get history for
             limit: Number of messages to retrieve (default: 12)
-        
+
         Returns:
             List of quality data dictionaries, oldest first (ascending order)
         """
         try:
             redis_client = get_redis()
             history_key = f"ivf_quality_history:{tank_id}"
-            
+
             # Get last N messages (0 to limit-1, since lrange is inclusive)
             # Redis lpush stores newest at index 0, so this gets newest first
             raw_history = redis_client.lrange(history_key, 0, limit - 1)
-            
+
             if not raw_history:
                 return []
-            
+
             # Parse JSON strings and return as list of dicts
             history = []
             for raw_data in raw_history:
@@ -528,12 +590,14 @@ class QualityService:
                     data = json.loads(raw_data)
                     history.append(data)
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse Redis message for tank {tank_id}: {e}")
+                    logger.warning(
+                        f"Failed to parse Redis message for tank {tank_id}: {e}"
+                    )
                     continue
-            
+
             # Reverse to get ascending order (oldest first)
             history.reverse()
-            
+
             return history
         except Exception as e:
             logger.error(f"Error retrieving Redis history for tank {tank_id}: {e}")
@@ -544,6 +608,7 @@ class QualityService:
         Get KPI limits config for a tank from kpi_config table (nested kpi_limits for frontend).
         Only includes non-null, non-empty values (no unnecessary null data).
         """
+
         def _omit_none(d: dict) -> dict:
             return {k: v for k, v in d.items() if v is not None and v != ""}
 
@@ -551,7 +616,11 @@ class QualityService:
             tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
             branch = None
             if tank and tank.branch_id is not None:
-                branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+                branch = (
+                    self.db.query(HospitalBranch)
+                    .filter(HospitalBranch.branch_id == tank.branch_id)
+                    .first()
+                )
 
             rows = (
                 self.db.query(KpiConfig)
@@ -565,19 +634,23 @@ class QualityService:
                     kpi_limits[name] = {}
                 if r.alert_name is None:
                     # Value config: only include unit if non-empty; min/max only if set
-                    val = _omit_none({
-                        "unit": (r.unit or "").strip() or None,
-                        "min": float(r.min) if r.min is not None else None,
-                        "max": float(r.max) if r.max is not None else None,
-                    })
+                    val = _omit_none(
+                        {
+                            "unit": (r.unit or "").strip() or None,
+                            "min": float(r.min) if r.min is not None else None,
+                            "max": float(r.max) if r.max is not None else None,
+                        }
+                    )
                     kpi_limits[name].update(val)
                 else:
                     # Bands: only include min, max, alert_type when set
-                    band = _omit_none({
-                        "min": float(r.min) if r.min is not None else None,
-                        "max": float(r.max) if r.max is not None else None,
-                        "alert_type": (r.alert_type or "").strip() or None,
-                    })
+                    band = _omit_none(
+                        {
+                            "min": float(r.min) if r.min is not None else None,
+                            "max": float(r.max) if r.max is not None else None,
+                            "alert_type": (r.alert_type or "").strip() or None,
+                        }
+                    )
                     kpi_limits[name][r.alert_name] = band
             return {
                 "tank_id": tank_id,
@@ -588,6 +661,7 @@ class QualityService:
             }
         except Exception as e:
             logger.error(f"Error retrieving KPI config for tank {tank_id}: {e}")
+            self.db.rollback()
             return {
                 "tank_id": tank_id,
                 "tank_code": tank_code,
@@ -620,12 +694,16 @@ class QualityService:
                     "max": float(r.max) if r.max is not None else None,
                     "unit": r.unit,
                     "alert_type": r.alert_type,
+                    "cooldown_minutes": int(r.cooldown_minutes)
+                    if r.cooldown_minutes is not None
+                    else 60,
                     "status": bool(r.status),
                 }
                 for r in rows
             ]
         except Exception as e:
             logger.error(f"Error listing KPI config for tank {tank_id}: {e}")
+            self.db.rollback()
             return []
 
     def create_kpi_config(
@@ -639,6 +717,7 @@ class QualityService:
         max_val: Optional[float] = None,
         unit: Optional[str] = None,
         alert_type: Optional[str] = None,
+        cooldown_minutes: Optional[int] = None,
         status: bool = True,
     ) -> KpiConfig:
         """Create a KpiConfig row. Validates tank belongs to branch."""
@@ -653,6 +732,7 @@ class QualityService:
             max=max_val,
             unit=unit.strip() if unit else None,
             alert_type=alert_type.strip() if alert_type else None,
+            cooldown_minutes=cooldown_minutes if cooldown_minutes is not None else 60,
             status=status,
         )
         self.db.add(row)
@@ -669,6 +749,7 @@ class QualityService:
         max_val: Optional[float] = None,
         unit: Optional[str] = None,
         alert_type: Optional[str] = None,
+        cooldown_minutes: Optional[int] = None,
         status: Optional[bool] = None,
     ) -> Optional[KpiConfig]:
         """Update a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
@@ -689,12 +770,16 @@ class QualityService:
             row.unit = unit.strip() if unit else None
         if alert_type is not None:
             row.alert_type = alert_type.strip() if alert_type else None
+        if cooldown_minutes is not None:
+            row.cooldown_minutes = cooldown_minutes
         if status is not None:
             row.status = status
         self.db.flush()
         return row
 
-    def delete_kpi_config(self, config_id: int, branch_id: Optional[int] = None) -> bool:
+    def delete_kpi_config(
+        self, config_id: int, branch_id: Optional[int] = None
+    ) -> bool:
         """Delete a KpiConfig row. Validates config's tank belongs to branch when branch_id provided."""
         row = self.db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
         if not row:
@@ -726,7 +811,11 @@ class QualityService:
             tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
             if not tank:
                 continue
-            branch = self.db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+            branch = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.branch_id == tank.branch_id)
+                .first()
+            )
             if not branch:
                 continue
             hospital_id = branch.hospital_id
@@ -756,6 +845,12 @@ class QualityService:
                 alert_type_val = cfg.get("alert_type")
                 if alert_type_val is not None and isinstance(alert_type_val, str):
                     alert_type_val = alert_type_val.strip() or None
+                cooldown_val = cfg.get("cooldown_minutes")
+                if cooldown_val is not None:
+                    try:
+                        cooldown_val = int(cooldown_val)
+                    except (TypeError, ValueError):
+                        cooldown_val = None
                 query = self.db.query(KpiConfig).filter(
                     KpiConfig.tank_id == tank_id,
                     KpiConfig.kpi_name == kpi_name,
@@ -771,6 +866,8 @@ class QualityService:
                     existing.alert_type = alert_type_val
                     if unit is not None:
                         existing.unit = unit
+                    if cooldown_val is not None:
+                        existing.cooldown_minutes = cooldown_val
                     self.db.flush()
                     updated += 1
                 else:
@@ -784,6 +881,9 @@ class QualityService:
                         max=max_val,
                         unit=unit,
                         alert_type=alert_type_val,
+                        cooldown_minutes=cooldown_val
+                        if cooldown_val is not None
+                        else 60,
                         status=True,
                     )
                     self.db.add(row)
@@ -796,26 +896,18 @@ class QualityService:
         row_number = (
             func.row_number()
             .over(
-                partition_by=Readings.kpi_config_id,
-                order_by=Readings.timestamp.desc()
+                partition_by=Readings.kpi_config_id, order_by=Readings.timestamp.desc()
             )
             .label("rn")
         )
 
         subquery = (
-            db.query(
-                Readings.id,
-                row_number
-            )
+            db.query(Readings.id, row_number)
             .filter(Readings.tank_id == tank_id)
             .subquery()
         )
 
-        valid_ids = (
-            db.query(subquery.c.id)
-            .filter(subquery.c.rn <= n)
-            .subquery()
-        )
+        valid_ids = db.query(subquery.c.id).filter(subquery.c.rn <= n).subquery()
 
         results = (
             db.query(
@@ -842,13 +934,19 @@ class QualityService:
         tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
 
         for row in results:
-            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
-            kpis[row.kpi_config_id].append({
-                "name": row.kpi_name,
-                "value": float(row.kpi_value),
-                "unit": row.unit or "",
-                "timestamp": ts,
-            })
+            ts = (
+                row.timestamp.isoformat()
+                if hasattr(row.timestamp, "isoformat")
+                else str(row.timestamp)
+            )
+            kpis[row.kpi_config_id].append(
+                {
+                    "name": row.kpi_name,
+                    "value": float(row.kpi_value),
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
 
         return {
             **tank_info,
@@ -882,13 +980,19 @@ class QualityService:
         kpis = []
         tank_info = {"tank_id": results[0].tank_id, "tank_code": results[0].tank_code}
         for row in results:
-            ts = row.timestamp.isoformat() if hasattr(row.timestamp, "isoformat") else str(row.timestamp)
-            kpis.append({
-                "name": row.kpi_name,
-                "value": float(row.kpi_value),
-                "unit": row.unit or "",
-                "timestamp": ts,
-            })
+            ts = (
+                row.timestamp.isoformat()
+                if hasattr(row.timestamp, "isoformat")
+                else str(row.timestamp)
+            )
+            kpis.append(
+                {
+                    "name": row.kpi_name,
+                    "value": float(row.kpi_value),
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
         return {**tank_info, "kpis": kpis}
 
     def get_tank_kpi_history_aggregated(
@@ -922,7 +1026,10 @@ class QualityService:
                 {"tank_id": tank_id, "since": since, "bucket_sec": bucket_seconds},
             ).fetchall()
         except Exception as e:
-            logger.error(f"Error in get_tank_kpi_history_aggregated: {e}", exc_info=True)
+            logger.error(
+                f"Error in get_tank_kpi_history_aggregated: {e}", exc_info=True
+            )
+            self.db.rollback()
             return None
         if not rows:
             return None
@@ -930,16 +1037,24 @@ class QualityService:
         tank_code = (tank.tank_code or f"T{tank_id}") if tank else f"T{tank_id}"
         kpis = []
         for row in rows:
-            ts = row.bucket_start.isoformat() if hasattr(row.bucket_start, "isoformat") else str(row.bucket_start)
-            kpis.append({
-                "name": row.kpi_name or "",
-                "value": float(row.avg_value) if row.avg_value is not None else 0,
-                "unit": row.unit or "",
-                "timestamp": ts,
-            })
+            ts = (
+                row.bucket_start.isoformat()
+                if hasattr(row.bucket_start, "isoformat")
+                else str(row.bucket_start)
+            )
+            kpis.append(
+                {
+                    "name": row.kpi_name or "",
+                    "value": float(row.avg_value) if row.avg_value is not None else 0,
+                    "unit": row.unit or "",
+                    "timestamp": ts,
+                }
+            )
         return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
 
-    def get_tank_kpi_history_from_readings(self, tank_id: int, tank_code: str, limit: int = 50) -> List[dict]:
+    def get_tank_kpi_history_from_readings(
+        self, tank_id: int, tank_code: str, limit: int = 50
+    ) -> List[dict]:
         """
         Get KPI readings history from readings table: group by timestamp, build kpis array.
         Includes readings for any kpi_config of this tank; one value per kpi_name per timestamp (first by config id).
@@ -947,7 +1062,12 @@ class QualityService:
         """
         try:
             rows = (
-                self.db.query(Readings.timestamp, Readings.kpi_value, KpiConfig.kpi_name, KpiConfig.unit)
+                self.db.query(
+                    Readings.timestamp,
+                    Readings.kpi_value,
+                    KpiConfig.kpi_name,
+                    KpiConfig.unit,
+                )
                 .join(KpiConfig, Readings.kpi_config_id == KpiConfig.id)
                 .filter(Readings.tank_id == tank_id)
                 .order_by(Readings.timestamp.asc(), KpiConfig.id.asc())
@@ -962,18 +1082,24 @@ class QualityService:
                     seen_per_ts[key] = set()
                 if kpi_name not in seen_per_ts[key]:
                     seen_per_ts[key].add(kpi_name)
-                    by_ts[key]["kpis"].append({
-                        "timestamp": key,
-                        "name": kpi_name,
-                        "value": float(value) if value is not None else 0,
-                        "unit": unit or "",
-                    })
+                    by_ts[key]["kpis"].append(
+                        {
+                            "timestamp": key,
+                            "name": kpi_name,
+                            "value": float(value) if value is not None else 0,
+                            "unit": unit or "",
+                        }
+                    )
             # Return with timestamp inside each kpi (no top-level timestamp)
-            out = [{"tank_id": tank_id, "tank_code": tank_code, "kpis": t["kpis"]} for t in by_ts.values()]
-            out.sort(key=lambda x: (x["kpis"][0]["timestamp"] if x.get("kpis") else ""))
+            out = [
+                {"tank_id": tank_id, "tank_code": tank_code, "kpis": t["kpis"]}
+                for t in by_ts.values()
+            ]
+            out.sort(key=lambda x: x["kpis"][0]["timestamp"] if x.get("kpis") else "")
             return out[-limit:] if limit else out
         except Exception as e:
             logger.error(f"Error retrieving readings history for tank {tank_id}: {e}")
+            self.db.rollback()
             return []
 
     def get_tank_kpi_history(self, tank_id: int, limit: int = 50) -> List[dict]:
@@ -1002,7 +1128,9 @@ class QualityService:
             out.reverse()
             return out
         except Exception as e:
-            logger.error(f"Error retrieving tank KPI Redis history for tank {tank_id}: {e}")
+            logger.error(
+                f"Error retrieving tank KPI Redis history for tank {tank_id}: {e}"
+            )
             return []
 
     def get_ln2_redis_history(self, tank_id: int, limit: int = 12) -> List[dict]:
@@ -1027,8 +1155,9 @@ class QualityService:
 
             # Fallback: check device_code based keys (written by old telemetry code)
             if not raw_history:
-                from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
                 from app.models.IVF.device_model import Device
+                from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+
                 device_rows = (
                     self.db.query(Device.device_code)
                     .join(Ln2IotDevice, Ln2IotDevice.device_id == Device.id)
@@ -1040,7 +1169,9 @@ class QualityService:
                     fallback_key = f"ln2_quality_history:{dev_code}"
                     raw_history = redis_client.lrange(fallback_key, 0, limit - 1)
                     if raw_history:
-                        logger.info(f"Found LN2 history under legacy key {fallback_key} for tank {tank_id}")
+                        logger.info(
+                            f"Found LN2 history under legacy key {fallback_key} for tank {tank_id}"
+                        )
                         break
 
             if not raw_history:
@@ -1051,7 +1182,9 @@ class QualityService:
                     data = json.loads(raw_data)
                     history.append(data)
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse LN2 Redis message for tank {tank_id}: {e}")
+                    logger.warning(
+                        f"Failed to parse LN2 Redis message for tank {tank_id}: {e}"
+                    )
                     continue
             history.reverse()
             return history
@@ -1059,7 +1192,9 @@ class QualityService:
             logger.error(f"Error retrieving LN2 Redis history for tank {tank_id}: {e}")
             return []
 
-    def get_tank_telemetry_history(self, tank_id: int, branch_id: Optional[int], limit: int = 12) -> List[dict]:
+    def get_tank_telemetry_history(
+        self, tank_id: int, branch_id: Optional[int], limit: int = 12
+    ) -> List[dict]:
         """
         Get last N telemetry records for an IVF tank from database.
 
@@ -1082,14 +1217,20 @@ class QualityService:
                 query = query.filter(Tank.branch_id == branch_id)
 
             telemetry_records = (
-                query.order_by(IVFTelemetryData.created_at.desc(), IVFTelemetryData.id.desc())
+                query.order_by(
+                    IVFTelemetryData.created_at.desc(), IVFTelemetryData.id.desc()
+                )
                 .limit(limit)
                 .all()
             )
 
             history: List[dict] = []
             for record in telemetry_records:
-                raw_payload = record.telemetry_data if isinstance(record.telemetry_data, dict) else {}
+                raw_payload = (
+                    record.telemetry_data
+                    if isinstance(record.telemetry_data, dict)
+                    else {}
+                )
                 payload = dict(raw_payload)
                 timestamp_value = (
                     payload.get("timestamp")
@@ -1099,7 +1240,9 @@ class QualityService:
                 payload.setdefault("type", "ivf_quality")
                 payload["tank_id"] = record.tank_id
                 payload["canister_id"] = record.tank_id
-                payload["tank_code"] = record.tank.tank_code if record.tank else payload.get("tank_code")
+                payload["tank_code"] = (
+                    record.tank.tank_code if record.tank else payload.get("tank_code")
+                )
                 payload["canister_number"] = (
                     payload.get("canister_number")
                     or payload.get("tank_code")
@@ -1109,7 +1252,9 @@ class QualityService:
                 payload["telemetry_data_id"] = record.id
                 payload["timestamp"] = timestamp_value
                 payload["created_at"] = (
-                    record.created_at.isoformat() if record.created_at else payload.get("created_at")
+                    record.created_at.isoformat()
+                    if record.created_at
+                    else payload.get("created_at")
                 )
                 history.append(payload)
 
@@ -1121,72 +1266,94 @@ class QualityService:
                 f"Error retrieving telemetry history for tank {tank_id}, branch {branch_id}: {e}"
             )
             return []
-    
-    def get_tank_geolocation_history(self, tank_id: int, limit: int = 100) -> List[dict]:
+
+    def get_tank_geolocation_history(
+        self, tank_id: int, limit: int = 100
+    ) -> List[dict]:
         """
         Get geolocation records for an IVF tank from database
-        
+
         Args:
             tank_id: Tank ID to get geolocation history for
             limit: Maximum number of records to retrieve (default: 100)
-        
+
         Returns:
             List of geolocation dictionaries, oldest first (ascending order)
         """
         try:
             # Query geolocation records for the tank, ordered by id
             # Note: IVFGeolocation.canister_id is actually tank_id
-            geolocation_records = self.db.query(IVFGeolocation).filter(
-                IVFGeolocation.canister_id == tank_id
-            ).order_by(
-                IVFGeolocation.id.asc()
-            ).limit(limit).all()
-            
+            geolocation_records = (
+                self.db.query(IVFGeolocation)
+                .filter(IVFGeolocation.canister_id == tank_id)
+                .order_by(IVFGeolocation.id.asc())
+                .limit(limit)
+                .all()
+            )
+
             # Convert to dictionary format
             geolocation_data = []
             for record in geolocation_records:
-                geolocation_data.append({
-                    "type": "ivf_geolocation",
-                    "id": record.id,
-                    "tank_id": record.canister_id,  # canister_id is actually tank_id
-                    "telemetry_data_id": record.ivf_telemetry_data_id,  # IVF model uses ivf_telemetry_data_id
-                    "current_latitude": round(record.current_latitude, 2) if record.current_latitude is not None else None,
-                    "current_longitude": round(record.current_longitude, 2) if record.current_longitude is not None else None,
-                    "reading_timestamp": record.reading_timestamp.isoformat() if record.reading_timestamp else None,
-                    "created_at": record.created_at.isoformat() if record.created_at else None,
-                })
-            
+                geolocation_data.append(
+                    {
+                        "type": "ivf_geolocation",
+                        "id": record.id,
+                        "tank_id": record.canister_id,  # canister_id is actually tank_id
+                        "telemetry_data_id": record.ivf_telemetry_data_id,  # IVF model uses ivf_telemetry_data_id
+                        "current_latitude": round(record.current_latitude, 2)
+                        if record.current_latitude is not None
+                        else None,
+                        "current_longitude": round(record.current_longitude, 2)
+                        if record.current_longitude is not None
+                        else None,
+                        "reading_timestamp": record.reading_timestamp.isoformat()
+                        if record.reading_timestamp
+                        else None,
+                        "created_at": record.created_at.isoformat()
+                        if record.created_at
+                        else None,
+                    }
+                )
+
             return geolocation_data
         except Exception as e:
-            logger.error(f"Error retrieving geolocation history for tank {tank_id}: {e}")
+            logger.error(
+                f"Error retrieving geolocation history for tank {tank_id}: {e}"
+            )
             return []
-    
-    def get_canister_redis_history(self, canister_id: int, limit: int = 12) -> List[dict]:
+
+    def get_canister_redis_history(
+        self, canister_id: int, limit: int = 12
+    ) -> List[dict]:
         """
         Deprecated: Use get_tank_redis_history instead. Kept for backward compatibility.
         Get last N messages for an IVF canister from Redis (canister_id is actually tank_id)
         """
         return self.get_tank_redis_history(canister_id, limit)
-    
-    def get_canister_geolocation_history(self, canister_id: int, limit: int = 100) -> List[dict]:
+
+    def get_canister_geolocation_history(
+        self, canister_id: int, limit: int = 100
+    ) -> List[dict]:
         """
         Deprecated: Use get_tank_geolocation_history instead. Kept for backward compatibility.
         Get geolocation records for an IVF canister from database (canister_id is actually tank_id)
         """
         return self.get_tank_geolocation_history(canister_id, limit)
-    
-    def validate_tank_belongs_to_branch(self, tank_id: int, branch_id: Optional[int]) -> bool:
+
+    def validate_tank_belongs_to_branch(
+        self, tank_id: int, branch_id: Optional[int]
+    ) -> bool:
         """
         Validate that a tank belongs to the user's branch.
         Admin users (branch_id is None) can access all tanks.
-        
+
         Args:
             tank_id: The tank ID to validate
             branch_id: The user's branch ID (None for Admin users)
-        
+
         Returns:
             True if tank belongs to branch (or user is Admin), False otherwise
-        
+
         Raises:
             Exception: If tank doesn't exist or validation fails
         """
@@ -1195,30 +1362,30 @@ class QualityService:
             tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
             if not tank:
                 raise Exception(f"Tank {tank_id} not found")
-            
+
             # Admin users (branch_id is None) can access all tanks
             if branch_id is None:
                 return True
-            
+
             # Validate branch match
             if tank.branch_id != branch_id:
                 raise Exception(f"Tank {tank_id} does not belong to your branch")
-            
+
             return True
         except Exception as e:
             logger.error(f"Error validating tank {tank_id} for branch {branch_id}: {e}")
             raise
-    
-    async def redis_listener(self, connection_manager: 'ConnectionManager'):
+
+    async def redis_listener(self, connection_manager: "ConnectionManager"):
         """
         Listen for messages from Redis and broadcast to WebSocket clients
-        
+
         Args:
             connection_manager: ConnectionManager instance to broadcast messages
         """
         loop = asyncio.get_event_loop()
         pubsub = None
-        
+
         while True:
             try:
                 # Try to get pubsub connection, retry if not available
@@ -1227,16 +1394,20 @@ class QualityService:
                         pubsub = get_pubsub()
                         logger.info("Redis listener started")
                     except Exception as e:
-                        logger.error(f"Error connecting to Redis: {e}. Retrying in 5 seconds...")
+                        logger.error(
+                            f"Error connecting to Redis: {e}. Retrying in 5 seconds..."
+                        )
                         await asyncio.sleep(5)
                         continue
-                
+
                 # Use run_in_executor to avoid blocking
                 message = await loop.run_in_executor(
                     None,
-                    lambda: pubsub.get_message(timeout=1.0, ignore_subscribe_messages=True)
+                    lambda: pubsub.get_message(
+                        timeout=1.0, ignore_subscribe_messages=True
+                    ),
                 )
-                
+
                 if message and message.get("type") == "message":
                     try:
                         data = json.loads(message["data"])
@@ -1250,27 +1421,31 @@ class QualityService:
                         logger.error(f"Failed to parse message: {e}")
                     except Exception as e:
                         logger.error(f"Error broadcasting message: {e}")
-                        
+
             except Exception as e:
                 logger.error(f"Error in redis_listener: {e}")
                 pubsub = None
                 reset_redis_connection()
                 await asyncio.sleep(5)
-    
-    async def log_connections_periodically(self, connection_manager: 'ConnectionManager'):
+
+    async def log_connections_periodically(
+        self, connection_manager: "ConnectionManager"
+    ):
         """
         Log WebSocket connections every 30 seconds
-        
+
         Args:
             connection_manager: ConnectionManager instance to get connection info
         """
         while True:
             await asyncio.sleep(30)
             connections_info = connection_manager.get_connections_info()
-            if connections_info['count'] > 0:
-                logger.info(f"Active WebSocket connections: {connections_info['count']}")
-                for conn in connections_info['connections']:
-                    patient = conn.get('patient_id', 'Not subscribed')
+            if connections_info["count"] > 0:
+                logger.info(
+                    f"Active WebSocket connections: {connections_info['count']}"
+                )
+                for conn in connections_info["connections"]:
+                    patient = conn.get("patient_id", "Not subscribed")
                     logger.debug(
                         f"Connection {conn['id'][:8]}... | "
                         f"Patient: {patient} | "
@@ -1278,7 +1453,9 @@ class QualityService:
                     )
 
 
-def push_ivf_quality_to_redis(tank_id: int, tank_code: str, data: dict, publish: bool = True) -> None:
+def push_ivf_quality_to_redis(
+    tank_id: int, tank_code: str, data: dict, publish: bool = True
+) -> None:
     """
     Push IVF quality data to Redis (history list + optionally publish for WebSocket).
     Used by seed, ln2_iot_raw_data ingestion, and quality controller fallback.
@@ -1319,18 +1496,24 @@ def append_tank_kpi_snapshot_to_db(
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
     if not tank:
         return
-    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    branch = (
+        db.query(HospitalBranch)
+        .filter(HospitalBranch.branch_id == tank.branch_id)
+        .first()
+    )
     hospital_id = branch.hospital_id if branch else None
     branch_id = tank.branch_id
     if hospital_id is None:
         return
     config_by_name = {
         c.kpi_name: c.id
-        for c in db.query(KpiConfig).filter(
+        for c in db.query(KpiConfig)
+        .filter(
             KpiConfig.tank_id == tank_id,
             KpiConfig.status == True,
             KpiConfig.alert_name.is_(None),
-        ).all()
+        )
+        .all()
     }
     for k in kpis:
         name = (k.get("name") or "").strip()
@@ -1357,13 +1540,25 @@ def append_tank_kpi_snapshot_to_db(
         )
         db.add(row)
     db.flush()
-    ts_iso = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
-    kpis_with_ts = [{"timestamp": ts_iso, "name": k.get("name"), "value": k.get("value"), "unit": k.get("unit", "")} for k in kpis]
+    ts_iso = (
+        timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+    )
+    kpis_with_ts = [
+        {
+            "timestamp": ts_iso,
+            "name": k.get("name"),
+            "value": k.get("value"),
+            "unit": k.get("unit", ""),
+        }
+        for k in kpis
+    ]
     payload = {"kpis": kpis_with_ts}
     push_tank_kpi_to_redis(tank_id, tank_code, payload, publish=True)
 
 
-def push_tank_kpi_to_redis(tank_id: int, tank_code: str, payload: dict, publish: bool = True) -> None:
+def push_tank_kpi_to_redis(
+    tank_id: int, tank_code: str, payload: dict, publish: bool = True
+) -> None:
     """
     Push tank KPI snapshot to Redis (history list + optionally publish for live Quality Tracking graph).
     payload must include: kpis (list of { timestamp, name, value, unit }) — timestamp is per KPI, not top-level.
