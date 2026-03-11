@@ -806,9 +806,36 @@ export default function AlertSetting() {
                 style={{ scrollbarWidth: 'thin' }}
               >
                 {containersLoading && (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-500 min-h-[280px]">
-                    <Loader2 className="animate-spin w-6 h-6 text-[#6b1176]" />
-                    <span className="text-xs">Loading...</span>
+                  <div className="flex-1 flex flex-col min-h-[280px] divide-y divide-gray-100">
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 items-center gap-2"
+                      >
+                        <div className="min-w-0 overflow-hidden space-y-2">
+                          <div className="relative overflow-hidden h-3.5 w-24 rounded-md bg-gray-200">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                            />
+                          </div>
+                          <div className="relative overflow-hidden h-3 w-20 rounded-md bg-gray-100">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08 + 0.05}s` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-center">
+                          <div className="relative overflow-hidden w-4 h-4 rounded border border-gray-200 bg-gray-100">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {!containersLoading && containersError && (

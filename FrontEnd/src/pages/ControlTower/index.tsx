@@ -487,9 +487,9 @@ const ControlTower = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_544px] gap-6 min-h-0 items-start">
+          <div className="flex-1 h-full grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
             {/* Left Panel - Filters and Routes */}
-            <div className="flex flex-col gap-6 min-w-0">
+            <div className="flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
               {/* Filters Section */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
                 <div className="flex flex-col gap-3">
@@ -743,7 +743,7 @@ const ControlTower = () => {
               </div>
 
               {/* Active Routes/Canisters List */}
-              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-shrink-0 flex flex-col overflow-hidden ${isIvfUser ? 'h-[544px]' : 'h-[460px]'}`}>
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-1 flex flex-col overflow-hidden min-h-80">
                 <h2 className="font-bold text-black text-base mb-2">
                 {isIvfUser ? 'Active Containers' : 'Active Routes'}
                 </h2>
@@ -759,7 +759,45 @@ const ControlTower = () => {
                   }}
                 >
                   {(loadingRoutes || loadingCanisters) && (
-                    <div className="p-4 text-xs text-gray-500">Loading...</div>
+                    <div className="flex flex-col divide-y divide-gray-100">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((i) => (
+                        <div
+                          key={i}
+                          className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 items-center gap-3"
+                        >
+                          <div className="min-w-0 overflow-hidden space-y-2">
+                            <div className="relative overflow-hidden h-3.5 w-24 rounded-md bg-gray-200">
+                              <div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                              />
+                            </div>
+                            <div className="relative overflow-hidden h-3 w-20 rounded-md bg-gray-100">
+                              <div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                style={{ width: '50%', animationDelay: `${i * 0.08 + 0.05}s` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-center">
+                            <div className="relative overflow-hidden h-5 w-12 rounded-full bg-gray-200">
+                              <div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-center">
+                            <div className="relative overflow-hidden h-3 w-16 rounded-md bg-gray-100">
+                              <div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {!loadingRoutes && !loadingCanisters && ((isCgtUser && routesError) || (isIvfUser && canistersError)) && (
                     <div className="p-4 text-xs text-red-600">{isIvfUser ? canistersError : routesError}</div>
@@ -912,7 +950,7 @@ const ControlTower = () => {
             </div>
 
             {/* Right Panel - Map Visualization */}
-            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2">
+            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
               <ControlTowerMap 
                 filters={{
                   selectedRegion,

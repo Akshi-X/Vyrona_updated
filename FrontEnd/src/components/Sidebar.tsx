@@ -84,8 +84,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     { icon: ControlTowerIconWhite, label: "Control Tower", path: "/control-tower" },
     { icon: MyTasksIcon, label: "Pending approvals", path: "/approval" },
     { icon: CriticalAlertsIcon, label: "Alert Configuration", path: "/alert-setting" },
-    // { icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
-    // { icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
+    { icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
+    { icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
   ];
 
   // Filter nav by role/department: Database hidden for IVF; Control Tower hidden for IVF User; Pending approvals only for Admin/Pharma_admin; Alert Setting only for IVF Manager/Admin

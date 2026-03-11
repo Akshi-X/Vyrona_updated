@@ -50,6 +50,7 @@ import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.sv
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
 import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 interface StakeholderChat {
   id: string;
@@ -1023,7 +1024,7 @@ export default function Dashboard({ }: DashboardProps) {
                               ? '--/--'
                               : ivfTotalsError
                                 ? '0/0'
-                                : `${ivfTotalEmbryos ?? 0}`}
+                                : <AnimatedNumber value={ivfTotalEmbryos ?? 0} />}
                           </div>
                         </div>
                       </div>
@@ -1042,7 +1043,7 @@ export default function Dashboard({ }: DashboardProps) {
                               ? '--'
                               : ivfContainersError
                                 ? '0'
-                                : `${ivfTotalContainers ?? 0}`}
+                                : <AnimatedNumber value={ivfTotalContainers ?? 0} />}
                           </div>
                         </div>
                       </div>
@@ -1067,7 +1068,7 @@ export default function Dashboard({ }: DashboardProps) {
                               ? '--'
                               : ivfQualityDeviationsError
                                 ? '0'
-                                : `${ivfQualityDeviations ?? 0}`}
+                                : <AnimatedNumber value={ivfQualityDeviations ?? 0} />}
                           </div>
                         </div>
                       </div>
@@ -1107,7 +1108,7 @@ export default function Dashboard({ }: DashboardProps) {
                             Total Shipments
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            0
+                            <AnimatedNumber value={0} />
                             {/* {loadingIvfOutboundShipments
                               ? '--'
                               : ivfOutboundShipmentsError
@@ -1127,7 +1128,8 @@ export default function Dashboard({ }: DashboardProps) {
                           Deviations
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            0{/* {loadingIvfTotalDeviations
+                            <AnimatedNumber value={0} />
+                            {/* {loadingIvfTotalDeviations
                               ? '--'
                               : ivfTotalDeviationsError
                                 ? '0'
@@ -1382,27 +1384,73 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section className="flex flex-1 ">
-                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 overflow-hidden w-full h-full">
+              <section className="flex flex-1 min-h-0">
+                <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 w-full h-full min-h-0">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
-                  <div className="px-4 py-8 text-center text-gray-500 text-xs">Loading embryo tracking...</div>
+                  <div className="w-full flex-1 flex flex-col min-h-0">
+                    <div className="mb-2">
+                      <div className="relative overflow-hidden h-4 w-32 rounded-md bg-gray-200">
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                          style={{ width: '50%' }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto min-h-80">
+                      <table className="min-w-max w-full">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="bg-[#FDF4FF]">
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">HIS # (PK)</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock #</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Canister #</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Tank ID</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cane ID</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Goblet Color</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock Color</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Date of Vitrification</th>
+                            <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Site Name</th>
+                          </tr>
+                        </thead>
+                        <tbody >
+                          {Array.from({ length: 6 }, (_, i) => (
+                            <tr key={i} className="border-b border-[#F3E0FF] bg-white">
+                              {[70, 75, 55, 60, 55, 65, 75, 95, 80].map((w, col) => (
+                                <td key={col} className="px-4 py-3">
+                                  <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                    <div
+                                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                      style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                                    />
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
                 ) : (
-                  <IVFOngoingTreatments
-                    treatments={ivfEmbryoTracking}
-                    hasMore={ivfEmbryoTrackingHasMore}
-                    isLoading={loadingIvfEmbryoTracking}
-                    isLoadingMore={loadingIvfEmbryoTrackingMore}
-                    onLoadMore={loadMoreIvfEmbryoTracking}
-                    filterOptions={ivfEmbryoTrackingFilterOptions}
-                    filterValues={ivfEmbryoTrackingFilterValues}
-                    onFilterChange={handleIvfEmbryoTrackingFilterChange}
-                    onClearFilters={handleIvfEmbryoTrackingClearFilters}
-                    filteredTotal={ivfEmbryoTrackingFilteredTotal}
-                    totalUnfiltered={ivfEmbryoTrackingTotalUnfiltered ?? ivfEmbryoTrackingFilterOptions.total}
-                  />
+                  <div className="w-full flex-1 flex flex-col min-h-0">
+                    <div className="flex-1 overflow-y-auto min-h-80">
+                      <IVFOngoingTreatments
+                      treatments={ivfEmbryoTracking}
+                      hasMore={ivfEmbryoTrackingHasMore}
+                      isLoading={loadingIvfEmbryoTracking}
+                      isLoadingMore={loadingIvfEmbryoTrackingMore}
+                      onLoadMore={loadMoreIvfEmbryoTracking}
+                      filterOptions={ivfEmbryoTrackingFilterOptions}
+                      filterValues={ivfEmbryoTrackingFilterValues}
+                      onFilterChange={handleIvfEmbryoTrackingFilterChange}
+                      onClearFilters={handleIvfEmbryoTrackingClearFilters}
+                      filteredTotal={ivfEmbryoTrackingFilteredTotal}
+                      totalUnfiltered={ivfEmbryoTrackingTotalUnfiltered ?? ivfEmbryoTrackingFilterOptions.total}
+                    />
+                    </div>
+                  </div>
                 )}
                 </div>
               </section>
@@ -1439,7 +1487,7 @@ export default function Dashboard({ }: DashboardProps) {
                           Patient Count:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : patientStats?.current_month_patient_count || '0'}
+                          {loading ? '...' : <AnimatedNumber value={patientStats?.current_month_patient_count ?? 0} />}
                         </div>
                       </div>
                     </div>
@@ -1458,7 +1506,7 @@ export default function Dashboard({ }: DashboardProps) {
                           Quality Deviation Flagged:
                         </div>
                         <div className="font-semibold text-black text-[28px] mt-1">
-                          {loading ? '...' : qualityDeviations?.total_deviations || '0'}
+                          {loading ? '...' : <AnimatedNumber value={qualityDeviations?.total_deviations ?? 0} />}
                         </div>
                       </div>
                     </div>

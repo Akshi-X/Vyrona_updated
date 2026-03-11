@@ -214,58 +214,9 @@ export function IVFOngoingTreatments({
           )}
         </div>
       )}
-      {/* <div className='bg-black  text-white h-[320px] overflow-y-auto flex  '>sda
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        sd
-        sd
-        sd
-        ssdasdsda
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        sd
-        sd
-        sd
-        ssdassda
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        sd
-        sd
-        sd
-        ssdassda
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        <br/>
-        sd
-        sd
-        sd
-        ssdas</div> */}
       <div
         ref={scrollContainerRef}
-        className="h-[320px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          className="h-full min-h-80 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
         <table className="min-w-max w-full">
             <thead className="sticky top-0 z-10">
@@ -358,11 +309,20 @@ export function IVFOngoingTreatments({
             {(() => {
               if (isLoading) {
                 return (
-                  <tr className="bg-white">
-                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-xs">
-                      Loading...
-                    </td>
-                  </tr>
+                  Array.from({ length: 6 }, (_, i) => (
+                    <tr key={i} className="border-b border-[#F3E0FF] bg-white">
+                      {[70, 75, 55, 60, 55, 65, 75, 95, 80].map((w, col) => (
+                        <td key={col} className="px-4 py-3">
+                          <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                              style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                            />
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))
                 );
               }
               if (treatments.length === 0) {
