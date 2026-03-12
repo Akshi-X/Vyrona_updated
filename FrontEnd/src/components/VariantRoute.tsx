@@ -21,8 +21,8 @@
  *
  * PERFORMANCE:
  * - Variant components are lazy-loaded only when needed
- * - Default component is shown immediately while loading
- * - Failed loads don't block the UI
+ * - Loader is shown until variant is ready (no default flash)
+ * - Failed loads fall back to default silently
  */
 
 import React, { Suspense, useState, useEffect } from 'react';
@@ -38,16 +38,14 @@ interface VariantRouteProps {
   fallback?: React.ReactNode;
   /** Props to pass to the variant component */
   componentProps?: Record<string, unknown>;
-  /** Whether to show default immediately while loading (better UX, possible flash) */
-  showDefaultWhileLoading?: boolean;
 }
 
 /**
- * Default loading fallback component
+ * Default loading fallback component (matches FullPageLoader spinner style)
  */
 const DefaultLoadingFallback: React.FC = () => (
   <div className="flex items-center justify-center h-full min-h-[200px]">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6b1176]" aria-hidden="true" />
   </div>
 );
 
@@ -63,11 +61,9 @@ export const VariantRoute: React.FC<VariantRouteProps> = ({
   defaultComponent,
   fallback,
   componentProps = {},
-  showDefaultWhileLoading = false,
 }) => {
   const { getVariantKey, isLoading: isContextLoading } = useUIVariants();
   const [VariantComponent, setVariantComponent] = useState<React.ComponentType<Record<string, unknown>> | null>(null);
-  const [isLoadingComponent, setIsLoadingComponent] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   // Get the variant key for this route
@@ -99,8 +95,6 @@ export const VariantRoute: React.FC<VariantRouteProps> = ({
         return;
       }
 
-      setIsLoadingComponent(true);
-
       try {
         const loader = getVariantLoader(variantKey);
         if (loader && isMounted) {
@@ -120,10 +114,6 @@ export const VariantRoute: React.FC<VariantRouteProps> = ({
         if (isMounted) {
           setLoadError(true);
         }
-      } finally {
-        if (isMounted) {
-          setIsLoadingComponent(false);
-        }
       }
     };
 
@@ -138,9 +128,6 @@ export const VariantRoute: React.FC<VariantRouteProps> = ({
 
   // If context is still loading variants from server
   if (isContextLoading) {
-    if (showDefaultWhileLoading) {
-      return <>{defaultComponent}</>;
-    }
     return <>{fallback || <DefaultLoadingFallback />}</>;
   }
 
@@ -149,30 +136,22 @@ export const VariantRoute: React.FC<VariantRouteProps> = ({
     return <>{defaultComponent}</>;
   }
 
-  // If component is loading
-  if (isLoadingComponent) {
-    if (showDefaultWhileLoading) {
-      return <>{defaultComponent}</>;
-    }
-    return <>{fallback || <DefaultLoadingFallback />}</>;
-  }
-
   // If there was a load error, fall back to default
   if (loadError) {
     return <>{defaultComponent}</>;
   }
 
-  // If variant component is loaded, render it with Suspense for any nested lazy loads
-  if (VariantComponent) {
-    return (
-      <Suspense fallback={fallback || <DefaultLoadingFallback />}>
-        <VariantComponent {...componentProps} />
-      </Suspense>
-    );
+  // Variant key exists but component not ready yet (first paint or chunk still loading) — show loader only to avoid default flash
+  if (!VariantComponent) {
+    return <>{fallback || <DefaultLoadingFallback />}</>;
   }
 
-  // Fallback to default (shouldn't normally reach here)
-  return <>{defaultComponent}</>;
+  // Variant component is loaded; render with Suspense for any nested lazy loads
+  return (
+    <Suspense fallback={fallback || <DefaultLoadingFallback />}>
+      <VariantComponent {...componentProps} />
+    </Suspense>
+  );
 };
 
 /**

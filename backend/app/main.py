@@ -29,6 +29,7 @@ from app.controller import (
     quality_controller,
     shipment_controller,
     task_controller,
+    ui_variant_controller,
     user_controller,
 )
 from app.controller.IVF import (
@@ -230,6 +231,7 @@ app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
+app.include_router(ui_variant_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint
