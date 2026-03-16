@@ -11,6 +11,7 @@ import { Sidebar } from "../../components/Sidebar";
 import {
     ivfService,
     type IvfBranch,
+    type HospitalNotificationSettings,
     type KpiConfigRow,
     type KpiConfigPayload,
 } from "../../services/ivfService";
@@ -31,7 +32,9 @@ import {
     ChevronDown,
     Loader2,
     Clock,
+    Settings,
 } from "lucide-react";
+import { Switch } from "../../components/ui/switch";
 
 interface ContainerRow {
     tank_id: number;
@@ -317,6 +320,18 @@ export default function AlertSetting() {
         null,
     );
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [showNotifySettings, setShowNotifySettings] = useState(false);
+    const [notifySettingsLoading, setNotifySettingsLoading] = useState(false);
+    const [notifySettingsSaving, setNotifySettingsSaving] = useState(false);
+    const [notifySettingsError, setNotifySettingsError] = useState<string | null>(
+        null,
+    );
+    const [notifySettings, setNotifySettings] =
+        useState<HospitalNotificationSettings>({
+            hospital_id: 0,
+            is_email_notifify: true,
+            is_whatsapp_notify: false,
+        });
 
     /** Inline edit draft for KPI table: min, max, alert_type, lid_state per config id */
     const [draftConfig, setDraftConfig] = useState<
@@ -944,6 +959,56 @@ export default function AlertSetting() {
         }
     };
 
+    const openNotifySettings = async () => {
+        setShowNotifySettings(true);
+        setNotifySettingsError(null);
+        setNotifySettingsLoading(true);
+        try {
+            const res = await ivfService.getHospitalNotificationSettings();
+            setNotifySettings(res);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to load notification settings",
+            );
+        } finally {
+            setNotifySettingsLoading(false);
+        }
+    };
+
+    const handleSelectNotificationChannel = (channel: "email" | "whatsapp") => {
+        setNotifySettings((prev) => ({
+            ...prev,
+            is_email_notifify: channel === "email",
+            is_whatsapp_notify: channel === "whatsapp",
+        }));
+        setNotifySettingsError(null);
+    };
+
+    const handleSaveNotifySettings = async () => {
+        if (notifySettings.is_email_notifify === notifySettings.is_whatsapp_notify) {
+            setNotifySettingsError(
+                "Exactly one notification channel must be enabled",
+            );
+            return;
+        }
+        setNotifySettingsSaving(true);
+        setNotifySettingsError(null);
+        try {
+            const res = await ivfService.updateHospitalNotificationSettings({
+                is_email_notifify: notifySettings.is_email_notifify,
+                is_whatsapp_notify: notifySettings.is_whatsapp_notify,
+            });
+            setNotifySettings(res);
+            setShowNotifySettings(false);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to save notification settings",
+            );
+        } finally {
+            setNotifySettingsSaving(false);
+        }
+    };
+
     const isMultiMode =
         selectedContainers.length > 1 || configList.length === 0;
     const hasPendingChanges = isMultiMode
@@ -956,9 +1021,20 @@ export default function AlertSetting() {
             <Sidebar onLogout={handleLogout} />
             <main className="flex-1 flex flex-col overflow-hidden ml-60 min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
-                    <h1 className="font-semibold text-black text-2xl">
-                        Alert Configuration
-                    </h1>
+                    <div className="flex items-center justify-between">
+                        <h1 className="font-semibold text-black text-2xl">
+                            Alert Configuration
+                        </h1>
+                        <button
+                            type="button"
+                            onClick={openNotifySettings}
+                            className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                            aria-label="Notification settings"
+                            title="Notification settings"
+                        >
+                            <Settings size={18} strokeWidth={2} />
+                        </button>
+                    </div>
                     <div className="flex gap-6 flex-1 min-h-0">
                         {/* Left: filters + containers (Control Tower UI) */}
                         <div className="w-[380px] shrink-0 flex flex-col gap-6">
@@ -3604,6 +3680,125 @@ export default function AlertSetting() {
                                       : "Create"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Notification settings modal */}
+            {showNotifySettings && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    onClick={() => {
+                        if (!notifySettingsSaving) {
+                            setShowNotifySettings(false);
+                            setNotifySettingsError(null);
+                        }
+                    }}
+                >
+                    <div
+                        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-lg text-black">
+                                Notification Settings
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!notifySettingsSaving) {
+                                        setShowNotifySettings(false);
+                                        setNotifySettingsError(null);
+                                    }
+                                }}
+                                className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                                aria-label="Close notification settings"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-4">
+                            Choose exactly one channel for alert notifications.
+                        </p>
+
+                        {notifySettingsLoading ? (
+                            <div className="py-8 flex items-center justify-center text-gray-500 text-sm">
+                                Loading settings...
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {/* Email row */}
+                                <div className="flex items-center justify-between py-2">
+                                    <label
+                                        htmlFor="notify-email"
+                                        className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                    >
+                                        Email Notification
+                                    </label>
+                                    <Switch
+                                        id="notify-email"
+                                        checked={notifySettings.is_email_notifify}
+                                        onCheckedChange={() =>
+                                            handleSelectNotificationChannel("email")
+                                        }
+                                        disabled={notifySettingsSaving}
+                                    />
+                                </div>
+
+                                <div className="border-t border-gray-100" />
+
+                                {/* WhatsApp row */}
+                                <div className="flex items-center justify-between py-2">
+                                    <label
+                                        htmlFor="notify-whatsapp"
+                                        className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                    >
+                                        WhatsApp Notification
+                                    </label>
+                                    <Switch
+                                        id="notify-whatsapp"
+                                        checked={notifySettings.is_whatsapp_notify}
+                                        onCheckedChange={() =>
+                                            handleSelectNotificationChannel("whatsapp")
+                                        }
+                                        disabled={notifySettingsSaving}
+                                    />
+                                </div>
+
+                                {notifySettingsError && (
+                                    <p className="text-sm text-red-600">
+                                        {notifySettingsError}
+                                    </p>
+                                )}
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!notifySettingsSaving) {
+                                                setShowNotifySettings(false);
+                                                setNotifySettingsError(null);
+                                            }
+                                        }}
+                                        disabled={notifySettingsSaving}
+                                        className="px-4 py-2 border border-[#E7E1E1] rounded text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveNotifySettings}
+                                        disabled={notifySettingsSaving}
+                                        className="px-4 py-2 bg-[#6b1176] text-white rounded text-sm hover:bg-[#8a2a95] disabled:opacity-50"
+                                    >
+                                        {notifySettingsSaving
+                                            ? "Saving..."
+                                            : "Save"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

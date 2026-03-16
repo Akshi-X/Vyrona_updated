@@ -11,6 +11,7 @@ export interface UserProfileDto {
   last_name: string;
   email: string;
   role: string;
+  phone_number?: string | null;
   company_name: string | null;
   pharma_id?: number | null;
   hospital_id?: number | null;
@@ -86,8 +87,8 @@ export class UserService extends BaseApiService {
   /**
    * Update user profile (first name and last name)
    */
-  async updateProfile(userId: string, data: { first_name: string; last_name: string }): Promise<{ message: string; user_id: string; first_name: string; last_name: string; updated_at: string }> {
-    return await this.request<{ message: string; user_id: string; first_name: string; last_name: string; updated_at: string }>(`/api/user/${encodeURIComponent(userId)}`, {
+  async updateProfile(userId: string, data: { first_name: string; last_name: string; phone_number?: string | null }): Promise<{ message: string; user_id: string; first_name: string; last_name: string; phone_number?: string | null; updated_at: string }> {
+    return await this.request<{ message: string; user_id: string; first_name: string; last_name: string; phone_number?: string | null; updated_at: string }>(`/api/user/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
