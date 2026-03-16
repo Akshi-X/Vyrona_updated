@@ -18,6 +18,7 @@ interface Ticket {
 const NAME_MAX = 80;
 const FIRST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for first name
 const LAST_NAME_REGEX = /^[A-Za-z ,.'-]{1,80}$/; // allows letters, spaces, common punctuation for last name
+const PHONE_REGEX = /^[+]?[\d\s\-().]{7,20}$/;
  
 const UserProfilePage: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -25,6 +26,8 @@ const UserProfilePage: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [firstNameError, setFirstNameError] = useState<string | null>(null);
   const [lastNameError, setLastNameError] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumberError, setPhoneNumberError] = useState<string | null>(null);
   const [workEmail, setWorkEmail] = useState("");
   const [role, setRole] = useState("");
   const [userId, setUserId] = useState<string>("");
@@ -127,6 +130,7 @@ const UserProfilePage: React.FC = () => {
         setWorkEmail(profile.email || '');
         setRole(profile.role || '');
         setUserId(profile.user_id || '');
+        setPhoneNumber(profile.phone_number || '');
       } catch (error) {
         if (!isMounted) return;
         setFirstName('');
@@ -217,6 +221,12 @@ const UserProfilePage: React.FC = () => {
     if (!LAST_NAME_REGEX.test(trimmed)) return 'Enter a valid last name (letters, spaces, , . \' - allowed)';
     return null;
   };
+
+  const validatePhoneNumber = (phone: string) => {
+    if (!phone || !phone.trim()) return null; // optional
+    if (!PHONE_REGEX.test(phone.trim())) return 'Enter a valid phone number (digits, spaces, + - () allowed)';
+    return null;
+  };
  
   const handleEditProfile = () => {
     setIsEditingProfile(true);
@@ -225,15 +235,13 @@ const UserProfilePage: React.FC = () => {
   const handleSaveProfile = async () => {
     const firstNameErr = validateFirstName(firstName);
     const lastNameErr = validateLastName(lastName);
+    const phoneErr = validatePhoneNumber(phoneNumber);
    
-    if (firstNameErr) {
-      setFirstNameError(firstNameErr);
-    }
-    if (lastNameErr) {
-      setLastNameError(lastNameErr);
-    }
+    if (firstNameErr) setFirstNameError(firstNameErr);
+    if (lastNameErr) setLastNameError(lastNameErr);
+    if (phoneErr) setPhoneNumberError(phoneErr);
    
-    if (firstNameErr || lastNameErr) {
+    if (firstNameErr || lastNameErr || phoneErr) {
       return;
     }
    
@@ -246,11 +254,13 @@ const UserProfilePage: React.FC = () => {
     setSaveError(null);
     setFirstNameError(null);
     setLastNameError(null);
+    setPhoneNumberError(null);
    
     try {
       await userService.updateProfile(userId, {
         first_name: firstName,
-        last_name: lastName
+        last_name: lastName,
+        phone_number: phoneNumber.trim() || null,
       });
      
       // Success - exit edit mode
@@ -270,6 +280,7 @@ const UserProfilePage: React.FC = () => {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setWorkEmail(profile.email || '');
+      setPhoneNumber(profile.phone_number || '');
     } catch (error) {
       // Keep current values if API fails
     }
@@ -487,6 +498,35 @@ const UserProfilePage: React.FC = () => {
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700">
                 {role || 'User'}
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-black mb-2">
+                Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPhoneNumber(value);
+                  if (phoneNumberError) setPhoneNumberError(null);
+                  if (value.trim()) {
+                    const err = validatePhoneNumber(value);
+                    if (err) setPhoneNumberError(err);
+                  }
+                }}
+                maxLength={20}
+                disabled={!isEditingProfile}
+                placeholder="e.g. +91 98765 43210"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  isEditingProfile
+                    ? phoneNumberError
+                      ? 'border-red-500 bg-white text-gray-900 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 bg-white text-gray-900 focus:ring-[#8b2a96]'
+                    : 'border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed'
+                }`}
+              />
+              {phoneNumberError && (<p className="mt-1 text-xs text-red-600">{phoneNumberError}</p>)}
             </div>
           </div>
          

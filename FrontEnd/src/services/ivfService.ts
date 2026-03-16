@@ -131,6 +131,12 @@ export interface KpiConfigPayload {
     status?: boolean;
 }
 
+export interface HospitalNotificationSettings {
+    hospital_id: number;
+    is_email_notifify: boolean;
+    is_whatsapp_notify: boolean;
+}
+
 export interface DeviationsGraphDataItem {
     site_id?: number;
     site_name?: string;
@@ -433,6 +439,23 @@ export class IvfService extends BaseApiService {
             `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
             { method: "GET" },
         );
+    }
+
+    async getHospitalNotificationSettings(): Promise<HospitalNotificationSettings> {
+        return await this.request("/api/ivf/quality/hospital-notification-settings", {
+            method: "GET",
+        });
+    }
+
+    async updateHospitalNotificationSettings(payload: {
+        is_email_notifify: boolean;
+        is_whatsapp_notify: boolean;
+    }): Promise<HospitalNotificationSettings> {
+        return await this.request("/api/ivf/quality/hospital-notification-settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
     }
 
     async createKpiConfig(payload: KpiConfigPayload): Promise<KpiConfigRow> {
