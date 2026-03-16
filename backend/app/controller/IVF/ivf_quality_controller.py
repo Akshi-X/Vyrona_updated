@@ -274,47 +274,6 @@ def get_tank_kpi_history(
         latest_readings_raw = None
         aggregated_order_asc = False
 
-    # Build latest reading map per KPI name
-    if latest_readings_raw is not None:
-        latest_readings = latest_readings_raw
-    else:
-        latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
-    latest_by_name = {}
-    # Raw desc: first per name is latest. Aggregated asc: last per name is latest. Overwrite so last wins.
-    for item in latest_readings.get("kpis") or []:
-        name = (item.get("name") or "").strip()
-        if not name:
-            continue
-        latest_by_name[name] = {
-            "value": item.get("value"),
-            "timestamp": item.get("timestamp"),
-            "unit": item.get("unit") or "",
-        }
-
-    # Build kpi_config from configured KPI rows (value rows only: alert_name is null)
-    # and attach latest reading fields for each configured KPI.
-    raw_config_rows = quality_service.list_kpi_config_by_tank(tank_id)
-    seen_names = set()
-    kpi_config = []
-    for row in raw_config_rows:
-        if not row.get("status"):
-            continue
-        if row.get("alert_name") is not None:
-            continue
-        name = (row.get("kpi_name") or "").strip()
-        if not name or name in seen_names:
-            continue
-        seen_names.add(name)
-        latest = latest_by_name.get(name, {})
-        kpi_config.append(
-            {
-                "name": name,
-                "unit": row.get("unit") or latest.get("unit") or "",
-                "latest_value": latest.get("value"),
-                "latest_timestamp": latest.get("timestamp"),
-            }
-        )
-
     # KPI-wise grouped series for easier per-KPI graph rendering
     # Built from DB helper that returns last N readings per KPI config.
     kpi_series = {}
@@ -337,23 +296,9 @@ def get_tank_kpi_history(
         for name in list(kpi_series.keys()):
             kpi_series[name].reverse()
 
-    # Fallback when no value-rows exist in kpi_config table: derive tabs from kpi_series keys.
-    if not kpi_config:
-        for name, points in kpi_series.items():
-            latest = points[-1] if points else {}
-            kpi_config.append(
-                {
-                    "name": name,
-                    "unit": latest.get("unit") or "",
-                    "latest_value": latest.get("value"),
-                    "latest_timestamp": latest.get("timestamp"),
-                }
-            )
-
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",
         "tank_id": tank_id,
-        "kpi_config": kpi_config,
         "kpi_series": kpi_series,
     }
 
