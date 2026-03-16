@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
-import { userService } from '../../services/userService';
 import { type IVFTreatment } from '../../types/ivf';
 
 interface EmbryoGradingDetail {
@@ -16,10 +15,17 @@ interface EmbryoGradingDetail {
   recommendations: string[];
 }
 
+interface AIGradeReport {
+  generatedAt: string;
+  filesAnalyzed: number;
+  predictedGrade: string;
+  confidence: string;
+  summary: string;
+}
+
 export default function EmbryoGradingPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [userInitials, setUserInitials] = useState<string>('U');
   const [embryos, setEmbryos] = useState<IVFTreatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +35,10 @@ export default function EmbryoGradingPage() {
   const [direction, setDirection] = useState<'fresh' | 'frozen'>('fresh');
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [uploadedFilesByEmbryo, setUploadedFilesByEmbryo] = useState<Record<string, File[]>>({});
+  const [isAiGrading, setIsAiGrading] = useState(false);
+  const [aiRunError, setAiRunError] = useState<string | null>(null);
+  const [aiReports, setAiReports] = useState<Record<string, AIGradeReport>>({});
   const branchDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -138,20 +148,6 @@ export default function EmbryoGradingPage() {
       recommendations: ['Consult with embryologist for assessment']
     };
   };
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const profile = await userService.getProfile();
-        const first = profile.first_name?.trim?.() || '';
-        const last = profile.last_name?.trim?.() || '';
-        setUserInitials(`${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U');
-      } catch {
-        // ignore
-      }
-    };
-    fetchUser();
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -332,20 +328,113 @@ export default function EmbryoGradingPage() {
     });
   }, [embryos, selectedBranch, selectedStatus]);
 
+  const embryoStats = React.useMemo(() => {
+    const total = filteredEmbryos.length;
+    const stored = filteredEmbryos.filter((embryo) => embryo.status === 'Stored').length;
+    const inTransit = filteredEmbryos.filter((embryo) => embryo.status === 'In Transit').length;
+    const thawed = filteredEmbryos.filter((embryo) => embryo.status === 'Thawed').length;
+    const highGrade = filteredEmbryos.filter((embryo) => {
+      const grades = (embryo.embryoGrading || '').split(',').map((g) => g.trim());
+      return grades.some((grade) => grade === '4AA' || grade === '4AB' || grade === '4BA');
+    }).length;
+
+    return { total, stored, inTransit, thawed, highGrade };
+  }, [filteredEmbryos]);
+
+  const getPrimaryGrade = (grading?: string) => {
+    return grading?.split(',')[0]?.trim() || 'N/A';
+  };
+
+  const getGradeChipStyle = (grade: string) => {
+    if (['4AA', '4AB', '4BA'].includes(grade)) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    if (['4BB', '3AA'].includes(grade)) return 'bg-amber-100 text-amber-700 border-amber-200';
+    return 'bg-slate-100 text-slate-700 border-slate-200';
+  };
+
+  const getEmbryoKey = (embryo: IVFTreatment | null) => {
+    if (!embryo) return '';
+    return `${embryo.hisNumber}-${embryo.cryolockNum}`;
+  };
+
+  const selectedEmbryoKey = getEmbryoKey(selectedEmbryo);
+  const selectedEmbryoFiles = selectedEmbryoKey ? (uploadedFilesByEmbryo[selectedEmbryoKey] || []) : [];
+
+  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    if (!selectedEmbryoKey) {
+      setAiRunError('Select an embryo before uploading files.');
+      event.target.value = '';
+      return;
+    }
+    setUploadedFilesByEmbryo((prev) => {
+      const current = prev[selectedEmbryoKey] || [];
+      return {
+        ...prev,
+        [selectedEmbryoKey]: [...current, ...files].slice(0, 12),
+      };
+    });
+    setAiRunError(null);
+    event.target.value = '';
+  };
+
+  const removeUploadedFile = (indexToRemove: number) => {
+    if (!selectedEmbryoKey) return;
+    setUploadedFilesByEmbryo((prev) => ({
+      ...prev,
+      [selectedEmbryoKey]: (prev[selectedEmbryoKey] || []).filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
+  const runMockAiGrading = async () => {
+    if (!selectedEmbryo) {
+      setAiRunError('Select an embryo before running AI grading.');
+      return;
+    }
+    if (selectedEmbryoFiles.length === 0) {
+      setAiRunError('Upload at least one image/video file to run AI grading.');
+      return;
+    }
+
+    setAiRunError(null);
+    setIsAiGrading(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    const gradePool = ['4AA', '4AB', '4BA', '4BB', '3AA'];
+    const confidencePool = ['96%', '93%', '91%', '89%', '87%'];
+    const randomGrade = gradePool[Math.floor(Math.random() * gradePool.length)];
+    const randomConfidence = confidencePool[Math.floor(Math.random() * confidencePool.length)];
+    const reportSummary = `Mock AI reviewed ${selectedEmbryoFiles.length} file(s) and predicts ${randomGrade} morphology with ${randomConfidence} confidence.`;
+
+    const embryoKey = getEmbryoKey(selectedEmbryo);
+    const updatedEmbryo: IVFTreatment = {
+      ...selectedEmbryo,
+      embryoGrading: randomGrade,
+      description: reportSummary,
+    };
+
+    setEmbryos((prev) => prev.map((embryo) => (
+      getEmbryoKey(embryo) === embryoKey ? updatedEmbryo : embryo
+    )));
+    setSelectedEmbryo(updatedEmbryo);
+    setAiReports((prev) => ({
+      ...prev,
+      [embryoKey]: {
+        generatedAt: new Date().toLocaleString(),
+        filesAnalyzed: selectedEmbryoFiles.length,
+        predictedGrade: randomGrade,
+        confidence: randomConfidence,
+        summary: reportSummary,
+      },
+    }));
+    setIsAiGrading(false);
+  };
+
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
-        <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 z-40">
-          <div />
-          <div
-            className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-            onClick={() => navigate('/user-profile')}
-            title="Go to User Profile"
-          >
-            <span className="text-white text-xs font-semibold">{userInitials}</span>
-          </div>
-        </header>
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-black text-2xl">
@@ -353,12 +442,39 @@ export default function EmbryoGradingPage() {
             </h1>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Total Embryos</p>
+              <p className="text-2xl font-semibold text-black mt-1">{embryoStats.total}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Stored</p>
+              <p className="text-2xl font-semibold text-emerald-700 mt-1">{embryoStats.stored}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">In Transit</p>
+              <p className="text-2xl font-semibold text-amber-700 mt-1">{embryoStats.inTransit}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Thawed</p>
+              <p className="text-2xl font-semibold text-sky-700 mt-1">{embryoStats.thawed}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">High Grade (4A*)</p>
+              <p className="text-2xl font-semibold text-[#6b1176] mt-1">{embryoStats.highGrade}</p>
+            </div>
+          </div>
+
           {/* Main Content Grid - Matching Control Tower Layout */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
             {/* Left Panel - Filters and Embryo List */}
             <div className="flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
               {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
+              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full lg:w-[380px] flex-shrink-0 flex flex-col justify-center shadow-sm">
+                <div className="mb-3 pb-2 border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-black">Filters</h2>
+                  <p className="text-xs text-gray-500">Refine embryos by direction, branch and status</p>
+                </div>
                 <div className="flex flex-col gap-3">
                   {/* Direction Toggle */}
                   <div>
@@ -492,10 +608,13 @@ export default function EmbryoGradingPage() {
               </div>
 
               {/* Active Embryos List */}
-              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-1 flex flex-col overflow-hidden min-h-80`}>
-                <h2 className="font-bold text-black text-base mb-2">
+              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-full lg:w-[380px] flex-1 flex flex-col overflow-hidden min-h-80 shadow-sm`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-bold text-black text-base">
                   Active Embryos
-                </h2>
+                  </h2>
+                  <span className="text-xs font-medium text-[#6b1176] bg-[#F7ECFF] px-2 py-1 rounded-full">{filteredEmbryos.length}</span>
+                </div>
                 <div className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                   <div className="text-left">Embryo ID</div>
                   <div className="text-center">Grade</div>
@@ -517,6 +636,7 @@ export default function EmbryoGradingPage() {
                     filteredEmbryos.map((embryo, index) => {
                       const embryoId = `${embryo.hisNumber}-${embryo.cryolockNum}`;
                       const isSelected = selectedEmbryo?.hisNumber === embryo.hisNumber && selectedEmbryo?.cryolockNum === embryo.cryolockNum;
+                      const primaryGrade = getPrimaryGrade(embryo.embryoGrading);
 
                       return (
                         <div
@@ -535,8 +655,8 @@ export default function EmbryoGradingPage() {
                             </div>
                           </div>
                           <div className="text-center">
-                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
-                              {embryo.embryoGrading || 'N/A'}
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getGradeChipStyle(primaryGrade)}`}>
+                              {primaryGrade}
                             </span>
                           </div>
                           <div className="text-center text-xs font-bold text-gray-600 truncate">
@@ -565,10 +685,109 @@ export default function EmbryoGradingPage() {
                 <div className="flex-1 overflow-y-auto p-6">
                   {selectedEmbryo ? (
                     <div className="space-y-6">
+                      <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+                          <div>
+                            <h3 className="text-sm font-semibold text-black">AI Assisted Grading (Mock)</h3>
+                            <p className="text-xs text-gray-500">Upload image/video set for this embryo and run mock AI grading.</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="px-3 py-2 rounded-md border border-[#6b1176] text-[#6b1176] text-sm font-medium cursor-pointer hover:bg-[#F7ECFF] transition-colors">
+                              Upload Image/Video
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,video/*"
+                                className="hidden"
+                                onChange={handleFileSelection}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={runMockAiGrading}
+                              disabled={isAiGrading || selectedEmbryoFiles.length === 0}
+                              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#5a0f62] transition-colors"
+                            >
+                              {isAiGrading ? 'Running AI...' : 'Run AI Grading'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUploadedFilesByEmbryo((prev) => ({ ...prev, [selectedEmbryoKey]: [] }))}
+                              disabled={selectedEmbryoFiles.length === 0 || isAiGrading}
+                              className="px-3 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+
+                        {aiRunError && (
+                          <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{aiRunError}</div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                          {selectedEmbryoFiles.length === 0 ? (
+                            <span className="text-xs text-gray-500">No files uploaded for this embryo yet.</span>
+                          ) : (
+                            selectedEmbryoFiles.map((file, index) => (
+                              <div key={`${file.name}-${index}`} className="inline-flex items-center gap-2 bg-[#F7ECFF] text-[#6b1176] text-xs px-2.5 py-1.5 rounded-full border border-[#E8D6F3]">
+                                <span className="max-w-[180px] truncate">{file.name}</span>
+                                <button
+                                  type="button"
+                                  className="text-[#6b1176] hover:text-[#4a0c53]"
+                                  onClick={() => removeUploadedFile(index)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {aiReports[selectedEmbryoKey] && (
+                        <div className="rounded-lg border border-[#E7E1E1] p-4 bg-[#F7ECFF]">
+                          <div className="flex flex-wrap items-center gap-2 justify-between mb-2">
+                            <h3 className="text-sm font-semibold text-[#6b1176]">Latest AI Report (Mock)</h3>
+                            <span className="text-xs text-gray-600">{aiReports[selectedEmbryoKey].generatedAt}</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
+                            <div>
+                              <p className="text-xs text-gray-500">Predicted Grade</p>
+                              <p className="text-sm font-semibold text-[#6b1176]">{aiReports[selectedEmbryoKey].predictedGrade}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Confidence</p>
+                              <p className="text-sm font-semibold text-gray-900">{aiReports[selectedEmbryoKey].confidence}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Files Analyzed</p>
+                              <p className="text-sm font-semibold text-gray-900">{aiReports[selectedEmbryoKey].filesAnalyzed}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700">{aiReports[selectedEmbryoKey].summary}</p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-[#E7E1E1] p-3 bg-[#FCF9FF]">
+                          <p className="text-xs text-gray-500">Primary Grade</p>
+                          <p className="text-lg font-semibold text-[#6b1176] mt-1">{getPrimaryGrade(selectedEmbryo.embryoGrading)}</p>
+                        </div>
+                        <div className="rounded-lg border border-[#E7E1E1] p-3 bg-[#FCF9FF]">
+                          <p className="text-xs text-gray-500">Current Status</p>
+                          <p className="text-lg font-semibold text-gray-900 mt-1">{selectedEmbryo.status || 'N/A'}</p>
+                        </div>
+                        <div className="rounded-lg border border-[#E7E1E1] p-3 bg-[#FCF9FF]">
+                          <p className="text-xs text-gray-500">Direction</p>
+                          <p className="text-lg font-semibold text-gray-900 mt-1 capitalize">{direction}</p>
+                        </div>
+                      </div>
+
                       {/* Basic Information */}
-                      <div>
+                      <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
                         <h3 className="text-md font-semibold text-gray-900 mb-3">Basic Information</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium text-gray-700">HIS Number:</span>
                             <p className="text-gray-900">{selectedEmbryo.hisNumber}</p>
@@ -596,20 +815,20 @@ export default function EmbryoGradingPage() {
 
                       {/* Grading Information */}
                       {selectedEmbryo.embryoGrading && (
-                        <div>
+                        <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
                           <h3 className="text-md font-semibold text-gray-900 mb-3">Grading Analysis</h3>
                           {selectedEmbryo.embryoGrading.split(',').map((grade, index) => {
                             const trimmedGrade = grade.trim();
                             const details = getEmbryoGradingDetails(trimmedGrade);
                             return (
-                              <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
+                              <div key={index} className="mb-4 p-4 bg-[#FCF9FF] rounded-lg border border-[#EFE3F5]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="text-lg font-bold text-[#6b1176]">{details.grade}</span>
                                   <span className="text-sm text-gray-600">Embryo {index + 1}</span>
                                 </div>
                                 <p className="text-sm text-gray-700 mb-3">{details.description}</p>
 
-                                <div className="grid grid-cols-1 gap-2 text-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                   <div className="flex justify-between">
                                     <span className="font-medium text-gray-700">Blastocyst Formation:</span>
                                     <span className="text-gray-900">{details.blastocystFormation}</span>
@@ -647,9 +866,9 @@ export default function EmbryoGradingPage() {
                       )}
 
                       {/* Storage Information */}
-                      <div>
+                      <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
                         <h3 className="text-md font-semibold text-gray-900 mb-3">Storage Information</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium text-gray-700">Tank Code:</span>
                             <p className="text-gray-900">{selectedEmbryo.tankCode}</p>

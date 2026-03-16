@@ -65,7 +65,6 @@ export default function TrackPage() {
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
-  const [userInitials, setUserInitials] = useState<string>('');
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [reengineeringStatus, setReengineeringStatus] = useState<boolean>(false);
   const [patientData, setPatientData] = useState<PatientResponse | null>(null);
@@ -145,10 +144,6 @@ export default function TrackPage() {
         const profile = await userService.getProfile();
       setCurrentUser(profile);
       setCurrentUserId(profile.user_id);
-        const first = profile.first_name?.trim?.() || '';
-        const last = profile.last_name?.trim?.() || '';
-        const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
-        setUserInitials(initials);
     } catch {
       // Error handled silently
     }
@@ -309,18 +304,7 @@ export default function TrackPage() {
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
-        {/* Top Nav Bar (fixed like Control Tower) */}
-        <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-end px-6 gap-6 z-40">
-          {/* Avatar only on the black bar */}
-          <div 
-            className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-            onClick={() => navigate('/user-profile')}
-            title="Go to User Profile"
-          >
-            <span className="text-white text-xs font-semibold">{userInitials}</span>
-          </div>
-        </header>
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
 
         {/* Subheader with patient summary and icons */}
         <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">

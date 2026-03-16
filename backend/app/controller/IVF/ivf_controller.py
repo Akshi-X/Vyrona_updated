@@ -479,11 +479,19 @@ def check_tank_exists(
     for regular users.
     """
     try:
-        effective_branch_id = branch_id
+        current_role = None
+        if request is not None:
+            _, current_role = get_branch_filter_info(request) if request else (None, None)
 
-        if effective_branch_id is None:
-            jwt_branch_id, _ = get_branch_filter_info(request) if request else (None, None)
-            effective_branch_id = jwt_branch_id
+        # Admin/Manager: not restricted to JWT branch, but honor explicit branch_id filter if provided.
+        # User: keep branch scoping, preferring explicit branch_id when provided.
+        if current_role in ("Admin", "Manager"):
+            effective_branch_id = branch_id
+        else:
+            effective_branch_id = branch_id
+            if effective_branch_id is None:
+                jwt_branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+                effective_branch_id = jwt_branch_id
         
         query = db.query(Tank).filter(Tank.tank_code == tank_code)
         
@@ -508,7 +516,9 @@ def check_tank_exists(
                 canister_id=None,
                 is_active=None,
                 canister_status=None,
-                message=f"Tank {tank_code} does not exist" + (f" in your branch" if branch_id is not None else "")
+                message=f"Tank {tank_code} does not exist" + (
+                    f" in your branch" if effective_branch_id is not None and current_role not in ("Admin", "Manager") else ""
+                )
             )
     except HTTPException:
         raise

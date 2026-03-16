@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
-import { userService } from '../../services/userService';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 
 interface IncubatorCardItem {
@@ -16,24 +15,9 @@ interface IncubatorCardItem {
 export default function IncubatorTrackingDashboardPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [userInitials, setUserInitials] = useState<string>('U');
   const [incubators, setIncubators] = useState<IncubatorCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const profile = await userService.getProfile();
-        const first = profile.first_name?.trim?.() || '';
-        const last = profile.last_name?.trim?.() || '';
-        setUserInitials(`${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U');
-      } catch {
-        // ignore
-      }
-    };
-    fetchUser();
-  }, []);
 
   useEffect(() => {
     const fetchIncubators = async () => {
@@ -93,19 +77,9 @@ export default function IncubatorTrackingDashboardPage() {
   }, []);
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full h-full">
+    <div className="bg-[#FDFAFF] flex w-full min-h-screen">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
-        <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 z-40">
-          <div />
-          <div
-            className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-            onClick={() => navigate('/user-profile')}
-            title="Go to User Profile"
-          >
-            <span className="text-white text-xs font-semibold">{userInitials}</span>
-          </div>
-        </header>
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
         <div className="flex-1 p-6 overflow-y-auto min-h-0">
           <div className="flex items-center gap-1 text-sm mb-6">
             <button
