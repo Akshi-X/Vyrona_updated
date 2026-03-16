@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
@@ -11,7 +12,6 @@ import { userService, type UserProfileDto } from '../../services/userService';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
-import ExportIcon from '../../assets/TrackAndTraceIcons/Extract.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
@@ -244,10 +244,11 @@ export default function IVFTrackShipmentPage() {
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
                                     ) : (
-                                        <img
-                                            className="w-[25px] h-[25px]"
-                                            alt="Export Excel"
-                                            src={ExportIcon}
+                                        <Download
+                                            size={21}
+                                            strokeWidth={2.25}
+                                            className="text-[#6B1176]"
+                                            aria-label="Export Excel"
                                         />
                                     )}
                                 </button>

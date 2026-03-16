@@ -409,12 +409,6 @@ export class IvfService extends BaseApiService {
                 unit: string;
             }>
         >;
-        kpi_config?: Array<{
-            name: string;
-            unit: string;
-            latest_value?: number | null;
-            latest_timestamp?: string | null;
-        }>;
     }> {
         const params = new URLSearchParams();
         if (durationMinutes != null && durationMinutes > 0) {

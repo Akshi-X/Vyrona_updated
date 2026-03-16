@@ -375,7 +375,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   useEffect(() => {
     if (!normalizedTankId) return;
     latestKpiTimestampRef.current = {};
-    ivfService.getKpiHistory(normalizedTankId, 50).then((res) => {
+    ivfService.getKpiHistory(normalizedTankId).then((res) => {
       if (!isMountedRef.current || !res?.kpi_series) return;
       const latestByKpi = new Map<string, { name: string; value: number; unit: string; timestamp: string }>();
       Object.entries(res.kpi_series).forEach(([name, points]) => {

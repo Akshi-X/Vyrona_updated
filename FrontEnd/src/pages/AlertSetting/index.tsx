@@ -957,7 +957,7 @@ export default function AlertSetting() {
             <main className="flex-1 flex flex-col overflow-hidden ml-60 min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
                     <h1 className="font-semibold text-black text-2xl">
-                        Alert Setting
+                        Alert Configuration
                     </h1>
                     <div className="flex gap-6 flex-1 min-h-0">
                         {/* Left: filters + containers (Control Tower UI) */}

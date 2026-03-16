@@ -373,7 +373,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     setActiveTab('');
   }, [tankId]);
 
-  // Fetch KPI config (limits + units) for tabs and visualization; prefer over kpi_history's kpi_config
+  // Fetch KPI config (limits + units) for tabs and visualization
   useEffect(() => {
     if (!tankId) return;
     ivfService
