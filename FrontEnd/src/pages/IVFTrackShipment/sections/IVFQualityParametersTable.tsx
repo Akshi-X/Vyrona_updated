@@ -315,9 +315,12 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     }
   };
 
-  const formatTimeAgo = (timestampMs: number | null): string => {
+  const MAX_TIME_AGO_DISPLAY_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+
+  const formatTimeAgo = (timestampMs: number | null): string | null => {
     if (timestampMs == null) return '—';
     const diffMs = Math.max(0, nowTs - timestampMs);
+    if (diffMs > MAX_TIME_AGO_DISPLAY_MS) return null;
     const diffMinutes = Math.floor(diffMs / 60000);
     if (diffMinutes <= 0) return 'just now';
     if (diffMinutes === 1) return '1 min ago';
@@ -349,6 +352,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       : minutesSinceUpdate <= 120
         ? 'text-green-600'
         : 'text-yellow-500';
+  const batteryTimeAgo = formatTimeAgo(batteryStatusTimestampMs);
 
   useEffect(() => {
     if (!normalizedTankId) {
@@ -513,11 +517,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               <div className="relative overflow-hidden h-3.5 w-16 rounded-md bg-gray-200">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" style={{ width: '50%' }} />
               </div>
-            ) : (
+            ) : batteryTimeAgo ? (
               <div className={`text-xs ${timeAgoColorClass}`}>
-                {formatTimeAgo(batteryStatusTimestampMs)}
+                {batteryTimeAgo}
               </div>
-            )}
+            ) : null}
           </div>
             {isBatteryLoading ? (
               <div className="relative overflow-hidden h-5 w-[58px] rounded-md bg-gray-200">
