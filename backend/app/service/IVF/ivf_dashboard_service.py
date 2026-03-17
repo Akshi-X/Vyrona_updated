@@ -22,10 +22,11 @@ class IVFDashboardService:
     
     def get_deviation_counts_by_kpi(self, hospital_id: int, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict[str, int]:
             """
-            Get count of deviated readings grouped by KpiConfig.alert_name for a specific hospital and branch.
-            Only readings with deviation=True are counted.
+            Get count of active KPI deviation alerts grouped by KpiConfig.alert_name.
+            The KPI config id is extracted from the last segment of CriticalAlert.dedup_key.
+            Response shape remains {alert_name: count}.
             Args:
-                hospital_id: The hospital ID to filter readings.
+                hospital_id: The hospital ID to filter alerts.
                 branch_id: Optional branch ID to filter by (role-based).
                 role: User's role to determine filtering.
             Returns:
@@ -33,23 +34,26 @@ class IVFDashboardService:
             """
             filter_branch_id = self._get_branch_filter(branch_id, role)
 
-            # Build base query: readings with deviation=True, filtered by hospital and branch
+            # Count active KPI alerts and map them back to alert_name via kpi_config_id stored
+            # as the last segment of dedup_key: tank_id:source:alert_type:date:kpi_config_id
             query = text("""SELECT
-                                k.alert_name,
-                                COUNT(r.id) AS deviation_count
+                                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
+                                COUNT(c.alert_id) AS deviation_count
                             FROM
-                                readings r
-                            JOIN
-                                kpi_config k ON r.kpi_config_id = k.id
-                            JOIN
-                                tanks t ON r.tank_id = t.tank_id
+                                critical_alerts c
+                            LEFT JOIN
+                                kpi_config k ON k.id = CASE
+                                    WHEN c.dedup_key ~ ':[0-9]+$'
+                                    THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
+                                    ELSE NULL
+                                END
                             WHERE
-                                r.deviation = TRUE
-                                AND r.hospital_id = :hospital_id
-                                -- Optionally filter by branch if needed:
-                                AND (:branch_id IS NULL OR t.branch_id = :branch_id)
+                                c.hospital_id = :hospital_id
+                                AND c.source = 'KPI'
+                                AND c.status = 'Active'
+                                AND (:branch_id IS NULL OR c.branch_id = :branch_id)
                             GROUP BY
-                                k.id, k.alert_name;""")
+                                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');""")
 
             results = self.db.execute(query, {"hospital_id": hospital_id, "branch_id": filter_branch_id}).fetchall()
 
@@ -467,22 +471,27 @@ class IVFDashboardService:
         query = text("""
         SELECT
             b.branch_name,
-            k.alert_name,
-            COUNT(r.id) AS deviation_count
+            COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
+            COUNT(c.alert_id) AS deviation_count
         FROM
-            readings r
+            critical_alerts c
         JOIN
-            kpi_config k ON r.kpi_config_id = k.id
+            hospital_branches b ON c.branch_id = b.branch_id
+        LEFT JOIN
+            kpi_config k ON k.id = CASE
+                WHEN c.dedup_key ~ ':[0-9]+$'
+                THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
+                ELSE NULL
+            END
         JOIN
-            tanks t ON r.tank_id = t.tank_id
-        JOIN
-            hospital_branches b ON t.branch_id = b.branch_id
+            tanks t ON c.tank_id = t.tank_id
         WHERE
-            r.deviation = TRUE
-            AND r.hospital_id = :hospital_id
+            c.hospital_id = :hospital_id
+            AND c.source = 'KPI'
+            AND c.status = 'Active'
             AND (:branch_id IS NULL OR b.branch_id = :branch_id)
         GROUP BY
-            b.branch_name, k.id, k.alert_name;
+            b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');
         """)
 
         results = self.db.execute(
@@ -513,29 +522,32 @@ class IVFDashboardService:
         ),
         alert_list AS (
             SELECT DISTINCT
-                k.alert_name
+                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name
             FROM
                 kpi_config k
             WHERE
                 k.hospital_id = :hospital_id
-                AND k.alert_name IS NOT NULL
+                AND (k.alert_name IS NOT NULL OR k.kpi_name IS NOT NULL)
         ),
         deviation_counts AS (
             SELECT
-                t.branch_id,
-                k.alert_name,
-                COUNT(r.id) AS deviation_count
+                c.branch_id,
+                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
+                COUNT(c.alert_id) AS deviation_count
             FROM
-                readings r
-            JOIN
-                kpi_config k ON r.kpi_config_id = k.id
-            JOIN
-                tanks t ON r.tank_id = t.tank_id
+                critical_alerts c
+            LEFT JOIN
+                kpi_config k ON k.id = CASE
+                    WHEN c.dedup_key ~ ':[0-9]+$'
+                    THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
+                    ELSE NULL
+                END
             WHERE
-                r.deviation = TRUE
-                AND r.hospital_id = :hospital_id
+                c.hospital_id = :hospital_id
+                AND c.source = 'KPI'
+                AND c.status = 'Active'
             GROUP BY
-                t.branch_id, k.alert_name
+                c.branch_id, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
         )
         SELECT
             bl.branch_name,

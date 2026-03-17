@@ -273,6 +273,8 @@ export default function OutboundQualityTrackingPage() {
                         : a.canister_number
                             ? a.canister_number
                             : `Canister ${a.canister_id}`,
+                    branchName: (a as typeof a & { branch_name?: string }).branch_name,
+                    dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
                     message: a.message,
                     timestamp: new Date(a.occurred_at+"Z").toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
