@@ -399,7 +399,7 @@ export class IvfService extends BaseApiService {
 
     /**
      * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
-     * No limit param; backend uses duration_minutes only (10=10M, 60=1H, 1440=24H, 10080=7D). Omit for LIVE.
+        * No limit param; backend uses duration_minutes only (10=10M, 60=1H, 1440=24H, 10080=7D with 6h buckets). Omit for LIVE.
      */
     async getKpiHistory(
         tankId: string | number,
@@ -412,6 +412,10 @@ export class IvfService extends BaseApiService {
             Array<{
                 timestamp: string;
                 value: number;
+                avg?: number;
+                min?: number;
+                max?: number;
+                count?: number;
                 unit: string;
             }>
         >;

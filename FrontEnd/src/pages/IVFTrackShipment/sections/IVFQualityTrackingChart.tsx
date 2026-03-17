@@ -7,10 +7,11 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 import { authUtils } from '../../../utils/auth';
 
 ChartJS.register(
@@ -18,6 +19,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Tooltip,
   Legend
 );
@@ -170,14 +172,21 @@ interface KpiReading {
   tank_id: number;
   tank_code: string;
   timestamp: string;
-  kpis: Array<{ name: string; value: number; unit: string }>;
+  kpis: Array<{
+    name: string;
+    value: number;
+    avg?: number;
+    min?: number;
+    max?: number;
+    count?: number;
+    unit: string;
+  }>;
 }
 
 /** Max readings to keep in state so 7D range has enough; display filters by time window. */
 const MAX_READINGS_CAP = 250;
-/** Extra slots at end of timeline so the curve doesn't end at the right edge (responsive "beyond end"). */
-const TIMELINE_BUFFER_SLOTS = 4;
-
+/** Display cap for chart points. If exceeded, downsample while preserving local extremes. */
+const MAX_CHART_POINTS = 160;
 /** Time range: LIVE = last 10 min only (WebSocket). Others = static fetch from DB (1H/24H/7D = aggregated). */
 const LIVE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const TIME_RANGES = [
@@ -240,16 +249,81 @@ const formatDateTimeLabel = (timestamp: string): string => {
   return `${datePart}, ${timePart}`;
 };
 
-function getKpiValue(reading: KpiReading, kpiName: string): number | null {
+function getKpiStats(reading: KpiReading, kpiName: string): { avg: number; min: number | null; max: number | null } | null {
   const k =
     reading.kpis.find((x) => x.name === kpiName) ??
     (kpiName === 'ln2_lid_state' ? reading.kpis.find((x) => x.name === 'lid_state') : null);
-  if (k == null || typeof k.value !== 'number' || isNaN(k.value)) return null;
+  if (!k) return null;
+
+  const baseValue = typeof k.avg === 'number' && Number.isFinite(k.avg)
+    ? k.avg
+    : (typeof k.value === 'number' && Number.isFinite(k.value) ? k.value : null);
+
+  if (baseValue == null) return null;
+
+  let min = typeof k.min === 'number' && Number.isFinite(k.min) ? k.min : null;
+  let max = typeof k.max === 'number' && Number.isFinite(k.max) ? k.max : null;
+  let avg = baseValue;
+
   if (kpiName === 'lid_state' || kpiName === 'ln2_lid_state') {
-    // Enforce binary display: 0 = Close, 1 = Open.
-    return k.value >= 1 ? 1 : 0;
+    avg = avg >= 1 ? 1 : 0;
+    min = min == null ? null : (min >= 1 ? 1 : 0);
+    max = max == null ? null : (max >= 1 ? 1 : 0);
   }
-  return k.value;
+
+  if (min != null && max != null && min > max) {
+    const temp = min;
+    min = max;
+    max = temp;
+  }
+
+  return { avg, min, max };
+}
+
+function downsampleReadingsPreserveExtremes(
+  readings: KpiReading[],
+  kpiName: string,
+  maxPoints: number
+): KpiReading[] {
+  if (readings.length <= maxPoints) return readings;
+
+  const chunkSize = Math.max(1, Math.ceil(readings.length / maxPoints));
+  const selected = new Map<string, KpiReading>();
+
+  for (let start = 0; start < readings.length; start += chunkSize) {
+    const chunk = readings.slice(start, start + chunkSize);
+    if (chunk.length === 0) continue;
+
+    const first = chunk[0];
+    const last = chunk[chunk.length - 1];
+    if (first?.timestamp) selected.set(first.timestamp, first);
+    if (last?.timestamp) selected.set(last.timestamp, last);
+
+    let minItem: KpiReading | null = null;
+    let maxItem: KpiReading | null = null;
+    let minValue = Number.POSITIVE_INFINITY;
+    let maxValue = Number.NEGATIVE_INFINITY;
+
+    for (const item of chunk) {
+      const stats = getKpiStats(item, kpiName);
+      if (!stats) continue;
+      if (stats.avg < minValue) {
+        minValue = stats.avg;
+        minItem = item;
+      }
+      if (stats.avg > maxValue) {
+        maxValue = stats.avg;
+        maxItem = item;
+      }
+    }
+
+    if (minItem !== null) selected.set(minItem.timestamp, minItem);
+    if (maxItem !== null) selected.set(maxItem.timestamp, maxItem);
+  }
+
+  return Array.from(selected.values()).sort(
+    (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
+  );
 }
 
 /** Build display label from KPI name (e.g. temp_external -> Temp External). */
@@ -290,6 +364,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const latestKpiTimestampRef = useRef<Record<string, number>>({});
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyRequestSeqRef = useRef(0);
   const isMountedRef = useRef(true);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
@@ -420,27 +495,48 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   useEffect(() => {
     if (!tankId) return;
     setIsRangeLoading(true);
+    const requestSeq = ++historyRequestSeqRef.current;
     const rangeConfig = TIME_RANGES.find((r) => r.id === timeRange);
     const durationMinutes = rangeConfig?.durationMinutes;
     ivfService
       .getKpiHistory(tankId, durationMinutes)
       .then((res) => {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || requestSeq != historyRequestSeqRef.current) return;
         const series = res?.kpi_series || {};
         const entries = Object.entries(series);
         if (entries.length > 0) {
           const isStaticRange = durationMinutes != null && durationMinutes > 0;
           setKpiReadings((prev) => {
             const byTs = new Map<string, KpiReading>();
-            const appendKpiPoint = (kpiName: string, point: { timestamp?: string; value?: number; unit?: string }) => {
+            const appendKpiPoint = (
+              kpiName: string,
+              point: {
+                timestamp?: string;
+                value?: number;
+                avg?: number;
+                min?: number;
+                max?: number;
+                count?: number;
+                unit?: string;
+              }
+            ) => {
               const timestamp = typeof point.timestamp === 'string' ? point.timestamp : '';
               if (!timestamp) return;
-              const value = typeof point.value === 'number' ? point.value : Number(point.value ?? 0);
+              const avg = typeof point.avg === 'number' ? point.avg : Number(point.avg ?? NaN);
+              const fallbackValue = typeof point.value === 'number' ? point.value : Number(point.value ?? NaN);
+              const value = Number.isFinite(avg) ? avg : fallbackValue;
               if (Number.isNaN(value)) return;
+              const minValue = typeof point.min === 'number' ? point.min : Number(point.min ?? NaN);
+              const maxValue = typeof point.max === 'number' ? point.max : Number(point.max ?? NaN);
+              const countValue = typeof point.count === 'number' ? point.count : Number(point.count ?? NaN);
               const existing = byTs.get(timestamp);
               const nextKpi = {
                 name: kpiName,
                 value,
+                avg: Number.isFinite(avg) ? avg : value,
+                min: Number.isFinite(minValue) ? minValue : undefined,
+                max: Number.isFinite(maxValue) ? maxValue : undefined,
+                count: Number.isFinite(countValue) ? countValue : undefined,
                 unit: point.unit ?? '',
               };
               if (existing) {
@@ -489,7 +585,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       .catch(() => {
       })
       .finally(() => {
-        if (isMountedRef.current) setIsRangeLoading(false);
+        if (isMountedRef.current && requestSeq == historyRequestSeqRef.current) {
+          setIsRangeLoading(false);
+        }
       });
   }, [tankId, timeRange]);
 
@@ -773,55 +871,83 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     }
   }, [timeRange, tankId]);
 
-  const chartData = useMemo(() => {
-    const sorted = [...displayReadings].sort(
+  const plottedReadings = useMemo(() => {
+    const sortedAll = [...displayReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
+    return downsampleReadingsPreserveExtremes(sortedAll, activeTab, MAX_CHART_POINTS);
+  }, [displayReadings, activeTab]);
+
+  const chartData = useMemo(() => {
+    const sorted = plottedReadings;
     const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
-    const values = sorted.map((r) => getKpiValue(r, activeTab));
+    const stats = sorted.map((r) => getKpiStats(r, activeTab));
+    const values = stats.map((s) => (s ? s.avg : null));
+    const rangeValues = stats.map((s) => {
+      if (!s || s.min == null || s.max == null) return null;
+      return [s.min, s.max];
+    });
     const tab = kpiTabs.find((t) => t.id === activeTab);
     const unit = tab?.unit ?? '';
     const datasetLabel = unit
       ? `${tab?.label ?? activeTab} (${unit})`
       : `${tab?.label ?? activeTab}`;
+    const isBinaryTab = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
+    const showCandlestick = !isBinaryTab && timeRange !== 'LIVE';
 
-    // Extend timeline beyond last point so the curve doesn't end at the right edge
-    const bufferLabels = [...labels, ...Array(TIMELINE_BUFFER_SLOTS).fill('')];
-    const bufferValues = [...values, ...Array(TIMELINE_BUFFER_SLOTS).fill(null)];
+    const datasets: any[] = [];
 
-    const datasets: any[] = [
-      {
-        label: datasetLabel,
-        data: bufferValues,
-        borderColor: '#6B1176',
-        backgroundColor: (context: any) => {
-          const chart = context.chart;
-          const { ctx, chartArea } = chart;
-          if (!chartArea) {
-            return 'rgba(107, 17, 118, 0.75)';
-          }
-          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(107, 17, 118, 0.75)');
-          gradient.addColorStop(1, 'rgba(107, 17, 118, 0.08)');
-          return gradient;
-        },
-        borderWidth: 2,
-        pointRadius: 2.5,
-        pointHoverRadius: 4,
-        pointBackgroundColor: '#6B1176',
-        pointBorderColor: '#6B1176',
-        pointBorderWidth: 0,
-        tension: 0.3,
-        fill: true,
-        spanGaps: true,
+    if (showCandlestick) {
+      datasets.push({
+        type: 'bar',
+        label: `${tab?.label ?? activeTab} Range (Min–Max)`,
+        data: rangeValues,
+        backgroundColor: 'rgba(107, 17, 118, 0.26)',
+        borderColor: 'rgba(107, 17, 118, 0.65)',
+        borderWidth: 1.2,
+        borderRadius: 4,
+        borderSkipped: false,
+        barPercentage: 0.78,
+        categoryPercentage: 0.9,
+        maxBarThickness: 14,
+        order: 1,
+        _isRange: true,
+      });
+    }
+
+    datasets.push({
+      type: 'line',
+      label: showCandlestick ? `${datasetLabel} Avg` : datasetLabel,
+      data: values,
+      borderColor: '#6B1176',
+      backgroundColor: (context: any) => {
+        const chart = context.chart;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) {
+          return 'rgba(107, 17, 118, 0.75)';
+        }
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, 'rgba(107, 17, 118, 0.75)');
+        gradient.addColorStop(1, 'rgba(107, 17, 118, 0.08)');
+        return gradient;
       },
-    ];
+      borderWidth: 2,
+      pointRadius: showCandlestick ? 0 : 2.5,
+      pointHoverRadius: 4,
+      pointBackgroundColor: '#6B1176',
+      pointBorderColor: '#6B1176',
+      pointBorderWidth: 0,
+      tension: 0.3,
+      fill: !showCandlestick,
+      spanGaps: true,
+      order: 2,
+    });
 
     const thresholds = kpiThresholds[activeTab];
     thresholds?.lines?.forEach((line, idx) => {
       datasets.push({
         label: line.label,
-        data: [...values.map(() => line.value), ...Array(TIMELINE_BUFFER_SLOTS).fill(line.value)],
+        data: values.map(() => line.value),
         borderColor: line.kind === 'max' ? 'rgba(220, 38, 38, 0.45)' : 'rgba(249, 115, 22, 0.45)',
         borderWidth: 1.5,
         borderDash: idx % 2 === 0 ? [4, 4] : [8, 4],
@@ -832,14 +958,18 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       });
     });
 
-    return { labels: bufferLabels, datasets };
-  }, [displayReadings, activeTab, kpiTabs, kpiThresholds, timeRange]);
+    return { labels, datasets };
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange]);
 
   const chartOptions = useMemo(() => {
-    const sorted = [...displayReadings].sort(
-      (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
-    );
-    const values = sorted.map((r) => getKpiValue(r, activeTab)).filter((v): v is number => v != null);
+    const sorted = plottedReadings;
+    const stats = sorted.map((r) => getKpiStats(r, activeTab)).filter((v): v is { avg: number; min: number | null; max: number | null } => v != null);
+    const values = stats.flatMap((s) => {
+      const parts = [s.avg];
+      if (s.min != null) parts.push(s.min);
+      if (s.max != null) parts.push(s.max);
+      return parts;
+    });
     const thresholds = kpiThresholds[activeTab];
     let minY: number | undefined;
     let maxY: number | undefined;
@@ -859,7 +989,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         legend: {
           display: true,
           position: 'top' as const,
-          labels: { boxWidth: 8, boxHeight: 8, padding: 16, color: '#4B4B4B', usePointStyle: true, font: { size: 11 } },
+          labels: {
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 14,
+            color: '#4B4B4B',
+            usePointStyle: true,
+            font: { size: 11 },
+          },
         },
         tooltip: {
           enabled: true,
@@ -870,22 +1007,31 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             title: (items: any[]) => {
               if (!items?.length) return '';
               const idx = items[0].dataIndex;
-              const sorted = [...displayReadings].sort(
-                (a, b) =>
-                  (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
-              );
               if (idx >= sorted.length) return '';
               const r = sorted[idx];
               return r ? formatDateTimeLabel(r.timestamp) : '';
             },
             label: (context: any) => {
-              const v = context.parsed?.y;
-              if (v == null) return '';
+              const parsedY = context.parsed?.y;
+              if (parsedY == null) return '';
               const label = context.dataset.label || '';
-              if (activeTab === 'lid_state' || activeTab === 'ln2_lid_state') {
-                return `${label}: ${v >= 1 ? 'Open (1)' : 'Close (0)'}`;
+              const isRangeDataset = Boolean(context?.dataset?._isRange);
+              if (isRangeDataset) {
+                const raw = context.raw;
+                const min = Array.isArray(raw) ? raw[0] : null;
+                const max = Array.isArray(raw) ? raw[1] : null;
+                if (min == null || max == null) return '';
+                const idx = context.dataIndex;
+                const reading = idx < sorted.length ? sorted[idx] : null;
+                const kpi = reading?.kpis?.find((k: any) => k.name === activeTab) ??
+                  (activeTab === 'ln2_lid_state' ? reading?.kpis?.find((k: any) => k.name === 'lid_state') : null);
+                const count = typeof kpi?.count === 'number' ? kpi.count : null;
+                return `${label}: Min ${Number(min).toFixed(2)}, Max ${Number(max).toFixed(2)}${count != null ? `, n=${count}` : ''}`;
               }
-              return `${label}: ${typeof v === 'number' ? (Math.round(v * 100) / 100).toFixed(2) : v}`;
+              if (activeTab === 'lid_state' || activeTab === 'ln2_lid_state') {
+                return `${label}: ${parsedY >= 1 ? 'Open (1)' : 'Close (0)'}`;
+              }
+              return `${label}: ${typeof parsedY === 'number' ? (Math.round(parsedY * 100) / 100).toFixed(2) : parsedY}`;
             },
           },
         },
@@ -894,8 +1040,16 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       interaction: { mode: 'index' as const, intersect: false },
       scales: {
         x: {
+          offset: true,
           grid: { display: true, color: 'rgba(0,0,0,0.06)', borderDash: [2, 6] },
-          ticks: { color: '#4B4B4B', font: { size: 11 }, maxRotation: 45, maxTicksLimit: 12 },
+          ticks: {
+            color: '#4B4B4B',
+            font: { size: 11 },
+            maxRotation: 35,
+            minRotation: 0,
+            maxTicksLimit: 10,
+            includeBounds: true,
+          },
           border: { display: false },
         },
         y: {
@@ -925,7 +1079,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         },
       },
     };
-  }, [displayReadings, activeTab, kpiTabs, kpiThresholds]);
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds]);
 
   const hasData = displayReadings.length > 0;
 
@@ -1011,7 +1165,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           )
         ) : (
           <>
-            <Line data={chartData} options={chartOptions as any} />
+            <Chart type="line" data={chartData} options={chartOptions as any} />
             {isRangeLoading && (
               <div
                 className="absolute inset-0 bg-white/75 flex items-center justify-center z-10"

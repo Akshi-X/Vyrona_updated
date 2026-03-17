@@ -996,11 +996,16 @@ class QualityService:
         return {**tank_info, "kpis": kpis}
 
     def get_tank_kpi_history_aggregated(
-        self, tank_id: int, since: datetime, bucket_minutes: int
+        self,
+        tank_id: int,
+        since: datetime,
+        bucket_minutes: int,
+        until: Optional[datetime] = None,
     ) -> Optional[dict]:
         """
-        Efficient DB aggregation: group readings by time bucket, AVG(kpi_value) per bucket.
-        Returns same shape as get_last_n_readings_per_kpi: { tank_id, tank_code, kpis: [{ name, value, unit, timestamp }] }.
+        Efficient DB aggregation: group readings by time bucket, MIN/MAX/AVG(kpi_value) per bucket.
+        Returns same shape as get_last_n_readings_per_kpi, with extra min/max/avg fields:
+        { tank_id, tank_code, kpis: [{ name, value, avg, min, max, count, unit, timestamp }] }.
         bucket_minutes: bucket size in minutes (e.g. 1 for 1H range, 30 for 24H, 720 for 7D).
         No limit; suitable for large ranges (1H / 24H / 7D) so chart gets few points from DB.
         """
@@ -1013,17 +1018,27 @@ class QualityService:
                 ) AT TIME ZONE 'UTC' AS bucket_start,
                 k.kpi_name,
                 k.unit,
-                AVG(r.kpi_value)::double precision AS avg_value
+                AVG(r.kpi_value)::double precision AS avg_value,
+                MIN(r.kpi_value)::double precision AS min_value,
+                MAX(r.kpi_value)::double precision AS max_value,
+                COUNT(*)::integer AS sample_count
             FROM readings r
             JOIN kpi_config k ON r.kpi_config_id = k.id
-            WHERE r.tank_id = :tank_id AND r.timestamp >= :since
+            WHERE r.tank_id = :tank_id
+              AND r.timestamp >= :since
+              AND (:until IS NULL OR r.timestamp <= :until)
             GROUP BY bucket_start, k.id, k.kpi_name, k.unit
             ORDER BY bucket_start ASC
         """)
         try:
             rows = self.db.execute(
                 sql,
-                {"tank_id": tank_id, "since": since, "bucket_sec": bucket_seconds},
+                {
+                    "tank_id": tank_id,
+                    "since": since,
+                    "until": until,
+                    "bucket_sec": bucket_seconds,
+                },
             ).fetchall()
         except Exception as e:
             logger.error(
@@ -1046,11 +1061,29 @@ class QualityService:
                 {
                     "name": row.kpi_name or "",
                     "value": float(row.avg_value) if row.avg_value is not None else 0,
+                    "avg": float(row.avg_value) if row.avg_value is not None else 0,
+                    "min": float(row.min_value) if row.min_value is not None else None,
+                    "max": float(row.max_value) if row.max_value is not None else None,
+                    "count": int(row.sample_count) if row.sample_count is not None else 0,
                     "unit": row.unit or "",
                     "timestamp": ts,
                 }
             )
         return {"tank_id": tank_id, "tank_code": tank_code, "kpis": kpis}
+
+    def get_latest_tank_kpi_timestamp(self, tank_id: int) -> Optional[datetime]:
+        """Return latest readings.timestamp for a tank (None when no data)."""
+        try:
+            latest_ts = (
+                self.db.query(func.max(Readings.timestamp))
+                .filter(Readings.tank_id == tank_id)
+                .scalar()
+            )
+            return latest_ts
+        except Exception as e:
+            logger.error(f"Error getting latest KPI timestamp for tank {tank_id}: {e}")
+            self.db.rollback()
+            return None
 
     def get_tank_kpi_history_from_readings(
         self, tank_id: int, tank_code: str, limit: int = 50
