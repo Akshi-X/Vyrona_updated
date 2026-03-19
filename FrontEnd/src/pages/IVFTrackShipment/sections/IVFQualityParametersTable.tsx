@@ -547,7 +547,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       </div>
 
       {/* Main content: Left tiles + Tank + Right tiles */}
-      <div className="flex items-start justify-center gap-1 @max-[505px]:flex-col @max-[505px]:items-center @max-[505px]:gap-3">
+      <div className="flex items-start justify-center gap-1 @max-[505px]:flex-col @max-[505px]:items-center @max-[505px]:gap-3 my-auto">
         {/* Left KPI Tiles */}
         <div className="flex flex-col gap-3 justify-start pt-6 @max-[505px]:order-2 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
           <KpiTile
