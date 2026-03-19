@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import Modal from '../../components/Modal';
@@ -92,9 +92,6 @@ interface NewEmbryoFormState {
 export default function EmbryoGradingPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const { his } = useParams<{ his: string }>();
-  const detailHis = his?.trim().toUpperCase() || '';
-  const isDetailView = Boolean(detailHis);
   const [embryos, setEmbryos] = useState<IVFTreatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,8 +103,6 @@ export default function EmbryoGradingPage() {
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [embryologyLogsByEmbryo, setEmbryologyLogsByEmbryo] = useState<Record<string, EmbryologyLogEntry[]>>({});
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
-  const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [openDaySection, setOpenDaySection] = useState<'day0' | 'day3' | 'day5' | 'day6' | null>('day0');
   const [isAddEmbryoFormOpen, setIsAddEmbryoFormOpen] = useState(false);
   const [newEmbryoForm, setNewEmbryoForm] = useState<NewEmbryoFormState>({
     hisNumber: '',
@@ -478,14 +473,6 @@ export default function EmbryoGradingPage() {
   const selectedEmbryologyLogs = selectedEmbryoKey ? (embryologyLogsByEmbryo[selectedEmbryoKey] || []) : [];
 
   useEffect(() => {
-    if (!detailHis || embryos.length === 0) return;
-    const matchedEmbryo = embryos.find((embryo) => embryo.hisNumber.toUpperCase() === detailHis);
-    if (matchedEmbryo) {
-      setSelectedEmbryo(matchedEmbryo);
-    }
-  }, [detailHis, embryos]);
-
-  useEffect(() => {
     if (!selectedEmbryo || !selectedEmbryoKey) return;
     setEmbryologyLogsByEmbryo((prev) => {
       if (prev[selectedEmbryoKey]) return prev;
@@ -578,7 +565,6 @@ export default function EmbryoGradingPage() {
       fzNo: '',
       notes: '',
     });
-    setOpenDaySection('day0');
   };
 
   const handleLogFieldChange = (field: keyof EmbryologyLogFormState, value: string) => {
@@ -614,8 +600,8 @@ export default function EmbryoGradingPage() {
     const day5Label = generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade);
     const day6Label = generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade);
 
-    const updatedEntry: EmbryologyLogEntry = {
-      id: editingLogId || Date.now(),
+    const nextEntry: EmbryologyLogEntry = {
+      id: Date.now(),
       oocyteNo: logForm.oocyteNo || '—',
       maturity: logForm.maturity || '—',
       oocyteComments: logForm.oocyteComments || '—',
@@ -645,21 +631,10 @@ export default function EmbryoGradingPage() {
       notes: logForm.notes || '—',
     };
     
-    if (editingLogId) {
-      // Update existing entry
-      setEmbryologyLogsByEmbryo((prev) => ({
-        ...prev,
-        [selectedEmbryoKey]: (prev[selectedEmbryoKey] || []).map(log => log.id === editingLogId ? updatedEntry : log),
-      }));
-      setEditingLogId(null);
-    } else {
-      // Add new entry
-      setEmbryologyLogsByEmbryo((prev) => ({
-        ...prev,
-        [selectedEmbryoKey]: [...(prev[selectedEmbryoKey] || []), updatedEntry],
-      }));
-    }
-    
+    setEmbryologyLogsByEmbryo((prev) => ({
+      ...prev,
+      [selectedEmbryoKey]: [...(prev[selectedEmbryoKey] || []), nextEntry],
+    }));
     resetLogForm();
     setIsAddLogFormOpen(false);
   };
@@ -727,25 +702,6 @@ export default function EmbryoGradingPage() {
     return { totalRows, fertilized, blastRows, frozenRows };
   }, [selectedEmbryologyLogs]);
 
-  const calculateDayInCycle = (): string => {
-    if (!selectedEmbryo?.dateOfVitrification) {
-      return 'Day 0';
-    }
-    
-    try {
-      const startDate = new Date(selectedEmbryo.dateOfVitrification);
-      const today = new Date();
-      const timeDiff = today.getTime() - startDate.getTime();
-      const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-      
-      if (daysDiff < 0) return 'Day 0';
-      if (daysDiff === 0) return 'Day 0';
-      return `Day ${daysDiff}`;
-    } catch {
-      return 'Day 0';
-    }
-  };
-
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
       <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
@@ -755,25 +711,35 @@ export default function EmbryoGradingPage() {
             <h1 className="font-semibold text-black text-2xl">
               Embryo Grading
             </h1>
-            {isDetailView && (
-              <button
-                type="button"
-                onClick={() => navigate('/embryo-grading')}
-                className="px-3 py-2 rounded-md border border-[#E7E1E1] text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Back to List
-              </button>
-            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Total Embryos</p>
+              <p className="text-2xl font-semibold text-black mt-1">{embryoStats.total}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Stored</p>
+              <p className="text-2xl font-semibold text-emerald-700 mt-1">{embryoStats.stored}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">In Transit</p>
+              <p className="text-2xl font-semibold text-amber-700 mt-1">{embryoStats.inTransit}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">Thawed</p>
+              <p className="text-2xl font-semibold text-sky-700 mt-1">{embryoStats.thawed}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#E7E1E1] p-4">
+              <p className="text-xs text-gray-500">High Grade (4A*)</p>
+              <p className="text-2xl font-semibold text-[#6b1176] mt-1">{embryoStats.highGrade}</p>
+            </div>
           </div>
 
           {/* Main Content Grid - Matching Control Tower Layout */}
-          <div className={`flex-1 grid grid-cols-1 gap-6 min-h-0 ${
-            isDetailView
-              ? 'lg:grid-cols-1 items-start'
-              : 'lg:grid-cols-[380px_320px] items-start'
-          }`}>
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
             {/* Left Panel - Filters and Embryo List */}
-            <div className={`flex flex-col gap-6 min-w-0 h-full min-h-0 ${isDetailView ? 'hidden' : ''}`}>
+            <div className="flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
               {/* Filters Section */}
               <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full lg:w-[380px] flex-shrink-0 flex flex-col justify-center shadow-sm">
                 <div className="mb-3 pb-2 border-b border-gray-100">
@@ -958,10 +924,7 @@ export default function EmbryoGradingPage() {
                           className={`grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer ${
                             isSelected ? 'bg-[#F7ECFF] border-l-4 border-[#6b1176]' : ''
                           }`}
-                          onClick={() => {
-                            setSelectedEmbryo(embryo);
-                            navigate(`/embryo-grading/${embryo.hisNumber}`);
-                          }}
+                          onClick={() => setSelectedEmbryo(embryo)}
                         >
                           <div className="min-w-0 text-left overflow-hidden">
                             <div className="text-[#6b1176] text-xs font-bold truncate">
@@ -988,8 +951,7 @@ export default function EmbryoGradingPage() {
             </div>
 
             {/* Right Panel - Embryology Log Sheet */}
-            {isDetailView && (
-            <div className="flex flex-col gap-6 min-w-0 w-full h-full min-h-0">
+            <div className="flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
                   <div>
@@ -1000,6 +962,15 @@ export default function EmbryoGradingPage() {
                       </p>
                     )}
                   </div>
+                  {selectedEmbryo && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddLogFormOpen(true)}
+                      className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] transition-colors"
+                    >
+                      Add Entry
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
@@ -1039,19 +1010,21 @@ export default function EmbryoGradingPage() {
                             <p className="font-medium text-gray-900">{primaryGradeDetails?.grade || '—'}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Current Day</p>
-                            <p className="font-medium text-gray-900">{calculateDayInCycle()}</p>
+                            <p className="text-xs text-gray-500">Direction</p>
+                            <p className="font-medium text-gray-900 capitalize">{direction}</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="rounded-lg border border-[#E7E1E1] overflow-hidden">
                         <div className="overflow-x-auto">
-                          <table className="min-w-[1320px] w-full text-xs">
+                          <table className="min-w-[1280px] w-full text-xs">
                             <thead className="bg-[#F7ECFF] text-[#6b1176]">
                               <tr>
                                 <th className="px-2 py-2 text-left font-semibold">S.No</th>
                                 <th className="px-2 py-2 text-left font-semibold">Oocyte No</th>
+                                <th className="px-2 py-2 text-left font-semibold">MAT</th>
+                                <th className="px-2 py-2 text-left font-semibold">Oocyte Comments</th>
                                 <th className="px-2 py-2 text-left font-semibold">Day 0 Dish</th>
                                 <th className="px-2 py-2 text-left font-semibold">PN</th>
                                 <th className="px-2 py-2 text-left font-semibold">Drop No</th>
@@ -1062,19 +1035,20 @@ export default function EmbryoGradingPage() {
                                 <th className="px-2 py-2 text-left font-semibold">Fate</th>
                                 <th className="px-2 py-2 text-left font-semibold">FZ No</th>
                                 <th className="px-2 py-2 text-left font-semibold">Notes</th>
-                                <th className="px-2 py-2 text-left font-semibold w-24 sticky right-0 z-10 bg-[#F7ECFF] border-l border-[#E7E1E1]">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
                               {selectedEmbryologyLogs.length === 0 ? (
                                 <tr>
-                                  <td colSpan={13} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Entry.</td>
+                                  <td colSpan={14} className="px-3 py-6 text-center text-gray-500">No log entries yet. Click Add Entry.</td>
                                 </tr>
                               ) : (
                                 selectedEmbryologyLogs.map((row, index) => (
                                   <tr key={row.id} className="border-t border-[#F1F1F1] hover:bg-[#FCF9FF]">
                                     <td className="px-2 py-2">{index + 1}</td>
                                     <td className="px-2 py-2">{row.oocyteNo}</td>
+                                    <td className="px-2 py-2">{row.maturity}</td>
+                                    <td className="px-2 py-2 text-xs">{row.oocyteComments}</td>
                                     <td className="px-2 py-2">{row.day0Dish}</td>
                                     <td className="px-2 py-2">{row.pn}</td>
                                     <td className="px-2 py-2">{row.dropNo}</td>
@@ -1085,45 +1059,6 @@ export default function EmbryoGradingPage() {
                                     <td className="px-2 py-2">{row.fate}</td>
                                     <td className="px-2 py-2">{row.fzNo}</td>
                                     <td className="px-2 py-2 text-xs">{row.notes}</td>
-                                    <td className="px-2 py-2 flex gap-1 sticky right-0 z-10 bg-white border-l border-[#E7E1E1]">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setLogForm({
-                                            oocyteNo: row.oocyteNo === '—' ? '' : (row.oocyteNo || ''),
-                                            maturity: row.maturity === '—' ? '' : (row.maturity || 'MII'),
-                                            oocyteComments: row.oocyteComments === '—' ? '' : (row.oocyteComments || ''),
-                                            day0Dish: row.day0Dish === '—' ? '' : (row.day0Dish || ''),
-                                            pn: row.pn === '—' ? '' : (row.pn || '2PN'),
-                                            dropNo: row.dropNo === '—' ? '' : (row.dropNo || ''),
-                                            day0ZygoteStatus: row.day0ZygoteStatus === '—' ? '' : (row.day0ZygoteStatus || ''),
-                                            day0Notes: row.day0Notes === '—' ? '' : (row.day0Notes || ''),
-                                            day3CellCount: row.day3CellCount === '—' ? '' : (row.day3CellCount || ''),
-                                            day3Fragmentation: row.day3Fragmentation === '—' ? '' : (row.day3Fragmentation || ''),
-                                            day3Symmetry: row.day3Symmetry === '—' ? '' : (row.day3Symmetry || ''),
-                                            day3Notes: row.day3Notes === '—' ? '' : (row.day3Notes || ''),
-                                            day5Stage: row.day5Stage === '—' ? '' : (row.day5Stage || ''),
-                                            day5ExpansionGrade: row.day5ExpansionGrade === '—' ? '' : (row.day5ExpansionGrade || ''),
-                                            day5IcmGrade: row.day5IcmGrade === '—' ? '' : (row.day5IcmGrade || ''),
-                                            day5TeGrade: row.day5TeGrade === '—' ? '' : (row.day5TeGrade || ''),
-                                            day6Stage: row.day6Stage === '—' ? '' : (row.day6Stage || ''),
-                                            day6ExpansionGrade: row.day6ExpansionGrade === '—' ? '' : (row.day6ExpansionGrade || ''),
-                                            day6IcmGrade: row.day6IcmGrade === '—' ? '' : (row.day6IcmGrade || ''),
-                                            day6TeGrade: row.day6TeGrade === '—' ? '' : (row.day6TeGrade || ''),
-                                            day6Progression: row.day6Progression === '—' ? '' : (row.day6Progression || ''),
-                                            fate: row.fate === '—' ? 'Freeze' : (row.fate || 'Freeze'),
-                                            fzNo: row.fzNo === '—' ? '' : (row.fzNo || ''),
-                                            notes: row.notes === '—' ? '' : (row.notes || ''),
-                                          });
-                                          setEditingLogId(row.id);
-                                          setIsAddLogFormOpen(true);
-                                        }}
-                                        className="px-2 py-1 text-xs bg-[#6b1176] text-white rounded hover:bg-[#5a0f62] transition-colors"
-                                        title="Update entry"
-                                      >
-                                        Update
-                                      </button>
-                                    </td>
                                   </tr>
                                 ))
                               )}
@@ -1131,18 +1066,6 @@ export default function EmbryoGradingPage() {
                           </table>
                         </div>
                       </div>
-
-                      {selectedEmbryo && (
-                        <div className="flex justify-start">
-                          <button
-                            type="button"
-                            onClick={() => setIsAddLogFormOpen(true)}
-                            className="px-2.5 py-1.5 rounded bg-[#6b1176] text-white text-xs font-medium hover:bg-[#5a0f62] transition-colors"
-                          >
-                            Add Oocyte
-                          </button>
-                        </div>
-                      )}
 
                       <div className="rounded-lg border border-[#E7E1E1] p-4 bg-white">
                         <h3 className="text-sm font-semibold text-gray-900 mb-2">Grade Context</h3>
@@ -1158,47 +1081,6 @@ export default function EmbryoGradingPage() {
                 </div>
               </div>
             </div>
-            )}
-
-            {!isDetailView && (
-            <div className="lg:sticky lg:top-4 self-start w-full lg:w-[340px]">
-              <div className="rounded-lg border border-[#E7E1E1] bg-white shadow-sm p-5 space-y-4">
-                <div className="border-b border-[#F0EAF4] pb-4">
-                  <p className="text-xs uppercase tracking-widest font-semibold text-[#8A7892]">Status Overview</p>
-                  <p className="text-sm font-bold text-[#6b1176] mt-2">Embryo Snapshot</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-[#E8E1F0] bg-gradient-to-br from-[#FCF9FF] to-[#F8F4FD] px-4 py-4 min-h-[90px] flex flex-col justify-center">
-                    <p className="text-xs font-medium text-gray-600">Total Embryos</p>
-                    <p className="text-[32px] leading-none font-bold text-black mt-2">{embryoStats.total}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-[#E6F4EC] bg-gradient-to-br from-[#F5FCF8] to-[#EEFAF6] px-3 py-3 min-h-[75px] flex flex-col justify-center hover:shadow-sm transition-shadow">
-                      <p className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">Stored</p>
-                      <p className="text-xl font-bold text-emerald-700 mt-1">{embryoStats.stored}</p>
-                    </div>
-                    <div className="rounded-lg border border-[#FFF3CD] bg-gradient-to-br from-[#FFF8E9] to-[#FFF5DB] px-3 py-3 min-h-[75px] flex flex-col justify-center hover:shadow-sm transition-shadow">
-                      <p className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">In Transit</p>
-                      <p className="text-xl font-bold text-amber-700 mt-1">{embryoStats.inTransit}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-[#DDEFFA] bg-gradient-to-br from-[#F4FAFF] to-[#EBF7FF] px-3 py-3 min-h-[75px] flex flex-col justify-center hover:shadow-sm transition-shadow">
-                      <p className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">Thawed</p>
-                      <p className="text-xl font-bold text-sky-700 mt-1">{embryoStats.thawed}</p>
-                    </div>
-                    <div className="rounded-lg border border-[#F5EFF9] bg-gradient-to-br from-[#FCF7FF] to-[#F9F1FE] px-3 py-3 min-h-[75px] flex flex-col justify-center hover:shadow-sm transition-shadow">
-                      <p className="text-[10px] font-medium text-gray-600 uppercase tracking-wide">High Grade</p>
-                      <p className="text-xl font-bold text-[#6b1176] mt-1">{embryoStats.highGrade}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            )}
           </div>
         </div>
       </main>
@@ -1218,7 +1100,7 @@ export default function EmbryoGradingPage() {
             <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="HIS Number *" value={newEmbryoForm.hisNumber} onChange={(e) => handleNewEmbryoFieldChange('hisNumber', e.target.value)} />
             <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" type="number" min={1} placeholder="Embryo Count" value={newEmbryoForm.embryo_count} onChange={(e) => handleNewEmbryoFieldChange('embryo_count', e.target.value)} />
             <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Site / Branch" value={newEmbryoForm.siteName} onChange={(e) => handleNewEmbryoFieldChange('siteName', e.target.value)} />
-            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Incubator ID" value={newEmbryoForm.tankCode} onChange={(e) => handleNewEmbryoFieldChange('tankCode', e.target.value)} />
+            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Tank Code" value={newEmbryoForm.tankCode} onChange={(e) => handleNewEmbryoFieldChange('tankCode', e.target.value)} />
           </div>
           <div className="flex items-center justify-end gap-2">
             <button
@@ -1248,105 +1130,197 @@ export default function EmbryoGradingPage() {
         onClose={() => {
           setIsAddLogFormOpen(false);
           resetLogForm();
-          setEditingLogId(null);
         }}
-        title={editingLogId ? "Edit Log Entry" : "Add Log Entry"}
-        description={editingLogId ? "Update embryology sheet details for the selected entry" : "Enter embryology sheet details for the selected HIS"}
-        containerClassName="w-full max-w-[1050px]"
+        title="Add Log Entry"
+        description="Enter embryology sheet details for the selected HIS"
+        containerClassName="w-full max-w-[1000px]"
       >
-        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-          <div className="rounded-xl border border-[#E7E1E1] bg-gradient-to-r from-[#FCF9FF] to-white px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#6b1176] uppercase tracking-wide">Embryology Sheet</span>
-              <span className="h-1 w-1 rounded-full bg-[#9c3aa6]" />
-              <span className="text-xs text-gray-600">HIS: {selectedEmbryo?.hisNumber || '—'}</span>
-            </div>
-            <span className="inline-flex w-fit items-center rounded-full border border-[#e6d3ec] bg-[#f8f0fb] px-2.5 py-1 text-xs font-medium text-[#6b1176]">
-              {editingLogId ? 'Update Mode' : 'New Entry'}
-            </span>
-          </div>
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto">
           
-          {/* Oocyte Identity (always visible) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-4 shadow-sm">
+          {/* Oocyte ID & Maturity (always visible) */}
+          <div className="border-b border-[#E7E1E1] pb-3">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Oocyte Identity</h3>
-            <div className="grid grid-cols-1 gap-2 w-full sm:max-w-[220px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Oocyte No" value={logForm.oocyteNo} onChange={(e) => handleLogFieldChange('oocyteNo', e.target.value)} />
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.maturity} onChange={(e) => handleLogFieldChange('maturity', e.target.value)}>
+                <option value="MII">MII</option>
+                <option value="MI">MI</option>
+                <option value="GV">GV</option>
+              </select>
+              <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Oocyte Comments" value={logForm.oocyteComments} onChange={(e) => handleLogFieldChange('oocyteComments', e.target.value)} />
             </div>
           </div>
 
           {/* Day 0: Fertilization Check (PN Stage) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setOpenDaySection((prev) => (prev === 'day0' ? null : 'day0'))}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <h3 className="text-sm font-semibold text-gray-900">📅 Day 0: Fertilization Check (PN Stage)</h3>
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#e6d3ec] bg-[#f8f0fb] text-sm font-semibold text-[#6b1176]">{openDaySection === 'day0' ? '−' : '+'}</span>
-            </button>
-            {openDaySection === 'day0' && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3">
-                  <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Day 0 Dish" value={logForm.day0Dish} onChange={(e) => handleLogFieldChange('day0Dish', e.target.value)} />
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.pn} onChange={(e) => handleLogFieldChange('pn', e.target.value)}>
-                    <option value="2PN">✅ 2PN (normal)</option>
-                    <option value="1PN">1PN</option>
-                    <option value="3PN">3PN</option>
-                    <option value="0PN">0PN</option>
-                    <option value="Degenerated">Degenerated</option>
-                  </select>
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day0ZygoteStatus} onChange={(e) => handleLogFieldChange('day0ZygoteStatus', e.target.value)}>
-                    <option value="">Zygote Status</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Abnormal">Abnormal</option>
-                  </select>
-                  <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Drop No" value={logForm.dropNo} onChange={(e) => handleLogFieldChange('dropNo', e.target.value)} />
-                </div>
-                <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm mt-2 w-full" placeholder="Day 0 Notes (e.g., early cleavage)" value={logForm.day0Notes} onChange={(e) => handleLogFieldChange('day0Notes', e.target.value)} />
-              </>
-            )}
+          <div className="border-b border-[#E7E1E1] pb-3">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">📅 Day 0: Fertilization Check (PN Stage)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Day 0 Dish" value={logForm.day0Dish} onChange={(e) => handleLogFieldChange('day0Dish', e.target.value)} />
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.pn} onChange={(e) => handleLogFieldChange('pn', e.target.value)}>
+                <option value="2PN">✅ 2PN (normal)</option>
+                <option value="1PN">1PN</option>
+                <option value="3PN">3PN</option>
+                <option value="0PN">0PN</option>
+                <option value="Degenerated">Degenerated</option>
+              </select>
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day0ZygoteStatus} onChange={(e) => handleLogFieldChange('day0ZygoteStatus', e.target.value)}>
+                <option value="">Zygote Status</option>
+                <option value="Normal">Normal</option>
+                <option value="Abnormal">Abnormal</option>
+              </select>
+              <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Drop No" value={logForm.dropNo} onChange={(e) => handleLogFieldChange('dropNo', e.target.value)} />
+            </div>
+            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm mt-2 w-full" placeholder="Day 0 Notes (e.g., early cleavage)" value={logForm.day0Notes} onChange={(e) => handleLogFieldChange('day0Notes', e.target.value)} />
           </div>
 
           {/* Day 3 Entry */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setOpenDaySection((prev) => (prev === 'day3' ? null : 'day3'))}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <h3 className="text-sm font-semibold text-gray-900">📅 Day 3: Cleavage Stage</h3>
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#e6d3ec] bg-[#f8f0fb] text-sm font-semibold text-[#6b1176]">{openDaySection === 'day3' ? '−' : '+'}</span>
-            </button>
-            {openDaySection === 'day3' && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-3">
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3CellCount} onChange={(e) => handleLogFieldChange('day3CellCount', e.target.value)}>
-                    <option value="">Cell Count</option>
+          <div className="border-b border-[#E7E1E1] pb-3">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">📅 Day 3: Cleavage Stage</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3CellCount} onChange={(e) => handleLogFieldChange('day3CellCount', e.target.value)}>
+                <option value="">Cell Count</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9+">9+</option>
+              </select>
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3Fragmentation} onChange={(e) => handleLogFieldChange('day3Fragmentation', e.target.value)}>
+                <option value="">Fragmentation</option>
+                <option value="1">1 (≤10%)</option>
+                <option value="2">2 (10–25%)</option>
+                <option value="3">3 (25–50%)</option>
+                <option value="4">4 (&gt;50%)</option>
+              </select>
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3Symmetry} onChange={(e) => handleLogFieldChange('day3Symmetry', e.target.value)}>
+                <option value="">Symmetry</option>
+                <option value="Even">Even</option>
+                <option value="Slightly uneven">Slightly uneven</option>
+                <option value="Uneven">Uneven</option>
+              </select>
+              {logForm.day3CellCount && logForm.day3Fragmentation ? (
+                <div className="h-10 rounded-md border border-[#9c3aa6] bg-[#f3e8f7] px-3 flex items-center">
+                  <span className="text-sm font-semibold text-[#6b1176]">🔀 {generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation)}</span>
+                </div>
+              ) : (
+                <div className="h-10 rounded-md border border-[#E7E1E1] bg-gray-50 px-3 flex items-center">
+                  <span className="text-sm text-gray-400">Label</span>
+                </div>
+              )}
+            </div>
+            <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm mt-2 w-full" placeholder="Day 3 Notes (e.g., multinucleation)" value={logForm.day3Notes} onChange={(e) => handleLogFieldChange('day3Notes', e.target.value)} />
+          </div>
+
+          {/* Day 5 Blastocyst Assessment */}
+          <div className="border-b border-[#E7E1E1] pb-3">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">📅 Day 5: Blastocyst Assessment</h3>
+            <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full mb-2" value={logForm.day5Stage} onChange={(e) => handleLogFieldChange('day5Stage', e.target.value)}>
+              <option value="">Development Stage</option>
+              <option value="Cleavage">Cleavage (cells)</option>
+              <option value="Morula">Morula</option>
+              <option value="Early Blast">Early Blast (EB)</option>
+              <option value="Blastocyst">Blastocyst</option>
+            </select>
+            
+            {logForm.day5Stage === 'Blastocyst' && (
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Expansion (1–6)</label>
+                  <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5ExpansionGrade} onChange={(e) => handleLogFieldChange('day5ExpansionGrade', e.target.value)}>
+                    <option value="">—</option>
+                    <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
                     <option value="4">4</option>
                     <option value="5">5</option>
                     <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9+">9+</option>
                   </select>
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3Fragmentation} onChange={(e) => handleLogFieldChange('day3Fragmentation', e.target.value)}>
-                    <option value="">Fragmentation</option>
-                    <option value="1">1 (≤10%)</option>
-                    <option value="2">2 (10–25%)</option>
-                    <option value="3">3 (25–50%)</option>
-                    <option value="4">4 (&gt;50%)</option>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">ICM</label>
+                  <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5IcmGrade} onChange={(e) => handleLogFieldChange('day5IcmGrade', e.target.value)}>
+                    <option value="">—</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
                   </select>
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day3Symmetry} onChange={(e) => handleLogFieldChange('day3Symmetry', e.target.value)}>
-                    <option value="">Symmetry</option>
-                    <option value="Even">Even</option>
-                    <option value="Slightly uneven">Slightly uneven</option>
-                    <option value="Uneven">Uneven</option>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">TE</label>
+                  <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5TeGrade} onChange={(e) => handleLogFieldChange('day5TeGrade', e.target.value)}>
+                    <option value="">—</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
                   </select>
-                  {logForm.day3CellCount && logForm.day3Fragmentation ? (
+                </div>
+                {logForm.day5ExpansionGrade && logForm.day5IcmGrade && logForm.day5TeGrade ? (
+                  <div className="h-10 rounded-md border border-[#9c3aa6] bg-[#f3e8f7] px-3 flex items-center">
+                    <span className={`text-sm font-semibold ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>
+                      ✓ {generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="h-10 rounded-md border border-[#E7E1E1] bg-gray-50 px-3 flex items-center">
+                    <span className="text-sm text-gray-400">Label</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Day 6 Blastocyst Assessment (optional if Day 5 not blastocyst) */}
+          {logForm.day5Stage && logForm.day5Stage !== 'Blastocyst' && (
+            <div className="border-b border-[#E7E1E1] pb-3">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">📅 Day 6: Late Blastocyst Check</h3>
+              <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full mb-2" value={logForm.day6Stage} onChange={(e) => handleLogFieldChange('day6Stage', e.target.value)}>
+                <option value="">Development Stage</option>
+                <option value="Cleavage">Cleavage (cells)</option>
+                <option value="Morula">Morula</option>
+                <option value="Early Blast">Early Blast (EB)</option>
+                <option value="Blastocyst">Blastocyst</option>
+              </select>
+
+              {logForm.day6Stage === 'Blastocyst' && (
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Expansion (1–6)</label>
+                    <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
+                      <option value="">—</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">ICM</label>
+                    <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6IcmGrade} onChange={(e) => handleLogFieldChange('day6IcmGrade', e.target.value)}>
+                      <option value="">—</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">TE</label>
+                    <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6TeGrade} onChange={(e) => handleLogFieldChange('day6TeGrade', e.target.value)}>
+                      <option value="">—</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                    </select>
+                  </div>
+                  {logForm.day6ExpansionGrade && logForm.day6IcmGrade && logForm.day6TeGrade ? (
                     <div className="h-10 rounded-md border border-[#9c3aa6] bg-[#f3e8f7] px-3 flex items-center">
-                      <span className="text-sm font-semibold text-[#6b1176]">🔀 {generateDay3Label(logForm.day3CellCount, logForm.day3Fragmentation)}</span>
+                      <span className={`text-sm font-semibold ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>
+                        ⚡ {generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}
+                      </span>
                     </div>
                   ) : (
                     <div className="h-10 rounded-md border border-[#E7E1E1] bg-gray-50 px-3 flex items-center">
@@ -1354,163 +1328,22 @@ export default function EmbryoGradingPage() {
                     </div>
                   )}
                 </div>
-                <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm mt-2 w-full" placeholder="Day 3 Notes (e.g., multinucleation)" value={logForm.day3Notes} onChange={(e) => handleLogFieldChange('day3Notes', e.target.value)} />
-              </>
-            )}
-          </div>
+              )}
 
-          {/* Day 5 Blastocyst Assessment */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setOpenDaySection((prev) => (prev === 'day5' ? null : 'day5'))}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <h3 className="text-sm font-semibold text-gray-900">📅 Day 5: Blastocyst Assessment</h3>
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#e6d3ec] bg-[#f8f0fb] text-sm font-semibold text-[#6b1176]">{openDaySection === 'day5' ? '−' : '+'}</span>
-            </button>
-            {openDaySection === 'day5' && (
-              <>
-                <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full mb-2 mt-3" value={logForm.day5Stage} onChange={(e) => handleLogFieldChange('day5Stage', e.target.value)}>
-                  <option value="">Development Stage</option>
-                  <option value="Cleavage">Cleavage (cells)</option>
-                  <option value="Morula">Morula</option>
-                  <option value="Early Blast">Early Blast (EB)</option>
-                  <option value="Blastocyst">Blastocyst</option>
+              {logForm.day6Stage && (
+                <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full" value={logForm.day6Progression} onChange={(e) => handleLogFieldChange('day6Progression', e.target.value)}>
+                  <option value="">Progression Status</option>
+                  <option value="Delayed development">Delayed development</option>
+                  <option value="Same as Day 5">Same as Day 5</option>
+                  <option value="Improved">Improved</option>
+                  <option value="Degenerated">Degenerated</option>
                 </select>
-
-                {logForm.day5Stage === 'Blastocyst' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Expansion (1–6)</label>
-                      <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5ExpansionGrade} onChange={(e) => handleLogFieldChange('day5ExpansionGrade', e.target.value)}>
-                        <option value="">—</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">ICM</label>
-                      <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5IcmGrade} onChange={(e) => handleLogFieldChange('day5IcmGrade', e.target.value)}>
-                        <option value="">—</option>
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">TE</label>
-                      <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day5TeGrade} onChange={(e) => handleLogFieldChange('day5TeGrade', e.target.value)}>
-                        <option value="">—</option>
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                      </select>
-                    </div>
-                    {logForm.day5ExpansionGrade && logForm.day5IcmGrade && logForm.day5TeGrade ? (
-                      <div className="h-10 rounded-md border border-[#9c3aa6] bg-[#f3e8f7] px-3 flex items-center">
-                        <span className={`text-sm font-semibold ${getGradeColor(generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade))}`}>
-                          ✓ {generateBlastLabel(logForm.day5ExpansionGrade, logForm.day5IcmGrade, logForm.day5TeGrade)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="h-10 rounded-md border border-[#E7E1E1] bg-gray-50 px-3 flex items-center">
-                        <span className="text-sm text-gray-400">Label</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Day 6 Blastocyst Assessment (optional if Day 5 not blastocyst) */}
-          {logForm.day5Stage && logForm.day5Stage !== 'Blastocyst' && (
-            <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setOpenDaySection((prev) => (prev === 'day6' ? null : 'day6'))}
-                className="w-full flex items-center justify-between text-left"
-              >
-                <h3 className="text-sm font-semibold text-gray-900">📅 Day 6: Late Blastocyst Check</h3>
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#e6d3ec] bg-[#f8f0fb] text-sm font-semibold text-[#6b1176]">{openDaySection === 'day6' ? '−' : '+'}</span>
-              </button>
-              {openDaySection === 'day6' && (
-                <>
-                  <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full mb-2 mt-3" value={logForm.day6Stage} onChange={(e) => handleLogFieldChange('day6Stage', e.target.value)}>
-                    <option value="">Development Stage</option>
-                    <option value="Cleavage">Cleavage (cells)</option>
-                    <option value="Morula">Morula</option>
-                    <option value="Early Blast">Early Blast (EB)</option>
-                    <option value="Blastocyst">Blastocyst</option>
-                  </select>
-
-                  {logForm.day6Stage === 'Blastocyst' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Expansion (1–6)</label>
-                        <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6ExpansionGrade} onChange={(e) => handleLogFieldChange('day6ExpansionGrade', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="1">1</option>
-                          <option value="2">2</option>
-                          <option value="3">3</option>
-                          <option value="4">4</option>
-                          <option value="5">5</option>
-                          <option value="6">6</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">ICM</label>
-                        <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6IcmGrade} onChange={(e) => handleLogFieldChange('day6IcmGrade', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="A">A</option>
-                          <option value="B">B</option>
-                          <option value="C">C</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">TE</label>
-                        <select className="h-10 w-full rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.day6TeGrade} onChange={(e) => handleLogFieldChange('day6TeGrade', e.target.value)}>
-                          <option value="">—</option>
-                          <option value="A">A</option>
-                          <option value="B">B</option>
-                          <option value="C">C</option>
-                        </select>
-                      </div>
-                      {logForm.day6ExpansionGrade && logForm.day6IcmGrade && logForm.day6TeGrade ? (
-                        <div className="h-10 rounded-md border border-[#9c3aa6] bg-[#f3e8f7] px-3 flex items-center">
-                          <span className={`text-sm font-semibold ${getGradeColor(generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade))}`}>
-                            ⚡ {generateBlastLabel(logForm.day6ExpansionGrade, logForm.day6IcmGrade, logForm.day6TeGrade)}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="h-10 rounded-md border border-[#E7E1E1] bg-gray-50 px-3 flex items-center">
-                          <span className="text-sm text-gray-400">Label</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {logForm.day6Stage && (
-                    <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white w-full" value={logForm.day6Progression} onChange={(e) => handleLogFieldChange('day6Progression', e.target.value)}>
-                      <option value="">Progression Status</option>
-                      <option value="Delayed development">Delayed development</option>
-                      <option value="Same as Day 5">Same as Day 5</option>
-                      <option value="Improved">Improved</option>
-                      <option value="Degenerated">Degenerated</option>
-                    </select>
-                  )}
-                </>
               )}
             </div>
           )}
 
           {/* Fate & Freeze Details (Final Decision) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-gradient-to-r from-[#FCF9FF] to-white px-4 py-4 shadow-sm">
+          <div className="border-b border-[#E7E1E1] pb-3">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">🎯 Final Decision</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.fate} onChange={(e) => handleLogFieldChange('fate', e.target.value)}>
@@ -1530,24 +1363,23 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 pt-3 pb-2 border-t border-[#E7E1E1] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E7E1E1]">
             <button
               type="button"
               onClick={() => {
                 setIsAddLogFormOpen(false);
                 resetLogForm();
-                setEditingLogId(null);
               }}
-              className="px-4 py-2 rounded-md border border-[#E7E1E1] text-gray-700 text-sm font-medium hover:bg-gray-50"
+              className="px-3 py-2 rounded-md border border-[#E7E1E1] text-gray-700 text-sm font-medium hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleAddLogEntry}
-              className="px-4 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] shadow-sm"
+              className="px-3 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62]"
             >
-              {editingLogId ? "Update Entry" : "Save Entry"}
+              Save Entry
             </button>
           </div>
         </div>
