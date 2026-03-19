@@ -883,17 +883,34 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     const labels = sorted.map((r) => formatTimeLabel(r.timestamp, timeRange));
     const stats = sorted.map((r) => getKpiStats(r, activeTab));
     const values = stats.map((s) => (s ? s.avg : null));
+    const numericAverages = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const avgSpan =
+      numericAverages.length > 1
+        ? Math.max(...numericAverages) - Math.min(...numericAverages)
+        : 0;
+    const visualPad = Math.max(avgSpan * 0.01, 0.01);
     const rangeValues = stats.map((s) => {
-      if (!s || s.min == null || s.max == null) return null;
-      return [s.min, s.max];
+      if (!s) return null;
+      let low = s.min ?? s.avg;
+      let high = s.max ?? s.avg;
+      if (!Number.isFinite(low) || !Number.isFinite(high)) return null;
+      if (low > high) {
+        const temp = low;
+        low = high;
+        high = temp;
+      }
+      if (Math.abs(high - low) < Number.EPSILON) {
+        low -= visualPad / 2;
+        high += visualPad / 2;
+      }
+      return [low, high];
     });
     const tab = kpiTabs.find((t) => t.id === activeTab);
     const unit = tab?.unit ?? '';
     const datasetLabel = unit
       ? `${tab?.label ?? activeTab} (${unit})`
       : `${tab?.label ?? activeTab}`;
-    const isBinaryTab = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
-    const showCandlestick = !isBinaryTab && timeRange !== 'LIVE';
+    const showCandlestick = timeRange !== 'LIVE';
 
     const datasets: any[] = [];
 
