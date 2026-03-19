@@ -226,6 +226,7 @@ export const router = createBrowserRouter([
     },
     { path: "/alert-setting", element: <AlertSettingWithAuth /> },
     { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+    { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
     { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
     { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
 

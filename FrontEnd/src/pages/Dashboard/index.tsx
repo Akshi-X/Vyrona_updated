@@ -622,13 +622,22 @@ export default function Dashboard({ }: DashboardProps) {
       try {
         const response = await ivfService.getTotalDeviations();
 
-        let max_deviated_alert = ""
-        let max_deviations = 0
-        for(const alert_name in response.deviations_by_kpi) {
-          if(response.deviations_by_kpi[alert_name] > max_deviations) {
+        // Sort deviations by count (descending) and skip "Unknown"
+        const sortedEntries = Object.entries(response.deviations_by_kpi)
+          .sort(([, countA], [, countB]) => countB - countA);
+
+        // Find the first entry that is not "Unknown"
+        let max_deviated_alert = "";
+        for (const [alert_name] of sortedEntries) {
+          if (alert_name !== "Unknown") {
             max_deviated_alert = alert_name;
-            max_deviations = response.deviations_by_kpi[alert_name];
+            break;
           }
+        }
+
+        // Fallback to first entry if all are "Unknown"
+        if (!max_deviated_alert && sortedEntries.length > 0) {
+          max_deviated_alert = sortedEntries[0][0];
         }
 
         if (!cancelled) setIvfTopDeviationDriverName(max_deviated_alert || 'N/A');
