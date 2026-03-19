@@ -54,6 +54,7 @@ from app.middleware.token_validation_middleware import TokenValidationMiddleware
 from app.schemas.response_schema import HealthCheckResponse
 from app.service.quality_service import QualityService
 from app.utils.alert_reminder_scheduler import schedule_alert_reminders
+from app.utils.arc_autorun_scheduler import schedule_arc_ivf_storage_midnight
 from app.utils.lane_risk_utils import schedule_daily_lpi_fetch
 
 # Create logs directory if it doesn't exist (BEFORE logging setup)
@@ -179,6 +180,11 @@ async def startup_event():
     # Step 5: Start scheduled task for hourly alert reminders
     logger.info("Starting hourly alert reminder scheduler...")
     asyncio.create_task(schedule_alert_reminders())
+
+    # Step 6: Start ARC IVF autorun scheduler when enabled
+    if settings.ARC_AUTORUN:
+        logger.info("ARC_AUTORUN enabled. Starting ARC midnight scheduler...")
+        asyncio.create_task(schedule_arc_ivf_storage_midnight())
 
     print("!" * 60 + "\n")
 

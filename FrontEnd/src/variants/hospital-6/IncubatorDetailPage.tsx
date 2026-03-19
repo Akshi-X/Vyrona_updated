@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import { ivfService } from '../../services/ivfService';
-import MockQualityTrackingChart from './MockQualityTrackingChart';
-import MockContainerDataTable from './MockContainerDataTable';
+import MockQualityTrackingChart from '../../pages/IncubatorTracking/MockQualityTrackingChart';
+import MockContainerDataTable from '../../pages/IncubatorTracking/MockContainerDataTable';
 
 type IllustrationMetrics = {
   temp: string;
@@ -32,105 +32,109 @@ function IncubatorIllustrationPanel({ metrics }: { metrics: IllustrationMetrics 
     <div className="flex items-center justify-center w-full">
       <div className="flex-1 flex items-center justify-center">
         <svg
-          viewBox="0 0 360 420"
+          viewBox="0 0 360 520"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           aria-label="IVF Incubator with readings"
           className="w-full max-w-[420px]"
         >
           <defs>
-            <linearGradient id="inc-body-front" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#dbe1e8" />
-              <stop offset="100%" stopColor="#cdd6df" />
+            <linearGradient id="inc-body-grad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#f5f3f8" />
+              <stop offset="100%" stopColor="#e8e3f0" />
             </linearGradient>
-            <linearGradient id="inc-body-side" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#d4dbe4" />
-              <stop offset="100%" stopColor="#c8d0da" />
+            <linearGradient id="inc-body-side" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#ccc6d8" />
+              <stop offset="8%" stopColor="#f5f3f8" />
+              <stop offset="92%" stopColor="#f5f3f8" />
+              <stop offset="100%" stopColor="#ccc6d8" />
             </linearGradient>
-            <linearGradient id="inc-top-plate" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#253244" />
-              <stop offset="100%" stopColor="#111b28" />
+            <linearGradient id="inc-glass-grad" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#c8e8ff" stopOpacity="0.85" />
+              <stop offset="50%" stopColor="#90c8f0" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#5ba8e0" stopOpacity="0.5" />
             </linearGradient>
-            <linearGradient id="inc-mast" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#2a3748" />
-              <stop offset="100%" stopColor="#121c29" />
+            <linearGradient id="inc-glow" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#60b8ff" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#2080d0" stopOpacity="0.1" />
             </linearGradient>
-            <linearGradient id="inc-lid" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#2b3a4d" />
-              <stop offset="100%" stopColor="#121d2b" />
+            <linearGradient id="inc-display-grad" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#1a1430" />
+              <stop offset="100%" stopColor="#0d0a20" />
             </linearGradient>
-            <linearGradient id="inc-display-bezel" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#f6fafc" />
-              <stop offset="100%" stopColor="#dbe4eb" />
+            <linearGradient id="inc-panel-grad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#3a3050" />
+              <stop offset="100%" stopColor="#2a2240" />
             </linearGradient>
-            <linearGradient id="inc-display-screen" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#4f5661" />
-              <stop offset="100%" stopColor="#2d3239" />
-            </linearGradient>
-            <linearGradient id="inc-teal" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="#7ff6e7" stopOpacity="0" />
-              <stop offset="50%" stopColor="#95fff0" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#7ff6e7" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="inc-led" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#8DFF95" />
-              <stop offset="100%" stopColor="#21D84B" />
-            </linearGradient>
-            <filter id="inc-glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.6" result="glow" />
+            <filter id="inc-glass-blur">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="inc-glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="6" result="glow" />
               <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
 
-          <rect x="3" y="3" width="354" height="414" rx="6" fill="#ECE8F0" />
-          <ellipse cx="180" cy="360" rx="112" ry="17" fill="#D4CEDA" />
+          <rect x="92" y="482" width="40" height="14" rx="7" fill="#c0bcd0" />
+          <rect x="228" y="482" width="40" height="14" rx="7" fill="#c0bcd0" />
+          <rect x="88" y="486" width="184" height="6" rx="3" fill="#d0cce0" />
 
-          <path d="M91 253 L228 228 L281 254 L141 280 Z" fill="url(#inc-top-plate)" />
-          <path d="M86 256 L141 280 L138 305 L89 286 Z" fill="#1C2836" />
+          <rect x="70" y="44" width="220" height="104" rx="12" fill="url(#inc-panel-grad)" stroke="#4a3870" strokeWidth="1.5" />
+          <rect x="82" y="56" width="196" height="78" rx="8" fill="url(#inc-display-grad)" stroke="#6B1176" strokeWidth="1" />
 
-          <path d="M103 112 L132 103 L132 266 L103 283 Z" fill="url(#inc-mast)" />
-          <path d="M109 117 H123" stroke="#ED8F93" strokeWidth="5" strokeLinecap="round" />
+          {[0, 1, 2, 3].map((index) => {
+            const y = 62 + index * 18;
+            const labelX = 96;
+            const valueX = 264;
+            const labels = ['TEMP', 'CO₂ CONC', 'pH LEVEL', 'HUMIDITY'];
+            const values = [metrics.temp, metrics.co2, metrics.ph, metrics.humidity];
+            const colors = ['#7ee8ff', '#7ee8ff', '#a8f0a0', '#ffd080'];
+            return (
+              <g key={labels[index]}>
+                <rect x="90" y={y - 9} width="180" height="16" rx="4" fill="#1d1635" stroke="#3b2f5a" strokeWidth="0.6" />
+                <text x={labelX} y={y + 2} textAnchor="start" fontSize="8" fill="#9b8fc0" fontFamily="monospace">
+                  {labels[index]}
+                </text>
+                <text x={valueX} y={y + 2} textAnchor="end" fontSize="10" fontWeight="700" fill={colors[index]} fontFamily="monospace">
+                  {values[index]}
+                </text>
+              </g>
+            );
+          })}
 
-          <path d="M165 124 L243 110 L270 162 L191 176 Z" fill="url(#inc-lid)" />
-          <path d="M175 132 L236 121 L255 157 L194 168 Z" fill="#0E1724" opacity="0.86" />
-          <circle cx="253" cy="114" r="5" stroke="#7D8D9D" strokeWidth="2" fill="none" />
+          <text x="180" y="34" textAnchor="middle" fontSize="10" fill="#8878a8" fontFamily="sans-serif" letterSpacing="2">IVF INCUBATOR</text>
 
-          <path d="M171 184 L232 173 L247 202 L185 212 Z" fill="#152233" />
-          {[0, 1].flatMap((row) =>
-            [0, 1, 2].map((col) => {
-              const cx = 185 + col * 14 + (row === 1 ? 6 : 0);
-              const cy = 188 + row * 11;
-              return <circle key={`${row}-${col}`} cx={cx} cy={cy} r="4" fill="none" stroke="#63788E" strokeWidth="1" />;
+          <rect x="70" y="148" width="220" height="334" rx="16" fill="url(#inc-body-side)" stroke="#b8b0cc" strokeWidth="1.5" />
+
+          <rect x="88" y="174" width="184" height="286" rx="12" fill="#ddd8e8" stroke="#c8c0d8" strokeWidth="1" />
+
+          <rect x="96" y="184" width="168" height="266" rx="10" fill="url(#inc-glass-grad)" stroke="#90c0e8" strokeWidth="1.4" />
+          <rect x="96" y="184" width="168" height="266" rx="10" fill="url(#inc-glow)" />
+
+          {[250, 305, 360, 415].map((y) => (
+            <line key={y} x1="112" y1={y} x2="248" y2={y} stroke="#a8c8e8" strokeWidth="1.4" strokeDasharray="6,4" opacity="0.65" />
+          ))}
+
+          {[0, 1, 2].map((row) => (
+            [126, 156, 186, 216, 246].map((cx) => {
+              const cy = 272 + row * 52;
+              return (
+                <g key={`${row}-${cx}`}>
+                  <ellipse cx={cx} cy={cy} rx="9" ry="4.5" fill="#e8f4ff" stroke="#90c0e8" strokeWidth="0.8" opacity="0.9" />
+                  <ellipse cx={cx} cy={cy - 1.5} rx="6.5" ry="2.5" fill="#d0e8ff" opacity="0.7" />
+                </g>
+              );
             })
-          )}
+          ))}
 
-          <path d="M84 283 L138 282 L138 343 L84 339 Z" fill="url(#inc-body-side)" stroke="#BCC7D2" />
-          <path d="M138 282 L281 254 L281 337 L138 343 Z" fill="url(#inc-body-front)" stroke="#BBC6D2" />
-          <path d="M143 332 L270 314" stroke="#C0CBD6" strokeWidth="1" />
+          <rect x="104" y="190" width="152" height="5" rx="2" fill="#40a8ff" opacity="0.8" filter="url(#inc-glow-filter)" />
 
-          <circle cx="154" cy="281" r="8" fill="#2A3646" stroke="#506176" strokeWidth="1.5" />
-          <circle cx="154" cy="281" r="4.5" fill="#3B4A5E" />
+          <rect x="52" y="178" width="22" height="286" rx="8" fill="#f0edf6" stroke="#c8c0d8" strokeWidth="1" />
+          <rect x="66" y="300" width="5" height="52" rx="2.5" fill="#c0b8d0" stroke="#a0a0b8" strokeWidth="0.8" />
 
-          <path d="M170 272 L246 259 L240 301 L164 312 Z" fill="url(#inc-display-bezel)" />
-          <path d="M176 276 L239 265 L234 297 L171 308 Z" fill="url(#inc-display-screen)" />
-
-          <text x="182" y="283" transform="rotate(-10 182 283)" fontSize="9" fill="#EFE6AE" fontFamily="monospace" fontWeight="700">
-            {metrics.temp}
-          </text>
-          <text x="216" y="277" transform="rotate(-10 216 277)" fontSize="9" fill="#EFE6AE" fontFamily="monospace" fontWeight="700">
-            {metrics.co2}
-          </text>
-          <text x="183" y="295" transform="rotate(-10 183 295)" fontSize="9" fill="#EFE6AE" fontFamily="monospace" fontWeight="700">
-            {metrics.ph}
-          </text>
-          <text x="217" y="290" transform="rotate(-10 217 290)" fontSize="9" fill="#EFE6AE" fontFamily="monospace" fontWeight="700">
-            {metrics.humidity}
-          </text>
-
-          <path d="M154 310 L230 297" stroke="url(#inc-teal)" strokeWidth="4" strokeLinecap="round" filter="url(#inc-glow)" />
-          <path d="M206 314 L222 312 L222 342 L216 343 L216 317 L206 319 Z" fill="url(#inc-led)" filter="url(#inc-glow)" />
-
-          <text x="103" y="334" fontSize="22" fill="#1F2A38" fontFamily="sans-serif" letterSpacing="2">PLANER</text>
+          <circle cx="276" cy="462" r="5" fill="#00e676" opacity="0.9" filter="url(#inc-glow-filter)" />
+          <circle cx="276" cy="462" r="3" fill="#80ffb0" />
         </svg>
       </div>
     </div>
@@ -283,7 +287,6 @@ export default function IncubatorDetailPage() {
             </div>
           </div>
 
-          {/* Row 1: Live graph on KPIs (left) | Visual representation of incubator (right) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="h-full min-h-[320px] bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               {hasIncubatorId ? (
@@ -300,7 +303,6 @@ export default function IncubatorDetailPage() {
             </div>
           </div>
 
-          {/* Row 3: Contents of the incubator and its information */}
           {hasIncubatorId ? (
             <MockContainerDataTable />
           ) : (

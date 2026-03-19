@@ -2,6 +2,7 @@ export interface IVFTreatment {
   hisNumber: string;
   cryolockNum: string;
   canisterNum: number;
+  embryo_count?: number;
   tankCode: string;
   caneCode: string;
   gobletColor: string;
