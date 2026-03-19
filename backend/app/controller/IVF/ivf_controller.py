@@ -122,11 +122,16 @@ def get_ivf_control_tower_map(
     }
     """
     try:
+        user = _ensure_ivf_user(request)
         # Get branch filter info for IVF department users
         branch_id, role = get_branch_filter_info(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
         
         service = IVFService(db)
-        map_data = service.get_control_tower_map_locations(branch_id=branch_id)
+        map_data = service.get_control_tower_map_locations(
+            hospital_id=hospital_id,
+            branch_id=branch_id,
+        )
         return IVFControlTowerResponse(**map_data)
     except HTTPException:
         raise
