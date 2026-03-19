@@ -40,7 +40,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
     const [dashboardOpen, setDashboardOpen] = useState(() => {
         const p = window.location.pathname;
-        return p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/");
+        return p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/");
     });
     const navigate = useNavigate();
     const location = useLocation();
@@ -105,7 +105,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // Keep dropdown open when on a dashboard sub-route
     useEffect(() => {
         const p = location.pathname;
-        if (p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading") {
+        if (p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/")) {
             setDashboardOpen(true);
         }
     }, [location.pathname]);
@@ -241,7 +241,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                       ? location.pathname === "/incubator-tracking" ||
                                                         location.pathname.startsWith("/incubator-tracking/")
                                                       : child.path === "/embryo-grading"
-                                                        ? location.pathname === "/embryo-grading"
+                                                                                                                ? location.pathname === "/embryo-grading" ||
+                                                                                                                    location.pathname.startsWith("/embryo-grading/")
                                                         : false;
                                             return (
                                                 <button
