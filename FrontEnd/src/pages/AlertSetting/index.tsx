@@ -975,20 +975,24 @@ export default function AlertSetting() {
         }
     };
 
-    const handleSelectNotificationChannel = (channel: "email" | "whatsapp") => {
-        setNotifySettings((prev) => ({
-            ...prev,
-            is_email_notifify: channel === "email",
-            is_whatsapp_notify: channel === "whatsapp",
-        }));
+    const handleSelectNotificationChannel = (
+        channel: "email" | "whatsapp",
+        enabled: boolean,
+    ) => {
+        setNotifySettings((prev) =>
+            channel === "email"
+                ? { ...prev, is_email_notifify: enabled }
+                : { ...prev, is_whatsapp_notify: enabled },
+        );
         setNotifySettingsError(null);
     };
 
     const handleSaveNotifySettings = async () => {
-        if (notifySettings.is_email_notifify === notifySettings.is_whatsapp_notify) {
-            setNotifySettingsError(
-                "Exactly one notification channel must be enabled",
-            );
+        if (
+            !notifySettings.is_email_notifify &&
+            !notifySettings.is_whatsapp_notify
+        ) {
+            setNotifySettingsError("Enable at least one notification channel");
             return;
         }
         setNotifySettingsSaving(true);
@@ -3719,7 +3723,7 @@ export default function AlertSetting() {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-4">
-                            Choose exactly one channel for alert notifications.
+                            Enable one or both channels for alert notifications.
                         </p>
 
                         {notifySettingsLoading ? (
@@ -3739,8 +3743,11 @@ export default function AlertSetting() {
                                     <Switch
                                         id="notify-email"
                                         checked={notifySettings.is_email_notifify}
-                                        onCheckedChange={() =>
-                                            handleSelectNotificationChannel("email")
+                                        onCheckedChange={(checked) =>
+                                            handleSelectNotificationChannel(
+                                                "email",
+                                                checked,
+                                            )
                                         }
                                         disabled={notifySettingsSaving}
                                     />
@@ -3759,8 +3766,11 @@ export default function AlertSetting() {
                                     <Switch
                                         id="notify-whatsapp"
                                         checked={notifySettings.is_whatsapp_notify}
-                                        onCheckedChange={() =>
-                                            handleSelectNotificationChannel("whatsapp")
+                                        onCheckedChange={(checked) =>
+                                            handleSelectNotificationChannel(
+                                                "whatsapp",
+                                                checked,
+                                            )
                                         }
                                         disabled={notifySettingsSaving}
                                     />

@@ -508,10 +508,10 @@ def update_hospital_notification_settings(
     email_enabled = bool(body.get("is_email_notifify"))
     whatsapp_enabled = bool(body.get("is_whatsapp_notify"))
 
-    if email_enabled == whatsapp_enabled:
+    if not email_enabled and not whatsapp_enabled:
         raise HTTPException(
             status_code=400,
-            detail="Exactly one notification channel must be enabled",
+            detail="At least one notification channel must be enabled",
         )
 
     hospital_id = _resolve_current_hospital_id(request, db)

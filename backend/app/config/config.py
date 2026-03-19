@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     ARC_API_TOKEN: Optional[str] = None  # Token ID for ARC IVF Storage API authentication
     ARC_IVF_TOKEN_ID: Optional[str] = None  # Alias for ARC_API_TOKEN (for backward compatibility)
     ARC_AUTORUN: bool = False  # Enable daily ARC IVF autorun at midnight when true
+    # Twilio (Optional - for WhatsApp notifications)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_WHATSAPP_FROM: Optional[str] = None
     # ============================================
     # COMPUTED/DERIVED VALUES
     # ============================================
