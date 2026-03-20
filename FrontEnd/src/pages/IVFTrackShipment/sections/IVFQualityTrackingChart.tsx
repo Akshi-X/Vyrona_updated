@@ -961,7 +961,25 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     });
 
     const thresholds = kpiThresholds[activeTab];
-    thresholds?.lines?.forEach((line, idx) => {
+    const mergedThresholdLines = (() => {
+      const sourceLines = thresholds?.lines ?? [];
+      const grouped = new Map<string, { line: KpiThresholdLine; count: number }>();
+      sourceLines.forEach((line) => {
+        const key = line.value.toFixed(6);
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.count += 1;
+          return;
+        }
+        grouped.set(key, { line, count: 1 });
+      });
+      return Array.from(grouped.values()).map(({ line, count }) => ({
+        ...line,
+        label: count > 1 ? 'Limit' : line.label,
+      }));
+    })();
+
+    mergedThresholdLines.forEach((line, idx) => {
       datasets.push({
         label: line.label,
         data: values.map(() => line.value),
@@ -1018,8 +1036,11 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         tooltip: {
           enabled: true,
           backgroundColor: 'rgba(20, 20, 20, 0.92)',
-          padding: 10,
+          padding: 8,
           cornerRadius: 6,
+          boxPadding: 2,
+          titleFont: { size: 12 },
+          bodyFont: { size: 11 },
           callbacks: {
             title: (items: any[]) => {
               if (!items?.length) return '';
@@ -1029,6 +1050,18 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               return r ? formatDateTimeLabel(r.timestamp) : '';
             },
             label: (context: any) => {
+              const toShortLabel = (rawLabel: string): string => {
+                const normalized = String(rawLabel || '').toLowerCase();
+                if (normalized.includes('avg')) return 'Avg';
+                if (normalized.includes('lower limit')) return 'Lower';
+                if (normalized.includes('upper limit')) return 'Upper';
+                if (normalized.includes('critical')) return 'Critical';
+                if (normalized.includes('l1')) return 'L1';
+                if (normalized.includes('l2')) return 'L2';
+                if (normalized.includes('l3')) return 'L3';
+                return rawLabel || 'Value';
+              };
+              const formatNum = (value: number) => (Math.round(value * 100) / 100).toFixed(2);
               const parsedY = context.parsed?.y;
               if (parsedY == null) return '';
               const label = context.dataset.label || '';
@@ -1043,12 +1076,27 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 const kpi = reading?.kpis?.find((k: any) => k.name === activeTab) ??
                   (activeTab === 'ln2_lid_state' ? reading?.kpis?.find((k: any) => k.name === 'lid_state') : null);
                 const count = typeof kpi?.count === 'number' ? kpi.count : null;
-                return `${label}: Min ${Number(min).toFixed(2)}, Max ${Number(max).toFixed(2)}${count != null ? `, n=${count}` : ''}`;
+                return `Range: ${formatNum(Number(min))}–${formatNum(Number(max))}${count != null ? ` (n=${count})` : ''}`;
               }
               if (activeTab === 'lid_state' || activeTab === 'ln2_lid_state') {
-                return `${label}: ${parsedY >= 1 ? 'Open (1)' : 'Close (0)'}`;
+                const shortLabel = toShortLabel(label);
+                const stateText = parsedY >= 1 ? 'Open' : 'Close';
+                if (shortLabel === 'Avg') return `Avg: ${stateText}`;
+                if (
+                  shortLabel === 'Lower' ||
+                  shortLabel === 'Upper' ||
+                  shortLabel === 'Critical' ||
+                  shortLabel === 'L1' ||
+                  shortLabel === 'L2' ||
+                  shortLabel === 'L3' ||
+                  shortLabel === 'Limit'
+                ) {
+                  return `Limit: ${stateText}`;
+                }
+                return `State: ${stateText}`;
               }
-              return `${label}: ${typeof parsedY === 'number' ? (Math.round(parsedY * 100) / 100).toFixed(2) : parsedY}`;
+              const shortLabel = toShortLabel(label);
+              return `${shortLabel}: ${typeof parsedY === 'number' ? formatNum(parsedY) : parsedY}`;
             },
           },
         },

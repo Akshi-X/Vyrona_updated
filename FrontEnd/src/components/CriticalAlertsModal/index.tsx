@@ -34,6 +34,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
   const showPatientId = Boolean(patientIdLabel?.trim());
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<string>>(new Set());
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
+  const [pendingAcknowledgeAlertId, setPendingAcknowledgeAlertId] = useState<string | null>(null);
   // Filter states
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -49,6 +50,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
       setStatusFilter('all');
       setIsFilterPanelOpen(false);
       setExpandedGroupKeys(new Set());
+      setPendingAcknowledgeAlertId(null);
     }
   }, [isOpen]);
 
@@ -86,16 +88,17 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
 
     const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0);
 
-    const handleAcknowledge = async (alertId: string) => {
-    const confirmation = window.confirm('Are you sure you want to acknowledge this alert?');
+    const handleAcknowledgeRequest = (alertId: string) => {
+    setPendingAcknowledgeAlertId(alertId);
+  };
 
-    if (!confirmation) {
-      return;
-    }
-
+  const handleAcknowledgeConfirm = async () => {
+    const alertId = pendingAcknowledgeAlertId;
+    if (!alertId) return;
     if (!onAcknowledge) return;
 
     setAcknowledgingIds(prev => new Set(prev).add(alertId));
+    setPendingAcknowledgeAlertId(null);
     try {
       await onAcknowledge(alertId);
     } catch (error) {
@@ -482,7 +485,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                           <>
                             {latestAlert.status === 'Active' ? (
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleAcknowledge(latestAlert.id); }}
+                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
                                 disabled={acknowledgingIds.has(latestAlert.id)}
                                 className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${
                                   acknowledgingIds.has(latestAlert.id)
@@ -512,7 +515,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                               <>
                                 {alert.status === 'Active' ? (
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); handleAcknowledge(alert.id); }}
+                                    onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(alert.id); }}
                                     disabled={acknowledgingIds.has(alert.id)}
                                     className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${
                                       acknowledgingIds.has(alert.id)
@@ -538,6 +541,31 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
           </div>
         ))}
       </div>
+
+      {pendingAcknowledgeAlertId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
+            <h4 className="text-base font-semibold text-[#1f2937]">Acknowledge alert</h4>
+            <p className="mt-2 text-sm text-gray-600">Are you sure you want to acknowledge this alert?</p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingAcknowledgeAlertId(null)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-[#E7E1E1] text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAcknowledgeConfirm}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-[#6b1176] text-white hover:bg-[#5a0f66]"
+              >
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AlertCard>
   );
 };
