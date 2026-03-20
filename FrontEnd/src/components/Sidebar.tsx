@@ -249,9 +249,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                     key={childIndex}
                                                     onClick={() => {
                                                         // Incubator Quality Tracking & Embryo Grading: navigation disabled for now
-                                                        if (child.path !== "/incubator-tracking" && child.path !== "/embryo-grading") {
+                                                        // if (child.path !== "/incubator-tracking" && child.path !== "/embryo-grading") {
                                                             handleNavigation(child.path);
-                                                        }
+                                                        // }
                                                     }}
                                                     className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${childIndex === 0 ? "mt-2" : ""} ${
                                                         isChildActive
