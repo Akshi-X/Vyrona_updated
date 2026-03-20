@@ -27,6 +27,7 @@ import type { ReactNode } from "react";
 import type { UIVariantMap, UIVariantMapping } from "../types/uiVariant";
 import { uiVariantService } from "../services/uiVariantService";
 import { useAuth } from "./AuthContext";
+import { FullPageLoader } from "../components/FullPageLoader";
 
 interface UIVariantContextType {
     /** Map of route_path → component_key */
@@ -207,6 +208,15 @@ export const UIVariantProvider: React.FC<UIVariantProviderProps> = ({
             refreshVariants,
         ],
     );
+
+    // Full-page loader until UI variants fetch completes (authenticated users only)
+    if (isAuthenticated && isLoading) {
+        return (
+            <UIVariantContext.Provider value={value}>
+                <FullPageLoader />
+            </UIVariantContext.Provider>
+        );
+    }
 
     return (
         <UIVariantContext.Provider value={value}>

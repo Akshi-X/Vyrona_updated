@@ -131,6 +131,12 @@ export interface KpiConfigPayload {
     status?: boolean;
 }
 
+export interface HospitalNotificationSettings {
+    hospital_id: number;
+    is_email_notifify: boolean;
+    is_whatsapp_notify: boolean;
+}
+
 export interface DeviationsGraphDataItem {
     site_id?: number;
     site_name?: string;
@@ -393,7 +399,7 @@ export class IvfService extends BaseApiService {
 
     /**
      * Get tank KPI history for Quality Tracking tabbed graph (temp_external, temp_internal, ln2_level, etc.).
-     * No limit param; backend uses duration_minutes only (10=10M, 60=1H, 1440=24H, 10080=7D). Omit for LIVE.
+        * No limit param; backend uses duration_minutes only (10=10M, 60=1H, 1440=24H, 10080=7D with 6h buckets). Omit for LIVE.
      */
     async getKpiHistory(
         tankId: string | number,
@@ -406,15 +412,13 @@ export class IvfService extends BaseApiService {
             Array<{
                 timestamp: string;
                 value: number;
+                avg?: number;
+                min?: number;
+                max?: number;
+                count?: number;
                 unit: string;
             }>
         >;
-        kpi_config?: Array<{
-            name: string;
-            unit: string;
-            latest_value?: number | null;
-            latest_timestamp?: string | null;
-        }>;
     }> {
         const params = new URLSearchParams();
         if (durationMinutes != null && durationMinutes > 0) {
@@ -439,6 +443,23 @@ export class IvfService extends BaseApiService {
             `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
             { method: "GET" },
         );
+    }
+
+    async getHospitalNotificationSettings(): Promise<HospitalNotificationSettings> {
+        return await this.request("/api/ivf/quality/hospital-notification-settings", {
+            method: "GET",
+        });
+    }
+
+    async updateHospitalNotificationSettings(payload: {
+        is_email_notifify: boolean;
+        is_whatsapp_notify: boolean;
+    }): Promise<HospitalNotificationSettings> {
+        return await this.request("/api/ivf/quality/hospital-notification-settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
     }
 
     async createKpiConfig(payload: KpiConfigPayload): Promise<KpiConfigRow> {
