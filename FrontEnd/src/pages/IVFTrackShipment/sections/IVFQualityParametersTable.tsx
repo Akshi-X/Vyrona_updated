@@ -94,19 +94,46 @@ interface KpiTileProps {
   value: string;
   tooltip?: string;
   muted?: boolean;
+  danger?: boolean;
+  loading?: boolean;
 }
 
-const KpiTile = ({ icon, label, value, tooltip, muted = false }: KpiTileProps) => (
+const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, loading = false }: KpiTileProps) => (
   <div className="relative group w-full @max-[505px]:w-[150px]">
-    <div className={`bg-white rounded-lg border border-[#E7E1E1] shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px] ${muted ? 'opacity-75' : ''}`}>
-      <div className="bg-[#FDF4FF] rounded-lg p-1 flex items-center justify-center">
-        {icon}
+    {loading ? (
+      <div className="rounded-lg border border-[#E7E1E1] bg-white shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px]">
+        <div className="relative overflow-hidden h-8 w-8 rounded-lg bg-gray-200 shrink-0">
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+            style={{ width: '50%' }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 w-full">
+          <div className="relative overflow-hidden h-3 w-20 rounded bg-gray-200">
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+              style={{ width: '50%' }}
+            />
+          </div>
+          <div className="relative overflow-hidden h-4 w-24 rounded bg-gray-200">
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+              style={{ width: '50%' }}
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col">
-        <span className="text-[11px] text-gray-500 font-medium">{label}</span>
-        <span className={`text-[15px] font-semibold ${muted ? 'text-gray-400' : 'text-black'}`}>{value}</span>
+    ) : (
+      <div className={`rounded-lg border shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px] ${danger ? 'bg-[#FEF2F2] border-[#FECACA]' : 'bg-white border-[#E7E1E1]'} ${muted ? 'opacity-75' : ''}`}>
+        <div className={`${danger ? 'bg-[#FEE2E2]' : 'bg-[#FDF4FF]'} rounded-lg p-1 flex items-center justify-center`}>
+          {icon}
+        </div>
+        <div className="flex flex-col">
+          <span className={`text-[11px] font-medium ${danger ? 'text-[#B91C1C]' : 'text-gray-500'}`}>{label}</span>
+          <span className={`text-[15px] font-semibold ${danger ? 'text-[#DC2626]' : muted ? 'text-gray-400' : 'text-black'}`}>{value}</span>
+        </div>
       </div>
-    </div>
+    )}
     {tooltip && (
       <div className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-60 -translate-x-1/2 rounded-lg border border-[#E7E1E1] bg-white px-3 py-2 text-center opacity-0 shadow-lg transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
         <div className="text-xs font-semibold text-black">
@@ -144,6 +171,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const [l2, setL2] = useState<number | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState<number>(Date.now());
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -183,6 +211,29 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     const normalized = timestamp.trim().replace(' ', 'T');
     const parsed = new Date(normalized).getTime();
     return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalizeKpiValue = (name: string, rawValue: unknown): number | null => {
+    if (typeof rawValue === 'number') {
+      return Number.isFinite(rawValue) ? rawValue : null;
+    }
+    if (typeof rawValue === 'boolean') {
+      return rawValue ? 1 : 0;
+    }
+    if (typeof rawValue === 'string') {
+      const normalized = rawValue.trim().toLowerCase();
+      const isLidKpi =
+        name === 'ln2_lid_state' ||
+        name === 'lid_state' ||
+        name === 'lid_status';
+      if (isLidKpi) {
+        if (['open', 'opened', '1', 'true', 'on'].includes(normalized)) return 1;
+        if (['close', 'closed', '0', 'false', 'off'].includes(normalized)) return 0;
+      }
+      const parsed = Number(rawValue);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
   };
 
   const extractLn2Thresholds = (kpiLimits: unknown): { l1: number | null; l2: number | null } => {
@@ -297,7 +348,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       trackFreshTimestamp(int.tsMs);
     }
 
-    const lid = getFresh('ln2_lid_state');
+    const lid = getFresh('ln2_lid_state') ?? getFresh('lid_state') ?? getFresh('lid_status');
     if (lid) {
       // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
@@ -312,6 +363,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     // Update last sync time
     if (hasAnyUpdate && latestFreshTimestampMs != null) {
       setLastUpdateAt(latestFreshTimestampMs);
+      setIsInitialLoading(false);
     }
   };
 
@@ -335,7 +387,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   }, []);
 
   const batteryStatusTimestampMs = batteryTimestampMs ?? lastUpdateAt;
-  const isBatteryLoading = batteryStatusTimestampMs == null && batteryLevel == null;
+  const isBatteryLoading = isInitialLoading;
   const minutesSinceUpdate =
     batteryStatusTimestampMs == null ? null : Math.floor(Math.max(0, nowTs - batteryStatusTimestampMs) / 60000);
   const batteryDead =
@@ -378,6 +430,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   useEffect(() => {
     if (!normalizedTankId) return;
+    setIsInitialLoading(true);
     latestKpiTimestampRef.current = {};
     ivfService.getKpiHistory(normalizedTankId).then((res) => {
       if (!isMountedRef.current || !res?.kpi_series) return;
@@ -385,8 +438,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       Object.entries(res.kpi_series).forEach(([name, points]) => {
         if (!Array.isArray(points) || points.length === 0) return;
         const latest = points[points.length - 1];
-        const numericValue = typeof latest?.value === 'number' ? latest.value : Number(latest?.value);
-        if (!Number.isFinite(numericValue)) return;
+        const numericValue = normalizeKpiValue(name, latest?.value);
+        if (numericValue == null) return;
         if (typeof latest?.timestamp !== 'string' || !latest.timestamp.trim()) return;
         latestByKpi.set(name, {
           name,
@@ -397,7 +450,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       });
       if (latestByKpi.size === 0) return;
       setLevelFromKpis(Array.from(latestByKpi.values()));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (!isMountedRef.current) return;
+      setIsInitialLoading(false);
+    });
   }, [normalizedTankId]);
 
   useEffect(() => {
@@ -426,21 +482,28 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         if (data.type === 'error') return;
         const incomingKpis: Array<{ name: string; value: number; unit: string; timestamp?: string }> | null =
           Array.isArray(data.kpis)
-            ? data.kpis.map((k: any) => ({
-                name: typeof k?.name === 'string' ? k.name : '',
-                value: typeof k?.value === 'number' ? k.value : Number(k?.value),
-                unit: typeof k?.unit === 'string' ? k.unit : '',
-                timestamp:
-                  typeof k?.timestamp === 'string'
-                    ? k.timestamp
-                    : (typeof data?.timestamp === 'string' ? data.timestamp : undefined),
-              }))
+            ? data.kpis
+                .map((k: any) => {
+                  const name = typeof k?.name === 'string' ? k.name : '';
+                  if (!name) return null;
+                  const value = normalizeKpiValue(name, k?.value);
+                  if (value == null) return null;
+                  return {
+                    name,
+                    value,
+                    unit: typeof k?.unit === 'string' ? k.unit : '',
+                    timestamp:
+                      typeof k?.timestamp === 'string'
+                        ? k.timestamp
+                        : (typeof data?.timestamp === 'string' ? data.timestamp : undefined),
+                  };
+                })
+                .filter((kpi: { name: string; value: number; unit: string; timestamp?: string } | null): kpi is { name: string; value: number; unit: string; timestamp?: string } => kpi != null)
             : (typeof data.kpi_name === 'string' &&
-                typeof data.kpi_value === 'number' &&
-                !Number.isNaN(data.kpi_value))
+                normalizeKpiValue(data.kpi_name, data.kpi_value) != null)
               ? [{
                   name: data.kpi_name,
-                  value: data.kpi_value,
+                  value: normalizeKpiValue(data.kpi_name, data.kpi_value) as number,
                   unit: data.kpi_unit || '',
                   timestamp: typeof data.timestamp === 'string' ? data.timestamp : undefined,
                 }]
@@ -481,6 +544,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const externalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempExternal);
   const shockValue = showBatteryDeadState ? '—' : shock != null ? String(shock) : '—';
   const deadBatteryTileTooltip = showBatteryDeadState ? batteryDeadTooltip : undefined;
+  const isLidMissing = lidLabel === '—';
+  const isInternalMissing = internalTemperatureValue === '—';
+  const isExternalMissing = externalTemperatureValue === '—';
+  const isShockMissing = shockValue === '—';
+  const isEvaporationMissing = evaporationRate == null;
 
   const levelActualPercent = levelPercent != null ? Math.round((levelPercent/34.894)*100) : null;
 
@@ -554,6 +622,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             icon={<LockIcon className="text-[#6B1176]" />}
             label="Lid State"
             value={lidLabel}
+            danger={isLidMissing}
+            loading={isInitialLoading}
           />
           <KpiTile
             icon={<ThermometerIcon className="text-[#6B1176]" />}
@@ -561,6 +631,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             value={internalTemperatureValue}
             tooltip={deadBatteryTileTooltip}
             muted={showBatteryDeadState}
+            danger={isInternalMissing}
+            loading={isInitialLoading}
           />
         </div>
 
@@ -723,11 +795,15 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             value={externalTemperatureValue}
             tooltip={deadBatteryTileTooltip}
             muted={showBatteryDeadState}
+            danger={isExternalMissing}
+            loading={isInitialLoading}
           />
           <KpiTile
             icon={<EvaporationIcon className="text-[#6B1176]" />}
             label="Evaporation Rate"
             value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
+            danger={isEvaporationMissing}
+            loading={isInitialLoading}
           />
           <KpiTile
             icon={<ShockIcon className="text-[#6B1176]" />}
@@ -735,6 +811,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             value={shockValue}
             tooltip={deadBatteryTileTooltip}
             muted={showBatteryDeadState}
+            danger={isShockMissing}
+            loading={isInitialLoading}
           />
         </div>
       </div>
