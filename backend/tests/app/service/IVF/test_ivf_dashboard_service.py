@@ -549,105 +549,43 @@ def test_get_branch_deviations_manager_not_branch_filtered(dashboard_service, db
 
 def test_get_total_deviations_no_filter(dashboard_service, db_session):
     """Test getting total deviations without branch filter"""
-    temp_internal_query = MagicMock()
-    temp_internal_query.join.return_value = temp_internal_query
-    temp_internal_query.filter.return_value = temp_internal_query
-    temp_internal_query.scalar.return_value = 10
-    
-    temp_external_query = MagicMock()
-    temp_external_query.join.return_value = temp_external_query
-    temp_external_query.filter.return_value = temp_external_query
-    temp_external_query.scalar.return_value = 5
-    
-    humidity_query = MagicMock()
-    humidity_query.join.return_value = humidity_query
-    humidity_query.filter.return_value = humidity_query
-    humidity_query.scalar.return_value = 3
-    
-    shock_query = MagicMock()
-    shock_query.join.return_value = shock_query
-    shock_query.filter.return_value = shock_query
-    shock_query.scalar.return_value = 2
-    
-    total_query = MagicMock()
-    total_query.join.return_value = total_query
-    total_query.filter.return_value = total_query
-    total_query.scalar.return_value = 20
-    
-    query_call_count = [0]
-    def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            return total_query
-        elif query_call_count[0] == 2:
-            return temp_internal_query
-        elif query_call_count[0] == 3:
-            return temp_external_query
-        elif query_call_count[0] == 4:
-            return humidity_query
-        elif query_call_count[0] == 5:
-            return shock_query
-        return MagicMock()
-    
-    db_session.query.side_effect = query_side_effect
+    execute_result = MagicMock()
+    execute_result.fetchall.return_value = [
+        ("Internal Temperature", 10),
+        ("External Temperature", 5),
+        ("Humidity", 3),
+        ("Shock", 2),
+    ]
+    db_session.execute.return_value = execute_result
     
     result = dashboard_service.get_total_deviations()
     
-    assert result["temp_internal_deviations"] == 10
-    assert result["temp_external_deviations"] == 5
-    assert result["humidity_deviations"] == 3
-    assert result["shock_deviations"] == 2
+    assert result["deviations_by_kpi"] == {
+        "Internal Temperature": 10,
+        "External Temperature": 5,
+        "Humidity": 3,
+        "Shock": 2,
+    }
     assert result["total_deviations"] == 20
 
 
 def test_get_total_deviations_with_branch_filter(dashboard_service, db_session):
     """Test getting total deviations with branch filter"""
-    temp_internal_query = MagicMock()
-    temp_internal_query.join.return_value = temp_internal_query
-    temp_internal_query.filter.return_value = temp_internal_query
-    temp_internal_query.scalar.return_value = 5
-    
-    temp_external_query = MagicMock()
-    temp_external_query.join.return_value = temp_external_query
-    temp_external_query.filter.return_value = temp_external_query
-    temp_external_query.scalar.return_value = 2
-    
-    humidity_query = MagicMock()
-    humidity_query.join.return_value = humidity_query
-    humidity_query.filter.return_value = humidity_query
-    humidity_query.scalar.return_value = 1
-    
-    shock_query = MagicMock()
-    shock_query.join.return_value = shock_query
-    shock_query.filter.return_value = shock_query
-    shock_query.scalar.return_value = 1
-    
-    total_query = MagicMock()
-    total_query.join.return_value = total_query
-    total_query.filter.return_value = total_query
-    total_query.scalar.return_value = 9
-    
-    query_call_count = [0]
-    def query_side_effect(*args, **kwargs):
-        query_call_count[0] += 1
-        if query_call_count[0] == 1:
-            return total_query
-        elif query_call_count[0] == 2:
-            return temp_internal_query
-        elif query_call_count[0] == 3:
-            return temp_external_query
-        elif query_call_count[0] == 4:
-            return humidity_query
-        elif query_call_count[0] == 5:
-            return shock_query
-        return MagicMock()
-    
-    db_session.query.side_effect = query_side_effect
+    execute_result = MagicMock()
+    execute_result.fetchall.return_value = [
+        ("Internal Temperature", 5),
+        ("External Temperature", 2),
+        ("Humidity", 1),
+        ("Shock", 1),
+    ]
+    db_session.execute.return_value = execute_result
     
     result = dashboard_service.get_total_deviations(branch_id=1, role="User")
     
-    assert result["temp_internal_deviations"] == 5
-    assert result["temp_external_deviations"] == 2
-    assert result["humidity_deviations"] == 1
-    assert result["shock_deviations"] == 1
+    assert result["deviations_by_kpi"] == {
+        "Internal Temperature": 5,
+        "External Temperature": 2,
+        "Humidity": 1,
+        "Shock": 1,
+    }
     assert result["total_deviations"] == 9

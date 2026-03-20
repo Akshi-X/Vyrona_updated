@@ -33,6 +33,7 @@ from ...models.IVF.critical_alert_model import (
     CriticalAlert,
 )
 from ...models.IVF.hospital_branch_model import HospitalBranch
+from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.ivf_quality_log_model import IVFQualityLog
 from ...models.IVF.tank_model import Tank
 from ...models.user_model import User
@@ -300,6 +301,24 @@ class CriticalAlertService:
 
         return branch.hospital_id, branch.branch_id
 
+    def _get_hospital_notification_config(
+        self, hospital_id: Optional[int]
+    ) -> tuple[bool, bool]:
+        """Return hospital notification config as (email_enabled, whatsapp_enabled)."""
+        if hospital_id is None:
+            return False, False
+
+        config = (
+            self.db.query(Hospital.is_email_notifify, Hospital.is_whatsapp_notify)
+            .filter(Hospital.hospital_id == hospital_id)
+            .first()
+        )
+        if not config:
+            return False, False
+
+        email_enabled, whatsapp_enabled = config
+        return bool(email_enabled), bool(whatsapp_enabled)
+
     def _generate_dedup_key(
         self,
         tank_id: int,
@@ -308,11 +327,11 @@ class CriticalAlertService:
         occurred_at: datetime,
         extra_info: Optional[str] = None,
     ) -> str:
-        """Generate deduplication key to prevent alert spam"""
-        # Use date (YYYY-MM-DD) to allow one alert per day per tank+source+type
-        date_str = occurred_at.strftime("%Y-%m-%d")
+        """Generate unique deduplication key with timestamp for each alert"""
+        # Use timestamp (YYYY-MM-DD_HH:MM:SS) to make each alert unique
+        timestamp_str = occurred_at.strftime("%Y-%m-%d_%H:%M:%S")
         return (
-            f"{tank_id}:{source.value}:{alert_type.value}:{date_str}:{extra_info or ''}"
+            f"{tank_id}:{source.value}:{alert_type.value}:{timestamp_str}:{extra_info or ''}"
         )
 
     def _create_alert(
@@ -562,9 +581,31 @@ class CriticalAlertService:
                 deviation.branch_id
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
-
+            
+            # Fetch both notification flags in a single DB query.
             if kpi_config.alert_type == "critical":
-                self._send_alert_email(alert)
+                (
+                    is_hospital_email_configured,
+                    is_hospital_whatsapp_configured,
+                ) = self._get_hospital_notification_config(
+                    alert.hospital_id
+                )
+                if is_hospital_email_configured:
+                    self._send_alert_email(alert)
+                else:
+                    logger.info(
+                        "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
+                if is_hospital_whatsapp_configured:
+                    self._send_alert_whatsapp(alert)
+                else:
+                    logger.info(
+                        "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
+                        alert.alert_id,
+                        alert.hospital_id,
+                    )
 
             deviation.alert_id = alert.alert_id
             deviation.checked = True
@@ -977,6 +1018,125 @@ class CriticalAlertService:
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
+
+    def _send_alert_whatsapp(self, alert: CriticalAlert):
+        """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
+        Recipients: all Managers across the hospital + Users in the tank's branch."""
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(
+                f"Skipping WhatsApp for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
+            )
+            return
+
+        account_sid = settings.TWILIO_ACCOUNT_SID
+        auth_token = settings.TWILIO_AUTH_TOKEN
+        from_number = settings.TWILIO_WHATSAPP_FROM
+
+        def _to_whatsapp_number(number: str) -> str:
+            normalized = number.strip()
+            if normalized.startswith("whatsapp:"):
+                return normalized
+            return f"whatsapp:{normalized}"
+
+        if not account_sid or not auth_token or not from_number:
+            logger.warning(
+                "Skipping WhatsApp for alert_id=%s because Twilio settings are incomplete",
+                alert.alert_id,
+            )
+            return
+
+        try:
+            from twilio.rest import Client
+        except Exception as e:
+            logger.error(
+                "Twilio library not available; install twilio package. Error: %s",
+                str(e),
+            )
+            return
+
+        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+        if not tank:
+            return
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == tank.branch_id)
+            .first()
+        )
+        if not branch:
+            return
+
+        hospital_id = branch.hospital_id
+        all_branches = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        )
+        branch_ids = [b.branch_id for b in all_branches]
+
+        managers = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role.in_(["Manager", "Admin"]),
+                User.branch_id.in_(branch_ids),
+                User.status == True,
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+        branch_users = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role == "User",
+                User.branch_id == tank.branch_id,
+                User.status == True,
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+
+        all_users = {user.user_id: user for user in managers + branch_users}.values()
+        recipients = [
+            user for user in all_users if getattr(user, "phone_number", None)
+        ]
+
+        if not recipients:
+            logger.info(
+                "No recipients with phone_number found for alert_id=%s; skipping WhatsApp",
+                alert.alert_id,
+            )
+            return
+
+        client = Client(account_sid, auth_token)
+        from_whatsapp_number = _to_whatsapp_number(from_number)
+        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
+        message_body = (
+            f"Critical Alert | Tank: {tank_code} | Branch: {branch.branch_name or 'N/A'} | "
+            f"Type: {alert.alert_type} | Severity: {alert.severity} | {alert.message}"
+        )
+
+        for user in recipients:
+            try:
+                to_number = _to_whatsapp_number(user.phone_number)
+                client.messages.create(
+                    from_=from_whatsapp_number,
+                    body=message_body,
+                    to=to_number,
+                )
+                logger.info(
+                    "Sent WhatsApp alert to %s for alert_id=%s",
+                    to_number,
+                    alert.alert_id,
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to send WhatsApp to %s for alert_id=%s: %s",
+                    getattr(user, "phone_number", "unknown"),
+                    alert.alert_id,
+                    str(e),
+                )
 
     def _count_occurrences(
         self, tank_id: int, violation_type: str, occurred_at: datetime

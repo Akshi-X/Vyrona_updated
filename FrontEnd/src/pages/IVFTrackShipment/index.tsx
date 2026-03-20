@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
@@ -11,10 +12,10 @@ import { userService, type UserProfileDto } from '../../services/userService';
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 import MyTasksIcon from '../../assets/DashBoardIcons/My_Tasks.svg';
-import ExportTrackPageIcon from '../../assets/ExportTrackPage.svg';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
 import StakeholderChatsModal from '../../components/StakeholderChatsModal';
+import TrackCanisterModal from '../../components/TrackCanisterModal';
 import { ivfAlertsService, type IVFAlert } from '../../services/ivfAlertsService';
 import { tasksService, type Task } from '../../services/tasksService';
 import { ivfService } from '../../services/ivfService';
@@ -25,7 +26,6 @@ export default function IVFTrackShipmentPage() {
     const { tankId } = useParams<{ tankId: string }>();
     const { logout, userRole } = useAuth();
     const navigate = useNavigate();
-    const [userInitials, setUserInitials] = useState<string>('U');
     const [headerTankCode, setHeaderTankCode] = useState<string>('-');
     const [headerBranchName, setHeaderBranchName] = useState<string>('-');
     
@@ -34,6 +34,7 @@ export default function IVFTrackShipmentPage() {
     const [showMyTasks, setShowMyTasks] = useState(false);
     const [showStakeholderChats, setShowStakeholderChats] = useState(false);
     const [showStakeholderChatScreen, setShowStakeholderChatScreen] = useState(false);
+    const [canisterError, setCanisterError] = useState<string | undefined>(undefined);
     const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
     const [myTasks, setMyTasks] = useState<Task[]>([]);
     const [loadingAlerts, setLoadingAlerts] = useState(false);
@@ -116,10 +117,6 @@ export default function IVFTrackShipmentPage() {
             const profile = await userService.getProfile();
             setCurrentUser(profile);
             setCurrentUserId(profile.user_id);
-            const first = profile.first_name?.trim?.() || '';
-            const last = profile.last_name?.trim?.() || '';
-            const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
-            setUserInitials(initials);
         } catch {
             // Error handled silently
         }
@@ -194,23 +191,30 @@ export default function IVFTrackShipmentPage() {
     }, [wsUnreadMessages, tankId]);
 
     return (
-        <div className="bg-[#FDFAFF] flex w-full h-full">
+        <div className="bg-[#FDFAFF] flex w-full min-h-screen">
             <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
-                {/* Top Nav Bar (fixed) */}
-                <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 z-40">
-                    <div />
-                    <div
-                        className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-                        onClick={() => navigate('/user-profile')}
-                        title="Go to User Profile"
-                    >
-                        <span className="text-white text-xs font-semibold">{userInitials}</span>
-                    </div>
-                </header>
+            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
+                    {!tankId ? (
+                        <div className="flex-1 min-h-[70vh] flex items-center justify-center">
+                            <TrackCanisterModal
+                                inlineMode={true}
+                                isOpen={true}
+                                onClose={() => {
+                                    setCanisterError(undefined);
+                                    navigate('/dashboard');
+                                }}
+                                error={canisterError}
+                                onTrack={(canisterId) => {
+                                    setCanisterError(undefined);
+                                    navigate(`/ivf-track-shipment/${encodeURIComponent(canisterId)}`);
+                                }}
+                            />
+                        </div>
+                    ) : (
+                    <>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 text-sm">
                             <button
@@ -240,10 +244,11 @@ export default function IVFTrackShipmentPage() {
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
                                     ) : (
-                                        <img
-                                            className="w-[25px] h-[25px]"
-                                            alt="Export Excel"
-                                            src={ExportTrackPageIcon}
+                                        <Download
+                                            size={21}
+                                            strokeWidth={2.25}
+                                            className="text-[#6B1176]"
+                                            aria-label="Export Excel"
                                         />
                                     )}
                                 </button>
@@ -342,6 +347,8 @@ export default function IVFTrackShipmentPage() {
                     <div>
                         <RefillLogTable canisterNumber={tankId} />
                     </div>
+                    </>
+                    )}
 
                 </div>
             </main>
@@ -370,12 +377,14 @@ export default function IVFTrackShipmentPage() {
                         : a.canister_number
                             ? a.canister_number
                             : `Canister ${a.canister_id}`,
+                    branchName: (a as typeof a & { branch_name?: string }).branch_name,
+                    dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
                     message: a.message,
                     timestamp: new Date(a.occurred_at+"Z").toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
-                patientIdLabel="Tank Code"
+                patientIdLabel=""
                 onAcknowledge={async (alertId) => {
                     try {
                         await ivfAlertsService.acknowledgeAlert(alertId);

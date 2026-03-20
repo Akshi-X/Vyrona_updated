@@ -106,10 +106,11 @@ class UserListResponse(BaseModel):
 
 
 class UserNameUpdateRequest(BaseModel):
-    """Schema for updating user first and last name"""
+    """Schema for updating user first and last name (and optional phone number)"""
     first_name: str
     last_name: str
-    
+    phone_number: Optional[str] = None
+
     @field_validator('first_name', 'last_name')
     @classmethod
     def validate_names(cls, v):
@@ -122,6 +123,19 @@ class UserNameUpdateRequest(BaseModel):
             raise ValueError("Name cannot exceed 50 characters")
         return v.strip()
 
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone(cls, v):
+        if v is None:
+            return v
+        stripped = v.strip()
+        if not stripped:
+            return None
+        import re
+        if not re.match(r'^[+]?[\d\s\-().]{7,20}$', stripped):
+            raise ValueError("Enter a valid phone number")
+        return stripped
+
 
 class UserUpdateResponse(BaseModel):
     """Response schema for user update operations"""
@@ -129,6 +143,7 @@ class UserUpdateResponse(BaseModel):
     user_id: str
     first_name: str
     last_name: str
+    phone_number: Optional[str] = None
     updated_at: datetime
 
 

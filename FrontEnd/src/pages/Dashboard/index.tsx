@@ -97,6 +97,7 @@ export default function Dashboard({ }: DashboardProps) {
   // User first and last name for greeting
   const [userFirstName, setUserFirstName] = useState<string>('');
   const [userLastName, setUserLastName] = useState<string>('');
+  const [loadingUserProfile, setLoadingUserProfile] = useState<boolean>(true);
   // Workspace label (hospital name or pharma company name) for header above greeting
   const [userWorkspaceName, setUserWorkspaceName] = useState<string>('');
   // User department (CGT or IVF) - initialize from localStorage
@@ -250,13 +251,17 @@ export default function Dashboard({ }: DashboardProps) {
   // Calculate dynamic notification counts
   // Use the maximum of WebSocket count and API count to ensure accuracy
   // This handles cases where WebSocket might not be connected yet or API has more recent data
+  const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
   const stakeholderChatCount = Math.max(wsUnreadCount || 0, apiUnreadCount || 0);
-  const criticalAlertsCount = criticalAlerts.filter((alert) => {
+  const activeCriticalAlertsCount = criticalAlerts.filter((alert) => {
     if ('acknowledged_at' in alert) {
       return alert.acknowledged_at == null && alert.status === 'Active';
     }
     return alert.status === 'Active';
   }).length;
+  const criticalAlertsCount = isIVF
+    ? (ivfQualityDeviations ?? 0)
+    : activeCriticalAlertsCount;
   const myTasksCount = myTasks.filter(task => task.status === 'Not started' || task.status === 'In progress').length;
 
   // Format count for display (show "9+" for counts > 9)
@@ -269,8 +274,6 @@ export default function Dashboard({ }: DashboardProps) {
   const fetchCriticalAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
-      
       if (isIVF) {
         // Use IVF alerts service for IVF department
         const response = await ivfAlertsService.getHospitalAlerts();
@@ -363,6 +366,7 @@ export default function Dashboard({ }: DashboardProps) {
   // Fetch user profile to compute initials and get department
   useEffect(() => {
     const fetchUserProfile = async () => {
+      setLoadingUserProfile(true);
       try {
         const profile = await userService.getProfile();
         const first = profile.first_name?.trim?.() || '';
@@ -401,10 +405,14 @@ export default function Dashboard({ }: DashboardProps) {
         setUserFirstName('');
         setUserLastName('');
         setUserWorkspaceName('');
+      } finally {
+        setLoadingUserProfile(false);
       }
     };
     if (isAuthenticated) {
       fetchUserProfile();
+    } else {
+      setLoadingUserProfile(false);
     }
   }, [isAuthenticated]);
 
@@ -614,13 +622,22 @@ export default function Dashboard({ }: DashboardProps) {
       try {
         const response = await ivfService.getTotalDeviations();
 
-        let max_deviated_alert = ""
-        let max_deviations = 0
-        for(const alert_name in response.deviations_by_kpi) {
-          if(response.deviations_by_kpi[alert_name] > max_deviations) {
+        // Sort deviations by count (descending) and skip "Unknown"
+        const sortedEntries = Object.entries(response.deviations_by_kpi)
+          .sort(([, countA], [, countB]) => countB - countA);
+
+        // Find the first entry that is not "Unknown"
+        let max_deviated_alert = "";
+        for (const [alert_name] of sortedEntries) {
+          if (alert_name !== "Unknown") {
             max_deviated_alert = alert_name;
-            max_deviations = response.deviations_by_kpi[alert_name];
+            break;
           }
+        }
+
+        // Fallback to first entry if all are "Unknown"
+        if (!max_deviated_alert && sortedEntries.length > 0) {
+          max_deviated_alert = sortedEntries[0][0];
         }
 
         if (!cancelled) setIvfTopDeviationDriverName(max_deviated_alert || 'N/A');
@@ -805,8 +822,6 @@ export default function Dashboard({ }: DashboardProps) {
     }
   });
 
-  const isIVF = (userDepartment || '').toUpperCase() === 'IVF';
-  
   const transformedAlerts = criticalAlerts.map(alert => {
     // Check if it's an IVF alert (has alert_id) or CGT alert (has id)
     if ('alert_id' in alert) {
@@ -826,12 +841,13 @@ export default function Dashboard({ }: DashboardProps) {
             : (typeof ivfAlert.canister_id === 'number'
               ? `Canister ${ivfAlert.canister_id}`
               : 'N/A'),
+        branchName: (ivfAlert as IVFAlert & { branch_name?: string }).branch_name,
+        dedupKey: (ivfAlert as IVFAlert & { dedup_key?: string }).dedup_key,
         message: ivfAlert.message,
         timestamp: new Date(ivfAlert.occurred_at+"Z").toLocaleString(),
         status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
       };
     } else {
-      // CGT alert
       const cgtAlert = alert as ServiceCriticalAlert;
       return {
         id: cgtAlert.id,
@@ -1007,8 +1023,13 @@ export default function Dashboard({ }: DashboardProps) {
                     const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
                     const displayName = [userFirstName, userLastName].filter(Boolean).join(' ') || 'User';
                     return (
-                      <p className="text-black font-semibold text-xl">
-                        Good {greeting}, {displayName}
+                      <p className="text-black font-semibold text-xl flex items-center gap-2">
+                        <span>Good {greeting},</span>
+                        {loadingUserProfile ? (
+                          <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
+                        ) : (
+                          <span className="text-[#6b1176]">{displayName}</span>
+                        )}
                       </p>
                     );
                   })()}

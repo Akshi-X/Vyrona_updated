@@ -448,11 +448,11 @@ const ControlTower = () => {
             <h1 className="font-semibold text-black text-2xl">
               Control Tower
             </h1>
+            {/**
             <div className="relative group">
               <button
                 type="button"
                 onClick={async () => {
-                  // Call API in background (non-blocking)
                   shipmentService.getIVFStorage().catch((error) => {
                     console.error('Failed to fetch latest IVF storage data:', error);
                   });
@@ -461,13 +461,13 @@ const ControlTower = () => {
               >
                 Get latest Data
               </button>
-              {/* Tooltip */}
               <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                 <div className="font-semibold text-black text-xs whitespace-nowrap">
                   Retrieve new patient data from the connected system?
                 </div>
               </div>
             </div>
+            */}
           </div>
 
           {/* Main Content Grid */}
