@@ -45,7 +45,7 @@ from app.schemas.ui_variant_schema import (
 # Configure logger
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/ui-variants", tags=["UI Variants"])
+router = APIRouter(prefix="/ui-variants", tags=["UI Variants"])
 
 
 def get_user_hospital_id(request: Request, db: Session) -> int | None:
@@ -55,25 +55,23 @@ def get_user_hospital_id(request: Request, db: Session) -> int | None:
     SECURITY: This is the ONLY way to determine which hospital's
     variants a user should see. Never trust client-provided values.
 
-    Returns:
-        Hospital ID if user belongs to a hospital, None otherwise
+    Uses request.state.current_user and request.state.hospital_id
+    (set by TokenValidationMiddleware).
     """
     try:
-        # Get user_id from request state (set by auth middleware)
-        user_id = getattr(request.state, "user_id", None)
-        if not user_id:
-            return None
+        # Prefer hospital_id from token (set by middleware for hospital users)
+        hospital_id = getattr(request.state, "hospital_id", None)
+        if hospital_id is not None:
+            return int(hospital_id)
 
-        # Get user from database
-        user = db.query(User).filter(User.user_id == user_id).first()
+        # Fallback: get from current_user (set by TokenValidationMiddleware)
+        user = getattr(request.state, "current_user", None)
         if not user:
             return None
 
-        # Return hospital_id directly if available
         if user.hospital_id:
             return user.hospital_id
 
-        # If user has branch_id, look up hospital through branch
         if user.branch_id:
             from app.models.IVF.hospital_branch_model import HospitalBranch
 
@@ -95,19 +93,12 @@ def is_admin_user(request: Request, db: Session) -> bool:
     """
     Check if the current user has admin privileges.
 
-    Returns:
-        True if user is admin, False otherwise
+    Uses request.state.current_user (set by TokenValidationMiddleware).
     """
     try:
-        user_id = getattr(request.state, "user_id", None)
-        if not user_id:
-            return False
-
-        user = db.query(User).filter(User.user_id == user_id).first()
+        user = getattr(request.state, "current_user", None)
         if not user:
             return False
-
-        # Check for admin roles
         admin_roles = ["Admin", "admin", "mygrape_admin", "pharma_admin"]
         return user.role in admin_roles
     except Exception:

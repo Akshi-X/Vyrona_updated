@@ -11,6 +11,7 @@ import { Sidebar } from "../../components/Sidebar";
 import {
     ivfService,
     type IvfBranch,
+    type HospitalNotificationSettings,
     type KpiConfigRow,
     type KpiConfigPayload,
 } from "../../services/ivfService";
@@ -31,7 +32,9 @@ import {
     ChevronDown,
     Loader2,
     Clock,
+    Settings,
 } from "lucide-react";
+import { Switch } from "../../components/ui/switch";
 
 interface ContainerRow {
     tank_id: number;
@@ -299,6 +302,9 @@ export default function AlertSetting() {
     const [configList, setConfigList] = useState<KpiConfigRow[]>([]);
     const [configLoading, setConfigLoading] = useState(false);
     const [configError, setConfigError] = useState<string | null>(null);
+    const [configLoadedTankId, setConfigLoadedTankId] = useState<number | null>(
+        null,
+    );
     const [tankContext, setTankContext] = useState<{
         hospital_id: number | null;
         branch_id: number | null;
@@ -317,6 +323,24 @@ export default function AlertSetting() {
         null,
     );
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [showUnsetConfirm, setShowUnsetConfirm] = useState(false);
+    const [pendingContainerSelection, setPendingContainerSelection] = useState<
+        ContainerRow[] | null
+    >(null);
+    const [selectionConflictCheckLoading, setSelectionConflictCheckLoading] =
+        useState(false);
+    const [showNotifySettings, setShowNotifySettings] = useState(false);
+    const [notifySettingsLoading, setNotifySettingsLoading] = useState(false);
+    const [notifySettingsSaving, setNotifySettingsSaving] = useState(false);
+    const [notifySettingsError, setNotifySettingsError] = useState<string | null>(
+        null,
+    );
+    const [notifySettings, setNotifySettings] =
+        useState<HospitalNotificationSettings>({
+            hospital_id: 0,
+            is_email_notifify: true,
+            is_whatsapp_notify: false,
+        });
 
     /** Inline edit draft for KPI table: min, max, alert_type, lid_state per config id */
     const [draftConfig, setDraftConfig] = useState<
@@ -506,10 +530,12 @@ export default function AlertSetting() {
         if (!primaryContainer?.tank_id) {
             setConfigList([]);
             setTankContext({ hospital_id: null, branch_id: null });
+            setConfigLoadedTankId(null);
             return;
         }
         setConfigLoading(true);
         setConfigError(null);
+        setConfigLoadedTankId(null);
         ivfService
             .getKpiConfigList(primaryContainer.tank_id)
             .then((res) => {
@@ -518,6 +544,7 @@ export default function AlertSetting() {
                     hospital_id: res?.hospital_id ?? null,
                     branch_id: res?.branch_id ?? null,
                 });
+                setConfigLoadedTankId(primaryContainer.tank_id);
             })
             .catch((e: any) => {
                 setConfigError(e?.message || "Failed to fetch KPI config");
@@ -531,10 +558,197 @@ export default function AlertSetting() {
         setMultiDraftConfig({});
     }, [primaryContainer?.tank_id]);
 
+    const closeUnsetConfirm = () => {
+        setShowUnsetConfirm(false);
+        setPendingContainerSelection(null);
+    };
+
+    const buildMultiDraftFromConfigList = (
+        rows: KpiConfigRow[],
+    ): Record<
+        string,
+        {
+            min?: number | null;
+            max?: number | null;
+            alert_type?: string | null;
+            lid_state?: string;
+            cooldown_minutes?: number;
+        }
+    > => {
+        const next: Record<
+            string,
+            {
+                min?: number | null;
+                max?: number | null;
+                alert_type?: string | null;
+                lid_state?: string;
+                cooldown_minutes?: number;
+            }
+        > = {};
+
+        for (const row of rows) {
+            const inputType = getKpiInputType(row.kpi_name);
+            const baseDraft = {
+                min: row.min ?? null,
+                max: row.max ?? null,
+                alert_type: row.alert_type ?? null,
+                cooldown_minutes: row.cooldown_minutes ?? 60,
+            };
+
+            if (inputType === "lid_state") {
+                next[row.kpi_name] = {
+                    ...baseDraft,
+                    lid_state: valuesToLidState(row.min, row.max),
+                };
+            } else {
+                next[row.kpi_name] = baseDraft;
+            }
+        }
+
+        return next;
+    };
+
+    const handleContinueWithOldSetting = () => {
+        if (pendingContainerSelection) {
+            setMultiDraftConfig(buildMultiDraftFromConfigList(configList));
+            setSelectedContainers(pendingContainerSelection);
+        }
+        closeUnsetConfirm();
+    };
+
+    const handleConfirmUnsetAndApply = () => {
+        if (pendingContainerSelection) {
+            setSelectedContainers(pendingContainerSelection);
+        }
+        closeUnsetConfirm();
+    };
+
+    const hasConfigConflict = (
+        baseRows: KpiConfigRow[],
+        candidateRows: KpiConfigRow[],
+    ) => {
+        const toComparableMap = (rows: KpiConfigRow[]) => {
+            const map = new Map<
+                string,
+                {
+                    min: number | null;
+                    max: number | null;
+                    alert_type: string | null;
+                    cooldown_minutes: number;
+                    lid_state: string | null;
+                }
+            >();
+
+            rows.forEach((row) => {
+                map.set(row.kpi_name, {
+                    min: row.min ?? null,
+                    max: row.max ?? null,
+                    alert_type: row.alert_type ?? null,
+                    cooldown_minutes: row.cooldown_minutes ?? 60,
+                    lid_state:
+                        row.kpi_name === KPI_NAMES.IVF_LN2_LID_STATE
+                            ? valuesToLidState(row.min, row.max)
+                            : null,
+                });
+            });
+
+            return map;
+        };
+
+        const baseMap = toComparableMap(baseRows);
+        const candidateMap = toComparableMap(candidateRows);
+        const allKpiNames = new Set([
+            ...Array.from(baseMap.keys()),
+            ...Array.from(candidateMap.keys()),
+        ]);
+
+        for (const kpiName of allKpiNames) {
+            const base = baseMap.get(kpiName);
+            const candidate = candidateMap.get(kpiName);
+            if (!base && !candidate) continue;
+            if (!base || !candidate) return true;
+
+            if (
+                base.min !== candidate.min ||
+                base.max !== candidate.max ||
+                base.alert_type !== candidate.alert_type ||
+                base.cooldown_minutes !== candidate.cooldown_minutes ||
+                base.lid_state !== candidate.lid_state
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const applyContainerSelection = async (nextSelection: ContainerRow[]) => {
+        if (selectionConflictCheckLoading) return;
+
+        if (
+            selectedContainers.length === 1 &&
+            nextSelection.length > 1 &&
+            configLoadedTankId !== selectedContainers[0]?.tank_id
+        ) {
+            return;
+        }
+
+        const switchingToMultiFromSingle =
+            selectedContainers.length === 1 && nextSelection.length > 1;
+
+        if (switchingToMultiFromSingle) {
+            const newlyAddedContainers = nextSelection.filter(
+                (next) =>
+                    !selectedContainers.some(
+                        (selected) => selected.tank_id === next.tank_id,
+                    ),
+            );
+
+            if (newlyAddedContainers.length > 0) {
+                setSelectionConflictCheckLoading(true);
+                try {
+                    const addedConfigs = await Promise.all(
+                        newlyAddedContainers.map(async (container) => {
+                            const response =
+                                await ivfService.getKpiConfigList(
+                                    container.tank_id,
+                                );
+                            return response?.config ?? [];
+                        }),
+                    );
+
+                    const hasAnyConflict = addedConfigs.some((rows) =>
+                        hasConfigConflict(configList, rows),
+                    );
+
+                    if (hasAnyConflict) {
+                        setPendingContainerSelection(nextSelection);
+                        setShowUnsetConfirm(true);
+                        return;
+                    }
+                } catch (e: any) {
+                    setConfigError(
+                        e?.message ||
+                            "Failed to compare alert settings between containers",
+                    );
+                    return;
+                } finally {
+                    setSelectionConflictCheckLoading(false);
+                }
+            }
+        }
+
+        setSelectedContainers(nextSelection);
+    };
+
     const branchOptions = useMemo(
         () => ["All", ...branches.map((b) => b.branch_name)],
         [branches],
     );
+    const lockContainerSelection =
+        selectedContainers.length === 1 &&
+        (configLoadedTankId !== selectedContainers[0]?.tank_id ||
+            selectionConflictCheckLoading);
     const configuredKpiNames = useMemo(
         () => new Set(configList.map((r) => r.kpi_name)),
         [configList],
@@ -944,6 +1158,60 @@ export default function AlertSetting() {
         }
     };
 
+    const openNotifySettings = async () => {
+        setShowNotifySettings(true);
+        setNotifySettingsError(null);
+        setNotifySettingsLoading(true);
+        try {
+            const res = await ivfService.getHospitalNotificationSettings();
+            setNotifySettings(res);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to load notification settings",
+            );
+        } finally {
+            setNotifySettingsLoading(false);
+        }
+    };
+
+    const handleSelectNotificationChannel = (
+        channel: "email" | "whatsapp",
+        enabled: boolean,
+    ) => {
+        setNotifySettings((prev) =>
+            channel === "email"
+                ? { ...prev, is_email_notifify: enabled }
+                : { ...prev, is_whatsapp_notify: enabled },
+        );
+        setNotifySettingsError(null);
+    };
+
+    const handleSaveNotifySettings = async () => {
+        if (
+            !notifySettings.is_email_notifify &&
+            !notifySettings.is_whatsapp_notify
+        ) {
+            setNotifySettingsError("Enable at least one notification channel");
+            return;
+        }
+        setNotifySettingsSaving(true);
+        setNotifySettingsError(null);
+        try {
+            const res = await ivfService.updateHospitalNotificationSettings({
+                is_email_notifify: notifySettings.is_email_notifify,
+                is_whatsapp_notify: notifySettings.is_whatsapp_notify,
+            });
+            setNotifySettings(res);
+            setShowNotifySettings(false);
+        } catch (e: any) {
+            setNotifySettingsError(
+                e?.message || "Failed to save notification settings",
+            );
+        } finally {
+            setNotifySettingsSaving(false);
+        }
+    };
+
     const isMultiMode =
         selectedContainers.length > 1 || configList.length === 0;
     const hasPendingChanges = isMultiMode
@@ -956,9 +1224,20 @@ export default function AlertSetting() {
             <Sidebar onLogout={handleLogout} />
             <main className="flex-1 flex flex-col overflow-hidden ml-60 min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
-                    <h1 className="font-semibold text-black text-2xl">
-                        Alert Setting
-                    </h1>
+                    <div className="flex items-center justify-between">
+                        <h1 className="font-semibold text-black text-2xl">
+                            Alert Configuration
+                        </h1>
+                        <button
+                            type="button"
+                            onClick={openNotifySettings}
+                            className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                            aria-label="Notification settings"
+                            title="Notification settings"
+                        >
+                            <Settings size={18} strokeWidth={2} />
+                        </button>
+                    </div>
                     <div className="flex gap-6 flex-1 min-h-0">
                         {/* Left: filters + containers (Control Tower UI) */}
                         <div className="w-[380px] shrink-0 flex flex-col gap-6">
@@ -1046,19 +1325,22 @@ export default function AlertSetting() {
                                     {containers.length > 0 && (
                                         <button
                                             type="button"
-                                            onClick={() => {
+                                            disabled={lockContainerSelection}
+                                            onClick={async () => {
                                                 if (
                                                     selectedContainers.length ===
                                                     containers.length
                                                 ) {
-                                                    setSelectedContainers([]);
+                                                    await applyContainerSelection(
+                                                        [],
+                                                    );
                                                 } else {
-                                                    setSelectedContainers([
+                                                    await applyContainerSelection([
                                                         ...containers,
                                                     ]);
                                                 }
                                             }}
-                                            className="text-xs font-medium text-[#6b1176] hover:text-[#8a2a95] transition-colors px-2 py-1 rounded hover:bg-[#F7ECFF]"
+                                            className={`text-xs font-medium transition-colors px-2 py-1 rounded ${lockContainerSelection ? "text-gray-400 cursor-not-allowed" : "text-[#6b1176] hover:text-[#8a2a95] hover:bg-[#F7ECFF]"}`}
                                         >
                                             {selectedContainers.length ===
                                             containers.length
@@ -1137,25 +1419,33 @@ export default function AlertSetting() {
                                                         s.tank_id === c.tank_id,
                                                 );
                                             const toggleSelection = () => {
-                                                setSelectedContainers((prev) =>
-                                                    isSelected
-                                                        ? prev.filter(
-                                                              (s) =>
-                                                                  s.tank_id !==
-                                                                  c.tank_id,
-                                                          )
-                                                        : [...prev, c],
+                                                const nextSelection = isSelected
+                                                    ? selectedContainers.filter(
+                                                          (s) =>
+                                                              s.tank_id !==
+                                                              c.tank_id,
+                                                      )
+                                                    : [
+                                                          ...selectedContainers,
+                                                          c,
+                                                      ];
+                                                void applyContainerSelection(
+                                                    nextSelection,
                                                 );
                                             };
                                             return (
                                                 <div
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
-                                                    onClick={toggleSelection}
+                                                    onClick={
+                                                        lockContainerSelection
+                                                            ? undefined
+                                                            : toggleSelection
+                                                    }
                                                     className={`grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-2 cursor-pointer ${
                                                         isSelected
                                                             ? "bg-[#F7ECFF]"
                                                             : ""
-                                                    }`}
+                                                    } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
                                                     <div className="min-w-0 text-left overflow-hidden">
                                                         <span className="text-[#6b1176] text-xs font-bold block truncate">
@@ -1184,7 +1474,8 @@ export default function AlertSetting() {
                                                             onChange={
                                                                 toggleSelection
                                                             }
-                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176] cursor-pointer"
+                                                            disabled={lockContainerSelection}
+                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                                             aria-label={`Select container ${c.canisterId}`}
                                                         />
                                                     </div>
@@ -3608,6 +3899,131 @@ export default function AlertSetting() {
                 </div>
             )}
 
+            {/* Notification settings modal */}
+            {showNotifySettings && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    onClick={() => {
+                        if (!notifySettingsSaving) {
+                            setShowNotifySettings(false);
+                            setNotifySettingsError(null);
+                        }
+                    }}
+                >
+                    <div
+                        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-lg text-black">
+                                Notification Settings
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!notifySettingsSaving) {
+                                        setShowNotifySettings(false);
+                                        setNotifySettingsError(null);
+                                    }
+                                }}
+                                className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                                aria-label="Close notification settings"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-4">
+                            Enable one or both channels for alert notifications.
+                        </p>
+
+                        {notifySettingsLoading ? (
+                            <div className="py-8 flex items-center justify-center text-gray-500 text-sm">
+                                Loading settings...
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {/* Email row */}
+                                <div className="flex items-center justify-between py-2">
+                                    <label
+                                        htmlFor="notify-email"
+                                        className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                    >
+                                        Email Notification
+                                    </label>
+                                    <Switch
+                                        id="notify-email"
+                                        checked={notifySettings.is_email_notifify}
+                                        onCheckedChange={(checked) =>
+                                            handleSelectNotificationChannel(
+                                                "email",
+                                                checked,
+                                            )
+                                        }
+                                        disabled={notifySettingsSaving}
+                                    />
+                                </div>
+
+                                <div className="border-t border-gray-100" />
+
+                                {/* WhatsApp row */}
+                                <div className="flex items-center justify-between py-2">
+                                    <label
+                                        htmlFor="notify-whatsapp"
+                                        className="text-sm font-medium text-gray-900 cursor-pointer select-none"
+                                    >
+                                        WhatsApp Notification
+                                    </label>
+                                    <Switch
+                                        id="notify-whatsapp"
+                                        checked={notifySettings.is_whatsapp_notify}
+                                        onCheckedChange={(checked) =>
+                                            handleSelectNotificationChannel(
+                                                "whatsapp",
+                                                checked,
+                                            )
+                                        }
+                                        disabled={notifySettingsSaving}
+                                    />
+                                </div>
+
+                                {notifySettingsError && (
+                                    <p className="text-sm text-red-600">
+                                        {notifySettingsError}
+                                    </p>
+                                )}
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!notifySettingsSaving) {
+                                                setShowNotifySettings(false);
+                                                setNotifySettingsError(null);
+                                            }
+                                        }}
+                                        disabled={notifySettingsSaving}
+                                        className="px-4 py-2 border border-[#E7E1E1] rounded text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveNotifySettings}
+                                        disabled={notifySettingsSaving}
+                                        className="px-4 py-2 bg-[#6b1176] text-white rounded text-sm hover:bg-[#8a2a95] disabled:opacity-50"
+                                    >
+                                        {notifySettingsSaving
+                                            ? "Saving..."
+                                            : "Save"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Delete confirmation modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50">
@@ -3637,6 +4053,38 @@ export default function AlertSetting() {
                                 {deleteLoading
                                     ? "Deleting..."
                                     : "Confirm Delete"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Unset confirmation modal */}
+            {showUnsetConfirm && (
+                <div className="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg max-w-md w-full mx-4">
+                        <h3 className="text-xl font-semibold text-gray-700 mb-4">
+                            Resolve Conflicting Settings
+                        </h3>
+                        <p className="text-gray-600 mb-6">
+                            Some of the selected containers have different alert settings.
+                            How would you like to proceed?
+
+                        </p>
+                        <div className="flex gap-4 justify-end">
+                            <button
+                                type="button"
+                                className="px-6 py-2 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition hover:bg-[#E8D4F0]"
+                                onClick={handleContinueWithOldSetting}
+                            >
+                                Keep Existing Settings
+                            </button>
+                            <button
+                                type="button"
+                                className="px-6 py-2 bg-[#6b1176] text-white rounded-md font-medium transition hover:bg-[#8a2a95]"
+                                onClick={handleConfirmUnsetAndApply}
+                            >
+                                Apply Unified Settings
                             </button>
                         </div>
                     </div>

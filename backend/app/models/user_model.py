@@ -18,6 +18,7 @@ class User(Base):
     last_name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     email = sqlalchemy.Column(sqlalchemy.String, unique=True, nullable=False, index=True)
     password_hash = sqlalchemy.Column(sqlalchemy.String, nullable=False)
+    phone_number = sqlalchemy.Column(sqlalchemy.String(20), nullable=True)
     
     # Role and Company
     # Schema validator normalizes any case input to title case before reaching database

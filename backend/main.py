@@ -232,9 +232,7 @@ app.include_router(quality_tracking_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ln2_readings_controller.router, prefix=API_PREFIX)
-app.include_router(
-    ui_variant_controller.router
-)  # No prefix - router already has /api/ui-variants prefix
+app.include_router(ui_variant_controller.router, prefix=API_PREFIX)
 
 
 # Health check endpoint (single source of truth: app.service.health_service)

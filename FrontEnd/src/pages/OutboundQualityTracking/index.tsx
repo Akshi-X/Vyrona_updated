@@ -22,7 +22,6 @@ export default function OutboundQualityTrackingPage() {
     const { canisterId } = useParams<{ canisterId: string }>();
     const { logout, userRole } = useAuth();
     const navigate = useNavigate();
-    const [userInitials, setUserInitials] = useState<string>('U');
     
     // Header interactions state
     const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -107,10 +106,6 @@ export default function OutboundQualityTrackingPage() {
             const profile = await userService.getProfile();
             setCurrentUser(profile);
             setCurrentUserId(profile.user_id);
-            const first = profile.first_name?.trim?.() || '';
-            const last = profile.last_name?.trim?.() || '';
-            const initials = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U';
-            setUserInitials(initials);
         } catch {
             // Error handled silently
         }
@@ -144,18 +139,7 @@ export default function OutboundQualityTrackingPage() {
     return (
         <div className="bg-[#FDFAFF] flex w-full h-full">
             <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-[63px]">
-                {/* Top Nav Bar (fixed) */}
-                <header className="fixed top-0 left-60 right-0 h-[63px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 z-40">
-                    <div />
-                    <div
-                        className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"
-                        onClick={() => navigate('/user-profile')}
-                        title="Go to User Profile"
-                    >
-                        <span className="text-white text-xs font-semibold">{userInitials}</span>
-                    </div>
-                </header>
+            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
@@ -289,6 +273,8 @@ export default function OutboundQualityTrackingPage() {
                         : a.canister_number
                             ? a.canister_number
                             : `Canister ${a.canister_id}`,
+                    branchName: (a as typeof a & { branch_name?: string }).branch_name,
+                    dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
                     message: a.message,
                     timestamp: new Date(a.occurred_at+"Z").toLocaleString(),
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
