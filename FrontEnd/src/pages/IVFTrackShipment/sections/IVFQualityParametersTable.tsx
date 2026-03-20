@@ -550,7 +550,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const isShockMissing = shockValue === '—';
   const isEvaporationMissing = evaporationRate == null;
 
-  const levelActualPercent = levelPercent != null ? Math.round((levelPercent/34.894)*100) : null;
+  // LN2 tank capacity constant (adjusted per tank_id)
+  const ln2_100per = normalizedTankId === "84" ? 38.2 : 34.894;
+
+  const levelActualPercent = levelPercent != null ? Math.round((levelPercent/ln2_100per)*100) : null;
 
   // Tank dimensions for fill calculation
   const tankBodyTop = 50;
@@ -561,7 +564,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   // L1/L2 level marker positions (calculate Y from percentage)
   const l1Y = l1 != null ? tankBodyBottom - (tankBodyHeight * l1) / 100 : null;
-  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * (100-((34.894-l2)/34.894)*100)) / 100 : null;
+  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * (100-((ln2_100per-l2)/ln2_100per)*100)) / 100 : null;
   
   // Alert color based on level thresholds
   const alertColor = levelPercent == null
@@ -771,7 +774,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               fill="#6B1176"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
-              {levelPercent != null ? `${Math.round((levelPercent/34.894)*100)}%` : '—'}
+              {levelPercent != null ? `${Math.round((levelPercent/ln2_100per)*100)}%` : '—'}
             </text>
             <text
               x="100"
