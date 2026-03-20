@@ -4064,12 +4064,12 @@ export default function AlertSetting() {
                 <div className="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg max-w-md w-full mx-4">
                         <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                            Unset Conflicting Settings?
+                            Resolve Conflicting Settings
                         </h3>
                         <p className="text-gray-600 mb-6">
-                            Multiple selected containers have conflicting alert
-                            settings. Do you want to unset and continue, or
-                            keep the old setting?
+                            Some of the selected containers have different alert settings.
+                            How would you like to proceed?
+
                         </p>
                         <div className="flex gap-4 justify-end">
                             <button
@@ -4077,14 +4077,14 @@ export default function AlertSetting() {
                                 className="px-6 py-2 bg-[#F2E4FF] text-[#8b2a96] rounded-md font-medium transition hover:bg-[#E8D4F0]"
                                 onClick={handleContinueWithOldSetting}
                             >
-                                Continue with Old Setting
+                                Keep Existing Settings
                             </button>
                             <button
                                 type="button"
                                 className="px-6 py-2 bg-[#6b1176] text-white rounded-md font-medium transition hover:bg-[#8a2a95]"
                                 onClick={handleConfirmUnsetAndApply}
                             >
-                                Unset and Continue
+                                Apply Unified Settings
                             </button>
                         </div>
                     </div>
