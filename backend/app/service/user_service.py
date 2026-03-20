@@ -752,6 +752,7 @@ def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
         approved_status=approved_status_str,
         status=status,
         session_timeout=session_timeout,
+        phone_number=getattr(user, 'phone_number', None),
         last_login=user.last_login,
         created_at=user.created_at,
         updated_at=user.updated_at,
@@ -959,6 +960,8 @@ def update_user_name(
         # Update user fields with audit trail
         target_user.first_name = update_request.first_name
         target_user.last_name = update_request.last_name
+        if update_request.phone_number is not None:
+            target_user.phone_number = update_request.phone_number or None
         target_user.updated_by = current_user.user_id
         target_user.updated_at = datetime.now(timezone.utc)
         
@@ -971,6 +974,7 @@ def update_user_name(
             user_id=target_user.user_id,
             first_name=target_user.first_name,
             last_name=target_user.last_name,
+            phone_number=getattr(target_user, 'phone_number', None),
             updated_at=target_user.updated_at
         )
         return response

@@ -404,6 +404,25 @@ def sync_ivf_schema():
         except Exception as enum_err:
             logger.warning(f"TaskStatus enum sync skipped: {enum_err}")
 
+        # hospitals: notification channel flags
+        db.execute(
+            text(
+                "ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_email_notifify BOOLEAN NOT NULL DEFAULT true"
+            )
+        )
+        db.execute(
+            text(
+                "ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS is_whatsapp_notify BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
+
+        # users: optional phone number
+        db.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20)"
+            )
+        )
+
         db.commit()
         logger.info("IVF schema sync completed")
     except Exception as e:

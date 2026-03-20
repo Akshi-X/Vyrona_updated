@@ -40,7 +40,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
     const [dashboardOpen, setDashboardOpen] = useState(() => {
         const p = window.location.pathname;
-        return p === "/dashboard" || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/");
+        return p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/");
     });
     const navigate = useNavigate();
     const location = useLocation();
@@ -105,7 +105,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // Keep dropdown open when on a dashboard sub-route
     useEffect(() => {
         const p = location.pathname;
-        if (p === "/dashboard" || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading") {
+        if (p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/")) {
             setDashboardOpen(true);
         }
     }, [location.pathname]);
@@ -118,6 +118,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             dropdown: true,
             children: [
                 { label: "Overview", path: "/dashboard" },
+                { label: "Container Quality Tracking", path: "/ivf-track-shipment" },
                 { label: "Incubator Quality Tracking", path: "/incubator-tracking" },
                 { label: "Embryo Grading", path: "/embryo-grading" },
             ],
@@ -228,16 +229,20 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                     </svg>
                                 </button>
                                 {dashboardOpen && (
-                                    <div className="flex flex-col gap-0.5 border-l-2 border-white/20 ml-4 pl-3 mt-0.5">
+                                    <div className="flex flex-col gap-[18px] border-l-2 border-white/20 ml-4 pl-3 my-1.5">
                                         {item.children.map((child, childIndex) => {
                                             const isChildActive =
                                                 child.path === "/dashboard"
                                                     ? location.pathname === "/dashboard"
+                                                                                                        : child.path === "/ivf-track-shipment"
+                                                                                                            ? location.pathname === "/ivf-track-shipment" ||
+                                                                                                                location.pathname.startsWith("/ivf-track-shipment/")
                                                     : child.path === "/incubator-tracking"
                                                       ? location.pathname === "/incubator-tracking" ||
                                                         location.pathname.startsWith("/incubator-tracking/")
                                                       : child.path === "/embryo-grading"
-                                                        ? location.pathname === "/embryo-grading"
+                                                                                                                ? location.pathname === "/embryo-grading" ||
+                                                                                                                    location.pathname.startsWith("/embryo-grading/")
                                                         : false;
                                             return (
                                                 <button
@@ -248,7 +253,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                             handleNavigation(child.path);
                                                         }
                                                     }}
-                                                    className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${
+                                                    className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${childIndex === 0 ? "mt-2" : ""} ${
                                                         isChildActive
                                                             ? "bg-white text-[#6b1176]"
                                                             : "text-white/85 hover:bg-white/10 hover:text-white"

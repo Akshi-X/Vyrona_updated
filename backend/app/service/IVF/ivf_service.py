@@ -26,14 +26,20 @@ class IVFService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_control_tower_map_locations(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
+    def get_control_tower_map_locations(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
         Get IVF control tower map locations with hospital and branch information.
         Returns data organized by states.
         
         Args:
-            branch_id: Optional branch ID to filter by. If provided, only returns data for that branch.
-                      If None, returns data for all branches (Admin role).
+            hospital_id: Optional hospital ID to filter by. If provided, only returns
+                         data for branches under that hospital.
+            branch_id: Optional branch ID to filter by. If provided, only returns data
+                       for that branch.
         
         Returns:
             Dictionary containing:
@@ -48,6 +54,10 @@ class IVFService:
         try:
             # Query hospital branches with optional branch filtering
             query = self.db.query(HospitalBranch).join(Hospital)
+
+            # Apply hospital scope first (required for tenant isolation)
+            if hospital_id is not None:
+                query = query.filter(HospitalBranch.hospital_id == hospital_id)
             
             # Apply branch filter if provided (User role only)
             if branch_id is not None:

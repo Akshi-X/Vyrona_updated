@@ -7,6 +7,7 @@ Separate from CGT quality monitoring to maintain isolation
 import asyncio
 import json
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -33,6 +34,7 @@ from app.constants.kpi_constants import (
 from app.dependencies.auth_dependencies import get_current_user
 from app.exceptions import InvalidTokenException
 from app.models.IVF.device_model import Device
+from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
@@ -197,6 +199,60 @@ DURATION_24H = 1440
 DURATION_7D = 10080
 # Default max readings for LIVE (raw) when no duration_minutes; no limit param in API.
 DEFAULT_LIVE_READINGS_CAP = 200
+# Total points budget across all KPI series for LIVE mode after backend refinement.
+LIVE_SERIES_TOTAL_POINTS_BUDGET = 300
+
+
+def _to_float_or_none(value) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        out = float(value)
+        if math.isfinite(out):
+            return out
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def _aggregate_live_points_avg(points: List[dict], max_points: int) -> List[dict]:
+    """Reduce dense LIVE raw points using average aggregation per chunk.
+
+    Returns timestamp-ordered points where each output point is the chunk average,
+    using the last timestamp in each chunk so latest edge remains visible.
+    """
+    if max_points <= 0 or len(points) <= max_points:
+        return points
+
+    chunk_size = max(1, math.ceil(len(points) / max_points))
+    aggregated: List[dict] = []
+
+    for start in range(0, len(points), chunk_size):
+        end = min(start + chunk_size, len(points))
+        if start >= end:
+            continue
+        chunk = points[start:end]
+        values: List[float] = []
+        for idx in range(start, end):
+            val = _to_float_or_none(points[idx].get("value"))
+            if val is not None:
+                values.append(val)
+
+        if not values:
+            continue
+
+        avg_val = sum(values) / len(values)
+        base = dict(chunk[-1])
+        base["value"] = avg_val
+        base["avg"] = avg_val
+        base["min"] = None
+        base["max"] = None
+        base["count"] = len(values)
+        aggregated.append(base)
+
+    if len(aggregated) > max_points:
+        aggregated = aggregated[-max_points:]
+    return aggregated
 
 
 @router.get("/tanks/{tank_id}/kpi-history")
@@ -204,7 +260,7 @@ def get_tank_kpi_history(
     tank_id: int = Path(..., description="Tank ID"),
     duration_minutes: Optional[int] = Query(
         None,
-        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (30min buckets), 10080=7D (12h buckets). 10=10M raw.",
+        description="LIVE=omit. Static: 60=1H (1min buckets), 1440=24H (30min buckets), 10080=7D (6h buckets). 10=10M raw.",
     ),
     request: Request = None,
     db: Session = Depends(get_db),
@@ -229,12 +285,17 @@ def get_tank_kpi_history(
         if duration_minutes
         else None
     )
+    latest_timestamp = None
+    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D}:
+        latest_timestamp = quality_service.get_latest_tank_kpi_timestamp(tank_id)
+        if latest_timestamp is not None:
+            since = latest_timestamp - timedelta(minutes=duration_minutes)
 
-    # Static aggregated ranges: efficient AVG in DB, no limit
+    # Static aggregated ranges: efficient MIN/MAX/AVG in DB, no limit
     if duration_minutes == DURATION_1H:
         per_kpi = (
             quality_service.get_tank_kpi_history_aggregated(
-                tank_id, since, AGG_BUCKET_MINUTES_1H
+                tank_id, since, AGG_BUCKET_MINUTES_1H, until=latest_timestamp
             )
             or {}
         )
@@ -243,7 +304,7 @@ def get_tank_kpi_history(
     elif duration_minutes == DURATION_24H:
         per_kpi = (
             quality_service.get_tank_kpi_history_aggregated(
-                tank_id, since, AGG_BUCKET_MINUTES_24H
+                tank_id, since, AGG_BUCKET_MINUTES_24H, until=latest_timestamp
             )
             or {}
         )
@@ -252,7 +313,7 @@ def get_tank_kpi_history(
     elif duration_minutes == DURATION_7D:
         per_kpi = (
             quality_service.get_tank_kpi_history_aggregated(
-                tank_id, since, AGG_BUCKET_MINUTES_7D
+                tank_id, since, AGG_BUCKET_MINUTES_7D, until=latest_timestamp
             )
             or {}
         )
@@ -274,47 +335,6 @@ def get_tank_kpi_history(
         latest_readings_raw = None
         aggregated_order_asc = False
 
-    # Build latest reading map per KPI name
-    if latest_readings_raw is not None:
-        latest_readings = latest_readings_raw
-    else:
-        latest_readings = quality_service.get_last_n_readings_per_kpi(tank_id, 1) or {}
-    latest_by_name = {}
-    # Raw desc: first per name is latest. Aggregated asc: last per name is latest. Overwrite so last wins.
-    for item in latest_readings.get("kpis") or []:
-        name = (item.get("name") or "").strip()
-        if not name:
-            continue
-        latest_by_name[name] = {
-            "value": item.get("value"),
-            "timestamp": item.get("timestamp"),
-            "unit": item.get("unit") or "",
-        }
-
-    # Build kpi_config from configured KPI rows (value rows only: alert_name is null)
-    # and attach latest reading fields for each configured KPI.
-    raw_config_rows = quality_service.list_kpi_config_by_tank(tank_id)
-    seen_names = set()
-    kpi_config = []
-    for row in raw_config_rows:
-        if not row.get("status"):
-            continue
-        if row.get("alert_name") is not None:
-            continue
-        name = (row.get("kpi_name") or "").strip()
-        if not name or name in seen_names:
-            continue
-        seen_names.add(name)
-        latest = latest_by_name.get(name, {})
-        kpi_config.append(
-            {
-                "name": name,
-                "unit": row.get("unit") or latest.get("unit") or "",
-                "latest_value": latest.get("value"),
-                "latest_timestamp": latest.get("timestamp"),
-            }
-        )
-
     # KPI-wise grouped series for easier per-KPI graph rendering
     # Built from DB helper that returns last N readings per KPI config.
     kpi_series = {}
@@ -328,6 +348,10 @@ def get_tank_kpi_history(
             {
                 "timestamp": item.get("timestamp"),
                 "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
                 "unit": item.get("unit") or "",
             }
         )
@@ -337,23 +361,19 @@ def get_tank_kpi_history(
         for name in list(kpi_series.keys()):
             kpi_series[name].reverse()
 
-    # Fallback when no value-rows exist in kpi_config table: derive tabs from kpi_series keys.
-    if not kpi_config:
-        for name, points in kpi_series.items():
-            latest = points[-1] if points else {}
-            kpi_config.append(
-                {
-                    "name": name,
-                    "unit": latest.get("unit") or "",
-                    "latest_value": latest.get("value"),
-                    "latest_timestamp": latest.get("timestamp"),
-                }
+    # LIVE only: backend average aggregation so frontend doesn't receive huge raw point volume.
+    # Apply a total budget across all KPI series (e.g. 5 KPIs => ~60 points each when budget=300).
+    if duration_minutes is None:
+        kpi_count = max(1, len(kpi_series))
+        per_kpi_max_points = max(1, LIVE_SERIES_TOTAL_POINTS_BUDGET // kpi_count)
+        for name in list(kpi_series.keys()):
+            kpi_series[name] = _aggregate_live_points_avg(
+                kpi_series[name], per_kpi_max_points
             )
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",
         "tank_id": tank_id,
-        "kpi_config": kpi_config,
         "kpi_series": kpi_series,
     }
 
@@ -425,6 +445,89 @@ def _require_alert_setting_role(current_user: User) -> None:
             status_code=403,
             detail="Access denied: Alert Setting requires Manager or Admin role",
         )
+
+
+def _resolve_current_hospital_id(request: Request, db: Session) -> int:
+    """Resolve hospital_id from authenticated request context for IVF users."""
+    hospital_id = getattr(getattr(request, "state", None), "hospital_id", None)
+    if hospital_id is not None:
+        return int(hospital_id)
+
+    branch_id, _ = get_branch_filter_info(request) if request else (None, None)
+    if branch_id is not None:
+        branch = (
+            db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == int(branch_id))
+            .first()
+        )
+        if branch and branch.hospital_id is not None:
+            return int(branch.hospital_id)
+
+    raise HTTPException(
+        status_code=400,
+        detail="Unable to resolve hospital for current user",
+    )
+
+
+@router.get("/hospital-notification-settings")
+def get_hospital_notification_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get hospital-level notification channel settings for Alert Configuration."""
+    _require_alert_setting_role(current_user)
+    hospital_id = _resolve_current_hospital_id(request, db)
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    return {
+        "hospital_id": hospital.hospital_id,
+        "is_email_notifify": bool(hospital.is_email_notifify),
+        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+    }
+
+
+@router.put("/hospital-notification-settings")
+def update_hospital_notification_settings(
+    request: Request,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update hospital-level notification channel settings for Alert Configuration."""
+    _require_alert_setting_role(current_user)
+
+    if "is_email_notifify" not in body or "is_whatsapp_notify" not in body:
+        raise HTTPException(
+            status_code=400,
+            detail="is_email_notifify and is_whatsapp_notify are required",
+        )
+
+    email_enabled = bool(body.get("is_email_notifify"))
+    whatsapp_enabled = bool(body.get("is_whatsapp_notify"))
+
+    if not email_enabled and not whatsapp_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one notification channel must be enabled",
+        )
+
+    hospital_id = _resolve_current_hospital_id(request, db)
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    hospital.is_email_notifify = email_enabled
+    hospital.is_whatsapp_notify = whatsapp_enabled
+    db.commit()
+
+    return {
+        "hospital_id": hospital.hospital_id,
+        "is_email_notifify": bool(hospital.is_email_notifify),
+        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+    }
 
 
 @router.get("/kpi-config/list")

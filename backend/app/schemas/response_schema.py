@@ -71,6 +71,7 @@ class UserProfileResponse(BaseModel):
     approved_status: str = "approved"
     status: bool = False
     session_timeout: int = Field(default=30, description="Session timeout in minutes")
+    phone_number: Optional[str] = None
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

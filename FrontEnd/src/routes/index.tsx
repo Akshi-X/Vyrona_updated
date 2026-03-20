@@ -34,7 +34,6 @@ const DashboardWithVariant = () => (
         <VariantRoute
             routePath="/dashboard"
             defaultComponent={<Dashboard />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -61,7 +60,6 @@ const ControlTowerWithVariant = () => (
         <VariantRoute
             routePath="/control-tower"
             defaultComponent={<ControlTower />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -76,7 +74,6 @@ const TrackPageWithVariant = () => (
         <VariantRoute
             routePath="/track/:patientId"
             defaultComponent={<TrackPage />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -92,7 +89,6 @@ const IVFTrackShipmentWithVariant = () => (
         <VariantRoute
             routePath="/ivf-track-shipment"
             defaultComponent={<IVFTrackShipmentPage />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -108,7 +104,6 @@ const IVFTrackShipmentWithTankVariant = () => (
         <VariantRoute
             routePath="/ivf-track-shipment/:tankId"
             defaultComponent={<IVFTrackShipmentPage />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -121,7 +116,6 @@ const OutboundQualityTrackingWithVariant = () => (
         <VariantRoute
             routePath="/outbound-quality-tracking"
             defaultComponent={<OutboundQualityTrackingPage />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -134,7 +128,6 @@ const OutboundQualityTrackingWithCanisterVariant = () => (
         <VariantRoute
             routePath="/outbound-quality-tracking/:canisterId"
             defaultComponent={<OutboundQualityTrackingPage />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -175,7 +168,6 @@ const AlertSettingWithAuth = () => (
         <VariantRoute
             routePath="/alert-setting"
             defaultComponent={<AlertSetting />}
-            showDefaultWhileLoading={true}
         />
     </RoleBasedRoute>
 );
@@ -193,7 +185,7 @@ const AlertSettingWithAuth = () => (
  * 1. Wrap the component with <VariantRoute>
  * 2. Set routePath to match the route pattern
  * 3. Set defaultComponent to the default page component
- * 4. Optionally set showDefaultWhileLoading for better UX
+ * 4. Loader is shown until variant is ready (no default flash)
  *
  * CREATING A VARIANT:
  * 1. Create component in src/variants/hospital-{id}/{ComponentName}.tsx
@@ -234,6 +226,7 @@ export const router = createBrowserRouter([
     },
     { path: "/alert-setting", element: <AlertSettingWithAuth /> },
     { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+    { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
     { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
     { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
 
