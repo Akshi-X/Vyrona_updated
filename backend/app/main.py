@@ -153,7 +153,7 @@ async def startup_event():
     #     logger.info("Creating database tables...")
     # create_tables()
     # Run schema sync/init migrations (safe/idempotent)
-    sync_ivf_schema()
+    # sync_ivf_schema()
 
     #     # Step 2: Create pharma admin users
     #     logger.info("Creating pharma admin users...")
