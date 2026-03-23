@@ -208,7 +208,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   const parseTimestampToMs = (timestamp?: string): number | null => {
     if (!timestamp || typeof timestamp !== 'string') return null;
-    const normalized = timestamp.trim().replace(' ', 'T');
+    const raw = timestamp.trim().replace(' ', 'T');
+    const trimmedMicroseconds = raw.replace(/(\.\d{3})\d+/, '$1');
+    const hasTimezone = /([zZ]|[+-]\d{2}:\d{2})$/.test(trimmedMicroseconds);
+    const normalized = hasTimezone ? trimmedMicroseconds : `${trimmedMicroseconds}Z`;
     const parsed = new Date(normalized).getTime();
     return Number.isFinite(parsed) ? parsed : null;
   };
@@ -279,15 +282,17 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     >();
     for (const kpi of kpis) {
       if (typeof kpi?.name !== 'string' || !kpi.name) continue;
+      const kpiName = kpi.name.trim();
+      if (!kpiName) continue;
       if (typeof kpi?.value !== 'number' || Number.isNaN(kpi.value)) continue;
       const tsMs = parseTimestampToMs(kpi.timestamp);
       if (tsMs == null) continue;
       const ts = (kpi.timestamp || '').trim();
       if (!ts) continue;
-      const existing = latestIncomingByName.get(kpi.name);
-      if (!existing || tsMs > existing.tsMs) {
-        latestIncomingByName.set(kpi.name, {
-          name: kpi.name,
+      const existing = latestIncomingByName.get(kpiName);
+      if (!existing || tsMs >= existing.tsMs) {
+        latestIncomingByName.set(kpiName, {
+          name: kpiName,
           value: kpi.value,
           unit: kpi.unit || '',
           timestamp: ts,
@@ -301,7 +306,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       const incoming = latestIncomingByName.get(name);
       if (!incoming) return null;
       const prevTs = latestKpiTimestampRef.current[name];
-      if (prevTs != null && incoming.tsMs <= prevTs) return null;
+      if (prevTs != null && incoming.tsMs < prevTs) return null;
       latestKpiTimestampRef.current[name] = incoming.tsMs;
       return incoming;
     };
@@ -436,13 +441,15 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       if (!isMountedRef.current || !res?.kpi_series) return;
       const latestByKpi = new Map<string, { name: string; value: number; unit: string; timestamp: string }>();
       Object.entries(res.kpi_series).forEach(([name, points]) => {
+        const kpiName = name.trim();
+        if (!kpiName) return;
         if (!Array.isArray(points) || points.length === 0) return;
         const latest = points[points.length - 1];
-        const numericValue = normalizeKpiValue(name, latest?.value);
+        const numericValue = normalizeKpiValue(kpiName, latest?.value);
         if (numericValue == null) return;
         if (typeof latest?.timestamp !== 'string' || !latest.timestamp.trim()) return;
-        latestByKpi.set(name, {
-          name,
+        latestByKpi.set(kpiName, {
+          name: kpiName,
           value: numericValue,
           unit: latest?.unit || '',
           timestamp: latest.timestamp,
@@ -484,7 +491,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
           Array.isArray(data.kpis)
             ? data.kpis
                 .map((k: any) => {
-                  const name = typeof k?.name === 'string' ? k.name : '';
+                  const name = typeof k?.name === 'string' ? k.name.trim() : '';
                   if (!name) return null;
                   const value = normalizeKpiValue(name, k?.value);
                   if (value == null) return null;
@@ -540,6 +547,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const formatTemp = (v: number | null) =>
     v != null ? `${v.toFixed(1)}°C` : '—';
   const lidLabel = lidStatus == null ? '—' : lidStatus === 1 ? 'Open' : 'Closed';
+
   const internalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempInternal);
   const externalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempExternal);
   const shockValue = showBatteryDeadState ? '—' : shock != null ? String(shock) : '—';
@@ -550,10 +558,9 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const isShockMissing = shockValue === '—';
   const isEvaporationMissing = evaporationRate == null;
 
-  // LN2 tank capacity constant (adjusted per tank_id)
-  const ln2_100per = normalizedTankId === "84" ? 38.2 : 34.894;
+  const ln2_100per = normalizedTankId === '84' ? 45.2 : 34.894;
 
-  const levelActualPercent = levelPercent != null ? Math.round((levelPercent/ln2_100per)*100) : null;
+  const levelActualPercent = levelPercent != null ? Math.round((levelPercent / ln2_100per) * 100) : null;
 
   // Tank dimensions for fill calculation
   const tankBodyTop = 50;
