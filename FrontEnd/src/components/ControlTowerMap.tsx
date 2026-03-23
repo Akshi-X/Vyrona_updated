@@ -182,8 +182,19 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
   const shouldLoadRoutes = true;
+  const [isMapDataLoading, setIsMapDataLoading] = useState(false);
   const [ivfBranches, setIvfBranches] = useState<IVFBranch[]>([]);
   const [highestBranchCountCountry, setHighestBranchCountCountry] = useState<string | null>(null);
+
+  const displayedIvfBranches = useMemo(() => {
+    let branches = ivfBranches;
+
+    if (filters?.selectedBranch && filters.selectedBranch !== 'All') {
+      branches = branches.filter(b => b.branch_name === filters.selectedBranch);
+    }
+
+    return branches;
+  }, [ivfBranches, filters?.selectedBranch]);
 
 
 
@@ -200,6 +211,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     }
 
     let mounted = true;
+    setIsMapDataLoading(true);
 
     // Clear existing markers and polylines when filters or direction change
     markersRef.current.forEach((marker, key) => {
@@ -242,6 +254,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
       if (department && department.toUpperCase() !== 'IVF') {
         setIvfBranches([]);
         setHighestBranchCountCountry(null);
+        setIsMapDataLoading(false);
         return;
       }
 
@@ -295,11 +308,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
               });
             });
             
-            // Filter by branch name if filter is set
-            if (filters?.selectedBranch && filters.selectedBranch !== 'All') {
-              branches = branches.filter(b => b.branch_name === filters.selectedBranch);
-            }
-            
             // Filter by status if filter is set
             if (filters?.selectedStatus && filters.selectedStatus !== 'All') {
               const normalizedFilterStatus = filters.selectedStatus.toLowerCase();
@@ -327,6 +335,8 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
           if (mounted) {
             console.warn('Failed to load IVF control tower data:', e?.message);
           }
+        } finally {
+          if (mounted) setIsMapDataLoading(false);
         }
       })();
     } else {
@@ -359,13 +369,15 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
           }
         } catch (e: any) {
           if (mounted) setError(e?.message || 'Failed to load map routes');
+        } finally {
+          if (mounted) setIsMapDataLoading(false);
         }
       })();
     }
 
     return () => { mounted = false; };
 
-  }, [shouldLoadRoutes, direction, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier, filters?.selectedBranch]);
+  }, [shouldLoadRoutes, direction, filters?.selectedRegion, filters?.selectedStatus, filters?.selectedCarrier]);
 
 
 
@@ -467,9 +479,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
   useEffect(() => {
     if (zoomToLocation && mapRef) {
       mapRef.panTo(zoomToLocation);
-      const currentZoom = mapRef.getZoom() ?? 3;
-      const targetZoom = Math.min(currentZoom + 3, 9);
-      mapRef.setZoom(targetZoom);
+      mapRef.setZoom(9);
     }
   }, [zoomToLocation, mapRef]);
 
@@ -487,10 +497,28 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     if (!position) return;
 
     mapRef.panTo(position);
-    const currentZoom = mapRef.getZoom() ?? 3;
-    const targetZoom = Math.min(currentZoom + 3, 9);
-    mapRef.setZoom(targetZoom);
+    mapRef.setZoom(9);
   }, [zoomToBranchName, ivfBranches, mapRef]);
+
+  // Auto zoom to selected branch from inbound branch filter
+  useEffect(() => {
+    if (direction !== 'inbound' || !mapRef) return;
+
+    const selectedBranch = filters?.selectedBranch;
+    if (!selectedBranch || selectedBranch === 'All') return;
+
+    const branch = ivfBranches.find(b => b.branch_name === selectedBranch);
+    if (!branch) return;
+
+    const position = toValidLatLng(
+      branch.geoLocation.latitude,
+      branch.geoLocation.longitude,
+    );
+    if (!position) return;
+
+    mapRef.panTo(position);
+    mapRef.setZoom(9);
+  }, [direction, filters?.selectedBranch, ivfBranches, mapRef]);
 
   // Cleanup all markers & polylines on unmount
   useEffect(() => {
@@ -574,13 +602,10 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
   // Helper function to zoom in to a marker position
   const zoomToMarker = useCallback((position: google.maps.LatLngLiteral) => {
     if (!mapRef) return;
-    
-    const currentZoom = mapRef.getZoom() ?? 3;
-    const targetZoom = Math.min(currentZoom + 3, 9); // Zoom in by 3 levels, max zoom is 9
-    
+
     // Pan to position and zoom
     mapRef.panTo(position);
-    mapRef.setZoom(targetZoom);
+    mapRef.setZoom(9);
   }, [mapRef]);
 
 
@@ -757,7 +782,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
               })}
 
               {/* IVF Branch Markers (Inbound only) */}
-              {direction === 'inbound' && ivfBranches.map((branch) => {
+              {direction === 'inbound' && displayedIvfBranches.map((branch) => {
                 const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
                 const branchPosition = toValidLatLng(
                   branch.geoLocation.latitude,
@@ -829,6 +854,15 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
             <div className="absolute inset-0 flex items-center justify-center text-white text-xs">Loading map...</div>
 
+          )}
+
+          {isLoaded && isMapDataLoading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/25">
+              <div className="flex items-center gap-2 rounded-md bg-black/60 px-3 py-2 text-xs text-white">
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                Updating map...
+              </div>
+            </div>
           )}
 
 
