@@ -866,40 +866,26 @@ const ControlTower = () => {
                           const pillClass = deviationCount > 0
                             ? 'border-[#FECACA] bg-[#FEF3F2] text-[#B42318]'
                             : 'border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]';
-                          const handleCanisterClick = (e: React.MouseEvent) => {
-                            // Don't navigate if clicking on the link
-                            if ((e.target as HTMLElement).tagName === 'A') {
-                              return;
-                            }
-                            if (canister.branchName && canister.branchName !== 'N/A') {
-                              setZoomToBranchName(canister.branchName);
-                            }
-                          };
-
                           return (
                             <div 
                               key={canister.id} 
                               className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
-                              onClick={handleCanisterClick}
+                              onClick={() => {
+                                try {
+                                  if (canister.branchId && canister.branchId !== 'N/A') {
+                                    sessionStorage.setItem('ivf_selected_branch_id', String(canister.branchId));
+                                  }
+                                  navigate(`/ivf-track-shipment/${encodeURIComponent(
+                                    canister.tankId && canister.tankId !== 'N/A' ? canister.tankId : canister.canisterId
+                                  )}`);
+                                } catch {}
+                              }}
                             >
                               <div className="min-w-0 text-left overflow-hidden">
                                 {canister.canisterId ? (
-                                  <Link 
-                                    to={`/ivf-track-shipment/${encodeURIComponent(
-                                      canister.tankId && canister.tankId !== 'N/A' ? canister.tankId : canister.canisterId
-                                    )}`}
-                                    className="text-[#6b1176] text-xs font-bold hover:underline cursor-pointer truncate block"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        if (canister.branchId && canister.branchId !== 'N/A') {
-                                          sessionStorage.setItem('ivf_selected_branch_id', String(canister.branchId));
-                                        }
-                                      } catch {}
-                                    }}
-                                  >
+                                  <span className="text-[#6b1176] text-xs font-bold hover:underline truncate block">
                                     Container {canister.canisterId}
-                                  </Link>
+                                  </span>
                                 ) : (
                                   <span className="text-[#6b1176] text-xs font-bold">
                                     Container {canister.canisterId}
