@@ -493,7 +493,7 @@ const ControlTower = () => {
                               : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
                           }`}
                         >
-                          Inbound
+                          Cryotanks
                         </button>
                         <button
                           type="button"
@@ -509,7 +509,7 @@ const ControlTower = () => {
                               : 'bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50'
                           } ${isIvfUser ? 'opacity-50 cursor-not-allowed hover:bg-white' : ''}`}
                         >
-                          Outbound
+                          Incubators
                         </button>
                       </div>
                     </div>
