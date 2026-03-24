@@ -193,18 +193,18 @@ export default function Dashboard({ }: DashboardProps) {
     setLoadingChats(true);
     try {
       const response = await chatService.getUnreadMessages();
-      
+
       // Update the total unread count from API response
       if (response && typeof response.total_unread === 'number') {
         setApiUnreadCount(response.total_unread);
       }
-      
+
       if (response && response.unread_messages && response.unread_messages.length > 0) {
         const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
           id: msg.message_id.toString(),
           sender: msg.sender_name,
-          patientId: msg.canister_number 
-            ? `Canister ID: ${msg.canister_number}` 
+          patientId: msg.canister_number
+            ? `Canister ID: ${msg.canister_number}`
             : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
           message: msg.message_content,
           timestamp: new Date(msg.created_at).toLocaleString(),
@@ -235,15 +235,15 @@ export default function Dashboard({ }: DashboardProps) {
       const transformedChats: StakeholderChat[] = wsUnreadMessages.map((msg) => ({
         id: msg.message_id.toString(),
         sender: msg.sender_name,
-        patientId: msg.canister_number 
-          ? `Canister ID: ${msg.canister_number}` 
+        patientId: msg.canister_number
+          ? `Canister ID: ${msg.canister_number}`
           : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
         message: msg.message_content,
         timestamp: new Date(msg.created_at).toLocaleString(),
         isRead: false
       }));
       setStakeholderChats(transformedChats);
-    } 
+    }
     // Don't clear chats if WebSocket is empty - API fetch will handle it
   }, [wsUnreadMessages]);
 
@@ -384,12 +384,12 @@ export default function Dashboard({ }: DashboardProps) {
             department = storedDept.toUpperCase();
           }
         } catch {}
-        
+
         // Fall back to API if not in localStorage
         if (!department) {
           department = profile.department?.toUpperCase() || null;
         }
-        
+
         setUserDepartment(department);
       } catch {
         // Try to get department from localStorage even if API fails
@@ -815,7 +815,7 @@ export default function Dashboard({ }: DashboardProps) {
         tankCode: task.tank_code || undefined,
         taskName: task.task_name,
         description: task.description || '',
-        assigneeBy: task.created_by 
+        assigneeBy: task.created_by
           ? `${task.created_by.first_name || ''} ${task.created_by.last_name || ''}`.trim() || 'Unknown'
           : 'Unknown',
         assignedTo: task.assignee
@@ -846,8 +846,8 @@ export default function Dashboard({ }: DashboardProps) {
     if ('alert_id' in alert) {
       // IVF alert
       const ivfAlert = alert as IVFAlert;
-      const severity: 'Low' | 'Medium' | 'High' | 'Critical' = 
-        ivfAlert.severity === 'High' ? 'High' : 
+      const severity: 'Low' | 'Medium' | 'High' | 'Critical' =
+        ivfAlert.severity === 'High' ? 'High' :
         ivfAlert.severity === 'Medium' ? 'Medium' : 'Low';
       return {
         id: ivfAlert.alert_id,
@@ -989,8 +989,8 @@ export default function Dashboard({ }: DashboardProps) {
 
 
   return (
-    <div 
-      className="bg-[#FDFAFF] flex w-full h-[100vh] overflow-x-hidden" 
+    <div
+      className="bg-[#FDFAFF] flex w-full h-[100vh] overflow-x-hidden"
       style={{
         maxWidth: '100vw',
         touchAction: 'pan-y',
@@ -998,7 +998,7 @@ export default function Dashboard({ }: DashboardProps) {
       }}
     >
       {/* Main Content Area */}
-      <main 
+      <main
         className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden min-w-0"
         style={{
           maxWidth: '100vw',
@@ -1009,9 +1009,9 @@ export default function Dashboard({ }: DashboardProps) {
       >
 
         {/* Dashboard Content */}
-        <div 
-          className="flex-1 p-6 pt-10 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0" 
-          style={{ 
+        <div
+          className="flex-1 p-6 pt-10 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0"
+          style={{
             touchAction: 'pan-y',
             overscrollBehaviorX: 'none',
             overscrollBehaviorY: 'auto',
@@ -1251,7 +1251,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <section>
                     <div className="flex gap-6 mt-10">
                       {/* Container Quality Tracking */}
-                          <div 
+                          <div
                             className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
                         onClick={() => {
                           setShowTrackCanister(true);
@@ -1266,7 +1266,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={ContainerQualityTrackingIcon}
                           />
                         </div>
-                        
+
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
@@ -1277,14 +1277,14 @@ export default function Dashboard({ }: DashboardProps) {
                               src={ContainerQualityTrackingIcon}
                             />
                           </div>
-                          
+
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
-                            Container 
+                            Cryocan
                             <br />
                             Quality Tracking
                           </div>
-                          
+
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
@@ -1306,7 +1306,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Embryo Grading */}
-                      <div 
+                      <div
                         className="flex-1 bg-[#6B1176] rounded-lg hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden"
                         onClick={() => {
                           // Embryo Grading: no redirect for now
@@ -1316,19 +1316,19 @@ export default function Dashboard({ }: DashboardProps) {
                         <div className="absolute bottom-0 right-0 opacity-5 translate-x-[0%] translate-y-[15%]">
                           <Microscope className="w-24 h-24 text-white" strokeWidth={1.5} />
                         </div>
-                        
+
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
                             <Microscope className="w-[18px] h-[18px] text-white" strokeWidth={2} />
                           </div>
-                          
+
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                             Embryo <br /> Grading
                           </div>
-                          
+
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
@@ -1358,7 +1358,7 @@ export default function Dashboard({ }: DashboardProps) {
                             src={IncubatorQualityTrackingIcon}
                           />
                         </div>
-                        
+
                         {/* Content */}
                         <div className="relative h-full px-3 py-4">
                           {/* Icon at Top Left */}
@@ -1369,12 +1369,12 @@ export default function Dashboard({ }: DashboardProps) {
                               src={IncubatorQualityTrackingIcon}
                             />
                           </div>
-                          
+
                           {/* Title - Left aligned */}
                           <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                             Incubator <br /> Quality Tracking
                           </div>
-                          
+
                           {/* Arrow Button at Bottom Right */}
                           <div className="absolute bottom-0 right-0">
                             <button
@@ -1656,7 +1656,7 @@ export default function Dashboard({ }: DashboardProps) {
                         </div>
                       </div>
                     </div>
-                    
+
                   </div>
                 </div>
               </section>
@@ -1778,7 +1778,7 @@ export default function Dashboard({ }: DashboardProps) {
                           src={card.icon}
                         />
                       </div>
-                      
+
                       {/* Content */}
                       <div className="relative h-full px-3 py-4">
                         {/* Icon at Top Left */}
@@ -1789,17 +1789,17 @@ export default function Dashboard({ }: DashboardProps) {
                             src={card.icon}
                           />
                         </div>
-                        
+
                         {/* Title - Centered */}
                         <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                           {card.label}
                         </div>
-                        
+
                         {/* Description - Centered */}
                         <div className="text-white opacity-90 text-[11px] text-left w-[120px]">
                           {card.description}
                         </div>
-                        
+
                         {/* Arrow Button at Bottom Right */}
                         <div className="absolute bottom-0 right-0">
                           <button
