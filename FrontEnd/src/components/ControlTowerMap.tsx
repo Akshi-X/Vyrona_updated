@@ -1274,12 +1274,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <span className="inline-block w-4 h-1.5 rounded-full bg-[#FFD901]" />
-
-                                    <span className="text-[12px]">Risk</span>
-                                </div>
-
-                                <div className="flex items-center gap-3">
                                     <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
 
                                     <span className="text-[12px]">
