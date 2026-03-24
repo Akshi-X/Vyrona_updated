@@ -152,11 +152,19 @@ export interface DeviationsGraphDataItem {
     shock: number;
 }
 
-export type DeviationsGraphResponse = {
+export type DeviationsGraphDataRow = {
     alert_name: string;
     branch_name: string;
+    tank_code?: string | null;
     deviation_count: number;
-}[];
+};
+
+export type DeviationsGraphResponse =
+    | DeviationsGraphDataRow[]
+    | {
+          available_heading?: string[];
+          data?: DeviationsGraphDataRow[];
+      };
 
 export interface RefillLogItem {
     canister_id: number;
