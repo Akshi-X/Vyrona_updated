@@ -725,7 +725,8 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationChartError(null);
       try {
         const response = await ivfService.getDeviationsGraph();
-        if (!cancelled && response && Array.isArray(response)) {
+        if (!cancelled && response) {
+          const isUserRole = String(userRole || '').toLowerCase() === 'user';
           const REQUIRED_ALERTS = [
             'Battery Level',
             'Lid State',
@@ -736,25 +737,44 @@ export default function Dashboard({ }: DashboardProps) {
             'Shock Detection',
           ];
 
-          const branchNamesFromData = response
-            .map((item) => item?.branch_name?.trim())
+          const responseRows = Array.isArray(response)
+            ? response
+            : Array.isArray(response.data)
+              ? response.data
+              : [];
+
+          const apiHeadings = !Array.isArray(response) && Array.isArray(response.available_heading)
+            ? response.available_heading
+            : [];
+
+          const getLabelForItem = (item: { branch_name?: string | null; tank_code?: string | null }) => {
+            const branchName = String(item?.branch_name ?? '').trim();
+            const tankCode = String(item?.tank_code ?? '').trim();
+            if (isUserRole) return tankCode || branchName;
+            if (!branchName) return '';
+            return branchName;
+          };
+
+          const labelsFromData = responseRows
+            .map((item) => getLabelForItem(item))
             .filter((name): name is string => typeof name === 'string' && name.length > 0);
 
-          // Show all branches returned by deviations API.
-          const containers = Array.from(new Set(branchNamesFromData)).sort((a, b) => a.localeCompare(b));
+          const containers = apiHeadings.length > 0
+            ? Array.from(new Set(apiHeadings.filter((name): name is string => typeof name === 'string' && name.trim().length > 0)))
+            : Array.from(new Set(labelsFromData)).sort((a, b) => a.localeCompare(b));
 
           // Sum duplicate rows from API by (branch_name, alert_name).
           const deviationMap = new Map<string, number>();
-          response.forEach((item) => {
-            const branchName = (item?.branch_name ?? '').trim();
+          responseRows.forEach((item) => {
+            const labelName = getLabelForItem(item);
             const alertName = (item?.alert_name ?? '').trim();
             const count = Number(item?.deviation_count ?? 0);
-            if (!branchName || !alertName || !Number.isFinite(count)) return;
-            const key = `${branchName}__${alertName}`;
+            if (!labelName || !alertName || !Number.isFinite(count)) return;
+            const key = `${labelName}__${alertName}`;
             deviationMap.set(key, (deviationMap.get(key) ?? 0) + count);
           });
 
-          const responseAlerts = response
+          const responseAlerts = responseRows
             .map((item) => item?.alert_name)
             .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
           const orderedAlerts = Array.from(new Set([...REQUIRED_ALERTS, ...responseAlerts]));
@@ -764,8 +784,8 @@ export default function Dashboard({ }: DashboardProps) {
           const metrics = orderedAlerts.map((alertName, idx) => ({
             name: alertName,
             color: colorPalette[idx % colorPalette.length],
-            data: containers.map((branchName) => {
-              const key = `${branchName}__${alertName}`;
+            data: containers.map((containerLabel) => {
+              const key = `${containerLabel}__${alertName}`;
               return deviationMap.get(key) ?? 0;
             }),
           }));
@@ -1188,7 +1208,7 @@ export default function Dashboard({ }: DashboardProps) {
 
                   {/* Outbound Shipments Section */}
                   <section>
-                    <h2 className="font-semibold text-black text-base mb-4">Shipment Performance</h2>
+                    <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
@@ -1197,7 +1217,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Outbound Shipment" src={OutboundShipmentIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Shipments
+                            Quality Deviations Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
@@ -1217,7 +1237,7 @@ export default function Dashboard({ }: DashboardProps) {
                             <img className="w-[18px] h-[18px]" alt="Avg Quality Lost Patient" src={AvgQualityLostPatientIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Deviations
+                          Top Deviation Driver
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
