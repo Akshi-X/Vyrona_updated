@@ -160,7 +160,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   }, [isOpen, isManagerAdmin]);
 
   const checkCanister = async (tankCode: string): Promise<CanisterCheckResponse | null> => {
-    const trimmed = tankCode.trim();
+    const trimmed = tankCode.trim().toUpperCase();
     if (!trimmed) {
       setCanisterCheckMessage(null);
       setCanisterCheckError(null);
@@ -191,7 +191,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
   };
 
   const handleCanisterIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value.toUpperCase();
     setCanisterId(value);
     // Clear previous messages when user types
     setCanisterCheckMessage(null);
@@ -268,7 +268,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
       }
     } else {
       // For other modals, use the existing checkCanister logic
-      const trimmedCanisterId = canisterId.trim();
+      const trimmedCanisterId = canisterId.trim().toUpperCase();
       if (!trimmedCanisterId) return;
       if (isManagerAdmin && !selectedBranchName) return;
       
