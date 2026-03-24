@@ -1,7 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Sidebar } from '../../components/Sidebar';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
@@ -28,7 +27,7 @@ const formatSensorLabel = (countValue: unknown): string => {
 };
 
 const ControlTower = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
@@ -47,11 +46,6 @@ const ControlTower = () => {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const carrierDropdownRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   // Active routes via API
   const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
@@ -441,11 +435,8 @@ const ControlTower = () => {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>
-      {/* Left Sidebar */}
-      <Sidebar onLogout={handleLogout} />
-
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden ml-60">
+      <main className="flex-1 flex flex-col overflow-hidden">
         
         {/* Control Tower Content */}
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10" >

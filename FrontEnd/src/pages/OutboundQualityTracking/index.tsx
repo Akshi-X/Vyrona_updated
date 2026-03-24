@@ -1,7 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import IVFQualityTrackingChart from '../IVFTrackShipment/sections/IVFQualityTrackingChart';
 import { IVFQualityParametersTable } from '../IVFTrackShipment/sections/IVFQualityParametersTable';
 import IVFTrackAndTraceMap from '../IVFTrackShipment/sections/IVFTrackAndTraceMap';
@@ -20,7 +19,7 @@ import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
 export default function OutboundQualityTrackingPage() {
     const { canisterId } = useParams<{ canisterId: string }>();
-    const { logout, userRole } = useAuth();
+    const { userRole } = useAuth();
     const navigate = useNavigate();
     
     // Header interactions state
@@ -138,8 +137,7 @@ export default function OutboundQualityTrackingPage() {
 
     return (
         <div className="bg-[#FDFAFF] flex w-full h-full">
-            <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">

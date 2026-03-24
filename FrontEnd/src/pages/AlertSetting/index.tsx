@@ -5,9 +5,7 @@ import React, {
     useRef,
     useCallback,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { Sidebar } from "../../components/Sidebar";
 import {
     ivfService,
     type IvfBranch,
@@ -265,8 +263,7 @@ const getKpiValidation = (
 };
 
 export default function AlertSetting() {
-    const { isAuthenticated, logout } = useAuth();
-    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
 
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [branchFilter, setBranchFilter] = useState<string>("All");
@@ -432,11 +429,6 @@ export default function AlertSetting() {
         },
         [getInputRefs],
     );
-
-    const handleLogout = () => {
-        logout();
-        navigate("/login");
-    };
 
     useEffect(() => {
         const loadBranches = async () => {
@@ -1221,8 +1213,7 @@ export default function AlertSetting() {
 
     return (
         <div className="flex w-full bg-[#FDFAFF]" style={{ height: "100vh" }}>
-            <Sidebar onLogout={handleLogout} />
-            <main className="flex-1 flex flex-col overflow-hidden ml-60 min-w-0">
+            <main className="flex-1 flex flex-col overflow-hidden min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
                     <div className="flex items-center justify-between">
                         <h1 className="font-semibold text-black text-2xl">

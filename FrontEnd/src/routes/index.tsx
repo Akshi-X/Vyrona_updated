@@ -17,6 +17,7 @@ import EmbryoGradingPage from "../pages/EmbryoGrading";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
 import { ApprovalLayout } from "../components/ApprovalLayout";
+import SidebarLayout from "../components/SidebarLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
 import SuccessAlert from "../pages/SuccessAlert";
@@ -205,36 +206,30 @@ export const router = createBrowserRouter([
     { path: "/success", element: <SuccessAlert /> },
 
     // ============================================================
-    // PROTECTED ROUTES WITH VARIANT SUPPORT
-    // These routes can have hospital-specific custom UIs
+    // PROTECTED ROUTES WITH SHARED APP LAYOUT
     // ============================================================
-    { path: "/dashboard", element: <DashboardWithVariant /> },
-    { path: "/control-tower", element: <ControlTowerWithVariant /> },
-    { path: "/track/:patientId", element: <TrackPageWithVariant /> },
     {
-        path: "/ivf-track-shipment/:tankId",
-        element: <IVFTrackShipmentWithTankVariant />,
+        element: <SidebarLayout />,
+        children: [
+            { path: "/dashboard", element: <DashboardWithVariant /> },
+            { path: "/control-tower", element: <ControlTowerWithVariant /> },
+            { path: "/track/:patientId", element: <TrackPageWithVariant /> },
+            { path: "/ivf-track-shipment/:tankId", element: <IVFTrackShipmentWithTankVariant /> },
+            { path: "/ivf-track-shipment", element: <IVFTrackShipmentWithVariant /> },
+            { path: "/outbound-quality-tracking/:canisterId", element: <OutboundQualityTrackingWithCanisterVariant /> },
+            { path: "/outbound-quality-tracking", element: <OutboundQualityTrackingWithVariant /> },
+            { path: "/alert-setting", element: <AlertSettingWithAuth /> },
+            { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
+            { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
+            { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
+            { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
+            { path: "/database", element: <DatabaseWithAuth /> },
+        ],
     },
-    { path: "/ivf-track-shipment", element: <IVFTrackShipmentWithVariant /> },
-    {
-        path: "/outbound-quality-tracking/:canisterId",
-        element: <OutboundQualityTrackingWithCanisterVariant />,
-    },
-    {
-        path: "/outbound-quality-tracking",
-        element: <OutboundQualityTrackingWithVariant />,
-    },
-    { path: "/alert-setting", element: <AlertSettingWithAuth /> },
-    { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
-    { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
-    { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
-    { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
 
     // ============================================================
-    // PROTECTED ROUTES WITHOUT VARIANT SUPPORT
-    // These routes use the same UI for all hospitals
+    // PROTECTED ROUTES WITHOUT SHARED SIDEBAR
     // ============================================================
-    { path: "/database", element: <DatabaseWithAuth /> },
     { path: "/track-and-trace", element: <TrackAndTrace /> },
     { path: "/user-profile", element: <UserProfilePage /> },
     { path: "/support", element: <Support /> },
