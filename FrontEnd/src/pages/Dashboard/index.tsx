@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { OngoingTreatments } from '../../components/OngoingTreatments';
 import { IVFOngoingTreatments } from '../../components/IVFOngoingTreatments';
-import { Sidebar } from '../../components/Sidebar';
 import { CurveBar } from '../../components/CurveBar';
 import CriticalAlertsModal from '../../components/CriticalAlertsModal';
 import MyTasksModal, { type MyTask } from '../../components/MyTasksModal';
@@ -68,7 +67,7 @@ import AvgLeadTimeIcon from '../../assets/DashBoardIcons/AvgLeadTime.svg';
 interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
-  const { isAuthenticated, logout, userRole } = useAuth();
+  const { isAuthenticated, userRole } = useAuth();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -881,11 +880,6 @@ export default function Dashboard({ }: DashboardProps) {
     }
   });
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   // State for patient statistics
   const [patientStats, setPatientStats] = useState<PatientStatistics | null>(null);
   const [logisticsMetrics, setLogisticsMetrics] = useState<LogisticsMetrics | null>(null);
@@ -1003,14 +997,11 @@ export default function Dashboard({ }: DashboardProps) {
         overscrollBehaviorX: 'none'
       }}
     >
-      {/* Left Sidebar */}
-      <Sidebar onLogout={handleLogout} />
-
       {/* Main Content Area */}
       <main 
-        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden ml-60 min-w-0"
+        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden min-w-0"
         style={{
-          maxWidth: 'calc(100vw - 15rem)',
+          maxWidth: '100vw',
           touchAction: 'pan-y',
           overscrollBehaviorX: 'none',
           height: '100vh'

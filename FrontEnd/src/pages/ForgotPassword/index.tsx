@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import MyGrapeBanner from "../../assets/Isolation_Mode.svg";
-import MyGrapeLogo from "../../assets/mGScale.svg";
 import { authService } from "../../services/authService";
+import AuthBrandPanel from "../../components/AuthBrandPanel";
 
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -63,37 +62,7 @@ const ForgotPassword: React.FC = () => {
 
     return (
         <div className="w-full h-screen flex overflow-hidden bg-white font-['Work_Sans']">
-            {/* Left Section */}
-            <aside
-                className="w-[35%] h-screen flex flex-col justify-between text-white relative overflow-hidden 
-             bg-gradient-to-b from-[#9C3AA6] to-[#30024D] 
-             rounded-tr-[40px] rounded-br-[40px]"
-            >
-                {/* Background Banner Image */}
-                <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
-                    <img
-                        src={MyGrapeBanner}
-                        className="w-full h-auto max-h-full object-contain"
-                        alt="banner"
-                    />
-                </div>
-
-                <div className="flex h-[15%] items-center space-x-2 p-12 pb-0 relative z-10">
-                    <img src={MyGrapeLogo} alt="logo" className="w-[150px] h-[100px]" />
-                </div>
-
-                <div className="flex-1 relative z-0"></div>
-
-                <div className="flex flex-col h-[20%] justify-end pt-0 p-12 pr-0 relative z-10">
-                    <h2 className="text-2xl font-bold leading-snug mt-8">
-                        <span style={{ color: '#D951E6' }}>Driving Health Forward</span> <br />
-                        One Smart Solution At a Time
-                    </h2>
-                    <p className="mt-1 font-[12px] text-white">
-                        Because every patient is someone's everything.
-                    </p>
-                </div>
-            </aside>
+            <AuthBrandPanel />
 
             {/* Right Section */}
             <main className="flex-1 flex flex-col items-center justify-center px-16 overflow-hidden">

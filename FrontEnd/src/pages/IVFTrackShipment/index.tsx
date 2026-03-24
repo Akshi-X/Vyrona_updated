@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
 import IVFQualityTrackingChart from './sections/IVFQualityTrackingChart';
@@ -24,7 +23,7 @@ import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
 
 export default function IVFTrackShipmentPage() {
     const { tankId } = useParams<{ tankId: string }>();
-    const { logout, userRole } = useAuth();
+    const { userRole } = useAuth();
     const navigate = useNavigate();
     const [headerTankCode, setHeaderTankCode] = useState<string>('-');
     const [headerBranchName, setHeaderBranchName] = useState<string>('-');
@@ -192,8 +191,7 @@ export default function IVFTrackShipmentPage() {
 
     return (
         <div className="bg-[#FDFAFF] flex w-full min-h-screen">
-            <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
 
                 {/* Main Content */}
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
