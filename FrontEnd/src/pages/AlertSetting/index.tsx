@@ -14,6 +14,7 @@ import {
     type KpiConfigPayload,
 } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
+import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import {
     Thermometer,
     Droplets,
@@ -1216,9 +1217,12 @@ export default function AlertSetting() {
             <main className="flex-1 flex flex-col overflow-hidden min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
                     <div className="flex items-center justify-between">
-                        <h1 className="font-semibold text-black text-2xl">
-                            Alert Configuration
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <img src={CriticalAlertsIcon} alt="Alert Configuration" className="w-8 h-8" />
+                            <h1 className="font-semibold text-black text-2xl">
+                                Alert Configuration
+                            </h1>
+                        </div>
                         <button
                             type="button"
                             onClick={openNotifySettings}
