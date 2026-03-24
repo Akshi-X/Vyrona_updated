@@ -36,61 +36,6 @@ const ControlTower = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [selectedRegion, setSelectedRegion] = useState<string>('All');
-  const [selectedStatusInbound, setSelectedStatusInbound] = useState<string>('All');
-  const [selectedStatusOutbound, setSelectedStatusOutbound] = useState<string>('All');
-  const [selectedCarrier, setSelectedCarrier] = useState<string>('All');
-  const [selectedBranch, setSelectedBranch] = useState<string>('All');
-  const [direction, setDirection] = useState<'inbound' | 'outbound'>('inbound');
-  const [department, setDepartment] = useState<string | null>(null);
-  const [_userInitials, setUserInitials] = useState<string>('');
-  const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const regionDropdownRef = useRef<HTMLDivElement>(null);
-  const statusDropdownRef = useRef<HTMLDivElement>(null);
-  const carrierDropdownRef = useRef<HTMLDivElement>(null);
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Active routes via API
-  const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
-  const [loadingRoutes, setLoadingRoutes] = useState(false);
-  const [routesError, setRoutesError] = useState<string | null>(null);
-
-  // Active canisters via API
-  const [canisters, setCanisters] = useState<Array<{
-    id: string;
-    canisterId: string;
-    tankId: string;
-    branchName: string;
-    branchId: string;
-    status: string;
-    deviations?: number;
-    date: string;
-  }>>([]);
-  const [loadingCanisters, setLoadingCanisters] = useState(false);
-  const [canistersError, setCanistersError] = useState<string | null>(null);
-  const [zoomToLocation, setZoomToLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [zoomToBranchName, setZoomToBranchName] = useState<string | null>(null);
-  const [mapRoutes, setMapRoutes] = useState<Array<{
-    patient_id: string;
-    source_latitude: number;
-    source_longitude: number;
-    destination_latitude: number;
-    destination_longitude: number;
-  }>>([]);
-
-  // Read department from localStorage (set after OTP verification)
-  useEffect(() => {
-    try {
-      const dept = localStorage.getItem('department');
-      setDepartment(dept);
-    } catch {
-      setDepartment(null);
-    }
-  }, []);
-
     const [selectedRegion, setSelectedRegion] = useState<string>("All");
     const [selectedStatusInbound, setSelectedStatusInbound] =
         useState<string>("All");
@@ -113,11 +58,6 @@ const ControlTower = () => {
     const statusDropdownRef = useRef<HTMLDivElement>(null);
     const carrierDropdownRef = useRef<HTMLDivElement>(null);
     const branchDropdownRef = useRef<HTMLDivElement>(null);
-
-    const handleLogout = () => {
-        logout();
-        navigate("/login");
-    };
 
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
@@ -618,12 +558,7 @@ const ControlTower = () => {
         );
     }
 
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-600">Please login to access Control Tower.</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>

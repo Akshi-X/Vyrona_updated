@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import QualityTrackingChart from './sections/QualityTrackingChart.tsx';
@@ -52,7 +52,7 @@ const steps = [
 export default function TrackPage() {
   const { patientId } = useParams();
   const { userRole } = useAuth();
-  const navigate = useNavigate();
+
 
   // Header interactions state (mirrors Dashboard behavior)
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
