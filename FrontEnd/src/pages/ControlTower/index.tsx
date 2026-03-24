@@ -5,6 +5,7 @@ import { shipmentService, type ActiveRouteItem } from '../../services/shipmentSe
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
+import ControlTowerIconDark from '../../assets/DashBoardIcons/ControlTowerDark.svg';
 
 const toDeviationCount = (value: unknown): number => {
   const count = Number(value);
@@ -441,9 +442,12 @@ const ControlTower = () => {
         {/* Control Tower Content */}
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10" >
           <div className="flex items-center justify-between">
-            <h1 className="font-semibold text-black text-2xl">
-              Control Tower
-            </h1>
+            <div className="flex items-center gap-3">
+              <img src={ControlTowerIconDark} alt="Control Tower" className="w-8 h-8" />
+              <h1 className="font-semibold text-black text-2xl">
+                Control Tower
+              </h1>
+            </div>
             {/**
             <div className="relative group">
               <button
