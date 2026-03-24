@@ -33,7 +33,9 @@ type NavItem =
           children: NavChild[];
       };
 
-const isDropdownItem = (item: NavItem): item is NavItem & { dropdown: true; children: NavChild[] } =>
+const isDropdownItem = (
+    item: NavItem,
+): item is NavItem & { dropdown: true; children: NavChild[] } =>
     "dropdown" in item && item.dropdown === true;
 
 const isDashboardRoute = (path: string) =>
@@ -92,7 +94,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 setUserDepartment(department);
                 const first = profile.first_name?.trim?.() || "";
                 const last = profile.last_name?.trim?.() || "";
-                setProfileName([first, last].filter(Boolean).join(" ") || "User");
+                setProfileName(
+                    [first, last].filter(Boolean).join(" ") || "User",
+                );
                 setProfileEmail(profile.email?.trim?.() || "");
             } catch {
                 // Try to get department from localStorage even if API fails
@@ -116,8 +120,14 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             dropdown: true,
             children: [
                 { label: "Overview", path: "/dashboard" },
-                { label: "Container Quality Tracking", path: "/ivf-track-shipment" },
-                { label: "Incubator Quality Tracking", path: "/incubator-tracking" },
+                {
+                    label: "Cryocan Quality Tracking",
+                    path: "/ivf-track-shipment",
+                },
+                {
+                    label: "Incubator Quality Tracking",
+                    path: "/incubator-tracking",
+                },
                 { label: "Embryo Grading", path: "/embryo-grading" },
             ],
         },
@@ -335,7 +345,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 onClick={() => navigate("/user-profile")}
                 className="group w-full flex items-center gap-4 px-9 py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
             >
-                <img className="w-5 h-5 flex-shrink-0" alt="Profile" src={UserIcon} />
+                <img
+                    className="w-5 h-5 flex-shrink-0"
+                    alt="Profile"
+                    src={UserIcon}
+                />
                 <div className="flex-1 min-w-0 flex flex-col items-start ">
                     <span className="font-semibold text-sm text-white truncate w-full text-left">
                         {profileName || "\u00A0"}
