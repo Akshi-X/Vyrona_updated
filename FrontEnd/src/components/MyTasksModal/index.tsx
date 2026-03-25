@@ -952,7 +952,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             </svg>
                                         </button>
                                         {isStatusFilterOpen && (
-                                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
+                                            <div className="absolute right-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
                                                 <button
                                                     onClick={() => {
                                                         setStatusFilter("all");
