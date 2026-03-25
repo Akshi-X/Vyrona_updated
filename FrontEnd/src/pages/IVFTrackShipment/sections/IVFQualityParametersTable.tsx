@@ -96,9 +96,10 @@ interface KpiTileProps {
   muted?: boolean;
   danger?: boolean;
   loading?: boolean;
+  timestamp?: string | null;
 }
 
-const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, loading = false }: KpiTileProps) => (
+const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, loading = false, timestamp }: KpiTileProps) => (
   <div className="relative group w-full @max-[505px]:w-[150px]">
     {loading ? (
       <div className="rounded-lg border border-[#E7E1E1] bg-white shadow-sm p-2 flex items-center gap-2 w-full @max-[505px]:h-[84px]">
@@ -131,6 +132,7 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, l
         <div className="flex flex-col">
           <span className={`text-[11px] font-medium ${danger ? 'text-[#B91C1C]' : 'text-gray-500'}`}>{label}</span>
           <span className={`text-[15px] font-semibold ${danger ? 'text-[#DC2626]' : muted ? 'text-gray-400' : 'text-black'}`}>{value}</span>
+          {timestamp && <span className="text-[10px] mt-0.5">{timestamp}</span>}
         </div>
       </div>
     )}
@@ -150,7 +152,8 @@ const KpiTile = ({ icon, label, value, tooltip, muted = false, danger = false, l
  * Level is driven by latest KPI ln2_level (0–100%); falls back to battery_level if no ln2_level.
  */
 export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableProps) {
-  const BATTERY_DEAD_THRESHOLD_MS = 5 * 60 * 1000;
+  const BATTERY_DEAD_THRESHOLD_MS = 2 * 60 * 1000 + 15 * 1000; // 2 min 15 sec
+  const BATTERY_DEAD_LEVEL_THRESHOLD = 5; // <= 5% is considered dead
   const batteryDeadTooltip = 'Charge your device to show Internal Temperature, External Temperature, Shock Detection';
 
   const normalizedTankId = tankId != null ? String(tankId) : undefined;
@@ -163,10 +166,15 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [batteryTimestampMs, setBatteryTimestampMs] = useState<number | null>(null);
   const [evaporationRate, setEvaporationRate] = useState<{ value: number; unit: string } | null>(null);
+  const [evapTs, setEvapTs] = useState<number | null>(null);
   const [tempExternal, setTempExternal] = useState<number | null>(null);
+  const [tempExternalTs, setTempExternalTs] = useState<number | null>(null);
   const [tempInternal, setTempInternal] = useState<number | null>(null);
+  const [tempInternalTs, setTempInternalTs] = useState<number | null>(null);
   const [lidStatus, setLidStatus] = useState<number | null>(null);
+  const [lidTs, setLidTs] = useState<number | null>(null);
   const [shock, setShock] = useState<number | null>(null);
+  const [shockTs, setShockTs] = useState<number | null>(null);
   const [l1, setL1] = useState<number | null>(null);
   const [l2, setL2] = useState<number | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
@@ -335,31 +343,35 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     const evap = getFresh('ln2_evaporation_rate');
     if (evap) {
       setEvaporationRate({ value: evap.value, unit: evap.unit || 'kg/day' });
+      setEvapTs(evap.tsMs);
       trackFreshTimestamp(evap.tsMs);
     }
 
     const ext = getFresh('temp_external');
     if (ext) {
       setTempExternal(ext.value);
+      setTempExternalTs(ext.tsMs);
       trackFreshTimestamp(ext.tsMs);
     }
 
     const int = getFresh('temp_internal');
     if (int) {
       setTempInternal(int.value);
+      setTempInternalTs(int.tsMs);
       trackFreshTimestamp(int.tsMs);
     }
 
     const lid = getFresh('ln2_lid_state') ?? getFresh('lid_state') ?? getFresh('lid_status');
     if (lid) {
-      // Enforce binary display: 0 = Close, 1 = Open.
       setLidStatus(lid.value >= 1 ? 1 : 0);
+      setLidTs(lid.tsMs);
       trackFreshTimestamp(lid.tsMs);
     }
 
     const sh = getFresh('shock');
     if (sh) {
       setShock(sh.value);
+      setShockTs(sh.tsMs);
       trackFreshTimestamp(sh.tsMs);
     }
     // Update last sync time
@@ -378,6 +390,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     const diffMinutes = Math.floor(diffMs / 60000);
     if (diffMinutes <= 0) return 'just now';
     if (diffMinutes === 1) return '1 min ago';
+    if (diffMinutes >= 60) {
+      const hours = Math.floor(diffMinutes / 6) / 10;
+      return `${hours} hours ago`;
+    }
     return `${diffMinutes} min ago`;
   };
 
@@ -393,9 +409,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const minutesSinceUpdate =
     batteryStatusTimestampMs == null ? null : Math.floor(Math.max(0, nowTs - batteryStatusTimestampMs) / 60000);
   const batteryDead =
+    batteryLevel != null &&
+    batteryLevel <= BATTERY_DEAD_LEVEL_THRESHOLD &&
     batteryStatusTimestampMs != null &&
     nowTs - batteryStatusTimestampMs >= BATTERY_DEAD_THRESHOLD_MS;
-  const showBatteryDeadState = !isBatteryLoading && (batteryDead || batteryLevel == null);
+  const showBatteryDeadState = !isBatteryLoading && batteryDead;
   const timeAgoColorClass =
     isBatteryLoading
       ? 'text-gray-400'
@@ -545,9 +563,28 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     v != null ? `${v.toFixed(1)}°C` : '—';
   const lidLabel = lidStatus == null ? '—' : lidStatus === 1 ? 'Open' : 'Closed';
 
-  const internalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempInternal);
-  const externalTemperatureValue = showBatteryDeadState ? '—' : formatTemp(tempExternal);
-  const shockValue = showBatteryDeadState ? '—' : shock != null ? String(shock) : '—';
+  const internalTemperatureValue = tempInternal != null ? formatTemp(tempInternal) : '—';
+  const externalTemperatureValue = tempExternal != null ? formatTemp(tempExternal) : '—';
+  const shockValue = shock != null ? String(shock) : '—';
+
+  const formatKpiTimestamp = (tsMs: number | null): string | null => {
+    if (tsMs == null) return null;
+    const diffMs = Math.max(0, nowTs - tsMs);
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes <= 0) return 'just now';
+    if (diffMinutes === 1) return '1 min ago';
+    if (diffMinutes >= 60) {
+      const hours = Math.floor(diffMinutes / 6) / 10;
+      return `${hours} hours ago`;
+    }
+    return `${diffMinutes} min ago`;
+  };
+
+  const tempInternalTimestamp = formatKpiTimestamp(tempInternalTs);
+  const tempExternalTimestamp = formatKpiTimestamp(tempExternalTs);
+  const shockTimestamp = formatKpiTimestamp(shockTs);
+  const lidTimestamp = formatKpiTimestamp(lidTs);
+  const evapTimestamp = formatKpiTimestamp(evapTs);
   const deadBatteryTileTooltip = showBatteryDeadState ? batteryDeadTooltip : undefined;
   const isLidMissing = lidLabel === '—';
   const isInternalMissing = internalTemperatureValue === '—';
@@ -631,6 +668,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             value={lidLabel}
             danger={isLidMissing}
             loading={isInitialLoading}
+            timestamp={lidTimestamp}
           />
           <KpiTile
             icon={<ThermometerIcon className="text-[#6B1176]" />}
@@ -640,6 +678,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             muted={showBatteryDeadState}
             danger={isInternalMissing}
             loading={isInitialLoading}
+            timestamp={tempInternalTimestamp}
           />
         </div>
 
@@ -804,6 +843,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             muted={showBatteryDeadState}
             danger={isExternalMissing}
             loading={isInitialLoading}
+            timestamp={tempExternalTimestamp}
           />
           <KpiTile
             icon={<EvaporationIcon className="text-[#6B1176]" />}
@@ -811,6 +851,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
             danger={isEvaporationMissing}
             loading={isInitialLoading}
+            timestamp={evapTimestamp}
           />
           <KpiTile
             icon={<ShockIcon className="text-[#6B1176]" />}
@@ -820,6 +861,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
             muted={showBatteryDeadState}
             danger={isShockMissing}
             loading={isInitialLoading}
+            timestamp={shockTimestamp}
           />
         </div>
       </div>
