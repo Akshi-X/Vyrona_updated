@@ -224,8 +224,12 @@ const ControlTower = () => {
                 }> = [];
 
                 // Handle flat format (canisters array) - legacy format
-                if (data.canisters && Array.isArray(data.canisters)) {
-                    flattenedCanisters = data.canisters.map((canister: any) => {
+                if (
+                    "canisters" in (data as any) &&
+                    Array.isArray((data as any).canisters)
+                ) {
+                    flattenedCanisters = (data as any).canisters.map(
+                        (canister: any) => {
                         const deviationCount = toDeviationCount(
                             canister.deviations,
                         );
@@ -260,7 +264,8 @@ const ControlTower = () => {
                             deviations: deviationCount,
                             date: date,
                         };
-                    });
+                        },
+                    );
                 }
                 // Handle nested format (branches with tanks) - new API format
                 else if (
