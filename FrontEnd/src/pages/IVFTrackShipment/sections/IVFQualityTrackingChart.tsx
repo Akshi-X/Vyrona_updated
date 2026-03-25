@@ -714,11 +714,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 }));
                 return tabs;
               });
-              setActiveTab((current) => {
-                if (current && parsed.kpis.some((k: { name?: string }) => k?.name === current)) return current;
-                const first = parsed.kpis[0]?.name;
-                return typeof first === 'string' && first.trim() ? first.trim() : current;
-              });
+              setActiveTab((current) => current || parsed.kpis[0]?.name || '');
               setKpiReadings((prev) => {
                 const byTs = new Map(prev.map((r) => [r.timestamp, r]));
                 groupedByTimestamp.forEach((incomingKpis, ts) => {
