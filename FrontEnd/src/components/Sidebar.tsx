@@ -14,6 +14,7 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
+import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 import UserIcon from "../assets/DashBoardIcons/User.svg";
 //import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
@@ -142,6 +143,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             icon: CriticalAlertsIcon,
             label: "Alert Configuration",
             path: "/alert-setting",
+        },
+        {
+            icon: ContainersIcon,
+            label: "Refill log",
+            path: "/refill-log",
         },
         //{ icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
         //{ icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
@@ -286,6 +292,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                               location.pathname === "/approval-screen"
                             : path === "/alert-setting"
                               ? location.pathname === "/alert-setting"
+                                                            : path === "/refill-log"
+                                                                ? location.pathname === "/refill-log"
                               : location.pathname === path;
                     const iconSrc = (() => {
                         if (item.label === "Database") {
@@ -302,7 +310,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     })();
                     const iconStyle =
                         (item.label === "Pending approvals" ||
-                            item.label === "Alert Configuration") &&
+                            item.label === "Alert Configuration" ||
+                            item.label === "Refill log") &&
                         !isActive
                             ? {
                                   filter: "brightness(0) saturate(100%) invert(100%)",

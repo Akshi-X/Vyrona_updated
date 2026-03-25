@@ -995,7 +995,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 </div>
                             </th>
                             {(variant === "track" || variant === "ivf") && (
-                                <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap sticky">
+                                <th className="p-[15px] font-semibold text-[#4b0d52] text-sm text-left whitespace-nowrap sticky bg-[#ead8f4]">
                                     Actions
                                 </th>
                             )}
@@ -1325,7 +1325,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         </select>
                                     </div>
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-center sticky z-10">
+                                <td className="bg-[#fbf8fd] p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-center sticky z-10">
                                     <div className="flex items-center justify-center gap-2">
                                         <button
                                             onClick={handleSaveAdd}
@@ -1762,7 +1762,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     {(variant === "track" ||
                                         variant === "ivf") && (
                                         <td
-                                            className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap text-right sticky"
+                                            className="bg-[#fbf8fd] p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-right sticky"
                                             style={{ zIndex: 1010 }}
                                         >
                                             {canEdit && (
@@ -1929,7 +1929,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                                                     );
                                                                 }
                                                             }}
-                                                            className="inline-flex items-center justify-center px-2 py-1 text-gray-600 hover:text-gray-800 rounded transition-colors"
+                                                            className="inline-flex items-center justify-center px-2 py-1 text-gray-700 hover:text-gray-900 rounded transition-colors"
                                                             title={
                                                                 isCreatedByMe
                                                                     ? "Edit task"
