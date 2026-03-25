@@ -337,8 +337,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const [error, setError] = useState<string | null>(null);
   const [hasReceivedData, setHasReceivedData] = useState(false);
   const [isRangeLoading, setIsRangeLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
   const [appliedCustomFrom, setAppliedCustomFrom] = useState('');
+  const [noDataForCustomDate, setNoDataForCustomDate] = useState(false);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const customPickerRef = useRef<HTMLDivElement>(null);
 
@@ -356,6 +358,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         return t != null && t >= fromMs;
       });
     }
+    // LIVE: show all data received from backend — no fixed time window
+    if (timeRange === 'LIVE') return kpiReadings;
     if (timeRangeConfig.windowMs == null) return kpiReadings;
     const windowStart = Date.now() - timeRangeConfig.windowMs;
     return kpiReadings.filter((r) => {
@@ -462,7 +466,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   useEffect(() => {
     if (!tankId) return;
     if (timeRange === 'CUSTOM' && !appliedCustomFrom) return;
+    setHistoryLoaded(false);
     setIsRangeLoading(true);
+    setNoDataForCustomDate(false);
     const requestSeq = ++historyRequestSeqRef.current;
     const apiCall =
       timeRange === 'CUSTOM' && appliedCustomFrom
@@ -473,6 +479,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         if (!isMountedRef.current || requestSeq != historyRequestSeqRef.current) return;
         const series = res?.kpi_series || {};
         const entries = Object.entries(series);
+        if (entries.length === 0 && timeRange === 'CUSTOM') {
+          setNoDataForCustomDate(true);
+          setKpiReadings([]);
+        }
         if (entries.length > 0) {
           const isStaticRange = timeRange !== 'LIVE';
           setKpiReadings((prev) => {
@@ -556,6 +566,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       .finally(() => {
         if (isMountedRef.current && requestSeq == historyRequestSeqRef.current) {
           setIsRangeLoading(false);
+          setHistoryLoaded(true);
         }
       });
   }, [tankId, timeRange, appliedCustomFrom]);
@@ -564,6 +575,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   useEffect(() => {
     isMountedRef.current = true;
     reconnectAttemptsRef.current = 0; // fresh attempts when canister or token changes
+    if (!historyLoaded) return;   // wait for kpi-history fetch to complete first
     if (!tankId) {
       setError('Canister number missing');
       return;
@@ -817,7 +829,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       isMountedRef.current = false;
       closeWebSocket();
     };
-  }, [tankId, token]);
+  }, [tankId, token, historyLoaded]);
 
   // Tell server to send socket data only when LIVE; stop sending when 1H/24H/7D
   useEffect(() => {
@@ -1196,13 +1208,24 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-xs text-[#7C7C7C]">
-              {!hasLoadedKpiConfig
-                ? 'Loading...'
-                : !isConnected || wsRef.current?.readyState !== WebSocket.OPEN
-                ? 'Connecting...'
-                : isConnected && !hasReceivedData
-                  ? 'No data available'
-                  : 'Waiting for data...'}
+              {(() => {
+                const noDataLabel =
+                  timeRange === 'LIVE' ? 'No data available'
+                  : timeRange === 'CUSTOM' ? `No data available for ${appliedCustomFrom}`
+                  : timeRange === '1H' ? 'No data available for 1 hour'
+                  : timeRange === '24H' ? 'No data available for 24 hours'
+                  : timeRange === '7D' ? 'No data available for 7 days'
+                  : 'No data available';
+                return noDataForCustomDate
+                  ? noDataLabel
+                  : !hasLoadedKpiConfig
+                  ? 'Loading...'
+                  : !isConnected || wsRef.current?.readyState !== WebSocket.OPEN
+                  ? 'Connecting...'
+                  : isConnected && !hasReceivedData
+                    ? noDataLabel
+                    : 'Waiting for data...';
+              })()}
             </div>
           )
         ) : (

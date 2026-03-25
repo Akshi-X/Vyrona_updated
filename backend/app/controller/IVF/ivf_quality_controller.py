@@ -198,7 +198,7 @@ DURATION_1H = 60
 DURATION_24H = 1440
 DURATION_7D = 10080
 # Default max readings for LIVE (raw) when no duration_minutes; no limit param in API.
-DEFAULT_LIVE_READINGS_CAP = 200
+DEFAULT_LIVE_READINGS_CAP = 50
 # Total points budget across all KPI series for LIVE mode after backend refinement.
 LIVE_SERIES_TOTAL_POINTS_BUDGET = 300
 
@@ -408,20 +408,22 @@ def get_tank_kpi_history_by_date(
     # IST is UTC+5:30 — subtract offset to get the UTC equivalent of IST midnight
     IST_OFFSET = timedelta(hours=5, minutes=30)
     since_utc = datetime(selected.year, selected.month, selected.day, tzinfo=timezone.utc) - IST_OFFSET
+    # End of the selected day in IST = start of next IST day
+    end_of_day_utc = since_utc + timedelta(days=1)
     now_utc = datetime.now(timezone.utc)
+    # Never query beyond now; also never bleed into another day's data
+    until_utc = min(end_of_day_utc, now_utc)
 
-    # Pick bucket size based on total days in range (same logic as 1H/24H/7D presets)
-    total_days = max(1, (now_utc - since_utc).days + 1)
-    if total_days <= 1:
-        bucket_minutes = AGG_BUCKET_MINUTES_1H       # 1-min buckets  → up to ~1440 pts (1 day)
-    elif total_days <= 3:
-        bucket_minutes = AGG_BUCKET_MINUTES_24H      # 30-min buckets → up to ~144 pts  (3 days)
-    else:
-        bucket_minutes = AGG_BUCKET_MINUTES_7D       # 360-min buckets → scales well for weeks
+    # If the selected date is entirely in the future, return empty
+    if since_utc >= now_utc:
+        return {"tank_code": tank.tank_code or f"T{tank_id}", "tank_id": tank_id, "kpi_series": {}}
+
+    # Always use 1-min buckets for a single day
+    bucket_minutes = AGG_BUCKET_MINUTES_1H
 
     per_kpi = (
         quality_service.get_tank_kpi_history_aggregated(
-            tank_id, since_utc, bucket_minutes, until=now_utc
+            tank_id, since_utc, bucket_minutes, until=until_utc
         )
         or {}
     )

@@ -261,7 +261,8 @@ const ControlTower = () => {
                             deviations: deviationCount,
                             date: date,
                         };
-                    });
+                        },
+                    );
                 }
                 // Handle nested format (branches with tanks) - new API format
                 else if (
