@@ -468,33 +468,72 @@ class IVFDashboardService:
         role: Optional[str] = None,
     ) -> Dict:
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        query = text("""
-        SELECT
-            b.branch_name,
-            COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
-            COUNT(c.alert_id) AS deviation_count
-        FROM
-            critical_alerts c
-        JOIN
-            hospital_branches b ON c.branch_id = b.branch_id
-        LEFT JOIN
-            kpi_config k ON k.id = CASE
-                WHEN c.dedup_key ~ ':[0-9]+$'
-                THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
-                ELSE NULL
-            END
-        JOIN
-            tanks t ON c.tank_id = t.tank_id
-        WHERE
-            c.hospital_id = :hospital_id
-            AND c.source = 'KPI'
-            AND c.status = 'Active'
-            AND (:branch_id IS NULL OR b.branch_id = :branch_id)
-        GROUP BY
-            b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');
-        """)
+        role_normalized = role.title() if role else None
 
-        results = self.db.execute(
+        if role_normalized == "User":
+            query = text("""
+            SELECT
+                b.branch_name,
+                t.tank_code,
+                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
+                COUNT(c.alert_id) AS deviation_count
+            FROM
+                critical_alerts c
+            JOIN
+                hospital_branches b ON c.branch_id = b.branch_id
+            LEFT JOIN
+                kpi_config k ON k.id = CASE
+                    WHEN c.dedup_key ~ ':[0-9]+$'
+                    THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
+                    ELSE NULL
+                END
+            JOIN
+                tanks t ON c.tank_id = t.tank_id
+            WHERE
+                c.hospital_id = :hospital_id
+                AND c.source = 'KPI'
+                AND c.status = 'Active'
+                AND (:branch_id IS NULL OR b.branch_id = :branch_id)
+            GROUP BY
+                b.branch_name,
+                t.tank_code,
+                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
+            ORDER BY
+                b.branch_name,
+                t.tank_code,
+                alert_name;
+            """)
+        else:
+            query = text("""
+            SELECT
+                b.branch_name,
+                COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
+                COUNT(c.alert_id) AS deviation_count
+            FROM
+                critical_alerts c
+            JOIN
+                hospital_branches b ON c.branch_id = b.branch_id
+            LEFT JOIN
+                kpi_config k ON k.id = CASE
+                    WHEN c.dedup_key ~ ':[0-9]+$'
+                    THEN CAST(regexp_replace(c.dedup_key, '^.*:', '') AS INTEGER)
+                    ELSE NULL
+                END
+            JOIN
+                tanks t ON c.tank_id = t.tank_id
+            WHERE
+                c.hospital_id = :hospital_id
+                AND c.source = 'KPI'
+                AND c.status = 'Active'
+                AND (:branch_id IS NULL OR b.branch_id = :branch_id)
+            GROUP BY
+                b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
+            ORDER BY
+                b.branch_name,
+                alert_name;
+            """)
+
+        data_rows = self.db.execute(
             query,
             {
                 "hospital_id": hospital_id,
@@ -502,8 +541,35 @@ class IVFDashboardService:
             },
         ).mappings().fetchall()
 
-        
-        return results
+        heading_query = text("""
+        SELECT
+            t.tank_code
+        FROM
+            tanks t
+        JOIN
+            hospital_branches b ON t.branch_id = b.branch_id
+        WHERE
+            t.is_active = TRUE
+            AND b.hospital_id = :hospital_id
+            AND (:branch_id IS NULL OR b.branch_id = :branch_id)
+        ORDER BY
+            t.tank_code;
+        """)
+
+        heading_rows = self.db.execute(
+            heading_query,
+            {
+                "hospital_id": hospital_id,
+                "branch_id": filter_branch_id,
+            },
+        ).fetchall()
+
+        available_heading = [str(row[0]) for row in heading_rows if row[0] is not None]
+
+        return {
+            "available_heading": available_heading,
+            "data": data_rows,
+        }
 
     def get_deviations_graph_all_branches(
         self,
@@ -565,8 +631,25 @@ class IVFDashboardService:
             bl.branch_name, al.alert_name;
         """)
 
-        results = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
-        return results
+        data_rows = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
+
+        heading_query = text("""
+        SELECT
+            b.branch_name
+        FROM
+            hospital_branches b
+        WHERE
+            b.hospital_id = :hospital_id
+        ORDER BY
+            b.branch_name;
+        """)
+        heading_rows = self.db.execute(heading_query, {"hospital_id": hospital_id}).fetchall()
+        available_heading = [str(row[0]) for row in heading_rows if row[0] is not None]
+
+        return {
+            "available_heading": available_heading,
+            "data": data_rows,
+        }
 
         
     def get_deviations_graph(self, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:

@@ -5,9 +5,7 @@ import React, {
     useRef,
     useCallback,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { Sidebar } from "../../components/Sidebar";
 import {
     ivfService,
     type IvfBranch,
@@ -16,6 +14,7 @@ import {
     type KpiConfigPayload,
 } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
+import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
 import {
     Thermometer,
     Droplets,
@@ -103,7 +102,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
     },
     [KPI_NAMES.IVF_LN2_LID_STATE]: {
         label: "Lid State",
-        description: "Monitor container lid open/close status for security",
+        description: "Monitor Cryocan lid open/close status for security",
         icon: <DoorOpen size={20} />,
     },
 };
@@ -265,8 +264,7 @@ const getKpiValidation = (
 };
 
 export default function AlertSetting() {
-    const { isAuthenticated, logout } = useAuth();
-    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
 
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [branchFilter, setBranchFilter] = useState<string>("All");
@@ -332,9 +330,9 @@ export default function AlertSetting() {
     const [showNotifySettings, setShowNotifySettings] = useState(false);
     const [notifySettingsLoading, setNotifySettingsLoading] = useState(false);
     const [notifySettingsSaving, setNotifySettingsSaving] = useState(false);
-    const [notifySettingsError, setNotifySettingsError] = useState<string | null>(
-        null,
-    );
+    const [notifySettingsError, setNotifySettingsError] = useState<
+        string | null
+    >(null);
     const [notifySettings, setNotifySettings] =
         useState<HospitalNotificationSettings>({
             hospital_id: 0,
@@ -432,11 +430,6 @@ export default function AlertSetting() {
         },
         [getInputRefs],
     );
-
-    const handleLogout = () => {
-        logout();
-        navigate("/login");
-    };
 
     useEffect(() => {
         const loadBranches = async () => {
@@ -709,10 +702,9 @@ export default function AlertSetting() {
                 try {
                     const addedConfigs = await Promise.all(
                         newlyAddedContainers.map(async (container) => {
-                            const response =
-                                await ivfService.getKpiConfigList(
-                                    container.tank_id,
-                                );
+                            const response = await ivfService.getKpiConfigList(
+                                container.tank_id,
+                            );
                             return response?.config ?? [];
                         }),
                     );
@@ -1221,13 +1213,15 @@ export default function AlertSetting() {
 
     return (
         <div className="flex w-full bg-[#FDFAFF]" style={{ height: "100vh" }}>
-            <Sidebar onLogout={handleLogout} />
-            <main className="flex-1 flex flex-col overflow-hidden ml-60 min-w-0">
+            <main className="flex-1 flex flex-col overflow-hidden min-w-0">
                 <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
                     <div className="flex items-center justify-between">
-                        <h1 className="font-semibold text-black text-2xl">
-                            Alert Configuration
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <img src={CriticalAlertsIcon} alt="Alert Configuration" className="w-8 h-8" />
+                            <h1 className="font-semibold text-black text-2xl">
+                                Alert Configuration
+                            </h1>
+                        </div>
                         <button
                             type="button"
                             onClick={openNotifySettings}
@@ -1335,9 +1329,9 @@ export default function AlertSetting() {
                                                         [],
                                                     );
                                                 } else {
-                                                    await applyContainerSelection([
-                                                        ...containers,
-                                                    ]);
+                                                    await applyContainerSelection(
+                                                        [...containers],
+                                                    );
                                                 }
                                             }}
                                             className={`text-xs font-medium transition-colors px-2 py-1 rounded ${lockContainerSelection ? "text-gray-400 cursor-not-allowed" : "text-[#6b1176] hover:text-[#8a2a95] hover:bg-[#F7ECFF]"}`}
@@ -1474,9 +1468,11 @@ export default function AlertSetting() {
                                                             onChange={
                                                                 toggleSelection
                                                             }
-                                                            disabled={lockContainerSelection}
+                                                            disabled={
+                                                                lockContainerSelection
+                                                            }
                                                             className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                                                            aria-label={`Select container ${c.canisterId}`}
+                                                            aria-label={`Select cryocan ${c.canisterId}`}
                                                         />
                                                     </div>
                                                 </div>
@@ -1500,7 +1496,7 @@ export default function AlertSetting() {
                                 {selectedContainers.length > 1
                                     ? `- ${selectedContainers.length} Containers Selected`
                                     : primaryContainer
-                                      ? `- Container ${primaryContainer.canisterId}`
+                                      ? `- Cryocan ${primaryContainer.canisterId}`
                                       : ""}
                             </h2>
                             <p className="text-sm text-gray-600 mb-6">
@@ -3953,7 +3949,9 @@ export default function AlertSetting() {
                                     </label>
                                     <Switch
                                         id="notify-email"
-                                        checked={notifySettings.is_email_notifify}
+                                        checked={
+                                            notifySettings.is_email_notifify
+                                        }
                                         onCheckedChange={(checked) =>
                                             handleSelectNotificationChannel(
                                                 "email",
@@ -3976,7 +3974,9 @@ export default function AlertSetting() {
                                     </label>
                                     <Switch
                                         id="notify-whatsapp"
-                                        checked={notifySettings.is_whatsapp_notify}
+                                        checked={
+                                            notifySettings.is_whatsapp_notify
+                                        }
                                         onCheckedChange={(checked) =>
                                             handleSelectNotificationChannel(
                                                 "whatsapp",
@@ -4067,9 +4067,8 @@ export default function AlertSetting() {
                             Resolve Conflicting Settings
                         </h3>
                         <p className="text-gray-600 mb-6">
-                            Some of the selected containers have different alert settings.
-                            How would you like to proceed?
-
+                            Some of the selected containers have different alert
+                            settings. How would you like to proceed?
                         </p>
                         <div className="flex gap-4 justify-end">
                             <button

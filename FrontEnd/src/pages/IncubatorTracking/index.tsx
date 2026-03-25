@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 
 interface IncubatorCardItem {
@@ -13,7 +11,6 @@ interface IncubatorCardItem {
 }
 
 export default function IncubatorTrackingDashboardPage() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [incubators, setIncubators] = useState<IncubatorCardItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,8 +75,7 @@ export default function IncubatorTrackingDashboardPage() {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full min-h-screen">
-      <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
         <div className="flex-1 p-6 overflow-y-auto min-h-0">
           <div className="flex items-center gap-1 text-sm mb-6">
             <button
