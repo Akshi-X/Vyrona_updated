@@ -329,9 +329,6 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
     if (bat) {
       setBatteryLevel(Math.min(100, Math.max(0, bat.value)));
       setBatteryTimestampMs(bat.tsMs);
-      if (!ln2) {
-        setLevel(Math.min(100, Math.max(0, bat.value)));
-      }
       trackFreshTimestamp(bat.tsMs);
     }
 
