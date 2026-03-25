@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import Modal from '../../components/Modal';
 import { type IVFTreatment } from '../../types/ivf';
 
@@ -90,7 +88,6 @@ interface NewEmbryoFormState {
 }
 
 export default function EmbryoGradingPage() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const { his } = useParams<{ his: string }>();
   const detailHis = his?.trim().toUpperCase() || '';
@@ -748,8 +745,7 @@ export default function EmbryoGradingPage() {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
-      <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-black text-2xl">

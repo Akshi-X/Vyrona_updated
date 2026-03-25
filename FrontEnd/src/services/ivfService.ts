@@ -152,11 +152,19 @@ export interface DeviationsGraphDataItem {
     shock: number;
 }
 
-export type DeviationsGraphResponse = {
+export type DeviationsGraphDataRow = {
     alert_name: string;
     branch_name: string;
+    tank_code?: string | null;
     deviation_count: number;
-}[];
+};
+
+export type DeviationsGraphResponse =
+    | DeviationsGraphDataRow[]
+    | {
+          available_heading?: string[];
+          data?: DeviationsGraphDataRow[];
+      };
 
 export interface RefillLogItem {
     canister_id: number;
@@ -427,6 +435,35 @@ export class IvfService extends BaseApiService {
         const qs = params.toString();
         return await this.request(
             `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+        );
+    }
+
+    /**
+     * Get KPI history from a specific IST date to now.
+     * Date is YYYY-MM-DD (IST); backend converts IST midnight → UTC for the DB query.
+     */
+    async getKpiHistoryByDate(
+        tankId: string | number,
+        date: string,
+    ): Promise<{
+        tank_code: string;
+        tank_id: number;
+        kpi_series: Record<
+            string,
+            Array<{
+                timestamp: string;
+                value: number;
+                avg?: number;
+                min?: number;
+                max?: number;
+                count?: number;
+                unit: string;
+            }>
+        >;
+    }> {
+        return await this.request(
+            `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history-date?date=${encodeURIComponent(date)}`,
             { method: "GET" },
         );
     }

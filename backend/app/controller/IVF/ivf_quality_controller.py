@@ -378,6 +378,79 @@ def get_tank_kpi_history(
     }
 
 
+@router.get("/tanks/{tank_id}/kpi-history-date")
+def get_tank_kpi_history_by_date(
+    tank_id: int = Path(..., description="Tank ID"),
+    date: str = Query(..., description="Date in YYYY-MM-DD format (IST). Converted to UTC midnight IST for DB query."),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history from IST start-of-day for the given date to now. DB stores UTC; IST midnight = UTC - 5h30m."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    query = db.query(Tank).filter(Tank.tank_id == tank_id)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    try:
+        selected = datetime.strptime(date.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid date format. Expected YYYY-MM-DD.")
+
+    # IST is UTC+5:30 — subtract offset to get the UTC equivalent of IST midnight
+    IST_OFFSET = timedelta(hours=5, minutes=30)
+    since_utc = datetime(selected.year, selected.month, selected.day, tzinfo=timezone.utc) - IST_OFFSET
+    now_utc = datetime.now(timezone.utc)
+
+    # Pick bucket size based on total days in range (same logic as 1H/24H/7D presets)
+    total_days = max(1, (now_utc - since_utc).days + 1)
+    if total_days <= 1:
+        bucket_minutes = AGG_BUCKET_MINUTES_1H       # 1-min buckets  → up to ~1440 pts (1 day)
+    elif total_days <= 3:
+        bucket_minutes = AGG_BUCKET_MINUTES_24H      # 30-min buckets → up to ~144 pts  (3 days)
+    else:
+        bucket_minutes = AGG_BUCKET_MINUTES_7D       # 360-min buckets → scales well for weeks
+
+    per_kpi = (
+        quality_service.get_tank_kpi_history_aggregated(
+            tank_id, since_utc, bucket_minutes, until=now_utc
+        )
+        or {}
+    )
+
+    kpi_series: dict = {}
+    for item in per_kpi.get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
+                "unit": item.get("unit") or "",
+            }
+        )
+
+    # aggregated returns oldest-first already
+    return {
+        "tank_code": tank.tank_code or f"T{tank_id}",
+        "tank_id": tank_id,
+        "kpi_series": kpi_series,
+    }
+
+
 @router.post("/tanks/{tank_code}/kpi-readings")
 def append_tank_kpi_reading(
     tank_code: str = Path(..., description="Tank code (e.g., T15)"),
