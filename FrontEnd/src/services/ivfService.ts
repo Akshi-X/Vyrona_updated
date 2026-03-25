@@ -439,6 +439,35 @@ export class IvfService extends BaseApiService {
         );
     }
 
+    /**
+     * Get KPI history from a specific IST date to now.
+     * Date is YYYY-MM-DD (IST); backend converts IST midnight → UTC for the DB query.
+     */
+    async getKpiHistoryByDate(
+        tankId: string | number,
+        date: string,
+    ): Promise<{
+        tank_code: string;
+        tank_id: number;
+        kpi_series: Record<
+            string,
+            Array<{
+                timestamp: string;
+                value: number;
+                avg?: number;
+                min?: number;
+                max?: number;
+                count?: number;
+                unit: string;
+            }>
+        >;
+    }> {
+        return await this.request(
+            `/api/ivf/quality/tanks/${encodeURIComponent(tankId)}/kpi-history-date?date=${encodeURIComponent(date)}`,
+            { method: "GET" },
+        );
+    }
+
     /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
     async getKpiConfigList(tankId: number): Promise<{
         tank_id: number;

@@ -185,8 +185,6 @@ interface KpiReading {
 
 /** Max readings to keep in state so 7D range has enough; display filters by time window. */
 const MAX_READINGS_CAP = 250;
-/** Display cap for chart points. If exceeded, downsample while preserving local extremes. */
-const MAX_CHART_POINTS = 160;
 /** Time range: LIVE = last 10 min only (WebSocket). Others = static fetch from DB (1H/24H/7D = aggregated). */
 const LIVE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const TIME_RANGES = [
@@ -195,7 +193,7 @@ const TIME_RANGES = [
   { id: '24H' as const, label: '24H', windowMs: 24 * 60 * 60 * 1000, durationMinutes: 1440 },
   { id: '7D' as const, label: '7D', windowMs: 7 * 24 * 60 * 60 * 1000, durationMinutes: 10080 },
 ] as const;
-export type TimeRangeId = (typeof TIME_RANGES)[number]['id'];
+export type TimeRangeId = (typeof TIME_RANGES)[number]['id'] | 'CUSTOM';
 
 /** Parse timestamp; treat ISO strings without timezone as UTC so we can show locale time. */
 const parseTimestamp = (timestamp: string): Date | null => {
@@ -280,51 +278,6 @@ function getKpiStats(reading: KpiReading, kpiName: string): { avg: number; min: 
   return { avg, min, max };
 }
 
-function downsampleReadingsPreserveExtremes(
-  readings: KpiReading[],
-  kpiName: string,
-  maxPoints: number
-): KpiReading[] {
-  if (readings.length <= maxPoints) return readings;
-
-  const chunkSize = Math.max(1, Math.ceil(readings.length / maxPoints));
-  const selected = new Map<string, KpiReading>();
-
-  for (let start = 0; start < readings.length; start += chunkSize) {
-    const chunk = readings.slice(start, start + chunkSize);
-    if (chunk.length === 0) continue;
-
-    const first = chunk[0];
-    const last = chunk[chunk.length - 1];
-    if (first?.timestamp) selected.set(first.timestamp, first);
-    if (last?.timestamp) selected.set(last.timestamp, last);
-
-    let minItem: KpiReading | null = null;
-    let maxItem: KpiReading | null = null;
-    let minValue = Number.POSITIVE_INFINITY;
-    let maxValue = Number.NEGATIVE_INFINITY;
-
-    for (const item of chunk) {
-      const stats = getKpiStats(item, kpiName);
-      if (!stats) continue;
-      if (stats.avg < minValue) {
-        minValue = stats.avg;
-        minItem = item;
-      }
-      if (stats.avg > maxValue) {
-        maxValue = stats.avg;
-        maxItem = item;
-      }
-    }
-
-    if (minItem !== null) selected.set(minItem.timestamp, minItem);
-    if (maxItem !== null) selected.set(maxItem.timestamp, maxItem);
-  }
-
-  return Array.from(selected.values()).sort(
-    (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
-  );
-}
 
 /** Build display label from KPI name (e.g. temp_external -> Temp External). */
 function kpiNameToLabel(name: string): string {
@@ -384,18 +337,32 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   const [error, setError] = useState<string | null>(null);
   const [hasReceivedData, setHasReceivedData] = useState(false);
   const [isRangeLoading, setIsRangeLoading] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [appliedCustomFrom, setAppliedCustomFrom] = useState('');
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const customPickerRef = useRef<HTMLDivElement>(null);
 
   const timeRangeConfig = TIME_RANGES.find((r) => r.id === timeRange) ?? TIME_RANGES[0];
   timeRangeRef.current = timeRange;
-  /** LIVE = last 10 min; 1H/24H/7D = filter by time window. */
+  /** LIVE = last 10 min; 1H/24H/7D = filter by time window; CUSTOM = filter by selected dates. */
   const displayReadings = useMemo(() => {
+    if (timeRange === 'CUSTOM') {
+      // Date input gives YYYY-MM-DD which JS parses as UTC midnight.
+      // IST midnight = UTC midnight - 5h30m, so subtract to align with backend query.
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+      const fromMs = appliedCustomFrom ? new Date(appliedCustomFrom).getTime() - IST_OFFSET_MS : 0;
+      return kpiReadings.filter((r) => {
+        const t = parseTimestamp(r.timestamp)?.getTime();
+        return t != null && t >= fromMs;
+      });
+    }
     if (timeRangeConfig.windowMs == null) return kpiReadings;
     const windowStart = Date.now() - timeRangeConfig.windowMs;
     return kpiReadings.filter((r) => {
       const t = parseTimestamp(r.timestamp)?.getTime();
       return t != null && t >= windowStart;
     });
-  }, [kpiReadings, timeRange, timeRangeConfig.windowMs]);
+  }, [kpiReadings, timeRange, timeRangeConfig.windowMs, appliedCustomFrom]);
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -491,21 +458,23 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       });
   }, [tankId]);
 
-  // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated (no limit in backend).
+  // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated. CUSTOM = raw from selected start.
   useEffect(() => {
     if (!tankId) return;
+    if (timeRange === 'CUSTOM' && !appliedCustomFrom) return;
     setIsRangeLoading(true);
     const requestSeq = ++historyRequestSeqRef.current;
-    const rangeConfig = TIME_RANGES.find((r) => r.id === timeRange);
-    const durationMinutes = rangeConfig?.durationMinutes;
-    ivfService
-      .getKpiHistory(tankId, durationMinutes)
+    const apiCall =
+      timeRange === 'CUSTOM' && appliedCustomFrom
+        ? ivfService.getKpiHistoryByDate(tankId, appliedCustomFrom)
+        : ivfService.getKpiHistory(tankId, TIME_RANGES.find((r) => r.id === timeRange)?.durationMinutes);
+    apiCall
       .then((res) => {
         if (!isMountedRef.current || requestSeq != historyRequestSeqRef.current) return;
         const series = res?.kpi_series || {};
         const entries = Object.entries(series);
         if (entries.length > 0) {
-          const isStaticRange = durationMinutes != null && durationMinutes > 0;
+          const isStaticRange = timeRange !== 'LIVE';
           setKpiReadings((prev) => {
             const byTs = new Map<string, KpiReading>();
             const appendKpiPoint = (
@@ -589,7 +558,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           setIsRangeLoading(false);
         }
       });
-  }, [tankId, timeRange]);
+  }, [tankId, timeRange, appliedCustomFrom]);
 
   // WebSocket connected for all time ranges; live data applied to chart only when range is LIVE.
   useEffect(() => {
@@ -762,12 +731,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const tsMs = parseTimestamp(ts)?.getTime();
               if (!ts || !Number.isFinite(tsMs)) return;
               const rawKpis = [
-                { name: 'temp_external', value: parsed.temp_external ?? parsed.frequency_results?.temp_external ?? 0, unit: '°C' },
-                { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal ?? 0, unit: '°C' },
-                { name: 'ln2_level', value: parsed.ln2_level ?? 0, unit: '%' },
-                { name: 'ln2_evaporation_rate', value: parsed.ln2_evaporation_rate ?? 0, unit: 'kg/day' },
-                { name: 'tive_battery_percentage', value: parsed.tive_battery_percentage ?? 0, unit: '%' },
-              ];
+                { name: 'temp_external', value: parsed.temp_external ?? parsed.frequency_results?.temp_external, unit: '°C' },
+                { name: 'temp_internal', value: parsed.temp_internal ?? parsed.frequency_results?.temp_internal, unit: '°C' },
+                { name: 'ln2_level', value: parsed.ln2_level, unit: '%' },
+                { name: 'ln2_evaporation_rate', value: parsed.ln2_evaporation_rate, unit: 'kg/day' },
+                { name: 'tive_battery_percentage', value: parsed.tive_battery_percentage, unit: '%' },
+              ].filter((k) => k.value != null && Number.isFinite(Number(k.value)))
+               .map((k) => ({ ...k, value: Number(k.value) }));
               const kpis = rawKpis.filter((k) => {
                 const prevTs = latestKpiTimestampRef.current[k.name];
                 if (prevTs != null && (tsMs as number) <= prevTs) return false;
@@ -867,11 +837,22 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     }
   }, [timeRange, tankId]);
 
+  // Close custom picker when clicking outside
+  useEffect(() => {
+    if (!showCustomPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (customPickerRef.current && !customPickerRef.current.contains(e.target as Node)) {
+        setShowCustomPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showCustomPicker]);
+
   const plottedReadings = useMemo(() => {
-    const sortedAll = [...displayReadings].sort(
+    return [...displayReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
-    return downsampleReadingsPreserveExtremes(sortedAll, activeTab, MAX_CHART_POINTS);
   }, [displayReadings, activeTab]);
 
   const chartData = useMemo(() => {
@@ -1260,7 +1241,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       </div>
 
       {/* Time range toggle: fetch from API for range; live data still appends */}
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 flex-wrap">
         <span className="text-xs text-[#7C7C7C] mr-1">Range:</span>
         <div className="flex rounded-md border border-gray-200 overflow-hidden bg-gray-50">
           {TIME_RANGES.map((range) => (
@@ -1270,6 +1251,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               onClick={() => {
                 if (range.id !== timeRange) setIsRangeLoading(true);
                 setTimeRange(range.id);
+                setShowCustomPicker(false);
               }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 timeRange === range.id
@@ -1280,6 +1262,48 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               {range.label}
             </button>
           ))}
+        </div>
+
+        {/* Custom date range picker */}
+        <div className="relative" ref={customPickerRef}>
+          <button
+            type="button"
+            onClick={() => setShowCustomPicker((v) => !v)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              timeRange === 'CUSTOM'
+                ? 'bg-[#6B1176] text-white border-[#6B1176]'
+                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {timeRange === 'CUSTOM' && appliedCustomFrom ? appliedCustomFrom : 'Custom'}
+          </button>
+
+          {showCustomPicker && (
+            <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[180px]">
+              <div className="flex flex-col gap-2">
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#6B1176]"
+                />
+                <button
+                  type="button"
+                  disabled={!customFrom}
+                  onClick={() => {
+                    setAppliedCustomFrom(customFrom);
+                    setTimeRange('CUSTOM');
+                    setIsRangeLoading(true);
+                    setShowCustomPicker(false);
+                  }}
+                  className="w-full py-1.5 text-xs font-medium rounded bg-[#6B1176] text-white disabled:opacity-40 hover:bg-[#591063] transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

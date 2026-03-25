@@ -224,12 +224,9 @@ const ControlTower = () => {
                 }> = [];
 
                 // Handle flat format (canisters array) - legacy format
-                if (
-                    "canisters" in (data as any) &&
-                    Array.isArray((data as any).canisters)
-                ) {
-                    flattenedCanisters = (data as any).canisters.map(
-                        (canister: any) => {
+                const dataAny = data as any;
+                if (dataAny.canisters && Array.isArray(dataAny.canisters)) {
+                    flattenedCanisters = dataAny.canisters.map((canister: any) => {
                         const deviationCount = toDeviationCount(
                             canister.deviations,
                         );
