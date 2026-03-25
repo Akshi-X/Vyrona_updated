@@ -13,6 +13,7 @@ import Dashboard from "../pages/Dashboard";
 import Database from "../pages/Database";
 import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
+import RefillLog from "../pages/RefillLog";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
@@ -62,6 +63,18 @@ const ControlTowerWithVariant = () => (
             routePath="/control-tower"
             defaultComponent={<ControlTower />}
         />
+    </RoleBasedRoute>
+);
+
+/**
+ * Refill Log page with role-based access
+ */
+const RefillLogWithAuth = () => (
+    <RoleBasedRoute
+        restrictedRoles={["mygrape_admin"]}
+        requireControlTower={true}
+    >
+        <RefillLog />
     </RoleBasedRoute>
 );
 
@@ -219,6 +232,7 @@ export const router = createBrowserRouter([
             { path: "/outbound-quality-tracking/:canisterId", element: <OutboundQualityTrackingWithCanisterVariant /> },
             { path: "/outbound-quality-tracking", element: <OutboundQualityTrackingWithVariant /> },
             { path: "/alert-setting", element: <AlertSettingWithAuth /> },
+            { path: "/refill-log", element: <RefillLogWithAuth /> },
             { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
             { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
