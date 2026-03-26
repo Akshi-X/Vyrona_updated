@@ -418,8 +418,8 @@ def get_tank_kpi_history_by_date(
     if since_utc >= now_utc:
         return {"tank_code": tank.tank_code or f"T{tank_id}", "tank_id": tank_id, "kpi_series": {}}
 
-    # Always use 1-min buckets for a single day
-    bucket_minutes = AGG_BUCKET_MINUTES_1H
+    # Use same bucket size as 24H for a single custom day
+    bucket_minutes = AGG_BUCKET_MINUTES_24H
 
     per_kpi = (
         quality_service.get_tank_kpi_history_aggregated(

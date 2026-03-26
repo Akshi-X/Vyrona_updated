@@ -862,10 +862,18 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   }, [showCustomPicker]);
 
   const plottedReadings = useMemo(() => {
-    return [...displayReadings].sort(
+    const sorted = [...displayReadings].sort(
       (a, b) => (parseTimestamp(a.timestamp)?.getTime() ?? 0) - (parseTimestamp(b.timestamp)?.getTime() ?? 0)
     );
-  }, [displayReadings, activeTab]);
+    // For LIVE: filter to timestamps where the active KPI has a value so each tab
+    // gets its own dynamic x-axis without blank gaps from other KPIs.
+    if (timeRange === 'LIVE' && activeTab) {
+      return sorted.filter((r) =>
+        r.kpis?.some((k: any) => k.name === activeTab && k.value != null && Number.isFinite(Number(k.value)))
+      );
+    }
+    return sorted;
+  }, [displayReadings, timeRange, activeTab]);
 
   const chartData = useMemo(() => {
     const sorted = plottedReadings;
@@ -911,7 +919,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         backgroundColor: 'rgba(107, 17, 118, 0.26)',
         borderColor: 'rgba(107, 17, 118, 0.65)',
         borderWidth: 1.2,
-        borderRadius: 4,
+        borderRadius: 0,
         borderSkipped: false,
         barPercentage: 0.78,
         categoryPercentage: 0.9,
@@ -985,6 +993,27 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     return { labels, datasets };
   }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange]);
 
+  const bucketMinutes =
+    timeRange === '1H' ? 1
+    : timeRange === '24H' ? 20
+    : timeRange === '7D' ? 180
+    : timeRange === 'CUSTOM' ? 20
+    : 0;
+
+  const formatBucketRange = (timestamp: string): string => {
+    const start = parseTimestamp(timestamp);
+    if (!start) return formatDateTimeLabel(timestamp);
+    const fmt = (d: Date) => {
+      const day = String(d.getDate()).padStart(2, '0');
+      const mon = String(d.getMonth() + 1);
+      const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }).toUpperCase().replace(' ', '');
+      return `${day}/${mon} - ${time}`;
+    };
+    if (bucketMinutes === 0) return fmt(start);
+    const end = new Date(start.getTime() + bucketMinutes * 60 * 1000);
+    return `${fmt(start)} to ${fmt(end)}`;
+  };
+
   const chartOptions = useMemo(() => {
     const sorted = plottedReadings;
     const stats = sorted.map((r) => getKpiStats(r, activeTab)).filter((v): v is { avg: number; min: number | null; max: number | null } => v != null);
@@ -1036,7 +1065,8 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const idx = items[0].dataIndex;
               if (idx >= sorted.length) return '';
               const r = sorted[idx];
-              return r ? formatDateTimeLabel(r.timestamp) : '';
+              if (!r) return '';
+              return timeRange !== 'LIVE' ? formatBucketRange(r.timestamp) : formatDateTimeLabel(r.timestamp);
             },
             label: (context: any) => {
               const toShortLabel = (rawLabel: string): string => {
@@ -1133,7 +1163,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         },
       },
     };
-  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds]);
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes]);
 
   const hasData = displayReadings.length > 0;
 
