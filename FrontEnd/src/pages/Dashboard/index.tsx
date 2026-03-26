@@ -41,7 +41,7 @@ import ContainersIcon from '../../assets/DashBoardIcons/Containers.svg';
 import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTracking.svg';
 import OutboundModelIcon from '../../assets/OutboundModel.svg';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
-import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
+//import QualityDeviationsIcon from '../../assets/DashBoardIcons/QualityDeviations.svg';
 import DeviationDriverIcon from '../../assets/flag-icon.svg';
 import OutboundShipmentIcon from '../../assets/DashBoardIcons/OutbondShipment.svg';
 import AvgQualityLostPatientIcon from '../../assets/DashBoardIcons/AvgQualityLostPatient.svg';
