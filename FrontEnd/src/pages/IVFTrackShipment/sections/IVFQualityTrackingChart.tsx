@@ -831,22 +831,19 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     };
   }, [tankId, token, historyLoaded]);
 
-  // Tell server to send socket data only when LIVE; stop sending when 1H/24H/7D
+  // Always keep the server streaming live data regardless of chart range,
+  // so Current Quality Status receives updates on all ranges.
+  // The chart's onmessage handler already ignores data when range is not LIVE.
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN || !tankId) return;
-    const live = timeRange === 'LIVE';
-    if (live) {
-      const numericTankId = Number(tankId);
-      ws.send(
-        JSON.stringify({
-          tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId,
-          live: true,
-        })
-      );
-    } else {
-      ws.send(JSON.stringify({ live: false }));
-    }
+    const numericTankId = Number(tankId);
+    ws.send(
+      JSON.stringify({
+        tank_id: Number.isFinite(numericTankId) ? numericTankId : tankId,
+        live: true,
+      })
+    );
   }, [timeRange, tankId]);
 
   // Close custom picker when clicking outside
@@ -908,8 +905,42 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       ? `${tab?.label ?? activeTab} (${unit})`
       : `${tab?.label ?? activeTab}`;
     const showCandlestick = timeRange !== 'LIVE';
+    const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
+    const showLidBar = isLidKpi && timeRange !== 'LIVE';
+
+    // For lid state in non-LIVE: count open events per bucket (avg * count = open readings)
+    const lidOpenCounts = showLidBar
+      ? sorted.map((r) => {
+          const k =
+            r.kpis.find((x: any) => x.name === activeTab) ??
+            r.kpis.find((x: any) => x.name === 'lid_state');
+          if (!k) return null;
+          const avg = typeof k.avg === 'number' ? k.avg : typeof k.value === 'number' ? k.value : null;
+          const count = typeof k.count === 'number' ? k.count : 1;
+          if (avg == null) return null;
+          return Math.round(avg * count);
+        })
+      : [];
 
     const datasets: any[] = [];
+
+    if (showLidBar) {
+      datasets.push({
+        type: 'bar',
+        label: 'Lid Open Count',
+        data: lidOpenCounts,
+        backgroundColor: 'rgba(107, 17, 118, 0.55)',
+        borderColor: 'rgba(107, 17, 118, 0.85)',
+        borderWidth: 1,
+        borderRadius: 0,
+        borderSkipped: false,
+        barPercentage: 0.7,
+        categoryPercentage: 0.9,
+        order: 1,
+        _isLidCount: true,
+      });
+      return { labels, datasets };
+    }
 
     if (showCandlestick) {
       datasets.push({
@@ -1014,6 +1045,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
     return `${fmt(start)} to ${fmt(end)}`;
   };
 
+  const isLidKpi = activeTab === 'lid_state' || activeTab === 'ln2_lid_state';
+  const showLidCountChart = isLidKpi && timeRange !== 'LIVE';
+
   const chartOptions = useMemo(() => {
     const sorted = plottedReadings;
     const stats = sorted.map((r) => getKpiStats(r, activeTab)).filter((v): v is { avg: number; min: number | null; max: number | null } => v != null);
@@ -1084,6 +1118,9 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const parsedY = context.parsed?.y;
               if (parsedY == null) return '';
               const label = context.dataset.label || '';
+              if (Boolean(context?.dataset?._isLidCount)) {
+                return `Open: ${Math.round(parsedY)} time${Math.round(parsedY) !== 1 ? 's' : ''}`;
+              }
               const isRangeDataset = Boolean(context?.dataset?._isRange);
               if (isRangeDataset) {
                 const raw = context.raw;
@@ -1136,34 +1173,48 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           },
           border: { display: false },
         },
-        y: {
-          // Keep binary ticks at 0/1, but add headroom for visual breathing space.
-          min: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? -0.2 : (minY != null ? minY - padding : undefined),
-          max: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? 1.2 : (maxY != null ? maxY + padding : undefined),
-          grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
-          ticks: {
-            color: '#6B6B6B',
-            font: { size: 10 },
-            stepSize: activeTab === 'lid_state' || activeTab === 'ln2_lid_state' ? 1 : undefined,
-            callback: (value: string | number) => {
-              if (activeTab !== 'lid_state' && activeTab !== 'ln2_lid_state') {
-                const numericValue = Number(value);
-                if (!Number.isFinite(numericValue)) return String(value);
-                // Avoid float artifacts like 0.45000000000000007.
-                return Number(numericValue.toFixed(2)).toString();
-              }
-              const numericValue = Number(value);
-              if (Math.abs(numericValue - 0) < 1e-6) return 'Close';
-              if (Math.abs(numericValue - 1) < 1e-6) return 'Open';
-              // Hide labels for padded headroom ticks.
-              return '';
+        y: showLidCountChart
+          ? {
+              min: 0,
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
+              title: { display: true, text: 'Open count', color: '#6B6B6B', font: { size: 10 } },
+              ticks: {
+                color: '#6B6B6B',
+                font: { size: 10 },
+                stepSize: 1,
+                callback: (value: string | number) => {
+                  const n = Number(value);
+                  return Number.isInteger(n) ? n : '';
+                },
+              },
+              border: { display: false },
+            }
+          : {
+              // Keep binary ticks at 0/1, but add headroom for visual breathing space.
+              min: isLidKpi ? -0.2 : (minY != null ? minY - padding : undefined),
+              max: isLidKpi ? 1.2 : (maxY != null ? maxY + padding : undefined),
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false, borderDash: [2, 8] },
+              ticks: {
+                color: '#6B6B6B',
+                font: { size: 10 },
+                stepSize: isLidKpi ? 1 : undefined,
+                callback: (value: string | number) => {
+                  if (!isLidKpi) {
+                    const numericValue = Number(value);
+                    if (!Number.isFinite(numericValue)) return String(value);
+                    return Number(numericValue.toFixed(2)).toString();
+                  }
+                  const numericValue = Number(value);
+                  if (Math.abs(numericValue - 0) < 1e-6) return 'Close';
+                  if (Math.abs(numericValue - 1) < 1e-6) return 'Open';
+                  return '';
+                },
+              },
+              border: { display: false },
             },
-          },
-          border: { display: false },
-        },
       },
     };
-  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes]);
+  }, [plottedReadings, activeTab, kpiTabs, kpiThresholds, timeRange, bucketMinutes, showLidCountChart, isLidKpi]);
 
   const hasData = displayReadings.length > 0;
 
