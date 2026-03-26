@@ -86,7 +86,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
         label: "Evaporation Rate",
         description: "Track LN2 evaporation rate to predict refill schedules",
         icon: <TrendingUp size={20} />,
-        unit: "%/day",
+        unit: "kg/hr",
     },
     [KPI_NAMES.IVF_SHOCK]: {
         label: "Shock Detection",

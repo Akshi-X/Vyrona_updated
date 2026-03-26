@@ -189,7 +189,7 @@ const MAX_READINGS_CAP = 250;
 /** Time range: LIVE = last 10 min only (WebSocket). Others = static fetch from DB (1H/24H/7D = aggregated). */
 const LIVE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const TIME_RANGES = [
-  { id: 'LIVE' as const, label: 'LIVE', windowMs: LIVE_WINDOW_MS, durationMinutes: undefined },
+  { id: 'LIVE' as const, label: 'LATEST', windowMs: LIVE_WINDOW_MS, durationMinutes: undefined },
   { id: '1H' as const, label: '1H', windowMs: 60 * 60 * 1000, durationMinutes: 60 },
   { id: '24H' as const, label: '24H', windowMs: 24 * 60 * 60 * 1000, durationMinutes: 1440 },
   { id: '7D' as const, label: '7D', windowMs: 7 * 24 * 60 * 60 * 1000, durationMinutes: 10080 },
