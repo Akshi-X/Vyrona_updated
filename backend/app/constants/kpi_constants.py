@@ -64,10 +64,10 @@ class KPI_NAMES:
 # ---------------------------------------------------------------------------
 # 1-minute buckets → used for 1-hour range (up to ~60 points)
 AGG_BUCKET_MINUTES_1H = 1
-# 30-minute buckets → used for 24-hour range (up to ~48 points)
-AGG_BUCKET_MINUTES_24H = 30
-# 6-hour buckets (duration in minutes) → used for 7-day range (up to ~28 points)
-AGG_BUCKET_MINUTES_7D = 6 * 60  # 360
+# 20-minute buckets → used for 24-hour range (up to ~72 points)
+AGG_BUCKET_MINUTES_24H = 20
+# 3-hour buckets (duration in minutes) → used for 7-day range (up to ~56 points)
+AGG_BUCKET_MINUTES_7D = 3 * 60  # 180
 
 
 class KPIConstants:

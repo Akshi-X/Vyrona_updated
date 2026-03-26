@@ -14,6 +14,7 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
+//import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 import UserIcon from "../assets/DashBoardIcons/User.svg";
 //import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
@@ -33,15 +34,23 @@ type NavItem =
           children: NavChild[];
       };
 
-const isDropdownItem = (item: NavItem): item is NavItem & { dropdown: true; children: NavChild[] } =>
+const isDropdownItem = (
+    item: NavItem,
+): item is NavItem & { dropdown: true; children: NavChild[] } =>
     "dropdown" in item && item.dropdown === true;
+
+const isDashboardRoute = (path: string) =>
+    path === "/dashboard" ||
+    path === "/ivf-track-shipment" ||
+    path.startsWith("/ivf-track-shipment/") ||
+    path === "/incubator-tracking" ||
+    path.startsWith("/incubator-tracking/") ||
+    path === "/embryo-grading" ||
+    path.startsWith("/embryo-grading/");
 
 export const Sidebar = ({ onLogout }: SidebarProps) => {
     const [sidebarHeight, setSidebarHeight] = useState(window.innerHeight);
-    const [dashboardOpen, setDashboardOpen] = useState(() => {
-        const p = window.location.pathname;
-        return p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/");
-    });
+    const [dashboardOpen, setDashboardOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const { isAuthenticated, userRole } = useAuth();
@@ -86,7 +95,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 setUserDepartment(department);
                 const first = profile.first_name?.trim?.() || "";
                 const last = profile.last_name?.trim?.() || "";
-                setProfileName([first, last].filter(Boolean).join(" ") || "User");
+                setProfileName(
+                    [first, last].filter(Boolean).join(" ") || "User",
+                );
                 setProfileEmail(profile.email?.trim?.() || "");
             } catch {
                 // Try to get department from localStorage even if API fails
@@ -102,14 +113,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         }
     }, [isAuthenticated]);
 
-    // Keep dropdown open when on a dashboard sub-route
-    useEffect(() => {
-        const p = location.pathname;
-        if (p === "/dashboard" || p === "/ivf-track-shipment" || p.startsWith("/ivf-track-shipment/") || p === "/incubator-tracking" || p.startsWith("/incubator-tracking/") || p === "/embryo-grading" || p.startsWith("/embryo-grading/")) {
-            setDashboardOpen(true);
-        }
-    }, [location.pathname]);
-
     // Base navigation items (Dashboard dropdown: Overview + Incubator quality tracking; then Database, Control Tower, etc.)
     const allNavigationItems: NavItem[] = [
         {
@@ -118,9 +121,15 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             dropdown: true,
             children: [
                 { label: "Overview", path: "/dashboard" },
-                { label: "Container Quality Tracking", path: "/ivf-track-shipment" },
-                { label: "Incubator Quality Tracking", path: "/incubator-tracking" },
-                { label: "Embryo Grading", path: "/embryo-grading" },
+                {
+                    label: "Cryocan Quality Tracking",
+                    path: "/ivf-track-shipment",
+                },
+                // {
+                //     label: "Incubator Quality Tracking",
+                //     path: "/incubator-tracking",
+                // },
+                //{ label: "Embryo Grading", path: "/embryo-grading" },
             ],
         },
         { icon: DatabaseIconWhite, label: "Database", path: "/database" },
@@ -135,6 +144,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             label: "Alert Configuration",
             path: "/alert-setting",
         },
+        // {
+        //     icon: ContainersIcon,
+        //     label: "Refill log",
+        //     path: "/refill-log",
+        // },
         //{ icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
         //{ icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
     ];
@@ -166,11 +180,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
     return (
         <aside
-            className="fixed left-0 top-0 w-60 bg-gradient-to-b from-[#9C3AA6] to-[#30024D] flex flex-col z-10 overflow-hidden"
+            className="fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-10 overflow-hidden"
             style={{ height: `${sidebarHeight}px` }}
         >
             {/* Decorative DNA/Wave Pattern Background */}
-            <div className="absolute left-0 w-full pointer-events-none bottom-[8%] h-[50%] overflow-hidden">
+            <div className="absolute left-0 w-full pointer-events-none bottom-[8%] h-[50%] overflow-hidden opacity-30">
                 <img
                     src={IsolationModeBanner}
                     alt="Decorative wave pattern"
@@ -192,6 +206,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             <nav className="flex flex-col gap-[18px] px-6 flex-shrink-0 relative z-10">
                 {navigationItems.map((item, index) => {
                     if (isDropdownItem(item)) {
+                        const isDashboardActive = isDashboardRoute(location.pathname);
                         return (
                             <div key={index} className="flex flex-col gap-0.5">
                                 <button
@@ -199,9 +214,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                         setDashboardOpen((open) => !open)
                                     }
                                     className={`h-auto w-full justify-between gap-4 px-3 py-[7px] rounded-[10px] flex items-center transition-colors ${
-                                        dashboardOpen
-                                            ? "bg-white/10"
-                                            : "bg-transparent hover:bg-white/10"
+                                        isDashboardActive
+                                            ? "bg-white/20"
+                                            : dashboardOpen
+                                              ? "bg-white/10"
+                                              : "bg-transparent hover:bg-white/10"
                                     }`}
                                 >
                                     <div className="flex items-center gap-4">
@@ -248,10 +265,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                 <button
                                                     key={childIndex}
                                                     onClick={() => {
-                                                        // Incubator Quality Tracking & Embryo Grading: navigation disabled for now
-                                                        if (child.path !== "/incubator-tracking" && child.path !== "/embryo-grading") {
-                                                            handleNavigation(child.path);
-                                                        }
+                                                        setDashboardOpen(true);
+                                                        handleNavigation(child.path);
                                                     }}
                                                     className={`h-auto w-full justify-start pr-3 py-2 rounded-[10px] flex items-center text-left transition-colors pl-5 ${childIndex === 0 ? "mt-2" : ""} ${
                                                         isChildActive
@@ -277,6 +292,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                               location.pathname === "/approval-screen"
                             : path === "/alert-setting"
                               ? location.pathname === "/alert-setting"
+                                                            : path === "/refill-log"
+                                                                ? location.pathname === "/refill-log"
                               : location.pathname === path;
                     const iconSrc = (() => {
                         if (item.label === "Database") {
@@ -293,7 +310,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     })();
                     const iconStyle =
                         (item.label === "Pending approvals" ||
-                            item.label === "Alert Configuration") &&
+                            item.label === "Alert Configuration" ||
+                            item.label === "Refill log") &&
                         !isActive
                             ? {
                                   filter: "brightness(0) saturate(100%) invert(100%)",
@@ -336,7 +354,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 onClick={() => navigate("/user-profile")}
                 className="group w-full flex items-center gap-4 px-9 py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
             >
-                <img className="w-5 h-5 flex-shrink-0" alt="Profile" src={UserIcon} />
+                <img
+                    className="w-5 h-5 flex-shrink-0"
+                    alt="Profile"
+                    src={UserIcon}
+                />
                 <div className="flex-1 min-w-0 flex flex-col items-start ">
                     <span className="font-semibold text-sm text-white truncate w-full text-left">
                         {profileName || "\u00A0"}

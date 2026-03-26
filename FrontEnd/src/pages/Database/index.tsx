@@ -1,20 +1,14 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Sidebar } from '../../components/Sidebar';
 import { DatabaseTable } from '../../components/DatabaseTable';
 import Header from '../../components/Header';
 import { useEffect, useState } from 'react';
 import { userService } from '../../services/userService';
 
 export default function Database() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [userInitials, setUserInitials] = useState<string>('');
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -43,16 +37,12 @@ export default function Database() {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>
-      {/* Left Sidebar */}
-      <Sidebar onLogout={handleLogout} />
-
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden ml-60">
+      <main className="flex-1 flex flex-col overflow-hidden">
         <Header
           title=""
           showBackButton={false}
           className=""
-          offsetLeft="15rem"
           rightContent={(
             <div 
               className="w-[30px] h-[30px] bg-[#9c3aa6] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#8a2a95] transition-colors duration-200"

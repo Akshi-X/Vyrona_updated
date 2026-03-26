@@ -330,9 +330,7 @@ class CriticalAlertService:
         """Generate unique deduplication key with timestamp for each alert"""
         # Use timestamp (YYYY-MM-DD_HH:MM:SS) to make each alert unique
         timestamp_str = occurred_at.strftime("%Y-%m-%d_%H:%M:%S")
-        return (
-            f"{tank_id}:{source.value}:{alert_type.value}:{timestamp_str}:{extra_info or ''}"
-        )
+        return f"{tank_id}:{source.value}:{alert_type.value}:{timestamp_str}:{extra_info or ''}"
 
     def _create_alert(
         self,
@@ -535,7 +533,10 @@ class CriticalAlertService:
                         if last_alert_time.tzinfo
                         else last_alert_time.replace(tzinfo=timezone.utc)
                     )
-                    if (now - last_alert_time).total_seconds() < cooldown_seconds:
+                    time_diff = (now - last_alert_time).total_seconds()
+                    # Ensure time difference is positive (in case of clock skew/tz mismatch making it negative)
+                    # and check if the absolute difference is within the cooldown period.
+                    if abs(time_diff) < cooldown_seconds:
                         logger.info(
                             "Skipping alert creation for kpi_config_id=%s as last alert was created/updated within cooldown period (%s minutes)",
                             kpi_config.id,
@@ -581,15 +582,13 @@ class CriticalAlertService:
                 deviation.branch_id
             )  # Set branch_id on alert for better filtering and notification targeting
             alert.tank_id = tank_id  # Set tank_id on alert for better filtering and notification targeting
-            
+
             # Fetch both notification flags in a single DB query.
             if kpi_config.alert_type == "critical":
                 (
                     is_hospital_email_configured,
                     is_hospital_whatsapp_configured,
-                ) = self._get_hospital_notification_config(
-                    alert.hospital_id
-                )
+                ) = self._get_hospital_notification_config(alert.hospital_id)
                 if is_hospital_email_configured:
                     self._send_alert_email(alert)
                 else:
@@ -1098,9 +1097,7 @@ class CriticalAlertService:
         )
 
         all_users = {user.user_id: user for user in managers + branch_users}.values()
-        recipients = [
-            user for user in all_users if getattr(user, "phone_number", None)
-        ]
+        recipients = [user for user in all_users if getattr(user, "phone_number", None)]
 
         if not recipients:
             logger.info(

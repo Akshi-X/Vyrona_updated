@@ -1,7 +1,6 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import QualityTrackingChart from './sections/QualityTrackingChart.tsx';
 import TrackAndTraceMap from './sections/TrackAndTraceMap.tsx';
 import QualityParametersTable from './sections/QualityParametersTable.tsx';
@@ -52,8 +51,8 @@ const steps = [
 
 export default function TrackPage() {
   const { patientId } = useParams();
-  const { logout, userRole } = useAuth();
-  const navigate = useNavigate();
+  const { userRole } = useAuth();
+
 
   // Header interactions state (mirrors Dashboard behavior)
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -303,8 +302,7 @@ export default function TrackPage() {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
-      <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
 
         {/* Subheader with patient summary and icons */}
         <div className="bg-[#ffffff] border-b border-[#E7E1E1] px-6 py-5 flex items-center justify-between">
