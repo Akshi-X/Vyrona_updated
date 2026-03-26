@@ -179,6 +179,7 @@ interface KpiReading {
     min?: number;
     max?: number;
     count?: number;
+    alert_count?: number;
     unit: string;
   }>;
 }
@@ -496,6 +497,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 min?: number;
                 max?: number;
                 count?: number;
+                alert_count?: number;
                 unit?: string;
               }
             ) => {
@@ -509,6 +511,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               const maxValue = typeof point.max === 'number' ? point.max : Number(point.max ?? NaN);
               const countValue = typeof point.count === 'number' ? point.count : Number(point.count ?? NaN);
               const existing = byTs.get(timestamp);
+              const alertCount = typeof point.alert_count === 'number' ? point.alert_count : 0;
               const nextKpi = {
                 name: kpiName,
                 value,
@@ -516,6 +519,7 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
                 min: Number.isFinite(minValue) ? minValue : undefined,
                 max: Number.isFinite(maxValue) ? maxValue : undefined,
                 count: Number.isFinite(countValue) ? countValue : undefined,
+                alert_count: alertCount,
                 unit: point.unit ?? '',
               };
               if (existing) {
@@ -1153,6 +1157,17 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
               }
               const shortLabel = toShortLabel(label);
               return `${shortLabel}: ${typeof parsedY === 'number' ? formatNum(parsedY) : parsedY}`;
+            },
+            afterBody: (items: any[]) => {
+              if (!items?.length) return [];
+              const idx = items[0].dataIndex;
+              const r = idx < sorted.length ? sorted[idx] : null;
+              if (!r) return [];
+              const kpi = r.kpis?.find((k: any) => k.name === activeTab) ??
+                (activeTab === 'ln2_lid_state' ? r.kpis?.find((k: any) => k.name === 'lid_state') : null);
+              const alertCount = kpi?.alert_count;
+              if (!alertCount || alertCount <= 0) return [];
+              return [`⚠ Alerts: ${alertCount}`];
             },
           },
         },
