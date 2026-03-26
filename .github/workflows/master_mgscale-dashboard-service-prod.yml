@@ -1,7 +1,4 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy Node.js app to Azure Web App - mgscale-dashboard-service-prod
+name: Build and Deploy Frontend (Vite) - mgscale-dashboard-service-prod
 
 on:
   push:
@@ -12,44 +9,86 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      # 1️⃣ Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js version
-        uses: actions/setup-node@v3
+      # 2️⃣ Setup Node
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: FrontEnd/package-lock.json
 
-      - name: npm install, build, and test
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
         working-directory: FrontEnd
-        run: |
-          npm install
-          npm run build --if-present
+        run: npm ci
 
-      - name: Upload artifact for deployment job
+      # 4️⃣ Validate PROD API URL secret
+      - name: Validate PROD API URL secret
+        working-directory: FrontEnd
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
+        run: |
+          echo "Checking secret..."
+          if [ "$VITE_API_BASE_URL" = "https://mgscale-alerting-service-prod-d5hfgmdnd6d3f2f8.westeurope-01.azurewebsites.net" ]; then
+            echo "Correct value"
+          else
+            echo "Wrong value "
+          fi
+
+
+      # 4️⃣ Build frontend (inject Vite env vars)
+      - name: Build frontend
+        working-directory: FrontEnd
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+        run: |
+          npm run build
+          cp web.config dist/
+
+      # 5️⃣ Upload dist artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
+          name: frontend-dist
           path: FrontEnd/dist
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    
+
+    permissions:
+      contents: read
+
     steps:
-      - name: Download artifact from build job
+      # 6️⃣ Download dist artifact
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: node-app
-      
-      - name: 'Deploy to Azure Web App'
-        id: deploy-to-webapp
+          name: frontend-dist
+          path: dist
+
+      # 7️⃣ Azure Login using SAME Service Principal as Backend
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          auth-type: SERVICE_PRINCIPAL
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 8️⃣ Deploy dist folder to Azure Web App
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'mgscale-dashboard-service-prod'
-          slot-name: 'Production'
-          package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1731404E8AE746D7AEFE65CC8E80ED64 }}
+          app-name: mgscale-dashboard-service-prod
+          package: dist
+
+
