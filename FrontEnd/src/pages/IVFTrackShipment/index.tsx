@@ -282,7 +282,7 @@ export default function IVFTrackShipmentPage() {
                                             type="button"
                                             onClick={handleExport}
                                             disabled={exporting || !tankId}
-                                            className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed !hidden"
                                         >
                                             {exporting ? (
                                                 <svg
