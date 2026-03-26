@@ -5,6 +5,7 @@ import { authUtils } from "../../utils/auth";
 import { BaseApiService } from "../../services/baseApiService";
 import { userService } from "../../services/userService";
 import type { UserProfileDto, UserListItem } from "../../services/userService";
+import MyTasksIcon from "../../assets/DashBoardIcons/My_Tasks.svg";
 
 const ApprovalScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -173,7 +174,10 @@ const ApprovalScreen: React.FC = () => {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
         <div className="w-full max-w-[28rem]">
-          <h2 className="text-[32px] font-black text-gray-700 mb-2 tracking-tighter">Pending approvals</h2>
+          <div className="flex items-center gap-3 mb-2">
+            <img src={MyTasksIcon} alt="Pending approvals" className="w-8 h-8" />
+            <h2 className="text-[32px] font-black text-gray-700 tracking-tighter">Pending approvals</h2>
+          </div>
           <p className="text-gray-500 mb-6">Select a user to review and approve or reject their registration.</p>
           {pendingListLoading ? (
             <p className="text-gray-500">Loading...</p>

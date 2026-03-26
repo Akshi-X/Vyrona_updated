@@ -313,10 +313,16 @@ class ShipmentService extends BaseApiService {
     branch_name?: string;
     status?: string;
   }): Promise<{
-    canisters: Array<{
-      canister_id: number;
-      canister_status: string;
-      updated_at: string | null;
+    branches: Array<{
+      branch_id: number;
+      branch_name: string;
+      tanks: Array<{
+        tank_id: number;
+        tank_code: string;
+        updated_at: string | null;
+        status: string;
+        deviations: number;
+      }>;
     }>;
     total: number;
   }> {
@@ -342,10 +348,12 @@ class ShipmentService extends BaseApiService {
     branches: Array<{
       branch_id: number;
       branch_name: string;
-      canisters: Array<{
-        canister_id: number;
-        canister_status: string;
-        updated_at: string;
+      tanks: Array<{
+        tank_id: number;
+        tank_code: string;
+        updated_at: string | null;
+        status: string;
+        deviations: number;
       }>;
     }>;
     total: number;

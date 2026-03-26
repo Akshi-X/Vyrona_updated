@@ -198,9 +198,92 @@ DURATION_1H = 60
 DURATION_24H = 1440
 DURATION_7D = 10080
 # Default max readings for LIVE (raw) when no duration_minutes; no limit param in API.
-DEFAULT_LIVE_READINGS_CAP = 200
+DEFAULT_LIVE_READINGS_CAP = 50
 # Total points budget across all KPI series for LIVE mode after backend refinement.
 LIVE_SERIES_TOTAL_POINTS_BUDGET = 300
+
+
+def _parse_kpi_from_dedup(dedup_key: str) -> str:
+    """Extract kpi_name from dedup_key: tank_id:source:alert_type:YYYY-MM-DD_HH:MM:SS:extra_info.
+    The timestamp contains 2 colons, so extra_info is after the 6th colon (index 6 in a 7-part split)."""
+    if not dedup_key:
+        return ''
+    parts = dedup_key.split(':', 6)
+    return parts[6].strip() if len(parts) > 6 else ''
+
+
+def _floor_to_bucket_iso(ts, bucket_minutes: int) -> str:
+    """Floor a timestamp (string or datetime) to the nearest bucket boundary. Returns ISO string."""
+    try:
+        if isinstance(ts, datetime):
+            dt = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        else:
+            s = str(ts).strip().replace(' ', 'T')
+            if not s.endswith('Z') and '+' not in s[-6:] and '-' not in s[-6:]:
+                s += '+00:00'
+            dt = datetime.fromisoformat(s)
+        dt_utc = dt.astimezone(timezone.utc)
+        epoch = int(dt_utc.timestamp())
+        bucket_secs = bucket_minutes * 60
+        floored = (epoch // bucket_secs) * bucket_secs
+        return datetime.fromtimestamp(floored, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+    except Exception:
+        return ''
+
+
+def _attach_alert_counts(db: Session, tank_id: int, kpi_series: dict,
+                          since_utc: datetime, until_utc: datetime, bucket_minutes: int) -> None:
+    """Query critical_alerts for the time range, resolve kpi_config_id (extra_info) → kpi_name,
+    and attach alert_count to each matching kpi_series data point."""
+    from collections import defaultdict
+    from app.models.IVF.critical_alert_model import CriticalAlert
+    from app.models.kpi_config_model import KpiConfig
+    try:
+        alerts = db.query(CriticalAlert).filter(
+            CriticalAlert.tank_id == tank_id,
+            CriticalAlert.occurred_at >= since_utc,
+            CriticalAlert.occurred_at <= until_utc,
+        ).all()
+    except Exception:
+        return
+
+    # Collect all unique kpi_config IDs from extra_info
+    kpi_config_ids: set = set()
+    for alert in alerts:
+        raw_id = _parse_kpi_from_dedup(alert.dedup_key or '')
+        if raw_id and raw_id.isdigit():
+            kpi_config_ids.add(int(raw_id))
+
+    # Resolve kpi_config_id → kpi_name
+    id_to_kpi_name: dict = {}
+    if kpi_config_ids:
+        try:
+            configs = db.query(KpiConfig.id, KpiConfig.kpi_name).filter(
+                KpiConfig.id.in_(kpi_config_ids)
+            ).all()
+            id_to_kpi_name = {row.id: row.kpi_name for row in configs}
+        except Exception:
+            pass
+
+    # Build alert_counts[kpi_name][bucket_iso] = count
+    alert_counts: dict = defaultdict(lambda: defaultdict(int))
+    for alert in alerts:
+        raw_id = _parse_kpi_from_dedup(alert.dedup_key or '')
+        if not raw_id:
+            continue
+        kpi_name = id_to_kpi_name.get(int(raw_id)) if raw_id.isdigit() else raw_id
+        if not kpi_name:
+            continue
+        bucket_iso = _floor_to_bucket_iso(alert.occurred_at, bucket_minutes)
+        if bucket_iso:
+            alert_counts[kpi_name][bucket_iso] += 1
+
+    # Attach to each data point in kpi_series
+    for kpi_name, points in kpi_series.items():
+        kpi_alert_map = alert_counts.get(kpi_name, {})
+        for point in points:
+            bucket_iso = _floor_to_bucket_iso(point.get('timestamp'), bucket_minutes)
+            point['alert_count'] = kpi_alert_map.get(bucket_iso, 0)
 
 
 def _to_float_or_none(value) -> Optional[float]:
@@ -361,15 +444,93 @@ def get_tank_kpi_history(
         for name in list(kpi_series.keys()):
             kpi_series[name].reverse()
 
-    # LIVE only: backend average aggregation so frontend doesn't receive huge raw point volume.
-    # Apply a total budget across all KPI series (e.g. 5 KPIs => ~60 points each when budget=300).
-    if duration_minutes is None:
-        kpi_count = max(1, len(kpi_series))
-        per_kpi_max_points = max(1, LIVE_SERIES_TOTAL_POINTS_BUDGET // kpi_count)
-        for name in list(kpi_series.keys()):
-            kpi_series[name] = _aggregate_live_points_avg(
-                kpi_series[name], per_kpi_max_points
-            )
+    # Attach alert counts for 1H/24H/7D (not LIVE)
+    if duration_minutes in {DURATION_1H, DURATION_24H, DURATION_7D} and since is not None:
+        bucket_map = {
+            DURATION_1H: AGG_BUCKET_MINUTES_1H,
+            DURATION_24H: AGG_BUCKET_MINUTES_24H,
+            DURATION_7D: AGG_BUCKET_MINUTES_7D,
+        }
+        bucket_min = bucket_map.get(duration_minutes, AGG_BUCKET_MINUTES_24H)
+        until_ts = latest_timestamp or datetime.now(timezone.utc)
+        _attach_alert_counts(db, tank_id, kpi_series, since, until_ts, bucket_min)
+
+    return {
+        "tank_code": tank.tank_code or f"T{tank_id}",
+        "tank_id": tank_id,
+        "kpi_series": kpi_series,
+    }
+
+
+@router.get("/tanks/{tank_id}/kpi-history-date")
+def get_tank_kpi_history_by_date(
+    tank_id: int = Path(..., description="Tank ID"),
+    date: str = Query(..., description="Date in YYYY-MM-DD format (IST). Converted to UTC midnight IST for DB query."),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get KPI history from IST start-of-day for the given date to now. DB stores UTC; IST midnight = UTC - 5h30m."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+    query = db.query(Tank).filter(Tank.tank_id == tank_id)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
+    quality_service = QualityService(db)
+    try:
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    try:
+        selected = datetime.strptime(date.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid date format. Expected YYYY-MM-DD.")
+
+    # IST is UTC+5:30 — subtract offset to get the UTC equivalent of IST midnight
+    IST_OFFSET = timedelta(hours=5, minutes=30)
+    since_utc = datetime(selected.year, selected.month, selected.day, tzinfo=timezone.utc) - IST_OFFSET
+    # End of the selected day in IST = start of next IST day
+    end_of_day_utc = since_utc + timedelta(days=1)
+    now_utc = datetime.now(timezone.utc)
+    # Never query beyond now; also never bleed into another day's data
+    until_utc = min(end_of_day_utc, now_utc)
+
+    # If the selected date is entirely in the future, return empty
+    if since_utc >= now_utc:
+        return {"tank_code": tank.tank_code or f"T{tank_id}", "tank_id": tank_id, "kpi_series": {}}
+
+    # Use same bucket size as 24H for a single custom day
+    bucket_minutes = AGG_BUCKET_MINUTES_24H
+
+    per_kpi = (
+        quality_service.get_tank_kpi_history_aggregated(
+            tank_id, since_utc, bucket_minutes, until=until_utc
+        )
+        or {}
+    )
+
+    kpi_series: dict = {}
+    for item in per_kpi.get("kpis") or []:
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        kpi_series.setdefault(name, []).append(
+            {
+                "timestamp": item.get("timestamp"),
+                "value": item.get("value"),
+                "avg": item.get("avg"),
+                "min": item.get("min"),
+                "max": item.get("max"),
+                "count": item.get("count"),
+                "unit": item.get("unit") or "",
+            }
+        )
+
+    # aggregated returns oldest-first already; attach alert counts for custom date
+    _attach_alert_counts(db, tank_id, kpi_series, since_utc, until_utc, bucket_minutes)
 
     return {
         "tank_code": tank.tank_code or f"T{tank_id}",

@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from '../../components/Sidebar';
 import { ivfService } from '../../services/ivfService';
 import MockQualityTrackingChart from './MockQualityTrackingChart';
 import MockContainerDataTable from './MockContainerDataTable';
@@ -303,7 +301,6 @@ export default function IncubatorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const normalizedTankId = normalizeTankId(id);
   const hasIncubatorId = Boolean(normalizedTankId);
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [incubatorCode, setIncubatorCode] = useState<string>('-');
   const [branchName, setBranchName] = useState<string>('-');
@@ -420,8 +417,7 @@ export default function IncubatorDetailPage() {
 
   return (
     <div className="bg-[#FDFAFF] flex w-full h-full">
-      <Sidebar onLogout={() => { logout(); navigate('/login'); }} />
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto ml-60 min-h-0 pt-10">
+      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm">
