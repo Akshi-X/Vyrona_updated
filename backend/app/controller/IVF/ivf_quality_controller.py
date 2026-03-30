@@ -170,6 +170,33 @@ def get_ln2_history(
     return {"tank_code": tank_code_str, "tank_id": tank_id, "history": history}
 
 
+@router.get("/tanks/by-id/{tank_id}/ln2-history")
+def get_ln2_history_by_id(
+    tank_id: int = Path(..., description="Tank ID (integer)"),
+    limit: int = Query(30, ge=1, le=100),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get LN2 readings history for a tank by tank_id (integer)."""
+    branch_id, role = get_branch_filter_info(request) if request else (None, None)
+
+    query = db.query(Tank).filter(Tank.tank_id == tank_id)
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Tank.branch_id == branch_id)
+    tank = query.first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank with id '{tank_id}' not found")
+
+    try:
+        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    history = _get_ln2_history_for_tank(db, tank_id, tank.tank_code, limit=limit)
+    return {"tank_code": tank.tank_code, "tank_id": tank_id, "history": history}
+
+
 @router.get("/tanks/{tank_id}/kpi-config")
 def get_tank_kpi_config(
     tank_id: int = Path(..., description="Tank ID"),
