@@ -311,6 +311,55 @@ export class IvfService extends BaseApiService {
         });
     }
 
+    async getReservoirs(): Promise<{
+        reservoirs: Array<{
+            reservoir_id: number;
+            reservoir_name: string;
+            branch_id: number | null;
+            hospital_id: number | null;
+            branch_name: string | null;
+            created_at: string | null;
+        }>;
+    }> {
+        return await this.request("/api/ivf/reservoirs", { method: "GET" });
+    }
+
+    async getReservoirLogs(): Promise<{
+        logs: Array<{
+            log_id: number;
+            reservoir_id: number;
+            reservoir_name: string;
+            branch_id: number | null;
+            branch_name: string | null;
+            ln2_ordered_date: string | null;
+            ln2_received_date: string | null;
+            created_at: string | null;
+        }>;
+    }> {
+        return await this.request("/api/ivf/reservoir-logs", { method: "GET" });
+    }
+
+    async createReservoirLog(payload: {
+        reservoir_id: number;
+        ln2_ordered_date?: string | null;
+        ln2_received_date?: string | null;
+    }): Promise<{ log_id: number; reservoir_id: number }> {
+        return await this.request("/api/ivf/reservoir-logs", {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+    }
+
+    async updateReservoirLog(logId: number, payload: {
+        ln2_ordered_date?: string | null;
+        ln2_received_date?: string | null;
+    }): Promise<{ log_id: number; reservoir_id: number }> {
+        return await this.request(`/api/ivf/reservoir-logs/${logId}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+        });
+    }
+
     async checkCanisterExists(
         canisterId: string | number,
         branchId?: number | null,
@@ -343,11 +392,38 @@ export class IvfService extends BaseApiService {
             evaporation_rate_kg_per_h: number | null;
             ln2_mass_kg: number | null;
             ln2_level?: number | null;
+            ln2_level_pct?: number | null;
+            
             ln2_evaporation_rate?: number | null;
         }>;
     }> {
         return await this.request(
             `/api/ivf/quality/tanks/${encodeURIComponent(tankCode)}/ln2-history?limit=${limit}`,
+            { method: "GET" },
+        );
+    }
+
+    async getLn2HistoryById(
+        tankId: number | string,
+        limit = 30,
+    ): Promise<{
+        tank_code: string;
+        tank_id: number;
+        history: Array<{
+            tank_code?: string;
+            tank_id?: number;
+            device_id?: string;
+            timestamp: string;
+            evaporation_rate_kg_per_h: number | null;
+            ln2_mass_kg: number | null;
+            ln2_level?: number | null;
+            ln2_level_pct?: number | null;
+            ln2_evaporation_rate?: number | null;
+            raw_weight_kg?: number | null;
+        }>;
+    }> {
+        return await this.request(
+            `/api/ivf/quality/tanks/by-id/${tankId}/ln2-history?limit=${limit}`,
             { method: "GET" },
         );
     }
