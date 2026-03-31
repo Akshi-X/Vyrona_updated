@@ -834,27 +834,25 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                             {/* Render Routes (Outbound only) */}
                             {direction === "outbound" &&
                                 routes.map((r) => {
-                                    const origin = {
-                                        lat: r.source_latitude,
-                                        lng: r.source_longitude,
-                                    } as google.maps.LatLngLiteral;
+                                    const origin = toValidLatLng(
+                                        r.source_latitude,
+                                        r.source_longitude,
+                                    );
 
-                                    const dest = {
-                                        lat: r.destination_latitude,
-                                        lng: r.destination_longitude,
-                                    } as google.maps.LatLngLiteral;
+                                    const dest = toValidLatLng(
+                                        r.destination_latitude,
+                                        r.destination_longitude,
+                                    );
+
+                                    if (!origin || !dest) return null;
 
                                     const routeKey = `${r.shipment_id}-${r.patient_id}`;
                                     // Calculate midpoint for tooltip position
                                     const midpoint = {
                                         lat:
-                                            (r.source_latitude +
-                                                r.destination_latitude) /
-                                            2,
+                                            (origin.lat + dest.lat) / 2,
                                         lng:
-                                            (r.source_longitude +
-                                                r.destination_longitude) /
-                                            2,
+                                            (origin.lng + dest.lng) / 2,
                                     } as google.maps.LatLngLiteral;
 
                                     // Get color based on route status
