@@ -297,6 +297,9 @@ export default function AlertSetting() {
         ContainerRow[]
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
+    const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+    const [selectedTankIds, setSelectedTankIds] = useState<number[]>([]);
+    const [savingToBranches, setSavingToBranches] = useState(false);
     const [configList, setConfigList] = useState<KpiConfigRow[]>([]);
     const [configLoading, setConfigLoading] = useState(false);
     const [configError, setConfigError] = useState<string | null>(null);
@@ -1316,38 +1319,9 @@ export default function AlertSetting() {
                                     <h2 className="font-bold text-black text-base">
                                         Active Containers
                                     </h2>
-                                    {containers.length > 0 && (
-                                        <button
-                                            type="button"
-                                            disabled={lockContainerSelection}
-                                            onClick={async () => {
-                                                if (
-                                                    selectedContainers.length ===
-                                                    containers.length
-                                                ) {
-                                                    await applyContainerSelection(
-                                                        [],
-                                                    );
-                                                } else {
-                                                    await applyContainerSelection(
-                                                        [...containers],
-                                                    );
-                                                }
-                                            }}
-                                            className={`text-xs font-medium transition-colors px-2 py-1 rounded ${lockContainerSelection ? "text-gray-400 cursor-not-allowed" : "text-[#6b1176] hover:text-[#8a2a95] hover:bg-[#F7ECFF]"}`}
-                                        >
-                                            {selectedContainers.length ===
-                                            containers.length
-                                                ? "Deselect All"
-                                                : "Select All"}
-                                        </button>
-                                    )}
                                 </div>
-                                <div className="grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-2 items-center">
-                                    <div className="text-left">
-                                        Containers #
-                                    </div>
-                                    <div className="flex justify-center" />
+                                <div className="pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176]">
+                                    Containers #
                                 </div>
                                 <div
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
@@ -1412,69 +1386,28 @@ export default function AlertSetting() {
                                                     (s) =>
                                                         s.tank_id === c.tank_id,
                                                 );
-                                            const toggleSelection = () => {
-                                                const nextSelection = isSelected
-                                                    ? selectedContainers.filter(
-                                                          (s) =>
-                                                              s.tank_id !==
-                                                              c.tank_id,
-                                                      )
-                                                    : [
-                                                          ...selectedContainers,
-                                                          c,
-                                                      ];
-                                                void applyContainerSelection(
-                                                    nextSelection,
-                                                );
-                                            };
                                             return (
                                                 <div
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
                                                     onClick={
                                                         lockContainerSelection
                                                             ? undefined
-                                                            : toggleSelection
+                                                            : () => void applyContainerSelection([c])
                                                     }
-                                                    className={`grid grid-cols-[1fr_40px] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-2 cursor-pointer ${
+                                                    className={`pl-2 pr-2 py-2 hover:bg-gray-50 overflow-hidden cursor-pointer ${
                                                         isSelected
                                                             ? "bg-[#F7ECFF]"
                                                             : ""
                                                     } ${lockContainerSelection ? "opacity-70 cursor-not-allowed" : ""}`}
                                                 >
-                                                    <div className="min-w-0 text-left overflow-hidden">
-                                                        <span className="text-[#6b1176] text-xs font-bold block truncate">
-                                                            Container{" "}
-                                                            {c.canisterId}
-                                                        </span>
-                                                        {c.branchName &&
-                                                            c.branchName !==
-                                                                "N/A" && (
-                                                                <div className="text-xs text-gray-900 leading-snug truncate">
-                                                                    {
-                                                                        c.branchName
-                                                                    }
-                                                                </div>
-                                                            )}
-                                                    </div>
-                                                    <div
-                                                        className="flex justify-center"
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={
-                                                                toggleSelection
-                                                            }
-                                                            disabled={
-                                                                lockContainerSelection
-                                                            }
-                                                            className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                                                            aria-label={`Select cryocan ${c.canisterId}`}
-                                                        />
-                                                    </div>
+                                                    <span className="text-[#6b1176] text-xs font-bold block truncate">
+                                                        Container {c.canisterId}
+                                                    </span>
+                                                    {c.branchName && c.branchName !== "N/A" && (
+                                                        <div className="text-xs text-gray-900 leading-snug truncate">
+                                                            {c.branchName}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -3631,42 +3564,131 @@ export default function AlertSetting() {
                                                     </>
                                                 )}
                                             </div>
-                                            <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex justify-end">
-                                                {!(
-                                                    saveAllLoading ||
-                                                    !hasPendingChanges
-                                                ) && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex items-center justify-end gap-3">
+                                                {/* Save to Additional Branches */}
+                                                <div className="relative">
                                                     <button
                                                         type="button"
-                                                        onClick={handleSaveAll}
-                                                        disabled={
-                                                            saveAllLoading ||
-                                                            !hasPendingChanges
-                                                        }
-                                                        className="px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                        disabled={!primaryContainer || configList.length === 0}
+                                                        onClick={() => setShowBranchDropdown((v) => !v)}
+                                                        className="px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                                                     >
-                                                        {saveAllLoading ? (
-                                                            <>
-                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                                                Saving...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <svg
-                                                                    className="w-4 h-4"
-                                                                    viewBox="0 0 24 24"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    strokeWidth="2"
-                                                                >
-                                                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                                    <path d="M17 21v-8H7v8M7 3v5h8" />
-                                                                </svg>
-                                                                Save Changes
-                                                            </>
-                                                        )}
+                                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                                                        </svg>
+                                                        Save to Additional Branches
+                                                        <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
                                                     </button>
-                                                )}
+                                                    {showBranchDropdown && (() => {
+                                                        const filteredTanks = branchFilter === "All"
+                                                            ? containers.filter((c) => c.tank_id !== primaryContainer?.tank_id)
+                                                            : containers.filter((c) => c.branchName === branchFilter && c.tank_id !== primaryContainer?.tank_id);
+                                                        return (
+                                                            <>
+                                                                <div className="fixed inset-0 z-40" onClick={() => { setShowBranchDropdown(false); setSelectedTankIds([]); }} />
+                                                                <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-[#E7E1E1] rounded-xl shadow-xl z-50 overflow-hidden">
+                                                                    {/* Select all row */}
+                                                                    <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                                                                        <span className="text-xs text-gray-500">{filteredTanks.length} tank{filteredTanks.length !== 1 ? "s" : ""}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                setSelectedTankIds(
+                                                                                    filteredTanks.every((c) => selectedTankIds.includes(c.tank_id))
+                                                                                        ? selectedTankIds.filter((id) => !filteredTanks.some((c) => c.tank_id === id))
+                                                                                        : [...new Set([...selectedTankIds, ...filteredTanks.map((c) => c.tank_id)])]
+                                                                                )
+                                                                            }
+                                                                            className="text-xs text-[#6b1176] font-medium hover:underline"
+                                                                        >
+                                                                            {filteredTanks.every((c) => selectedTankIds.includes(c.tank_id)) && filteredTanks.length > 0 ? "Deselect All" : "Select All"}
+                                                                        </button>
+                                                                    </div>
+                                                                    {/* Tank list */}
+                                                                    <div className="max-h-52 overflow-y-auto divide-y divide-gray-50" style={{ scrollbarWidth: "thin" }}>
+                                                                        {filteredTanks.length === 0 && (
+                                                                            <div className="px-4 py-3 text-xs text-gray-400">No tanks available.</div>
+                                                                        )}
+                                                                        {filteredTanks.map((c) => (
+                                                                            <label key={c.tank_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#F7ECFF] cursor-pointer">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={selectedTankIds.includes(c.tank_id)}
+                                                                                    onChange={() =>
+                                                                                        setSelectedTankIds((prev) =>
+                                                                                            prev.includes(c.tank_id)
+                                                                                                ? prev.filter((id) => id !== c.tank_id)
+                                                                                                : [...prev, c.tank_id]
+                                                                                        )
+                                                                                    }
+                                                                                    className="w-4 h-4 rounded border-gray-300 text-[#6b1176] focus:ring-[#6b1176]"
+                                                                                />
+                                                                                <div className="min-w-0">
+                                                                                    <div className="text-xs font-semibold text-[#6b1176] truncate">Container {c.canisterId}</div>
+                                                                                    <div className="text-xs text-gray-500 truncate">{c.branchName}</div>
+                                                                                </div>
+                                                                            </label>
+                                                                        ))}
+                                                                    </div>
+                                                                    <div className="px-4 py-3 border-t border-gray-100 flex justify-end">
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={selectedTankIds.length === 0 || savingToBranches}
+                                                                            onClick={async () => {
+                                                                                setSavingToBranches(true);
+                                                                                try {
+                                                                                    const configsToApply = configList.map((cfg) => ({
+                                                                                        kpi_name: cfg.kpi_name,
+                                                                                        alert_name: cfg.alert_name ?? null,
+                                                                                        min: cfg.min ?? null,
+                                                                                        max: cfg.max ?? null,
+                                                                                        unit: cfg.unit ?? null,
+                                                                                        alert_type: cfg.alert_type ?? null,
+                                                                                        cooldown_minutes: cfg.cooldown_minutes,
+                                                                                    }));
+                                                                                    await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
+                                                                                } finally {
+                                                                                    setSavingToBranches(false);
+                                                                                    setShowBranchDropdown(false);
+                                                                                    setSelectedTankIds([]);
+                                                                                }
+                                                                            }}
+                                                                            className="px-4 py-2 bg-[#6b1176] text-white rounded-lg text-xs font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                                        >
+                                                                            {savingToBranches ? (
+                                                                                <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
+                                                                            ) : (
+                                                                                <>Apply to {selectedTankIds.length} Tank{selectedTankIds.length !== 1 ? "s" : ""}</>
+                                                                            )}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                {/* Save Changes */}
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveAll}
+                                                    disabled={saveAllLoading || !hasPendingChanges}
+                                                    className="px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                >
+                                                    {saveAllLoading ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                            Saving...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                                                <path d="M17 21v-8H7v8M7 3v5h8" />
+                                                            </svg>
+                                                            Save Changes
+                                                        </>
+                                                    )}
+                                                </button>
                                             </div>
                                         </div>
                                     )}
