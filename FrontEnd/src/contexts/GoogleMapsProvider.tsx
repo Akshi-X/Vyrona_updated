@@ -12,6 +12,8 @@ interface GoogleMapsProviderProps {
   children: ReactNode;
 }
 
+const MAP_LIBRARIES: ("geometry" | "maps")[] = ["geometry", "maps"];
+
 /**
  * Provider that initializes Google Maps loader once at the app level.
  * This ensures all components share the same loader instance and prevents conflicts.
@@ -29,7 +31,7 @@ export const GoogleMapsProvider: React.FC<GoogleMapsProviderProps> = ({ children
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
-    libraries: ['geometry', 'maps'],
+    libraries: MAP_LIBRARIES,
     preventGoogleFontsLoading: true
   });
 
