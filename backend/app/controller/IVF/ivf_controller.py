@@ -774,3 +774,157 @@ def get_in_transit_crylocks(
     except Exception as e:
         logger.error(f"Error getting in-transit crylocks: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting in-transit crylocks: {str(e)}")
+
+
+@router.get("/reservoirs")
+def get_reservoirs(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """List all reservoirs, optionally filtered by the caller's branch."""
+    from app.models.IVF.reservoir_model import Reservoir
+
+    branch_id, role = get_branch_filter_info(request)
+    query = db.query(
+        Reservoir.reservoir_id,
+        Reservoir.reservoir_name,
+        Reservoir.branch_id,
+        Reservoir.hospital_id,
+        Reservoir.created_at,
+        HospitalBranch.branch_name,
+    ).outerjoin(HospitalBranch, HospitalBranch.branch_id == Reservoir.branch_id)
+
+    if role != "Admin" and branch_id is not None:
+        query = query.filter(Reservoir.branch_id == branch_id)
+
+    rows = query.order_by(Reservoir.reservoir_id).all()
+    return {
+        "reservoirs": [
+            {
+                "reservoir_id": r.reservoir_id,
+                "reservoir_name": r.reservoir_name,
+                "branch_id": r.branch_id,
+                "hospital_id": r.hospital_id,
+                "branch_name": r.branch_name,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/reservoir-logs")
+def get_reservoir_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    List all reservoir logs with reservoir name and branch.
+    Admin/Manager: all logs. User: only their branch.
+    """
+    from app.models.IVF.reservoir_model import Reservoir
+    from app.models.IVF.reservoir_log_model import ReservoirLog
+
+    branch_id, role = get_branch_filter_info(request)
+
+    query = (
+        db.query(
+            ReservoirLog.log_id,
+            ReservoirLog.reservoir_id,
+            ReservoirLog.ln2_ordered_date,
+            ReservoirLog.ln2_received_date,
+            ReservoirLog.created_at,
+            Reservoir.reservoir_name,
+            Reservoir.branch_id,
+            HospitalBranch.branch_name,
+        )
+        .join(Reservoir, Reservoir.reservoir_id == ReservoirLog.reservoir_id)
+        .outerjoin(HospitalBranch, HospitalBranch.branch_id == Reservoir.branch_id)
+    )
+
+    # User sees only their branch; Admin and Manager see all
+    if role == "User" and branch_id is not None:
+        query = query.filter(Reservoir.branch_id == branch_id)
+
+    rows = query.order_by(ReservoirLog.created_at.desc()).all()
+    return {
+        "logs": [
+            {
+                "log_id": r.log_id,
+                "reservoir_id": r.reservoir_id,
+                "reservoir_name": r.reservoir_name,
+                "branch_id": r.branch_id,
+                "branch_name": r.branch_name,
+                "ln2_ordered_date": r.ln2_ordered_date.isoformat() if r.ln2_ordered_date else None,
+                "ln2_received_date": r.ln2_received_date.isoformat() if r.ln2_received_date else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.put("/reservoir-logs/{log_id}")
+def update_reservoir_log(
+    log_id: int,
+    payload: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Update an existing reservoir log entry."""
+    from app.models.IVF.reservoir_log_model import ReservoirLog
+    from datetime import date as date_type
+
+    log = db.query(ReservoirLog).filter(ReservoirLog.log_id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Reservoir log not found")
+
+    def parse_date(val):
+        if not val:
+            return None
+        try:
+            return date_type.fromisoformat(str(val))
+        except ValueError:
+            return None
+
+    if "ln2_ordered_date" in payload:
+        log.ln2_ordered_date = parse_date(payload["ln2_ordered_date"])
+    if "ln2_received_date" in payload:
+        log.ln2_received_date = parse_date(payload["ln2_received_date"])
+
+    db.commit()
+    db.refresh(log)
+    return {"log_id": log.log_id, "reservoir_id": log.reservoir_id}
+
+
+@router.post("/reservoir-logs")
+def create_reservoir_log(
+    payload: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a new reservoir log entry."""
+    from app.models.IVF.reservoir_log_model import ReservoirLog
+    from datetime import date as date_type
+
+    reservoir_id = payload.get("reservoir_id")
+    if not reservoir_id:
+        raise HTTPException(status_code=422, detail="reservoir_id is required")
+
+    def parse_date(val):
+        if not val:
+            return None
+        try:
+            return date_type.fromisoformat(str(val))
+        except ValueError:
+            return None
+
+    log = ReservoirLog(
+        reservoir_id=int(reservoir_id),
+        ln2_ordered_date=parse_date(payload.get("ln2_ordered_date")),
+        ln2_received_date=parse_date(payload.get("ln2_received_date")),
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return {"log_id": log.log_id, "reservoir_id": log.reservoir_id}
