@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Header from "../../components/Header";
+
+
 import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/userService";
 import { shipmentService } from "../../services/shipmentService";
@@ -40,13 +40,6 @@ const escapeCsvValue = (value: string | number | null | undefined) => {
     return text;
 };
 
-const formatLocalDateTime = (value: string) => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString();
-};
-
 const getLocaleDateTimeParts = (value: string) => {
     if (!value) return { date: "", time: "" };
     const date = new Date(value);
@@ -59,7 +52,6 @@ const getLocaleDateTimeParts = (value: string) => {
 
 export default function ReportsPage() {
     const { isAuthenticated } = useAuth();
-    const navigate = useNavigate();
     const today = new Date();
     const startOfMonth = new Date(
         today.getFullYear(),
@@ -71,7 +63,7 @@ export default function ReportsPage() {
     ).padStart(2, "0")}`;
     const defaultStartDate = startOfMonth.toISOString().slice(0, 10);
     const defaultEndDate = today.toISOString().slice(0, 10);
-    const [userInitials, setUserInitials] = useState<string>("");
+    const [, setUserInitials] = useState<string>("");
     const [department, setDepartment] = useState<string | null>(() => {
         try {
             const dept = localStorage.getItem("department");
