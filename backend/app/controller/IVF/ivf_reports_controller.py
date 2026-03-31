@@ -115,6 +115,7 @@ def get_refill_logs_report(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     status: Optional[str] = Query(None, description="Refill status"),
+    tank_codes: Optional[List[str]] = Query(None, description="Filter by tank codes"),
     page: int = Query(1, ge=1, le=10000, description="Page number"),
     page_size: int = Query(20, ge=1, le=200, description="Page size"),
     db: Session = Depends(get_db),
@@ -142,6 +143,7 @@ def get_refill_logs_report(
             start_date=start_date,
             end_date=end_date,
             status=status,
+            tank_codes=tank_codes,
             page=page,
             page_size=page_size,
         )
