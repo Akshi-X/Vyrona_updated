@@ -14,6 +14,7 @@ import Database from "../pages/Database";
 import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
 import RefillLog from "../pages/RefillLog";
+import ReportsPage from "../pages/Reports";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
@@ -238,6 +239,14 @@ export const router = createBrowserRouter([
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
             { path: "/database", element: <DatabaseWithAuth /> },
+            {
+                path: "/reports",
+                element: (
+                    <RoleBasedRoute restrictedRoles={["mygrape_admin"]}>
+                        <ReportsPage />
+                    </RoleBasedRoute>
+                ),
+            },
         ],
     },
 

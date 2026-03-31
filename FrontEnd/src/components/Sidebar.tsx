@@ -14,7 +14,9 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
+import ReportsIcon from "../assets/ExportTrackPage.svg";
 //import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
+import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 import UserIcon from "../assets/DashBoardIcons/User.svg";
 //import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
@@ -125,11 +127,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     label: "Cryocan Quality Tracking",
                     path: "/ivf-track-shipment",
                 },
-                // {
-                //     label: "Incubator Quality Tracking",
-                //     path: "/incubator-tracking",
-                // },
-                //{ label: "Embryo Grading", path: "/embryo-grading" },
+                {
+                    label: "Incubator Quality Tracking",
+                    path: "/incubator-tracking",
+                },
+                { label: "Embryo Grading", path: "/embryo-grading" },
             ],
         },
         { icon: DatabaseIconWhite, label: "Database", path: "/database" },
@@ -144,11 +146,17 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             label: "Alert Configuration",
             path: "/alert-setting",
         },
+        { icon: ReportsIcon, label: "Reports", path: "/reports" },
         // {
         //     icon: ContainersIcon,
         //     label: "Refill log",
         //     path: "/refill-log",
         // },
+        {
+            icon: ContainersIcon,
+            label: "Refill log",
+            path: "/refill-log",
+        },
         //{ icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
         //{ icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
     ];
@@ -163,6 +171,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         }
         if (item.label === "Alert Configuration") {
             return isIVF && (userRole === "Manager" || userRole === "Admin");
+        }
+        if (!isIVF && item.label === "Reports") {
+            return false;
         }
         if (isIVF && item.label === "Database") {
             return false;

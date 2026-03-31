@@ -224,9 +224,7 @@ class QualityTrackingService:
                 status=refill_log_data.status,
                 cryoshipper=refill_log_data.cryoshipper,
                 disinfected_shipper_infected_tank_description=refill_log_data.disinfected_shipper_infected_tank_description,
-                reservoir=refill_log_data.reservoir,
-                ln2_ordered_date=refill_log_data.ln2_ordered_date,
-                ln2_received_date=refill_log_data.ln2_received_date,
+                reservoir_id=refill_log_data.reservoir_id,
                 created_by=created_by,
                 branch_id=tank_branch_id,  # Use tank's actual branch_id, not override
                 refilled_count=last_refilled_count + 1,
