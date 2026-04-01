@@ -9,6 +9,7 @@ import {
     ivfReportsService,
     type CriticalAlertReportRow,
     type MonthlySummaryRow,
+    type RefillLogReportRow,
 } from "../../services/ivfReportsService";
 
 const REPORT_TYPES = [
@@ -24,12 +25,14 @@ type FilterState = {
     month: string;
     dateFrom: string;
     dateTo: string;
-    status: string;
+    alertStatus: string;
     severity: string;
+    refillStatus: string;
     tankCodes: string[];
 };
 
-const STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
+const ALERT_STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
+const REFILL_STATUS_OPTIONS = ["All", "Not started", "In progress", "Done"] as const;
 const SEVERITY_OPTIONS = ["All", "High", "Medium", "Low"] as const;
 
 const escapeCsvValue = (value: string | number | null | undefined) => {
@@ -48,6 +51,26 @@ const getLocaleDateTimeParts = (value: string) => {
         date: date.toLocaleDateString(),
         time: date.toLocaleTimeString(),
     };
+};
+
+const formatLocaleDate = (value?: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString();
+};
+
+const formatLocaleTime = (value?: string | null) => {
+    if (!value) return "";
+    const time = new Date(`1970-01-01T${value}`);
+    if (Number.isNaN(time.getTime())) return value;
+    return time.toLocaleTimeString();
+};
+
+const getRefillStatusStyles = (status?: string | null) => {
+    if (status === "Done") return "bg-green-100 text-green-700";
+    if (status === "In progress") return "bg-amber-100 text-amber-700";
+    return "bg-gray-200 text-gray-700";
 };
 
 export default function ReportsPage() {
@@ -77,8 +100,9 @@ export default function ReportsPage() {
         month: defaultMonth,
         dateFrom: defaultStartDate,
         dateTo: defaultEndDate,
-        status: "All",
+        alertStatus: "All",
         severity: "All",
+        refillStatus: "All",
         tankCodes: [],
     };
     const [filters, setFilters] = useState<FilterState>(defaultFilters);
@@ -87,6 +111,7 @@ export default function ReportsPage() {
         MonthlySummaryRow[]
     >([]);
     const [alertRows, setAlertRows] = useState<CriticalAlertReportRow[]>([]);
+    const [refillLogRows, setRefillLogRows] = useState<RefillLogReportRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reportMonthLabel, setReportMonthLabel] = useState<string>("");
@@ -151,6 +176,7 @@ export default function ReportsPage() {
         if (!isIvfUser) {
             setMonthlySummaryRows([]);
             setAlertRows([]);
+            setRefillLogRows([]);
             setLoading(false);
             setError(null);
             return;
@@ -179,9 +205,9 @@ export default function ReportsPage() {
                             start_date: filters.dateFrom || undefined,
                             end_date: filters.dateTo || undefined,
                             status:
-                                filters.status === "All"
+                                filters.alertStatus === "All"
                                     ? undefined
-                                    : filters.status,
+                                    : filters.alertStatus,
                             severity:
                                 filters.severity === "All"
                                     ? undefined
@@ -195,14 +221,35 @@ export default function ReportsPage() {
                     return;
                 }
 
+                if (filters.reportType === "refill-logs") {
+                    const response = await ivfReportsService.getRefillLogsReport(
+                        {
+                            start_date: filters.dateFrom || undefined,
+                            end_date: filters.dateTo || undefined,
+                            status:
+                                filters.refillStatus === "All"
+                                    ? undefined
+                                    : filters.refillStatus,
+                            tank_codes: filters.tankCodes,
+                            page,
+                            page_size: pageSize,
+                        },
+                    );
+                    setRefillLogRows(response.logs || []);
+                    setTotalCount(response.total_count ?? 0);
+                    return;
+                }
+
                 setAlertRows([]);
                 setMonthlySummaryRows([]);
+                setRefillLogRows([]);
                 setTotalCount(0);
             } catch (err) {
                 const message = (err as Error)?.message || "Failed to load report";
                 setError(message);
                 setAlertRows([]);
                 setMonthlySummaryRows([]);
+                setRefillLogRows([]);
                 setTotalCount(0);
             } finally {
                 setLoading(false);
@@ -219,8 +266,9 @@ export default function ReportsPage() {
         filters.month,
         filters.dateFrom,
         filters.dateTo,
-        filters.status,
+        filters.alertStatus,
         filters.severity,
+        filters.refillStatus,
         filters.tankCodes.join(","),
     ]);
 
@@ -235,8 +283,11 @@ export default function ReportsPage() {
         if (filters.reportType === "critical-alerts") {
             return alertRows.length;
         }
+        if (filters.reportType === "refill-logs") {
+            return refillLogRows.length;
+        }
         return 0;
-    }, [filters.reportType, monthlySummaryRows, alertRows]);
+    }, [filters.reportType, monthlySummaryRows, alertRows, refillLogRows]);
 
     const totalPages = useMemo(() => {
         if (totalCount <= 0) return 1;
@@ -251,6 +302,14 @@ export default function ReportsPage() {
         });
     }, [alertRows]);
 
+    const sortedRefillLogRows = useMemo(() => {
+        return [...refillLogRows].sort((a, b) => {
+            const aKey = `${a.refill_date ?? ""}T${a.refill_time ?? ""}`;
+            const bKey = `${b.refill_date ?? ""}T${b.refill_time ?? ""}`;
+            return bKey.localeCompare(aKey);
+        });
+    }, [refillLogRows]);
+
     const handleResetFilters = () => {
         setFilters((prev) => ({
             ...defaultFilters,
@@ -259,7 +318,6 @@ export default function ReportsPage() {
     };
 
     const downloadCsv = () => {
-        if (filters.reportType === "refill-logs") return;
         if (activeRowsCount === 0) return;
 
         let headers: string[] = [];
@@ -293,6 +351,32 @@ export default function ReportsPage() {
                 row.message,
             ]);
             filename = "critical-alerts.csv";
+        } else if (filters.reportType === "refill-logs") {
+            headers = [
+                "Refill Date",
+                "Refill Time",
+                "Tank Code",
+                "Branch",
+                "Refilled By",
+                "Status",
+                "Description",
+                "Reservoir",
+                "LN2 Ordered Date",
+                "LN2 Received Date",
+            ];
+            rows = sortedRefillLogRows.map((row) => [
+                formatLocaleDate(row.refill_date) || "-",
+                formatLocaleTime(row.refill_time) || "-",
+                row.tank_code || "-",
+                row.branch_name || "-",
+                row.refilled_by || "-",
+                row.status || "-",
+                row.description || "-",
+                row.reservoir || "-",
+                formatLocaleDate(row.ln2_ordered_date) || "-",
+                formatLocaleDate(row.ln2_received_date) || "-",
+            ]);
+            filename = "refill-logs.csv";
         }
 
         const csvLines = [
@@ -449,16 +533,16 @@ export default function ReportsPage() {
                                         </label>
                                         <select
                                             className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                            value={filters.status}
+                                            value={filters.alertStatus}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
                                                     ...prev,
-                                                    status: event.target.value,
+                                                    alertStatus: event.target.value,
                                                 }))
                                             }
                                             disabled={!isIvfUser}
                                         >
-                                            {STATUS_OPTIONS.map((status) => (
+                                            {ALERT_STATUS_OPTIONS.map((status) => (
                                                 <option key={status} value={status}>
                                                     {status}
                                                 </option>
@@ -506,17 +590,79 @@ export default function ReportsPage() {
                             )}
 
                             {filters.reportType === "refill-logs" && (
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-gray-600">
-                                        Placeholder
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                        value="Coming soon"
-                                        disabled
-                                    />
-                                </div>
+                                <>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Date From
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.dateFrom}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateFrom: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!isIvfUser}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Date To
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.dateTo}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateTo: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!isIvfUser}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Status
+                                        </label>
+                                        <select
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.refillStatus}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    refillStatus: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!isIvfUser}
+                                        >
+                                            {REFILL_STATUS_OPTIONS.map((status) => (
+                                                <option key={status} value={status}>
+                                                    {status}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <MultiSelectDropdown
+                                            label="Tank Codes"
+                                            options={tankOptions}
+                                            selected={filters.tankCodes}
+                                            placeholder="All tanks"
+                                            disabled={!isIvfUser}
+                                            onChange={(selected) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    tankCodes: selected,
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                </>
                             )}
                         </div>
                     </section>
@@ -537,7 +683,6 @@ export default function ReportsPage() {
                                 type="button"
                                 onClick={downloadCsv}
                                 disabled={
-                                    filters.reportType === "refill-logs" ||
                                     activeRowsCount === 0 ||
                                     !isIvfUser
                                 }
@@ -553,59 +698,55 @@ export default function ReportsPage() {
                             </div>
                         )}
 
-                        {filters.reportType !== "refill-logs" && (
-                            <div className="mt-4 flex items-center justify-end gap-3 text-sm">
-                                <span className="text-gray-500">
-                                    Page {page} of {totalPages}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <label className="text-gray-500" htmlFor="pageSize">
-                                        Rows
-                                    </label>
-                                    <select
-                                        id="pageSize"
-                                        className="border border-[#E7E1E1] rounded-md px-2 py-1 text-sm"
-                                        value={pageSize}
-                                        onChange={(event) =>
-                                            setPageSize(
-                                                Number(event.target.value),
-                                            )
-                                        }
-                                        disabled={loading}
-                                    >
-                                        {[10, 20, 50, 100].map((size) => (
-                                            <option key={size} value={size}>
-                                                {size}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
-                                        onClick={() =>
-                                            setPage((prev) => Math.max(1, prev - 1))
-                                        }
-                                        disabled={page <= 1 || loading}
-                                    >
-                                        Previous
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
-                                        onClick={() =>
-                                            setPage((prev) =>
-                                                Math.min(totalPages, prev + 1),
-                                            )
-                                        }
-                                        disabled={page >= totalPages || loading}
-                                    >
-                                        Next
-                                    </button>
-                                </div>
+                        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+                            <span className="text-gray-500">
+                                Page {page} of {totalPages}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <label className="text-gray-500" htmlFor="pageSize">
+                                    Rows
+                                </label>
+                                <select
+                                    id="pageSize"
+                                    className="border border-[#E7E1E1] rounded-md px-2 py-1 text-sm"
+                                    value={pageSize}
+                                    onChange={(event) =>
+                                        setPageSize(Number(event.target.value))
+                                    }
+                                    disabled={loading}
+                                >
+                                    {[10, 20, 50, 100].map((size) => (
+                                        <option key={size} value={size}>
+                                            {size}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                        )}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
+                                    onClick={() =>
+                                        setPage((prev) => Math.max(1, prev - 1))
+                                    }
+                                    disabled={page <= 1 || loading}
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-3 py-1.5 rounded-md border border-[#E7E1E1] text-gray-700 disabled:opacity-50"
+                                    onClick={() =>
+                                        setPage((prev) =>
+                                            Math.min(totalPages, prev + 1),
+                                        )
+                                    }
+                                    disabled={page >= totalPages || loading}
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
 
                         {!loading && !isIvfUser && (
                             <div className="mt-4 text-sm text-gray-500">
@@ -751,11 +892,102 @@ export default function ReportsPage() {
                             )}
 
                             {filters.reportType === "refill-logs" && (
-                                <div className="border border-dashed border-[#E7E1E1] rounded-lg p-6 text-center text-sm text-gray-500">
-                                    Refill logs report is coming soon. We will
-                                    add filters and download support in the next
-                                    update.
-                                </div>
+                                <table className="min-w-full text-sm">
+                                    <thead className="bg-[#fdeeff]">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Refill Date
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Refill Time
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Tank Code
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Branch
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Refilled By
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Status
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Description
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Reservoir
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                LN2 Ordered
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                LN2 Received
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sortedRefillLogRows.map((row) => (
+                                            <tr
+                                                key={row.log_id}
+                                                className="border-b border-[#F1E8F2]"
+                                            >
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatLocaleDate(row.refill_date) || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatLocaleTime(row.refill_time) || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.tank_code || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.branch_name || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.refilled_by || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getRefillStatusStyles(
+                                                            row.status,
+                                                        )}`}
+                                                    >
+                                                        {row.status || "-"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.description || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.reservoir || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatLocaleDate(
+                                                        row.ln2_ordered_date,
+                                                    ) || "-"}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatLocaleDate(
+                                                        row.ln2_received_date,
+                                                    ) || "-"}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {!loading && refillLogRows.length === 0 && (
+                                            <tr>
+                                                <td
+                                                    colSpan={10}
+                                                    className="px-4 py-6 text-center text-gray-400"
+                                                >
+                                                    No refill logs found for the
+                                                    selected range.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
                     </section>
