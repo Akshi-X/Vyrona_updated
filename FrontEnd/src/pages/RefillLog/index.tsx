@@ -502,8 +502,8 @@ const RefillLog = () => {
                                 <svg width="220" height="320" viewBox="0 0 240 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
                                     <defs>
                                         <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">
-                                            <stop offset="0%" stopColor="#7c3aed" />
-                                            <stop offset="100%" stopColor="#a78bfa" />
+                                            <stop offset="0%" stopColor="#9B72B0" />
+                                            <stop offset="100%" stopColor="#B58BC6" />
                                         </linearGradient>
                                         <linearGradient id="res-body-gradient" x1="0" x2="1" y1="0" y2="0">
                                             <stop offset="0%" stopColor="#9580a8" />
@@ -527,7 +527,7 @@ const RefillLog = () => {
                                     {/* LN2 fill ~60% */}
                                     <g clipPath="url(#res-body-clip)">
                                         <rect x="30" y="182" width="140" height="88" fill="url(#res-fill-gradient)" />
-                                        <path d="M30 0 Q55 -6 80 0 T130 0 T170 0" fill="#a78bfa" opacity="0.9" transform="translate(0,182)">
+                                        <path d="M30 0 Q55 -6 80 0 T130 0 T170 0" fill="#B58BC6" opacity="0.9" transform="translate(0,182)">
                                             <animate attributeName="d" values="M30 0 Q55 -6 80 0 T130 0 T170 0;M30 0 Q55 6 80 0 T130 0 T170 0;M30 0 Q55 -6 80 0 T130 0 T170 0" dur="3s" repeatCount="indefinite" />
                                         </path>
                                         <ellipse cx="100" cy="182" rx="40" ry="3" fill="white" opacity="0.3">
