@@ -252,6 +252,7 @@ class IVFReportsService:
         start_date: Optional[str],
         end_date: Optional[str],
         status: Optional[str],
+        tank_codes: Optional[List[str]],
         page: int,
         page_size: int,
     ) -> dict:
@@ -275,6 +276,9 @@ class IVFReportsService:
 
         if status:
             query = query.filter(CanisterLn2Log.status == status)
+
+        if tank_codes:
+            query = query.filter(Tank.tank_code.in_(tank_codes))
 
         if start:
             query = query.filter(CanisterLn2Log.refill_date >= start)

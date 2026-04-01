@@ -140,6 +140,7 @@ export class IvfReportsService extends BaseApiService {
         start_date?: string;
         end_date?: string;
         status?: string;
+        tank_codes?: string[];
         page?: number;
         page_size?: number;
     }): Promise<RefillLogReportResponse> {
@@ -152,6 +153,13 @@ export class IvfReportsService extends BaseApiService {
         }
         if (options.status) {
             params.append("status", options.status);
+        }
+        if (options.tank_codes && options.tank_codes.length > 0) {
+            options.tank_codes.forEach((code) => {
+                if (code) {
+                    params.append("tank_codes", code);
+                }
+            });
         }
         if (options.page) {
             params.append("page", options.page.toString());
