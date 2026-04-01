@@ -9,6 +9,7 @@ import {
     type CanisterCheckResponse,
     type TankInTransitCheckResponse,
 } from "../../services/ivfService";
+import { shipmentService } from "../../services/shipmentService";
 
 interface TrackCanisterModalProps {
     isOpen: boolean;
@@ -37,6 +38,15 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
     const [canisterId, setCanisterId] = useState("");
     const [hisNumber, setHisNumber] = useState("");
     const [cryolockNumber, setCryolockNumber] = useState("");
+
+    const [tanks, setTanks] = useState<{ tank_id: number; tank_code: string }[]>([]);
+    const [tanksLoading, setTanksLoading] = useState(false);
+    const [isTankDropdownOpen, setIsTankDropdownOpen] = useState(false);
+    const tankDropdownRef = useRef<HTMLDivElement | null>(null);
+    const tankMenuRef = useRef<HTMLDivElement | null>(null);
+    const [tankMenuStyle, setTankMenuStyle] = useState<{
+        top: number; left: number; width: number; placement: "bottom" | "top";
+    } | null>(null);
 
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [branchesLoading, setBranchesLoading] = useState(false);
@@ -130,6 +140,54 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
             window.removeEventListener("scroll", handleReposition, true);
         };
     }, [isBranchDropdownOpen, updateBranchMenuPosition]);
+
+    const updateTankMenuPosition = useCallback(() => {
+        const el = tankDropdownRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const margin = 8;
+        const availableBelow = window.innerHeight - rect.bottom - margin;
+        const availableAbove = rect.top - margin;
+        const placement: "bottom" | "top" = availableBelow < 176 && availableAbove > availableBelow ? "top" : "bottom";
+        setTankMenuStyle({ top: placement === "bottom" ? rect.bottom + margin : rect.top - margin, left: rect.left, width: rect.width, placement });
+    }, []);
+
+    useEffect(() => {
+        if (!isTankDropdownOpen) return;
+        updateTankMenuPosition();
+        const reposition = () => updateTankMenuPosition();
+        window.addEventListener("resize", reposition);
+        window.addEventListener("scroll", reposition, true);
+        const handleClickOutside = (e: MouseEvent) => {
+            const t = e.target as Node;
+            if (!tankDropdownRef.current?.contains(t) && !tankMenuRef.current?.contains(t)) {
+                setIsTankDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            window.removeEventListener("resize", reposition);
+            window.removeEventListener("scroll", reposition, true);
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isTankDropdownOpen, updateTankMenuPosition]);
+
+    // Fetch tanks when branch is selected
+    useEffect(() => {
+        if (!selectedBranchName) { setTanks([]); setCanisterId(""); return; }
+        setTanksLoading(true);
+        setCanisterId("");
+        setCanisterCheckMessage(null);
+        setCanisterCheckError(null);
+        shipmentService
+            .getActiveCanisters({ branch_name: selectedBranchName })
+            .then((res) => {
+                const branch = res.branches?.find((b) => b.branch_name === selectedBranchName);
+                setTanks(branch?.tanks ?? []);
+            })
+            .catch(() => setTanks([]))
+            .finally(() => setTanksLoading(false));
+    }, [selectedBranchName]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -354,190 +412,153 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                 </>
             ) : (
                 <>
-                    <div>
-                        <div className="relative">
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={canisterId}
-                                onChange={handleCanisterIdChange}
-                                placeholder="e.g., 1"
-                                className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
-                                    canisterCheckError
-                                        ? "border-red-500 focus:ring-red-500 focus:border-red-500"
-                                        : canisterCheckMessage &&
-                                            !canisterCheckError
-                                          ? "border-green-500 focus:ring-green-500 focus:border-green-500"
-                                          : "border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]"
-                                }`}
-                            />
-                            {canisterCheckLoading && (
-                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                    <svg
-                                        className="animate-spin h-5 w-5 text-gray-400"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                        ></circle>
-                                        <path
-                                            className="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                        ></path>
-                                    </svg>
-                                </div>
-                            )}
-                        </div>
-                        {canisterCheckError ? (
-                            <p className="mt-2 text-sm text-red-600">
-                                {canisterCheckError}
-                            </p>
-                        ) : canisterCheckMessage && !canisterCheckError ? (
-                            <p className="mt-2 text-sm text-green-600">
-                                {canisterCheckMessage}
-                            </p>
-                        ) : error ? (
-                            <p className="mt-2 text-sm text-red-600">{error}</p>
-                        ) : null}
-                    </div>
-
-                    {isManagerAdmin ? (
+                    {/* Branch dropdown — always on top for manager/admin */}
+                    {isManagerAdmin && (
                         <div className="relative w-full" ref={branchDropdownRef}>
                             <div
-                                className={`peer w-full border rounded-[10px] px-3 py-2 pr-10 cursor-pointer text-sm focus:outline-none focus:ring-2 focus:ring-[#8b2a96] ${
-                                    branchesError
-                                        ? "border-red-500"
-                                        : "border-gray-300"
+                                className={`relative w-full border rounded-[10px] px-3 py-2.5 cursor-pointer text-sm ${
+                                    branchesError ? "border-red-500" : "border-gray-300"
                                 } ${!selectedBranchName ? "text-gray-400" : "text-black"} ${
-                                    branchesLoading
-                                        ? "bg-gray-100 cursor-not-allowed"
-                                        : ""
+                                    branchesLoading ? "bg-gray-100 cursor-not-allowed" : ""
                                 }`}
                                 onClick={() => {
                                     if (branchesLoading) return;
-                                    if (!isBranchDropdownOpen) {
-                                        updateBranchMenuPosition();
-                                    }
-                                    setIsBranchDropdownOpen(
-                                        !isBranchDropdownOpen,
-                                    );
+                                    if (!isBranchDropdownOpen) updateBranchMenuPosition();
+                                    setIsBranchDropdownOpen(!isBranchDropdownOpen);
                                 }}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(e) => {
                                     if (branchesLoading) return;
-
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        if (!isBranchDropdownOpen) {
-                                            updateBranchMenuPosition();
-                                        }
-                                        setIsBranchDropdownOpen(
-                                            !isBranchDropdownOpen,
-                                        );
-                                    }
-
-                                    if (e.key === "Escape") {
-                                        setIsBranchDropdownOpen(false);
-                                    }
+                                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!isBranchDropdownOpen) updateBranchMenuPosition(); setIsBranchDropdownOpen(!isBranchDropdownOpen); }
+                                    if (e.key === "Escape") setIsBranchDropdownOpen(false);
                                 }}
                             >
-                                <div className="flex justify-between items-center">
-                                    <span>
-                                        {selectedBranchName ||
-                                            (branchesLoading
-                                                ? "Loading branches..."
-                                                : "Branch")}
-                                    </span>
-                                    <svg
-                                        className={`w-4 h-4 transition-transform ${
-                                            isBranchDropdownOpen
-                                                ? "rotate-180"
-                                                : ""
-                                        }`}
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M19 9l-7 7-7-7"
-                                        />
-                                    </svg>
-                                </div>
+                                <span className="pr-6 block truncate">{selectedBranchName || (branchesLoading ? "Loading branches..." : "Select Branch")}</span>
+                                <svg className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
                             </div>
-
-                            {branchesError ? (
-                                <p className="text-xs text-red-500 mt-1">
-                                    {branchesError}
-                                </p>
-                            ) : null}
+                            {branchesError && <p className="text-xs text-red-500 mt-1">{branchesError}</p>}
                         </div>
-                    ) : null}
+                    )}
 
-                    {isManagerAdmin &&
-                    isBranchDropdownOpen &&
-                    branches.length > 0 &&
-                    branchMenuStyle &&
-                    typeof document !== "undefined"
-                        ? createPortal(
-                              <div
-                                  ref={branchMenuRef}
-                                  className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
-                                  style={{
-                                      top: branchMenuStyle.top,
-                                      left: branchMenuStyle.left,
-                                      width: branchMenuStyle.width,
-                                      transform:
-                                          branchMenuStyle.placement === "top"
-                                              ? "translateY(-100%)"
-                                              : undefined,
-                                  }}
-                              >
-                                  {branches.map((option) => (
-                                      <div
-                                          key={option.branch_id}
-                                          className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${
-                                              selectedBranchName ===
-                                              option.branch_name
-                                                  ? "bg-[#8b2a96] text-white"
-                                                  : "text-black"
-                                          }`}
-                                          onClick={() => {
-                                              setSelectedBranchName(
-                                                  option.branch_name,
-                                              );
-                                              setSelectedBranchId(
-                                                  option.branch_id,
-                                              );
+                    {/* Tank dropdown — shown after branch selected (manager/admin) or free text (user) */}
+                    {isManagerAdmin ? (
+                        <div className="relative w-full" ref={tankDropdownRef}>
+                            <div
+                                className={`relative w-full border rounded-[10px] px-3 py-2.5 text-sm ${
+                                    !selectedBranchName ? "bg-gray-50 cursor-not-allowed text-gray-300 border-gray-200" :
+                                    tanksLoading ? "bg-gray-100 cursor-not-allowed text-gray-400 border-gray-200" :
+                                    canisterCheckError ? "border-red-500 cursor-pointer text-black" :
+                                    canisterCheckMessage ? "border-green-500 cursor-pointer text-black" :
+                                    "border-gray-300 cursor-pointer " + (!canisterId ? "text-gray-400" : "text-black")
+                                }`}
+                                onClick={() => {
+                                    if (!selectedBranchName || tanksLoading || tanks.length === 0) return;
+                                    if (!isTankDropdownOpen) updateTankMenuPosition();
+                                    setIsTankDropdownOpen(!isTankDropdownOpen);
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (!selectedBranchName || tanksLoading) return;
+                                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!isTankDropdownOpen) updateTankMenuPosition(); setIsTankDropdownOpen(!isTankDropdownOpen); }
+                                    if (e.key === "Escape") setIsTankDropdownOpen(false);
+                                }}
+                            >
+                                <span className="pr-6 block truncate">
+                                    {tanksLoading ? "Loading tanks..." :
+                                     !selectedBranchName ? "Select branch first" :
+                                     canisterId || "Select Tank"}
+                                </span>
+                                {canisterCheckLoading ? (
+                                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                ) : (
+                                    <svg className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform ${isTankDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                )}
+                            </div>
+                            {canisterCheckError && <p className="mt-1 text-xs text-red-600">{canisterCheckError}</p>}
+                            {canisterCheckMessage && !canisterCheckError && <p className="mt-1 text-xs text-green-600">{canisterCheckMessage}</p>}
+                            {error && !canisterCheckError && !canisterCheckMessage && <p className="mt-1 text-xs text-red-600">{error}</p>}
+                        </div>
+                    ) : (
+                        <div>
+                            <div className="relative">
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={canisterId}
+                                    onChange={handleCanisterIdChange}
+                                    placeholder="e.g., T50"
+                                    className={`w-full px-4 py-3 rounded-md border outline-none focus:ring-2 ${
+                                        canisterCheckError ? "border-red-500 focus:ring-red-500" :
+                                        canisterCheckMessage && !canisterCheckError ? "border-green-500 focus:ring-green-500" :
+                                        "border-[#650458] focus:ring-[#bd56af] focus:border-[#bd56af]"
+                                    }`}
+                                />
+                                {canisterCheckLoading && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <svg className="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                    </div>
+                                )}
+                            </div>
+                            {canisterCheckError && <p className="mt-2 text-sm text-red-600">{canisterCheckError}</p>}
+                            {canisterCheckMessage && !canisterCheckError && <p className="mt-2 text-sm text-green-600">{canisterCheckMessage}</p>}
+                            {error && !canisterCheckError && !canisterCheckMessage && <p className="mt-2 text-sm text-red-600">{error}</p>}
+                        </div>
+                    )}
 
-                                              try {
-                                                  sessionStorage.setItem(
-                                                      "ivf_selected_branch_id",
-                                                      String(option.branch_id),
-                                                  );
-                                              } catch {}
+                    {/* Branch dropdown menu */}
+                    {isManagerAdmin && isBranchDropdownOpen && branches.length > 0 && branchMenuStyle &&
+                        createPortal(
+                            <div ref={branchMenuRef} className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
+                                style={{ top: branchMenuStyle.top, left: branchMenuStyle.left, width: branchMenuStyle.width, transform: branchMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
+                                {branches.map((option) => (
+                                    <div key={option.branch_id}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${selectedBranchName === option.branch_name ? "bg-[#8b2a96] text-white" : "text-black"}`}
+                                        onClick={() => {
+                                            setSelectedBranchName(option.branch_name);
+                                            setSelectedBranchId(option.branch_id);
+                                            try { sessionStorage.setItem("ivf_selected_branch_id", String(option.branch_id)); } catch {}
+                                            setIsBranchDropdownOpen(false);
+                                        }}>
+                                        {option.branch_name}
+                                    </div>
+                                ))}
+                            </div>,
+                            document.body
+                        )}
 
-                                              setIsBranchDropdownOpen(false);
-                                          }}
-                                      >
-                                          {option.branch_name}
-                                      </div>
-                                  ))}
-                              </div>,
-                              document.body,
-                          )
-                        : null}
+                    {/* Tank dropdown menu */}
+                    {isManagerAdmin && isTankDropdownOpen && tanks.length > 0 && tankMenuStyle &&
+                        createPortal(
+                            <div ref={tankMenuRef} className="fixed z-[1000] bg-white border border-gray-300 rounded-[10px] shadow-lg max-h-44 overflow-y-auto text-sm"
+                                style={{ top: tankMenuStyle.top, left: tankMenuStyle.left, width: tankMenuStyle.width, transform: tankMenuStyle.placement === "top" ? "translateY(-100%)" : undefined }}>
+                                {tanks.map((tank) => (
+                                    <div key={tank.tank_id}
+                                        className={`px-3 py-1.5 cursor-pointer hover:bg-[#8b2a96] hover:text-white transition-colors first:rounded-t-[10px] last:rounded-b-[10px] ${canisterId === tank.tank_code ? "bg-[#8b2a96] text-white" : "text-black"}`}
+                                        onClick={() => {
+                                            setCanisterId(tank.tank_code);
+                                            setCanisterCheckMessage(null);
+                                            setCanisterCheckError(null);
+                                            setHasInTransitShipments(null);
+                                            setIsTankDropdownOpen(false);
+                                        }}>
+                                        {tank.tank_code}
+                                    </div>
+                                ))}
+                            </div>,
+                            document.body
+                        )}
                 </>
             )}
 
