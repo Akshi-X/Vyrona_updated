@@ -5,11 +5,13 @@ Service layer for IVF reports with role-based access control.
 from datetime import date, datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from ...models.IVF.critical_alert_model import CriticalAlert
 from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
+from ...models.IVF.reservoir_model import Reservoir
+from ...models.IVF.reservoir_log_model import ReservoirLog
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.hospital_branch_model import HospitalBranch
 
@@ -260,14 +262,35 @@ class IVFReportsService:
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
 
+        reservoir_log_subq = (
+            self.db.query(
+                ReservoirLog.reservoir_id.label("reservoir_id"),
+                func.max(ReservoirLog.ln2_ordered_date).label("ln2_ordered_date"),
+                func.max(ReservoirLog.ln2_received_date).label("ln2_received_date"),
+            )
+            .group_by(ReservoirLog.reservoir_id)
+            .subquery()
+        )
+
         query = (
             self.db.query(
                 CanisterLn2Log,
                 Tank.tank_code,
                 HospitalBranch.branch_name,
+                Reservoir.reservoir_name,
+                reservoir_log_subq.c.ln2_ordered_date,
+                reservoir_log_subq.c.ln2_received_date,
             )
             .join(Tank, CanisterLn2Log.tank_id == Tank.tank_id)
             .join(HospitalBranch, Tank.branch_id == HospitalBranch.branch_id)
+            .outerjoin(
+                Reservoir,
+                Reservoir.reservoir_id == CanisterLn2Log.reservoir_id,
+            )
+            .outerjoin(
+                reservoir_log_subq,
+                reservoir_log_subq.c.reservoir_id == Reservoir.reservoir_id,
+            )
             .filter(HospitalBranch.hospital_id == hospital_id)
         )
 
@@ -278,7 +301,9 @@ class IVFReportsService:
             query = query.filter(CanisterLn2Log.status == status)
 
         if tank_codes:
-            query = query.filter(Tank.tank_code.in_(tank_codes))
+            cleaned_codes = [code for code in tank_codes if code]
+            if cleaned_codes:
+                query = query.filter(Tank.tank_code.in_(cleaned_codes))
 
         if start:
             query = query.filter(CanisterLn2Log.refill_date >= start)
@@ -296,7 +321,7 @@ class IVFReportsService:
         )
 
         logs: List[dict] = []
-        for log, tank_code, branch_name in results:
+        for log, tank_code, branch_name, reservoir_name, ln2_ordered_date, ln2_received_date in results:
             logs.append(
                 {
                     "log_id": log.log_id,
@@ -309,9 +334,9 @@ class IVFReportsService:
                     "refilled_by": log.refilled_by,
                     "description": log.description,
                     "status": log.status,
-                    "reservoir": log.reservoir,
-                    "ln2_ordered_date": log.ln2_ordered_date,
-                    "ln2_received_date": log.ln2_received_date,
+                    "reservoir": reservoir_name,
+                    "ln2_ordered_date": ln2_ordered_date,
+                    "ln2_received_date": ln2_received_date,
                     "created_at": log.created_at,
                 }
             )
