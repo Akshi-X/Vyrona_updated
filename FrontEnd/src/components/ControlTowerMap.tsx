@@ -49,7 +49,7 @@ const AdvancedMarker: React.FC<AdvancedMarkerProps> = ({
         }
 
         const marker = new AdvancedMarkerElement({ map, position, content, title });
-        if (onClick) marker.addListener("click", onClick);
+        if (onClick) marker.addListener("gmp-click", onClick);
         if (onMouseEnter) marker.element?.addEventListener("mouseenter", onMouseEnter);
         if (onMouseLeave) marker.element?.addEventListener("mouseleave", onMouseLeave);
 
@@ -483,8 +483,8 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
             fullscreenControl: false,
 
-            mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
-            colorScheme: google.maps.ColorScheme.DARK,
+            mapId: import.meta.env.VITE_GOOGLE_MAP_ID || "ee4dc0cb43f31799cab28ba9",
+            colorScheme: "DARK" as google.maps.ColorScheme,
 
             gestureHandling: "greedy",
 
