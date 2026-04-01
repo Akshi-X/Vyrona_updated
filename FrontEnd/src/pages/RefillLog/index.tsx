@@ -41,12 +41,12 @@ const formatDaysAgo = (dateStr: string): string => {
 };
 
 const RefillLog = () => {
-    const { isAuthenticated, userRole } = useAuth();
-    const [selectedBranch, setSelectedBranch] = useState<string>("All");
+    const { isAuthenticated } = useAuth();
+    const [selectedBranch] = useState<string>("All");
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
     const [containersLoading, setContainersLoading] = useState(false);
-    const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+
     const [activityBranch, setActivityBranch] = useState<string>("All");
     const [isActivityBranchOpen, setIsActivityBranchOpen] = useState(false);
     const activityBranchRef = useRef<HTMLDivElement>(null);
@@ -67,7 +67,6 @@ const RefillLog = () => {
     }[]>([]);
     const [activityLoading, setActivityLoading] = useState(false);
     const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; branch_id: number | null; branch_name: string | null }[]>([]);
-    const [reservoirsLoading, setReservoirsLoading] = useState(false);
     const [reservoirLogs, setReservoirLogs] = useState<{ log_id: number; reservoir_id: number; reservoir_name: string; branch_name: string | null; ln2_ordered_date: string | null; ln2_received_date: string | null; created_at: string | null }[]>([]);
     const [reservoirLogsLoading, setReservoirLogsLoading] = useState(false);
     // Modal tab: "refill" | "reservoir"
@@ -96,7 +95,7 @@ const RefillLog = () => {
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
-                setIsBranchDropdownOpen(false);
+                // dropdown closed via click outside
             }
             if (activityBranchRef.current && !activityBranchRef.current.contains(e.target as Node)) {
                 setIsActivityBranchOpen(false);
@@ -220,7 +219,6 @@ const RefillLog = () => {
     }, [isAuthenticated]);
 
     const loadReservoirData = async () => {
-        setReservoirsLoading(true);
         setReservoirLogsLoading(true);
         try {
             const [resRes, logsRes] = await Promise.all([
@@ -230,7 +228,6 @@ const RefillLog = () => {
             setReservoirs(Array.isArray(resRes?.reservoirs) ? resRes.reservoirs : []);
             setReservoirLogs(Array.isArray(logsRes?.logs) ? logsRes.logs : []);
         } finally {
-            setReservoirsLoading(false);
             setReservoirLogsLoading(false);
         }
     };
