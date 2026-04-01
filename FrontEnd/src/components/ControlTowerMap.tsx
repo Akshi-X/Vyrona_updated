@@ -483,7 +483,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
             fullscreenControl: false,
 
-            mapId: import.meta.env.VITE_GOOGLE_MAP_ID || "ee4dc0cb43f31799cab28ba9",
+            mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
             colorScheme: "DARK" as google.maps.ColorScheme,
 
             gestureHandling: "greedy",
