@@ -12,7 +12,7 @@ interface GoogleMapsProviderProps {
   children: ReactNode;
 }
 
-const MAP_LIBRARIES: ("geometry" | "maps")[] = ["geometry", "maps"];
+const MAP_LIBRARIES: ("geometry" | "maps" | "marker")[] = ["geometry", "maps", "marker"];
 
 /**
  * Provider that initializes Google Maps loader once at the app level.

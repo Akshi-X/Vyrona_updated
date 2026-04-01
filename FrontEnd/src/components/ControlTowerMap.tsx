@@ -7,10 +7,59 @@ import React, {
 } from "react";
 import {
     GoogleMap,
-    Marker,
     Polyline,
     OverlayView,
+    useGoogleMap,
 } from "@react-google-maps/api";
+
+// Minimal AdvancedMarkerElement wrapper — used inside <GoogleMap> like the old <Marker>
+interface AdvancedMarkerProps {
+    position: google.maps.LatLngLiteral;
+    iconUrl?: string;
+    dotColor?: string;
+    title?: string;
+    onClick?: () => void;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
+}
+
+const AdvancedMarker: React.FC<AdvancedMarkerProps> = ({
+    position, iconUrl, dotColor, title, onClick, onMouseEnter, onMouseLeave,
+}) => {
+    const map = useGoogleMap();
+
+    React.useEffect(() => {
+        if (!map) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const AdvancedMarkerElement = (google.maps as any).marker?.AdvancedMarkerElement;
+        if (!AdvancedMarkerElement) return;
+
+        let content: HTMLElement;
+        if (iconUrl) {
+            const img = document.createElement("img");
+            img.src = iconUrl;
+            img.style.cssText = "width:28px;height:28px;display:block;";
+            content = img;
+        } else if (dotColor) {
+            const dot = document.createElement("div");
+            dot.style.cssText = `width:12px;height:12px;border-radius:50%;background:${dotColor};border:2px solid #fff;box-sizing:border-box;`;
+            content = dot;
+        } else {
+            return;
+        }
+
+        const marker = new AdvancedMarkerElement({ map, position, content, title });
+        if (onClick) marker.addListener("click", onClick);
+        if (onMouseEnter) marker.element?.addEventListener("mouseenter", onMouseEnter);
+        if (onMouseLeave) marker.element?.addEventListener("mouseleave", onMouseLeave);
+
+        return () => { marker.map = null; };
+    // position/iconUrl/dotColor changes are handled by React key on the parent — keep deps minimal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [map]);
+
+    return null;
+};
 import { shipmentService } from "../services/shipmentService";
 import MarkerGreen from "../assets/ControlTower/MarkerGreen.svg";
 import MarkerRed from "../assets/ControlTower/MarkerRed.svg";
@@ -149,93 +198,6 @@ const getBranchStatusMapFromActiveCanisters = (
     return statusMap;
 };
 
-const darkWorldStyle: google.maps.MapTypeStyle[] = [
-    // Continents (land) solid black
-
-    { elementType: "geometry", stylers: [{ color: "#000000" }] },
-
-    {
-        featureType: "landscape",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "landscape.natural",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "landscape.man_made",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-
-    { elementType: "labels.text.fill", stylers: [{ color: "#a3a3a3" }] },
-
-    { elementType: "labels.text.stroke", stylers: [{ color: "#000000" }] },
-
-    // Light outlines
-
-    {
-        featureType: "administrative",
-        elementType: "geometry.stroke",
-        stylers: [{ color: "#272626" }, { weight: 0.5 }],
-    },
-
-    {
-        featureType: "administrative.country",
-        elementType: "geometry.stroke",
-        stylers: [{ color: "#272626" }, { weight: 0.7 }],
-    },
-
-    {
-        featureType: "poi",
-        elementType: "labels.text.fill",
-        stylers: [{ color: "#a3a3a3" }],
-    },
-
-    {
-        featureType: "poi.park",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "road",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "road",
-        elementType: "geometry.stroke",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "road.highway",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    {
-        featureType: "transit",
-        elementType: "geometry",
-        stylers: [{ color: "#000000" }],
-    },
-
-    // Oceans/sea background
-
-    {
-        featureType: "water",
-        elementType: "geometry",
-        stylers: [{ color: "#272626" }],
-    },
-];
 
 const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     filters,
@@ -256,7 +218,6 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
     const [tooltipPosition, setTooltipPosition] = useState<
         Map<string, google.maps.LatLngLiteral>
     >(new Map());
-    const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
     const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
     const shouldLoadRoutes = true;
     const [isMapDataLoading, setIsMapDataLoading] = useState(false);
@@ -291,16 +252,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
         let mounted = true;
         setIsMapDataLoading(true);
 
-        // Clear existing markers and polylines when filters or direction change
-        markersRef.current.forEach((marker, key) => {
-            try {
-                google.maps.event.clearInstanceListeners(marker);
-                marker.setMap(null);
-                markersRef.current.delete(key);
-            } catch (error) {
-                return;
-            }
-        });
+        // Clear existing polylines when filters or direction change
         polylinesRef.current.forEach((polyline) => {
             try {
                 google.maps.event.clearInstanceListeners(polyline);
@@ -531,7 +483,8 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
             fullscreenControl: false,
 
-            styles: darkWorldStyle,
+            mapId: import.meta.env.VITE_GOOGLE_MAP_ID,
+            colorScheme: google.maps.ColorScheme.DARK,
 
             gestureHandling: "greedy",
 
@@ -697,17 +650,9 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
         setPendingBranchZoomName(null);
     }, [pendingBranchZoomName, ivfBranches, mapRef]);
 
-    // Cleanup all markers & polylines on unmount
+    // Cleanup polylines on unmount
     useEffect(() => {
         return () => {
-            markersRef.current.forEach((marker) => {
-                try {
-                    google.maps.event.clearInstanceListeners(marker);
-                    marker.setMap(null);
-                } catch (error) {
-                    return;
-                }
-            });
             polylinesRef.current.forEach((polyline) => {
                 try {
                     google.maps.event.clearInstanceListeners(polyline);
@@ -716,28 +661,9 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                     return;
                 }
             });
-            markersRef.current.clear();
             polylinesRef.current.clear();
         };
     }, []);
-
-    // Cleanup IVF branch markers when branches change
-    useEffect(() => {
-        return () => {
-            // Cleanup IVF markers when component unmounts or branches change
-            markersRef.current.forEach((marker, key) => {
-                if (key.startsWith("ivf-")) {
-                    try {
-                        google.maps.event.clearInstanceListeners(marker);
-                        marker.setMap(null);
-                        markersRef.current.delete(key);
-                    } catch (error) {
-                        return;
-                    }
-                }
-            });
-        };
-    }, [ivfBranches]);
 
     const handleUnmount = useCallback(() => {
         setMapRef(null);
@@ -787,6 +713,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
         },
         [mapRef],
     );
+
 
     return (
         <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[60vh] min-h-[420px] lg:h-full lg:min-h-[544px]">
@@ -862,117 +789,27 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
                                     return (
                                         <React.Fragment key={routeKey}>
-                                            <Marker
+                                            <AdvancedMarker
+                                                key={`${routeKey}-origin`}
                                                 position={origin}
-                                                icon={{
-                                                    path: google.maps.SymbolPath
-                                                        .CIRCLE,
-                                                    scale: 6,
-                                                    fillColor: routeColor,
-                                                    fillOpacity: 1,
-                                                    strokeColor: "#FFFFFF",
-                                                    strokeOpacity: 1,
-                                                    strokeWeight: 2,
+                                                dotColor={routeColor}
+                                                onClick={() => zoomToMarker(origin)}
+                                                onMouseEnter={() => {
+                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(routeKey, origin); return m; });
+                                                    setActiveTooltip(routeKey);
                                                 }}
-                                                options={{ clickable: true }}
-                                                onClick={() => {
-                                                    zoomToMarker(origin);
-                                                }}
-                                                onLoad={(marker) => {
-                                                    if (marker) {
-                                                        markersRef.current.set(
-                                                            `${routeKey}-origin`,
-                                                            marker,
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseover",
-                                                            () => {
-                                                                setTooltipPosition(
-                                                                    (prev) => {
-                                                                        const newMap =
-                                                                            new Map(
-                                                                                prev,
-                                                                            );
-                                                                        newMap.set(
-                                                                            routeKey,
-                                                                            origin,
-                                                                        );
-                                                                        return newMap;
-                                                                    },
-                                                                );
-                                                                setActiveTooltip(
-                                                                    routeKey,
-                                                                );
-                                                            },
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseout",
-                                                            () => {
-                                                                setActiveTooltip(
-                                                                    null,
-                                                                );
-                                                            },
-                                                        );
-                                                    }
-                                                }}
+                                                onMouseLeave={() => setActiveTooltip(null)}
                                             />
-                                            <Marker
+                                            <AdvancedMarker
+                                                key={`${routeKey}-dest`}
                                                 position={dest}
-                                                icon={{
-                                                    path: google.maps.SymbolPath
-                                                        .CIRCLE,
-                                                    scale: 6,
-                                                    fillColor: routeColor,
-                                                    fillOpacity: 1,
-                                                    strokeColor: "#FFFFFF",
-                                                    strokeOpacity: 1,
-                                                    strokeWeight: 2,
+                                                dotColor={routeColor}
+                                                onClick={() => zoomToMarker(dest)}
+                                                onMouseEnter={() => {
+                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(routeKey, dest); return m; });
+                                                    setActiveTooltip(routeKey);
                                                 }}
-                                                options={{ clickable: true }}
-                                                onClick={() => {
-                                                    zoomToMarker(dest);
-                                                }}
-                                                onLoad={(marker) => {
-                                                    if (marker) {
-                                                        markersRef.current.set(
-                                                            `${routeKey}-dest`,
-                                                            marker,
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseover",
-                                                            () => {
-                                                                setTooltipPosition(
-                                                                    (prev) => {
-                                                                        const newMap =
-                                                                            new Map(
-                                                                                prev,
-                                                                            );
-                                                                        newMap.set(
-                                                                            routeKey,
-                                                                            dest,
-                                                                        );
-                                                                        return newMap;
-                                                                    },
-                                                                );
-                                                                setActiveTooltip(
-                                                                    routeKey,
-                                                                );
-                                                            },
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseout",
-                                                            () => {
-                                                                setActiveTooltip(
-                                                                    null,
-                                                                );
-                                                            },
-                                                        );
-                                                    }
-                                                }}
+                                                onMouseLeave={() => setActiveTooltip(null)}
                                             />
                                             <Polyline
                                                 path={[origin, dest]}
@@ -1101,7 +938,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                                     );
                                 })}
 
-                            {/* IVF Branch Markers (Inbound only) */}
+                            {/* IVF Branch Markers + Tooltips */}
                             {direction === "inbound" &&
                                 displayedIvfBranches.map((branch) => {
                                     const branchKey = `ivf-${branch.state}-${branch.branch_name}`;
@@ -1110,77 +947,23 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                                         branch.geoLocation.longitude,
                                     );
                                     if (!branchPosition) return null;
-                                    const markerIconUrl = getBranchMarkerIcon(
-                                        branch.branch_status,
-                                    );
 
                                     return (
                                         <React.Fragment key={branchKey}>
-                                            <Marker
+                                            <AdvancedMarker
                                                 position={branchPosition}
-                                                icon={{
-                                                    url: markerIconUrl,
-                                                    scaledSize:
-                                                        new google.maps.Size(
-                                                            24,
-                                                            24,
-                                                        ),
-                                                    anchor: new google.maps.Point(
-                                                        12,
-                                                        24,
-                                                    ),
-                                                }}
-                                                options={{ clickable: true }}
+                                                iconUrl={getBranchMarkerIcon(branch.branch_status)}
+                                                title={branch.branch_name}
                                                 onClick={() => {
-                                                    setPendingBranchZoomName(
-                                                        branch.branch_name,
-                                                    );
-                                                    onBranchSelect?.(
-                                                        branch.branch_name,
-                                                    );
-                                                    zoomToMarker(
-                                                        branchPosition,
-                                                    );
+                                                    setPendingBranchZoomName(branch.branch_name);
+                                                    onBranchSelect?.(branch.branch_name);
+                                                    zoomToMarker(branchPosition);
                                                 }}
-                                                onLoad={(marker) => {
-                                                    if (marker) {
-                                                        markersRef.current.set(
-                                                            branchKey,
-                                                            marker,
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseover",
-                                                            () => {
-                                                                setTooltipPosition(
-                                                                    (prev) => {
-                                                                        const newMap =
-                                                                            new Map(
-                                                                                prev,
-                                                                            );
-                                                                        newMap.set(
-                                                                            branchKey,
-                                                                            branchPosition,
-                                                                        );
-                                                                        return newMap;
-                                                                    },
-                                                                );
-                                                                setActiveTooltip(
-                                                                    branchKey,
-                                                                );
-                                                            },
-                                                        );
-                                                        google.maps.event.addListener(
-                                                            marker,
-                                                            "mouseout",
-                                                            () => {
-                                                                setActiveTooltip(
-                                                                    null,
-                                                                );
-                                                            },
-                                                        );
-                                                    }
+                                                onMouseEnter={() => {
+                                                    setTooltipPosition((prev) => { const m = new Map(prev); m.set(branchKey, branchPosition); return m; });
+                                                    setActiveTooltip(branchKey);
                                                 }}
+                                                onMouseLeave={() => setActiveTooltip(null)}
                                             />
                                             {activeTooltip === branchKey &&
                                                 mapRef && (
