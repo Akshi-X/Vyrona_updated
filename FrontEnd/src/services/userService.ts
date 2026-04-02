@@ -201,6 +201,12 @@ export class UserService extends BaseApiService {
     });
   }
 
+  async getUsersByHospital(hospitalId: number): Promise<UserListResponse> {
+    return await this.request<UserListResponse>(`/api/users?hospital_id=${hospitalId}`, {
+      method: 'GET',
+    });
+  }
+
   /**
    * Get list of users pending approval (Admin / Pharma_admin only).
    * Used by Dashboard and ApprovalScreen to show pending approval list.

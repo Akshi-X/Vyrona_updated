@@ -1,0 +1,201 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+
+interface MultiSelectDropdownProps {
+    label: string;
+    options: string[];
+    selected: string[];
+    placeholder?: string;
+    disabled?: boolean;
+    onChange: (nextSelected: string[]) => void;
+}
+
+export default function MultiSelectDropdown({
+    label,
+    options,
+    selected,
+    placeholder = "Select",
+    disabled = false,
+    onChange,
+}: MultiSelectDropdownProps) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const normalizedSelected = useMemo(() => new Set(selected), [selected]);
+
+    const filteredOptions = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) return options;
+        return options.filter((option) =>
+            option.toLowerCase().includes(term),
+        );
+    }, [options, search]);
+
+    const selectedLabel = useMemo(() => {
+        if (selected.length === 0) return placeholder;
+        if (selected.length === 1) return selected[0];
+        return `${selected.length} selected`;
+    }, [placeholder, selected]);
+
+    const toggleOption = (value: string) => {
+        if (normalizedSelected.has(value)) {
+            onChange(selected.filter((item) => item !== value));
+        } else {
+            onChange([...selected, value]);
+        }
+    };
+
+    const toggleAll = () => {
+        if (selected.length === options.length) {
+            onChange([]);
+        } else {
+            onChange([...options]);
+        }
+    };
+
+    const clearSelection = () => {
+        onChange([]);
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    return (
+        <div className="flex flex-col gap-2 relative" ref={dropdownRef}>
+            <label className="text-xs font-semibold text-gray-600">
+                {label}
+            </label>
+            <button
+                type="button"
+                onClick={() => !disabled && setOpen((prev) => !prev)}
+                className={`w-full px-3 py-2 border rounded-md text-sm text-left flex items-center justify-between transition-colors ${
+                    disabled
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
+                        : "bg-white border-[#E7E1E1] hover:border-[#c49ad1]"
+                }`}
+            >
+                <span
+                    className={
+                        selected.length > 0
+                            ? "text-[#6b1176]"
+                            : "text-gray-500"
+                    }
+                >
+                    {selectedLabel}
+                </span>
+                <svg
+                    className={`w-4 h-4 transition-transform ${
+                        open ? "rotate-180" : ""
+                    } ${disabled ? "text-gray-300" : "text-gray-500"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                    />
+                </svg>
+            </button>
+
+            {open && !disabled && (
+                <div className="absolute z-20 mt-2 w-full bg-white border border-[#E7E1E1] rounded-lg shadow-lg overflow-hidden">
+                    <div className="p-3 border-b border-[#F1E8F2]">
+                        <input
+                            type="text"
+                            placeholder="Search tanks"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-[#E7E1E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#9c3aa6]"
+                        />
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 border-b border-[#F1E8F2]">
+                        <span>{filteredOptions.length} options</span>
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={toggleAll}
+                                className="text-[#6b1176] font-semibold hover:underline"
+                            >
+                                {selected.length === options.length
+                                    ? "Clear all"
+                                    : "Select all"}
+                            </button>
+                            {selected.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={clearSelection}
+                                    className="text-gray-500 hover:underline"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                        {filteredOptions.length === 0 && (
+                            <div className="px-3 py-3 text-sm text-gray-400">
+                                No matching tanks
+                            </div>
+                        )}
+                        {filteredOptions.map((option) => {
+                            const isSelected = normalizedSelected.has(option);
+                            return (
+                                <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => toggleOption(option)}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                                        isSelected
+                                            ? "bg-[#f7ecfb] text-[#6b1176]"
+                                            : "text-gray-700 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    <span
+                                        className={`w-4 h-4 border rounded-sm flex items-center justify-center ${
+                                            isSelected
+                                                ? "border-[#6b1176] bg-[#6b1176]"
+                                                : "border-gray-300 bg-white"
+                                        }`}
+                                    >
+                                        {isSelected && (
+                                            <svg
+                                                className="w-3 h-3 text-white"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={3}
+                                                    d="M5 13l4 4L19 7"
+                                                />
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <span className="truncate">{option}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

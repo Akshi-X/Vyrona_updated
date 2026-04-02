@@ -239,27 +239,17 @@ def sync_ivf_schema():
         )
         db.execute(
             text(
-                "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS reservoir VARCHAR(255)"
-            )
-        )
-        db.execute(
-            text(
-                "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS ln2_ordered_date DATE"
-            )
-        )
-        db.execute(
-            text(
-                "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS ln2_received_date DATE"
-            )
-        )
-        db.execute(
-            text(
                 "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
             )
         )
         db.execute(
             text(
                 "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS updated_by VARCHAR"
+            )
+        )
+        db.execute(
+            text(
+                "ALTER TABLE canister_ln2_logs ADD COLUMN IF NOT EXISTS reservoir_id INTEGER REFERENCES reservoirs(reservoir_id)"
             )
         )
         # ln2_readings.device_id: migrate from VARCHAR to INTEGER FK (devices.id)
@@ -427,6 +417,121 @@ def sync_ivf_schema():
         logger.info("IVF schema sync completed")
     except Exception as e:
         logger.warning(f"IVF schema sync skipped or failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+    # Note: reservoir table migration is run as a separate one-time script
+    # Run: python scripts/run_reservoir_migration.py
+
+
+def _migrate_reservoir_tables():
+    """
+    1. Create reservoirs and reservoir_logs tables (safe, idempotent).
+    2. Drop reservoir / ln2_ordered_date / ln2_received_date from canister_ln2_logs
+       ONLY when the caller explicitly passes confirmation, because those columns
+       may still hold live data.
+
+    Permission gate: the caller must set env var
+        ALLOW_RESERVOIR_COLUMN_DROP=true
+    or pass confirm_drop=True when calling this function directly.
+    If the columns exist and the gate is not open, a WARNING is logged and the
+    drop is skipped — the server still starts normally.
+    """
+    import os
+
+    db = SessionLocal()
+    try:
+        insp = sa_inspect(db.get_bind())
+        existing_tables = insp.get_table_names()
+
+        # ── 1. Create reservoirs ──────────────────────────────────────────────
+        if "reservoirs" not in existing_tables:
+            db.execute(text("""
+                CREATE TABLE reservoirs (
+                    reservoir_id  SERIAL       PRIMARY KEY,
+                    reservoir_name VARCHAR(255) NOT NULL,
+                    branch_id     INTEGER      REFERENCES hospital_branches(branch_id) ON DELETE SET NULL,
+                    hospital_id   INTEGER      REFERENCES hospitals(hospital_id)        ON DELETE SET NULL,
+                    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+                    updated_at    TIMESTAMP             DEFAULT NOW(),
+                    created_by    VARCHAR,
+                    updated_by    VARCHAR
+                )
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_reservoirs_branch_id   ON reservoirs(branch_id)"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_reservoirs_hospital_id ON reservoirs(hospital_id)"))
+            db.commit()
+            logger.info("Created table: reservoirs")
+        else:
+            logger.info("Table reservoirs already exists — skipped")
+
+        # ── 2. Create reservoir_logs ──────────────────────────────────────────
+        if "reservoir_logs" not in existing_tables:
+            db.execute(text("""
+                CREATE TABLE reservoir_logs (
+                    log_id            SERIAL   PRIMARY KEY,
+                    reservoir_id      INTEGER  NOT NULL REFERENCES reservoirs(reservoir_id) ON DELETE CASCADE,
+                    ln2_ordered_date  DATE,
+                    ln2_received_date DATE,
+                    created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+                    updated_at        TIMESTAMP          DEFAULT NOW(),
+                    created_by        VARCHAR,
+                    updated_by        VARCHAR
+                )
+            """))
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_reservoir_logs_reservoir_id ON reservoir_logs(reservoir_id)"))
+            db.commit()
+            logger.info("Created table: reservoir_logs")
+        else:
+            logger.info("Table reservoir_logs already exists — skipped")
+
+        # ── 3. Drop legacy columns from canister_ln2_logs (destructive — needs permission) ──
+        legacy_cols = ["reservoir", "ln2_ordered_date", "ln2_received_date"]
+        if "canister_ln2_logs" not in existing_tables:
+            return  # nothing to do
+
+        existing_col_names = {c["name"] for c in insp.get_columns("canister_ln2_logs")}
+        cols_to_drop = [c for c in legacy_cols if c in existing_col_names]
+
+        if not cols_to_drop:
+            logger.info("canister_ln2_logs: legacy reservoir columns already removed")
+            return
+
+        # Check env-var permission gate
+        allow_drop = os.environ.get("ALLOW_RESERVOIR_COLUMN_DROP", "").strip().lower() == "true"
+        if not allow_drop:
+            logger.warning(
+                "canister_ln2_logs still has legacy columns %s. "
+                "Set env var ALLOW_RESERVOIR_COLUMN_DROP=true to drop them on next startup.",
+                cols_to_drop,
+            )
+            return
+
+        # Check if any of the columns have live data before dropping
+        for col in cols_to_drop:
+            row = db.execute(
+                text(f"SELECT COUNT(*) FROM canister_ln2_logs WHERE {col} IS NOT NULL")
+            ).scalar()
+            if row and row > 0:
+                logger.warning(
+                    "Column canister_ln2_logs.%s has %d non-null rows. "
+                    "Data will be lost. Skipping drop — back up first or confirm by "
+                    "also setting ALLOW_RESERVOIR_DATA_LOSS=true.",
+                    col, row,
+                )
+                if os.environ.get("ALLOW_RESERVOIR_DATA_LOSS", "").strip().lower() != "true":
+                    return
+
+        for col in cols_to_drop:
+            db.execute(text(f"ALTER TABLE canister_ln2_logs DROP COLUMN IF EXISTS {col}"))
+            logger.info("Dropped column canister_ln2_logs.%s", col)
+
+        db.commit()
+        logger.info("canister_ln2_logs: legacy reservoir columns removed")
+
+    except Exception as e:
+        logger.warning(f"_migrate_reservoir_tables skipped or failed: {e}")
         db.rollback()
     finally:
         db.close()

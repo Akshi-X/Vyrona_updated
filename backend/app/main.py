@@ -38,6 +38,7 @@ from app.controller.IVF import (
     ivf_controller,
     ivf_dashboard_controller,
     ivf_quality_controller,
+    ivf_reports_controller,
     quality_tracking_controller,
 )
 from app.init_db import init_db as create_admin
@@ -236,6 +237,7 @@ app.include_router(kpi_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_dashboard_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
+app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ui_variant_controller.router, prefix=API_PREFIX)
 
