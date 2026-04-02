@@ -8,13 +8,16 @@ import router from "./routes";
 import { AuthProvider } from "./contexts/AuthContext";
 import { GoogleMapsProvider } from "./contexts/GoogleMapsProvider";
 import { UIVariantProvider } from "./contexts/UIVariantContext";
+import ScreenSizeGuard from "./components/ScreenSizeGuard";
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <AuthProvider>
             <UIVariantProvider>
                 <GoogleMapsProvider>
-                    <RouterProvider router={router} />
+                    <ScreenSizeGuard>
+                        <RouterProvider router={router} />
+                    </ScreenSizeGuard>
                 </GoogleMapsProvider>
             </UIVariantProvider>
         </AuthProvider>
