@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight
+    // , Download
+ } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
 import MyGrapeLogo from "../assets/mGScale.svg";
@@ -26,9 +28,10 @@ interface SidebarProps {
 
 type NavChild = { label: string; path: string };
 type NavItem =
-    | { icon: string; label: string; path: string }
+    | { icon: string; lucideIcon?: React.ElementType; label: string; path: string }
     | {
           icon: string;
+          lucideIcon?: React.ElementType;
           label: string;
           dropdown: true;
           children: NavChild[];
@@ -129,7 +132,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 //     label: "Incubator Quality Tracking",
                 //     path: "/incubator-tracking",
                 // },
-                //{ label: "Embryo Grading", path: "/embryo-grading" },
+                // { label: "Embryo Grading", path: "/embryo-grading" },
             ],
         },
         { icon: DatabaseIconWhite, label: "Database", path: "/database" },
@@ -144,11 +147,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             label: "Alert Configuration",
             path: "/alert-setting",
         },
-        // {
-        //     icon: ContainersIcon,
-        //     label: "Refill log",
-        //     path: "/refill-log",
-        // },
+        // { icon: "", lucideIcon: Download, label: "Reports", path: "/reports" },
+
+        // { icon: ContainersIcon, label: "Refill log", path: "/refill-log" },
         //{ icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
         //{ icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
     ];
@@ -163,6 +164,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         }
         if (item.label === "Alert Configuration") {
             return isIVF && (userRole === "Manager" || userRole === "Admin");
+        }
+        if (!isIVF && item.label === "Reports") {
+            return false;
         }
         if (isIVF && item.label === "Database") {
             return false;
@@ -327,12 +331,19 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                     : "bg-transparent hover:bg-white/10"
                             }`}
                         >
-                            <img
-                                className="w-5 h-5"
-                                alt={`${item.label} icon`}
-                                src={iconSrc}
-                                style={iconStyle}
-                            />
+                            {item.lucideIcon ? (
+                                <item.lucideIcon
+                                    className="w-5 h-5"
+                                    color={isActive ? "#6b1176" : "#ffffff"}
+                                />
+                            ) : (
+                                <img
+                                    className="w-5 h-5"
+                                    alt={`${item.label} icon`}
+                                    src={iconSrc}
+                                    style={iconStyle}
+                                />
+                            )}
                             <span
                                 className={`font-semibold text-sm ${
                                     isActive ? "text-[#6b1176]" : "text-white"
