@@ -128,11 +128,11 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     label: "Cryocan Quality Tracking",
                     path: "/ivf-track-shipment",
                 },
-                // {
-                //     label: "Incubator Quality Tracking",
-                //     path: "/incubator-tracking",
-                // },
-                // { label: "Embryo Grading", path: "/embryo-grading" },
+                {
+                    label: "Incubator Quality Tracking",
+                    path: "/incubator-tracking",
+                },
+                { label: "Embryo Grading", path: "/embryo-grading" },
             ],
         },
         { icon: DatabaseIconWhite, label: "Database", path: "/database" },
@@ -147,9 +147,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             label: "Alert Configuration",
             path: "/alert-setting",
         },
-        // { icon: "", lucideIcon: Download, label: "Reports", path: "/reports" },
+        { icon: "", lucideIcon: Download, label: "Reports", path: "/reports" },
 
-        // { icon: ContainersIcon, label: "Refill log", path: "/refill-log" },
+        { icon: ContainersIcon, label: "Refill log", path: "/refill-log" },
         //{ icon: EmbryosIcon, label: "Embryo Grading", path: "/embryo-grading" },
         //{ icon: IncubatorQualityTrackingIcon, label: "Incubator Tracking", path: "/incubator-tracking" }
     ];
