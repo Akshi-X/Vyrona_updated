@@ -41,7 +41,8 @@ const formatDaysAgo = (dateStr: string): string => {
 };
 
 const RefillLog = () => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, userRole } = useAuth();
+    const isManagerAdmin = ["manager", "admin"].some((r) => (userRole || "").trim().toLowerCase().includes(r));
     const [selectedBranch] = useState<string>("All");
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
@@ -65,8 +66,8 @@ const RefillLog = () => {
         description: string;
         status: string;
     }[]>([]);
-    const [activityLoading, setActivityLoading] = useState(false);
-    const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; branch_id: number | null; branch_name: string | null }[]>([]);
+    const [activityLoading, setActivityLoading] = useState(true);
+    const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; hospital_id: number | null; branch_id: number | null; branch_name: string | null }[]>([]);
     const [reservoirLogs, setReservoirLogs] = useState<{ log_id: number; reservoir_id: number; reservoir_name: string; branch_name: string | null; ln2_ordered_date: string | null; ln2_received_date: string | null; created_at: string | null }[]>([]);
     const [reservoirLogsLoading, setReservoirLogsLoading] = useState(false);
     // Modal tab: "refill" | "reservoir"
@@ -209,7 +210,10 @@ const RefillLog = () => {
     useEffect(() => {
         const loadUsers = async () => {
             try {
-                const res = await userService.getAllUsersInCompany();
+                const profile = await userService.getProfile();
+                const res = profile?.hospital_id
+                    ? await userService.getUsersByHospital(profile.hospital_id)
+                    : await userService.getAllUsersInCompany();
                 setUsers(Array.isArray(res?.users) ? res.users : []);
             } catch {
                 setUsers([]);
@@ -221,11 +225,19 @@ const RefillLog = () => {
     const loadReservoirData = async () => {
         setReservoirLogsLoading(true);
         try {
-            const [resRes, logsRes] = await Promise.all([
+            const [resRes, logsRes, profile] = await Promise.all([
                 ivfService.getReservoirs().catch(() => null),
                 ivfService.getReservoirLogs().catch(() => null),
+                userService.getProfile().catch(() => null),
             ]);
-            setReservoirs(Array.isArray(resRes?.reservoirs) ? resRes.reservoirs : []);
+            const allReservoirs = Array.isArray(resRes?.reservoirs) ? resRes.reservoirs : [];
+            const filtered = allReservoirs.filter((r) => {
+                if (isManagerAdmin) {
+                    return profile?.hospital_id == null || r.hospital_id === profile.hospital_id;
+                }
+                return profile?.branch_id == null || r.branch_id === profile.branch_id;
+            });
+            setReservoirs(filtered);
             setReservoirLogs(Array.isArray(logsRes?.logs) ? logsRes.logs : []);
         } finally {
             setReservoirLogsLoading(false);
@@ -233,8 +245,8 @@ const RefillLog = () => {
     };
 
     useEffect(() => {
-        if (isAuthenticated) loadReservoirData();
-    }, [isAuthenticated]);
+        if (isAuthenticated && userRole !== undefined) loadReservoirData();
+    }, [isAuthenticated, userRole]);
 
     const branchOptions = useMemo(() => {
         const options = new Set<string>();
@@ -631,7 +643,7 @@ const RefillLog = () => {
                 </div>
 
                 {/* Recent Activity Log */}
-                <div className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col">
+                <div className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col min-h-[500px]">
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E1E1]">
                         <div className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6b1176]">
@@ -772,7 +784,7 @@ const RefillLog = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Reservoir</label>
-                                    <select value={addForm.reservoir_id} onChange={(e) => setAddForm((p) => ({ ...p, reservoir_id: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white">
+                                    <select value={addForm.reservoir_id} disabled className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
                                         <option value="">None</option>
                                         {reservoirs.map((r) => (
                                             <option key={r.reservoir_id} value={r.reservoir_id}>
@@ -783,11 +795,11 @@ const RefillLog = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Refill Date</label>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Refill Date <span className="text-red-500">*</span></label>
                                         <input type="date" value={addForm.refill_date} onChange={(e) => setAddForm((p) => ({ ...p, refill_date: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" required />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Refill Time</label>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Refill Time <span className="text-red-500">*</span></label>
                                         <input type="time" value={addForm.refill_time} onChange={(e) => setAddForm((p) => ({ ...p, refill_time: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" required />
                                     </div>
                                 </div>

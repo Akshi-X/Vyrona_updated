@@ -10,6 +10,7 @@ import {
     type TankInTransitCheckResponse,
 } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
+import { userService } from "../../services/userService";
 
 interface TrackCanisterModalProps {
     isOpen: boolean;
@@ -198,8 +199,12 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
         setBranchesLoading(true);
         setBranchesError(null);
 
-        ivfService
-            .getBranches()
+        userService
+            .getProfile()
+            .then((profile) => {
+                if (cancelled) return;
+                return ivfService.getBranches(profile?.hospital_id ?? undefined);
+            })
             .then((res) => {
                 if (cancelled) return;
                 setBranches(Array.isArray(res?.branches) ? res.branches : []);
