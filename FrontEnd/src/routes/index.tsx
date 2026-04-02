@@ -73,7 +73,6 @@ const ControlTowerWithVariant = () => (
 const RefillLogWithAuth = () => (
     <RoleBasedRoute
         restrictedRoles={["mygrape_admin"]}
-        requireControlTower={true}
     >
         <RefillLog />
     </RoleBasedRoute>
