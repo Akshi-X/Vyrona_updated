@@ -305,8 +305,11 @@ export class IvfService extends BaseApiService {
         return `${endpoint}${sep}${IvfService.BRANCH_OVERRIDE_PARAM}=${encodeURIComponent(branchId)}`;
     }
 
-    async getBranches(): Promise<IvfBranchesResponse> {
-        return await this.request<IvfBranchesResponse>("/api/ivf/branches", {
+    async getBranches(hospitalId?: number): Promise<IvfBranchesResponse> {
+        const endpoint = hospitalId
+            ? `/api/ivf/branches?hospital_id=${hospitalId}`
+            : "/api/ivf/branches";
+        return await this.request<IvfBranchesResponse>(endpoint, {
             method: "GET",
         });
     }
