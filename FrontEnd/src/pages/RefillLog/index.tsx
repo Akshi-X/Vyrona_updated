@@ -414,7 +414,7 @@ const RefillLog = () => {
                 )}
 
                 {/* Two panels */}
-                <div className="grid grid-cols-2 gap-6" style={{ height: "400px" }}>
+                <div className="grid grid-cols-1 min-[1436px]:grid-cols-2 min-[1436px]:h-[400px] gap-6">
 
                     {/* Left: Active Tank Status */}
                     <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
@@ -511,7 +511,7 @@ const RefillLog = () => {
                         <div className="flex flex-1 min-h-0 overflow-hidden">
                             {/* Left: Cryocan SVG illustration */}
                             <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1]">
-                                <svg width="220" height="320" viewBox="0 0 240 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
+                                <svg width="200" height="320" viewBox="0 0 200 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
                                     <defs>
                                         <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">
                                             <stop offset="0%" stopColor="#9B72B0" />
@@ -557,7 +557,7 @@ const RefillLog = () => {
                             {/* Right: table */}
                             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,110px)_minmax(0,110px)_36px] px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
+                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
                                     <div>Reservoir</div>
                                     <div>LN2 Ordered</div>
                                     <div>LN2 Received</div>
@@ -575,10 +575,10 @@ const RefillLog = () => {
                                         return (
                                             <div
                                                 key={log.log_id}
-                                                className="grid grid-cols-[minmax(0,1fr)_minmax(0,110px)_minmax(0,110px)_36px] px-4 py-2 items-center hover:bg-gray-50"
+                                                className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 items-center hover:bg-gray-50"
                                             >
                                                 <div className="flex items-center min-w-0">
-                                                    <span className="text-sm font-medium text-gray-800 truncate">{log.reservoir_name}</span>
+                                                    <span className="text-sm font-medium text-gray-800 break-words">{log.reservoir_name}</span>
                                                 </div>
                                                 {isEditing ? (
                                                     <input
@@ -588,7 +588,7 @@ const RefillLog = () => {
                                                         className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="text-xs text-gray-600 truncate">{log.ln2_ordered_date ?? "—"}</span>
+                                                    <span className="text-xs text-gray-600 truncate text-center">{log.ln2_ordered_date ?? "—"}</span>
                                                 )}
                                                 {isEditing ? (
                                                     <input
@@ -598,7 +598,7 @@ const RefillLog = () => {
                                                         className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="text-xs text-gray-600 truncate">{log.ln2_received_date ?? "—"}</span>
+                                                    <span className="text-xs text-gray-600 truncate text-center">{log.ln2_received_date ?? "—"}</span>
                                                 )}
                                                 <div className="flex items-center justify-end">
                                                     {isEditing ? (
