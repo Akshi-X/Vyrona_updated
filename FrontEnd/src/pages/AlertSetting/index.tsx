@@ -15,6 +15,8 @@ import {
 } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
 import CriticalAlertsIcon from "../../assets/DashBoardIcons/Critical_Alerts.svg";
+import PageLayout from "../../components/PageLayout";
+import FilterPanel, { FilterSelect } from "../../components/FilterPanel";
 import {
     Thermometer,
     Droplets,
@@ -331,6 +333,7 @@ export default function AlertSetting() {
     const [selectionConflictCheckLoading, setSelectionConflictCheckLoading] =
         useState(false);
     const [showNotifySettings, setShowNotifySettings] = useState(false);
+    const [showKpiPanel, setShowKpiPanel] = useState(false);
     const [notifySettingsLoading, setNotifySettingsLoading] = useState(false);
     const [notifySettingsSaving, setNotifySettingsSaving] = useState(false);
     const [notifySettingsError, setNotifySettingsError] = useState<
@@ -739,6 +742,10 @@ export default function AlertSetting() {
     const branchOptions = useMemo(
         () => ["All", ...branches.map((b) => b.branch_name)],
         [branches],
+    );
+    const activeFilterCount = useMemo(
+        () => (branchFilter !== "All" ? 1 : 0),
+        [branchFilter],
     );
     const lockContainerSelection =
         selectedContainers.length === 1 &&
@@ -1215,31 +1222,40 @@ export default function AlertSetting() {
           Object.keys(multiDraftConfig).length > 0;
 
     return (
-        <div className="flex w-full bg-[#FDFAFF]" style={{ height: "100vh" }}>
-            <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-                <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <img src={CriticalAlertsIcon} alt="Alert Configuration" className="w-8 h-8" />
-                            <h1 className="font-semibold text-black text-2xl">
-                                Alert Configuration
-                            </h1>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={openNotifySettings}
-                            className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
-                            aria-label="Notification settings"
-                            title="Notification settings"
-                        >
-                            <Settings size={18} strokeWidth={2} />
-                        </button>
-                    </div>
+        <>
+                <PageLayout
+                    title="Alert Configuration"
+                    icon={CriticalAlertsIcon}
+                    actions={
+                        <>
+                            <div className="md:hidden">
+                                <FilterPanel activeCount={activeFilterCount}>
+                                    <FilterSelect
+                                        label="Branch"
+                                        value={branchFilter}
+                                        options={branchOptions}
+                                        allLabel="All Branches"
+                                        onChange={(v) => setBranchFilter(v)}
+                                    />
+                                </FilterPanel>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={openNotifySettings}
+                                className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                                aria-label="Notification settings"
+                                title="Notification settings"
+                            >
+                                <Settings size={18} strokeWidth={2} />
+                            </button>
+                        </>
+                    }
+                >
                     <div className="flex gap-6 flex-1 min-h-0">
                         {/* Left: filters + containers (Control Tower UI) */}
                         <div className="w-[380px] shrink-0 flex flex-col gap-6">
-                            {/* Filters card */}
-                            <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex flex-col gap-3">
+                            {/* Filters card - hidden on mobile (shown via header filter icon) */}
+                            <div className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Branch
@@ -1422,16 +1438,47 @@ export default function AlertSetting() {
                             </div>
                         </div>
 
+                        {/* Configure Alerts button — visible only below xl1 (1200px) */}
+                        {primaryContainer && (
+                            <button
+                                type="button"
+                                onClick={() => setShowKpiPanel(true)}
+                                className="xl1:hidden mt-2 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors"
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
+                                </svg>
+                                Configure Alerts
+                            </button>
+                        )}
+
                         {/* Right: KPI config cards */}
-                        <section className="flex-1 flex flex-col bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-hidden">
-                            <h2 className="font-bold text-black text-base mb-4">
-                                Alert Configuration{" "}
-                                {selectedContainers.length > 1
-                                    ? `- ${selectedContainers.length} Containers Selected`
-                                    : primaryContainer
-                                      ? `- Cryocan ${primaryContainer.canisterId}`
-                                      : ""}
-                            </h2>
+                        {/* Overlay backdrop — mobile only */}
+                        {showKpiPanel && (
+                            <div
+                                className="xl1:hidden fixed inset-0 bg-black/40 z-40"
+                                onClick={() => setShowKpiPanel(false)}
+                            />
+                        )}
+                        <section className={`bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="font-bold text-black text-base">
+                                    Alert Configuration{" "}
+                                    {selectedContainers.length > 1
+                                        ? `- ${selectedContainers.length} Containers Selected`
+                                        : primaryContainer
+                                          ? `- Cryocan ${primaryContainer.canisterId}`
+                                          : ""}
+                                </h2>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowKpiPanel(false)}
+                                    className="xl1:hidden p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                                    aria-label="Close"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                             <p className="text-sm text-gray-600 mb-6">
                                 {selectedContainers.length > 1
                                     ? "Configure alert thresholds to apply to all selected containers. Enter values and save to apply the same configuration to the selected containers."
@@ -1694,7 +1741,7 @@ export default function AlertSetting() {
                                                                                 </p>
                                                                             )}
 
-                                                                            <div className="flex items-center gap-3 mt-4">
+                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
                                                                                 {/* Lid State - special select input */}
                                                                                 {inputType ===
                                                                                 "lid_state" ? (
@@ -1951,7 +1998,8 @@ export default function AlertSetting() {
                                                                                 ) : (
                                                                                     /* Standard/Temperature/Percentage inputs */
                                                                                     <>
-                                                                                        <div className="flex items-center gap-2">
+                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2012,18 +2060,11 @@ export default function AlertSetting() {
                                                                                                         "min",
                                                                                                     )
                                                                                                 }
-                                                                                                placeholder="Min"
-                                                                                                className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
-                                                                                            {metadata.unit && (
-                                                                                                <span className="text-xs text-gray-400">
-                                                                                                    {
-                                                                                                        metadata.unit
-                                                                                                    }
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-2">
+                                                                                        </label>
+                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2084,20 +2125,13 @@ export default function AlertSetting() {
                                                                                                         "max",
                                                                                                     )
                                                                                                 }
-                                                                                                placeholder="Max"
-                                                                                                className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
-                                                                                            {metadata.unit && (
-                                                                                                <span className="text-xs text-gray-400">
-                                                                                                    {
-                                                                                                        metadata.unit
-                                                                                                    }
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
+                                                                                        </label>
                                                                                     </>
                                                                                 )}
-                                                                                <div className="relative flex-1 min-w-[140px]">
+                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
                                                                                         className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
@@ -2260,6 +2294,7 @@ export default function AlertSetting() {
                                                                                         </span>
                                                                                     </div>
                                                                                 )}
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -2469,7 +2504,7 @@ export default function AlertSetting() {
                                                                             )}
 
                                                                             {/* Inputs Row */}
-                                                                            <div className="flex items-center gap-3 mt-4">
+                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
                                                                                 {/* Lid State - special select input */}
                                                                                 {inputType ===
                                                                                 "lid_state" ? (
@@ -2649,7 +2684,8 @@ export default function AlertSetting() {
                                                                                 ) : (
                                                                                     /* Standard/Temperature/Percentage inputs */
                                                                                     <>
-                                                                                        <div className="flex items-center gap-2">
+                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2710,18 +2746,11 @@ export default function AlertSetting() {
                                                                                                         "min",
                                                                                                     )
                                                                                                 }
-                                                                                                placeholder="Min"
-                                                                                                className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
-                                                                                            {metadata.unit && (
-                                                                                                <span className="text-xs text-gray-400">
-                                                                                                    {
-                                                                                                        metadata.unit
-                                                                                                    }
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-2">
+                                                                                        </label>
+                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2782,22 +2811,15 @@ export default function AlertSetting() {
                                                                                                         "max",
                                                                                                     )
                                                                                                 }
-                                                                                                placeholder="Max"
-                                                                                                className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
-                                                                                            {metadata.unit && (
-                                                                                                <span className="text-xs text-gray-400">
-                                                                                                    {
-                                                                                                        metadata.unit
-                                                                                                    }
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
+                                                                                        </label>
                                                                                     </>
                                                                                 )}
 
                                                                                 {/* Alert Type Select */}
-                                                                                <div className="relative flex-1 min-w-[140px]">
+                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
                                                                                         className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
@@ -2960,6 +2982,7 @@ export default function AlertSetting() {
                                                                                         </span>
                                                                                     </div>
                                                                                 )}
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -3085,7 +3108,7 @@ export default function AlertSetting() {
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="flex items-center gap-3 mt-4">
+                                                                        <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
                                                                             {inputType ===
                                                                             "lid_state" ? (
                                                                                 <div className="relative w-48">
@@ -3260,142 +3283,140 @@ export default function AlertSetting() {
                                                                                 </div>
                                                                             ) : (
                                                                                 <>
-                                                                                    <input
-                                                                                        ref={(
-                                                                                            el,
-                                                                                        ) => {
-                                                                                            refs.min =
-                                                                                                el;
-                                                                                        }}
-                                                                                        type="number"
-                                                                                        step="any"
-                                                                                        min={
-                                                                                            inputType ===
-                                                                                            "percentage"
-                                                                                                ? 0
-                                                                                                : undefined
-                                                                                        }
-                                                                                        value={
-                                                                                            minVal !=
-                                                                                            null
-                                                                                                ? minVal
-                                                                                                : ""
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            let v =
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value ===
-                                                                                                ""
-                                                                                                    ? null
-                                                                                                    : Number(
-                                                                                                          e
-                                                                                                              .target
-                                                                                                              .value,
-                                                                                                      );
-                                                                                            if (
+                                                                                    <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <input
+                                                                                            ref={(
+                                                                                                el,
+                                                                                            ) => {
+                                                                                                refs.min =
+                                                                                                    el;
+                                                                                            }}
+                                                                                            type="number"
+                                                                                            step="any"
+                                                                                            min={
                                                                                                 inputType ===
-                                                                                                    "percentage" &&
-                                                                                                v !==
-                                                                                                    null &&
-                                                                                                v <
-                                                                                                    0
-                                                                                            )
-                                                                                                v = 0;
-                                                                                            setMultiDraft(
-                                                                                                kpiName,
-                                                                                                {
-                                                                                                    min: v,
-                                                                                                },
-                                                                                            );
-                                                                                        }}
-                                                                                        onKeyDown={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            handleKeyDown(
-                                                                                                e,
-                                                                                                kpiKey,
-                                                                                                "min",
-                                                                                            )
-                                                                                        }
-                                                                                        placeholder="Min"
-                                                                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                                                                    />
-                                                                                    <input
-                                                                                        ref={(
-                                                                                            el,
-                                                                                        ) => {
-                                                                                            refs.max =
-                                                                                                el;
-                                                                                        }}
-                                                                                        type="number"
-                                                                                        step="any"
-                                                                                        min={
-                                                                                            inputType ===
-                                                                                            "percentage"
-                                                                                                ? 0
-                                                                                                : undefined
-                                                                                        }
-                                                                                        value={
-                                                                                            maxVal !=
-                                                                                            null
-                                                                                                ? maxVal
-                                                                                                : ""
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            let v =
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value ===
-                                                                                                ""
-                                                                                                    ? null
-                                                                                                    : Number(
-                                                                                                          e
-                                                                                                              .target
-                                                                                                              .value,
-                                                                                                      );
-                                                                                            if (
-                                                                                                inputType ===
-                                                                                                    "percentage" &&
-                                                                                                v !==
-                                                                                                    null &&
-                                                                                                v <
-                                                                                                    0
-                                                                                            )
-                                                                                                v = 0;
-                                                                                            setMultiDraft(
-                                                                                                kpiName,
-                                                                                                {
-                                                                                                    max: v,
-                                                                                                },
-                                                                                            );
-                                                                                        }}
-                                                                                        onKeyDown={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            handleKeyDown(
-                                                                                                e,
-                                                                                                kpiKey,
-                                                                                                "max",
-                                                                                            )
-                                                                                        }
-                                                                                        placeholder="Max"
-                                                                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
-                                                                                    />
-                                                                                    {metadata.unit && (
-                                                                                        <span className="text-xs text-gray-400">
-                                                                                            {
-                                                                                                metadata.unit
+                                                                                                "percentage"
+                                                                                                    ? 0
+                                                                                                    : undefined
                                                                                             }
-                                                                                        </span>
-                                                                                    )}
+                                                                                            value={
+                                                                                                minVal !=
+                                                                                                null
+                                                                                                    ? minVal
+                                                                                                    : ""
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                let v =
+                                                                                                    e
+                                                                                                        .target
+                                                                                                        .value ===
+                                                                                                    ""
+                                                                                                        ? null
+                                                                                                        : Number(
+                                                                                                              e
+                                                                                                                  .target
+                                                                                                                  .value,
+                                                                                                          );
+                                                                                                if (
+                                                                                                    inputType ===
+                                                                                                        "percentage" &&
+                                                                                                    v !==
+                                                                                                        null &&
+                                                                                                    v <
+                                                                                                        0
+                                                                                                )
+                                                                                                    v = 0;
+                                                                                                setMultiDraft(
+                                                                                                    kpiName,
+                                                                                                    {
+                                                                                                        min: v,
+                                                                                                    },
+                                                                                                );
+                                                                                            }}
+                                                                                            onKeyDown={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                handleKeyDown(
+                                                                                                    e,
+                                                                                                    kpiKey,
+                                                                                                    "min",
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                        />
+                                                                                    </label>
+                                                                                    <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <input
+                                                                                            ref={(
+                                                                                                el,
+                                                                                            ) => {
+                                                                                                refs.max =
+                                                                                                    el;
+                                                                                            }}
+                                                                                            type="number"
+                                                                                            step="any"
+                                                                                            min={
+                                                                                                inputType ===
+                                                                                                "percentage"
+                                                                                                    ? 0
+                                                                                                    : undefined
+                                                                                            }
+                                                                                            value={
+                                                                                                maxVal !=
+                                                                                                null
+                                                                                                    ? maxVal
+                                                                                                    : ""
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                let v =
+                                                                                                    e
+                                                                                                        .target
+                                                                                                        .value ===
+                                                                                                    ""
+                                                                                                        ? null
+                                                                                                        : Number(
+                                                                                                              e
+                                                                                                                  .target
+                                                                                                                  .value,
+                                                                                                          );
+                                                                                                if (
+                                                                                                    inputType ===
+                                                                                                        "percentage" &&
+                                                                                                    v !==
+                                                                                                        null &&
+                                                                                                    v <
+                                                                                                        0
+                                                                                                )
+                                                                                                    v = 0;
+                                                                                                setMultiDraft(
+                                                                                                    kpiName,
+                                                                                                    {
+                                                                                                        max: v,
+                                                                                                    },
+                                                                                                );
+                                                                                            }}
+                                                                                            onKeyDown={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                handleKeyDown(
+                                                                                                    e,
+                                                                                                    kpiKey,
+                                                                                                    "max",
+                                                                                                )
+                                                                                            }
+                                                                                            className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                        />
+                                                                                    </label>
                                                                                 </>
                                                                             )}
-                                                                            <div className="relative flex-1 min-w-[140px]">
+                                                                            <div className="flex items-center gap-3">
+                                                                            <div className="relative w-44 min-w-[140px]">
                                                                                 <button
                                                                                     type="button"
                                                                                     className={`dropdown-button w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white ${
@@ -3556,6 +3577,7 @@ export default function AlertSetting() {
                                                                                         </span>
                                                                                     </div>
                                                                                 )}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -3696,8 +3718,7 @@ export default function AlertSetting() {
                             )}
                         </section>
                     </div>
-                </div>
-            </main>
+                </PageLayout>
 
             {/* Create/Edit modal */}
             {showForm && (
@@ -4111,6 +4132,6 @@ export default function AlertSetting() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import PageLayout from "../../components/PageLayout";
+import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import { ivfService, type IvfBranch, type RefillLogItem } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
@@ -351,22 +353,20 @@ const RefillLog = () => {
     };
 
     return (
-        <main className="flex flex-col h-screen overflow-hidden">
-            <div className="flex-1 px-8 py-8 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pb-8">
-
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <h1 className="font-semibold text-black text-2xl tracking-tight">Refill Logs</h1>
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
-                            className="px-5 h-9 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-medium hover:bg-[#f7ecff] transition-colors"
-                        >
-                            Add Logs
-                        </button>
-                    </div>
-                </div>
+        <>
+        <PageLayout
+                title="Refill Logs"
+                icon={ContainersIcon}
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
+                        className="px-5 h-9 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-medium hover:bg-[#f7ecff] transition-colors"
+                    >
+                        Add Logs
+                    </button>
+                }
+            >
 
                 {/* Banner */}
                 {showBanner && (
@@ -727,7 +727,7 @@ const RefillLog = () => {
                         )}
                     </div>
                 </div>
-            </div>
+            </PageLayout>
 
             {/* Add Refill / Reservoir Modal */}
             {isAddRefillOpen && (
@@ -958,7 +958,7 @@ const RefillLog = () => {
                     </div>
                 </div>
             )}
-        </main>
+        </>
     );
 };
 

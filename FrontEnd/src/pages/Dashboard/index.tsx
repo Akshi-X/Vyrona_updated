@@ -21,6 +21,8 @@ import { complianceService, type ComplianceMetrics } from '../../services/compli
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
 import { userService } from '../../services/userService';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
+import DashboardIconDark from '../../assets/DashBoardIcons/DashBoardDark.svg';
+import PageLayout from '../../components/PageLayout';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -987,45 +989,47 @@ export default function Dashboard({ }: DashboardProps) {
     },
   ];
 
+  const dashboardActionIcons = (
+    <div className="flex items-center gap-4">
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="Critical Alerts" src={CriticalAlertsIcon}
+          onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }} />
+        {criticalAlertsCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+          </div>
+        )}
+      </div>
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="Stakeholder Chats" src={StakeholderChatsIcon}
+          onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }} />
+        {stakeholderChatCount > 0 && (
+          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
+            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+          </div>
+        )}
+      </div>
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="My Tasks" src={MyTasksIcon}
+          onClick={() => { fetchMyTasks(); setShowMyTasks(true); }} />
+        {myTasksCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div
-      className="bg-[#FDFAFF] flex w-full h-[100vh] overflow-x-hidden"
-      style={{
-        maxWidth: '100vw',
-        touchAction: 'pan-y',
-        overscrollBehaviorX: 'none'
-      }}
-    >
-      {/* Main Content Area */}
-      <main
-        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden min-w-0"
-        style={{
-          maxWidth: '100vw',
-          touchAction: 'pan-y',
-          overscrollBehaviorX: 'none',
-          height: '100vh'
-        }}
-      >
-
-        {/* Dashboard Content */}
-        <div
-          className="flex-1 p-6 pt-10 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0"
-          style={{
-            touchAction: 'pan-y',
-            overscrollBehaviorX: 'none',
-            overscrollBehaviorY: 'auto',
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
-
+    <>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
-              {/* Single row: greeting (left) + alerts (right); on mobile: alerts on top, greeting below */}
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                {/* Greeting - below alerts on mobile, left on desktop */}
-                <div className="order-2 lg:order-1 flex flex-col gap-0.5">
+              {/* Greeting row: greeting left + actions right on desktop */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
                   <p className="text-sm text-gray-500 font-normal min-h-[1.25rem]">
                     {userWorkspaceName || '\u00A0'}
                   </p>
@@ -1034,8 +1038,8 @@ export default function Dashboard({ }: DashboardProps) {
                     const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
                     const displayName = [userFirstName, userLastName].filter(Boolean).join(' ') || 'User';
                     return (
-                      <p className="text-black font-semibold text-xl flex items-center gap-2">
-                        <span>Good {greeting},</span>
+                      <p className="text-black font-semibold text-xl leading-tight flex flex-wrap items-center gap-2">
+                        <span>Good {greeting},<br className="md:hidden" /></span>
                         {loadingUserProfile ? (
                           <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
                         ) : (
@@ -1045,64 +1049,8 @@ export default function Dashboard({ }: DashboardProps) {
                     );
                   })()}
                 </div>
-                {/* Critical Alerts, Stakeholder Chats, My Tasks - on top on mobile, right on desktop */}
-                <section className="order-1 lg:order-2 w-full lg:w-auto">
-                  <div className="flex justify-end gap-8">
-                    {/* Critical Alerts */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="Critical Alerts"
-                        src={CriticalAlertsIcon}
-                        onClick={() => {
-                          fetchCriticalAlerts();
-                          setShowCriticalAlerts(true);
-                        }}
-                      />
-                      {criticalAlertsCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                          <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Stakeholder Chats */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="Stakeholder Chats"
-                        src={StakeholderChatsIcon}
-                        onClick={() => {
-                          refreshUnread();
-                          fetchStakeholderChats();
-                          setShowStakeholderChats(true);
-                        }}
-                      />
-                      {stakeholderChatCount > 0 && (
-                        <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
-                          stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
-                        }`}>
-                          <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* My Tasks */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="My Tasks"
-                        src={MyTasksIcon}
-                        onClick={() => {
-                          fetchMyTasks();
-                          setShowMyTasks(true);
-                        }}
-                      />
-                      {myTasksCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                          <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <section className="hidden md:flex justify-end">
+                  {dashboardActionIcons}
                 </section>
               </div>
 
@@ -1177,8 +1125,8 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
-                        <div className="flex flex-col items-start mb-2 ml-3 w-full min-w-0">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 h-[123px]">
+                        <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
@@ -1944,8 +1892,7 @@ export default function Dashboard({ }: DashboardProps) {
               </section>
             </>
           )}
-        </div>
-      </main>
+      </PageLayout>
 
       {/* Critical Alerts Modal */}
       <CriticalAlertsModal
@@ -2026,6 +1973,6 @@ export default function Dashboard({ }: DashboardProps) {
           navigate(`/outbound-quality-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
-    </div>
+    </>
   );
 }

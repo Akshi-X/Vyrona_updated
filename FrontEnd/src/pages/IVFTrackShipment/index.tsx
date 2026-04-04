@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
+import PageLayout from '../../components/PageLayout';
+import ContainerQualityTrackingIcon from '../../assets/DashBoardIcons/ContainerQualityTrackingDark.svg';
 import { useAuth } from '../../contexts/AuthContext';
 import ContainerDataTable from './sections/ContainerDataTable';
 import RefillLogTable from './sections/RefillLogTable';
@@ -14,7 +16,6 @@ import MyTasksIcon from "../../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsModal from "../../components/CriticalAlertsModal";
 import MyTasksModal, { type MyTask } from "../../components/MyTasksModal";
 import StakeholderChatsModal from "../../components/StakeholderChatsModal";
-import TrackCanisterModal from "../../components/TrackCanisterModal";
 import {
     ivfAlertsService,
     type IVFAlert,
@@ -37,9 +38,6 @@ export default function IVFTrackShipmentPage() {
     const [showStakeholderChats, setShowStakeholderChats] = useState(false);
     const [showStakeholderChatScreen, setShowStakeholderChatScreen] =
         useState(false);
-    const [canisterError, setCanisterError] = useState<string | undefined>(
-        undefined,
-    );
     const [criticalAlerts, setCriticalAlerts] = useState<IVFAlert[]>([]);
     const [myTasks, setMyTasks] = useState<Task[]>([]);
     const [loadingAlerts, setLoadingAlerts] = useState(false);
@@ -228,179 +226,110 @@ export default function IVFTrackShipmentPage() {
         }
     }, [wsUnreadMessages, tankId]);
 
-    return (
-        <div className="bg-[#FDFAFF] flex w-full min-h-screen">
-            <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
-
-                {/* Main Content */}
-                <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0">
-                    {!tankId ? (
-                        <div className="flex-1 min-h-[70vh] flex items-center justify-center">
-                            <TrackCanisterModal
-                                inlineMode={true}
-                                isOpen={true}
-                                onClose={() => {
-                                    setCanisterError(undefined);
-                                    navigate("/dashboard");
-                                }}
-                                error={canisterError}
-                                onTrack={(canisterId) => {
-                                    setCanisterError(undefined);
-                                    navigate(
-                                        `/ivf-track-shipment/${encodeURIComponent(canisterId)}`,
-                                    );
-                                }}
-                            />
-                        </div>
+    const pageActions = (
+        <div className="flex items-center gap-6">
+            {/* Export Excel */}
+            <div className="relative group">
+                <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting || !tankId}
+                    className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed !hidden"
+                >
+                    {exporting ? (
+                        <svg
+                            className="animate-spin h-[25px] w-[25px] text-[#6B1176]"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                        >
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                     ) : (
-                        <>
-                            <div className="flex items-center justify-between">
+                        <Download size={21} strokeWidth={2.25} className="text-[#6B1176]" aria-label="Export Excel" />
+                    )}
+                </button>
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="font-semibold text-black text-xs whitespace-nowrap">Export Combined Report</div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                </div>
+            </div>
+            {/* Critical Alerts */}
+            <div className="relative group">
+                <img
+                    className="w-[25px] h-[25px] cursor-pointer"
+                    alt="Critical Alerts"
+                    src={CriticalAlertsIcon}
+                    onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
+                />
+                {criticalAlertsCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+                    </div>
+                )}
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="font-semibold text-black text-xs whitespace-nowrap">Critical Alerts</div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                </div>
+            </div>
+            {/* Stakeholder Chats */}
+            <div className="relative group">
+                <img
+                    className="w-[25px] h-[25px] cursor-pointer"
+                    alt="Stakeholder Chats"
+                    src={StakeholderChatsIcon}
+                    onClick={() => setShowStakeholderChatScreen(true)}
+                />
+                {stakeholderChatCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">{stakeholderChatCount}</span>
+                    </div>
+                )}
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="font-semibold text-black text-xs whitespace-nowrap">Stakeholder Chats</div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                </div>
+            </div>
+            {/* My Tasks */}
+            <div className="relative group">
+                <img
+                    className="w-[25px] h-[25px] cursor-pointer"
+                    alt="My Tasks"
+                    src={MyTasksIcon}
+                    onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
+                />
+                {myTasksCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
+                        <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+                    </div>
+                )}
+                <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                    <div className="font-semibold text-black text-xs whitespace-nowrap">My Tasks</div>
+                    <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <>
+          <PageLayout title="Cryocan" icon={ContainerQualityTrackingIcon} actions={pageActions}>
+                            {/* Breadcrumb */}
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
                                 <div className="flex items-center gap-1 text-sm">
                                     <button
                                         type="button"
                                         onClick={() => navigate("/dashboard")}
-                                        className="text-gray-500 text-[12px] mt-[2.5px] hover:text-gray-700 transition-colors"
+                                        className="text-gray-500 font-semibold hover:text-gray-700 transition-colors"
                                     >
                                         Dashboard
                                     </button>
                                     <span className="text-gray-500">/</span>
-                                    <span className="text-black font-semibold">
-                                        Cryocan Quality Tracking
-                                    </span>
-                                    <span className="text-black font-semibold">
-                                        -
-                                    </span>
-                                    <span className="text-black font-semibold">
-                                        Tank: {headerTankCode} -{" "}
-                                        {headerBranchName}
-                                    </span>
+                                    <span className="text-black font-semibold">Cryocan Quality Tracking</span>
                                 </div>
-                                <div className="flex items-center gap-6">
-                                    {/* Export Excel */}
-                                    <div className="relative group">
-                                        <button
-                                            type="button"
-                                            onClick={handleExport}
-                                            disabled={exporting || !tankId}
-                                            className="w-[25px] h-[25px] flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed !hidden"
-                                        >
-                                            {exporting ? (
-                                                <svg
-                                                    className="animate-spin h-[25px] w-[25px] text-[#6B1176]"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle
-                                                        className="opacity-25"
-                                                        cx="12"
-                                                        cy="12"
-                                                        r="10"
-                                                        stroke="currentColor"
-                                                        strokeWidth="4"
-                                                    ></circle>
-                                                    <path
-                                                        className="opacity-75"
-                                                        fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                                    ></path>
-                                                </svg>
-                                            ) : (
-                                                <Download
-                                                    size={21}
-                                                    strokeWidth={2.25}
-                                                    className="text-[#6B1176]"
-                                                    aria-label="Export Excel"
-                                                />
-                                            )}
-                                        </button>
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                            <div className="font-semibold text-black text-xs whitespace-nowrap">
-                                                Export Combined Report
-                                            </div>
-                                            <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                                        </div>
-                                    </div>
-                                    {/* Critical Alerts */}
-                                    <div className="relative group">
-                                        <img
-                                            className="w-[25px] h-[25px] cursor-pointer"
-                                            alt="Critical Alerts"
-                                            src={CriticalAlertsIcon}
-                                            onClick={() => {
-                                                fetchCriticalAlerts();
-                                                setShowCriticalAlerts(true);
-                                            }}
-                                        />
-                                        {criticalAlertsCount > 0 && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                                                <span className="font-semibold text-white text-[10px]">
-                                                    {criticalAlertsCount}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                            <div className="font-semibold text-black text-xs whitespace-nowrap">
-                                                Critical Alerts
-                                            </div>
-                                            <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                                        </div>
-                                    </div>
-                                    {/* Stakeholder Chats */}
-                                    <div className="relative group">
-                                        <img
-                                            className="w-[25px] h-[25px] cursor-pointer"
-                                            alt="Stakeholder Chats"
-                                            src={StakeholderChatsIcon}
-                                            onClick={() =>
-                                                setShowStakeholderChatScreen(
-                                                    true,
-                                                )
-                                            }
-                                        />
-                                        {stakeholderChatCount > 0 && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                                                <span className="font-semibold text-white text-[10px]">
-                                                    {stakeholderChatCount}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                            <div className="font-semibold text-black text-xs whitespace-nowrap">
-                                                Stakeholder Chats
-                                            </div>
-                                            <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                                        </div>
-                                    </div>
-                                    {/* My Tasks */}
-                                    <div className="relative group">
-                                        <img
-                                            className="w-[25px] h-[25px] cursor-pointer"
-                                            alt="My Tasks"
-                                            src={MyTasksIcon}
-                                            onClick={() => {
-                                                fetchMyTasks();
-                                                setShowMyTasks(true);
-                                            }}
-                                        />
-                                        {myTasksCount > 0 && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                                                <span className="font-semibold text-white text-[10px]">
-                                                    {myTasksCount}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {/* Tooltip */}
-                                        <div className="absolute top-full -left-12 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                            <div className="font-semibold text-black text-xs whitespace-nowrap">
-                                                My Tasks
-                                            </div>
-                                            <div className="absolute bottom-full left-[63px] w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-[#E7E1E1]"></div>
-                                        </div>
-                                    </div>
+                                <div className="text-sm font-semibold text-black">
+                                    {headerTankCode} - {headerBranchName}
                                 </div>
                             </div>
                             {/* <ContainerProcessFlow /> */}
@@ -429,10 +358,7 @@ export default function IVFTrackShipmentPage() {
                             <div>
                                 <RefillLogTable canisterNumber={tankId} />
                             </div>
-                        </>
-                    )}
-                </div>
-            </main>
+          </PageLayout>
 
             {/* Stakeholder Chat Box */}
             <StakeholderChatBox
@@ -678,6 +604,6 @@ export default function IVFTrackShipmentPage() {
                 onClose={() => setShowStakeholderChats(false)}
                 chats={stakeholderChats}
             />
-        </div>
+        </>
     );
 }
