@@ -4,8 +4,8 @@ import MyGrapeLogo from "../assets/mGScale.svg";
 export default function AuthBrandPanel() {
     return (
         <aside
-            className="w-[35%] h-screen flex flex-col justify-between text-white relative overflow-hidden
-             bg-gradient-to-b  from-[#7b2f83] to-[#29053f]
+            className="hidden md:flex w-[35%] h-screen flex-col justify-between text-white relative overflow-hidden
+             bg-gradient-to-b from-[#7b2f83] to-[#29053f]
              rounded-tr-[40px] rounded-br-[40px]"
         >
             <div className="absolute inset-0 flex items-center justify-center z-0 overflow-hidden">

@@ -1,6 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import PageLayout from '../../components/PageLayout';
+import EmbryosIcon from '../../assets/DashBoardIcons/Embryos.svg';
 import Modal from '../../components/Modal';
+import FilterPanel, { FilterSelect, FilterToggle } from '../../components/FilterPanel';
 import { type IVFTreatment } from '../../types/ivf';
 
 interface EmbryoGradingDetail {
@@ -99,8 +102,6 @@ export default function EmbryoGradingPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedEmbryo, setSelectedEmbryo] = useState<IVFTreatment | null>(null);
   const [direction, setDirection] = useState<'fresh' | 'frozen'>('fresh');
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [embryologyLogsByEmbryo, setEmbryologyLogsByEmbryo] = useState<Record<string, EmbryologyLogEntry[]>>({});
   const [isAddLogFormOpen, setIsAddLogFormOpen] = useState(false);
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
@@ -146,8 +147,6 @@ export default function EmbryoGradingPage() {
     fzNo: '',
     notes: '',
   });
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
-  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   // Mock embryo grading details data
   const getEmbryoGradingDetails = (grade: string): EmbryoGradingDetail => {
@@ -256,19 +255,6 @@ export default function EmbryoGradingPage() {
     };
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
-        setIsBranchDropdownOpen(false);
-      }
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
-        setIsStatusDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Load embryo data
   useEffect(() => {
@@ -433,6 +419,13 @@ export default function EmbryoGradingPage() {
     });
     return ['All', ...Array.from(set).sort()];
   }, [embryos]);
+
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (selectedBranch !== 'All') count++;
+    if (selectedStatus !== 'All') count++;
+    return count;
+  }, [selectedBranch, selectedStatus]);
 
   // Filter embryos based on selected filters
   const filteredEmbryos = React.useMemo(() => {
@@ -744,34 +737,64 @@ export default function EmbryoGradingPage() {
   };
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full h-full">
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
-          <div className="flex items-center justify-between">
-            <h1 className="font-semibold text-black text-2xl">
-              Embryo Grading
-            </h1>
-            {isDetailView && (
-              <button
-                type="button"
-                onClick={() => navigate('/embryo-grading')}
-                className="px-3 py-2 rounded-md border border-[#E7E1E1] text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Back to List
-              </button>
-            )}
-          </div>
+    <PageLayout
+      title="Embryo Grading"
+      icon={EmbryosIcon}
+      actions={
+        <div className="flex items-center gap-2">
+          {!isDetailView && (
+            <div className="md:hidden">
+              <FilterPanel activeCount={activeFilterCount}>
+                <FilterToggle
+                  label="Direction"
+                  value={direction}
+                  onChange={setDirection}
+                  options={[
+                    { label: 'Fresh', value: 'fresh' },
+                    { label: 'Frozen', value: 'frozen' },
+                  ]}
+                />
+                <FilterSelect
+                  label="Branch"
+                  value={selectedBranch}
+                  onChange={setSelectedBranch}
+                  options={branchOptions}
+                  allLabel="All Branches"
+                />
+                <FilterSelect
+                  label="Status"
+                  value={selectedStatus}
+                  onChange={setSelectedStatus}
+                  options={statusOptions}
+                  allLabel="All Statuses"
+                />
+              </FilterPanel>
+            </div>
+          )}
+          {isDetailView && (
+            <button
+              type="button"
+              onClick={() => navigate('/embryo-grading')}
+              className="px-3 py-2 rounded-md border border-[#E7E1E1] text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Back to List
+            </button>
+          )}
+        </div>
+      }
+    >
+      <div className="flex-1 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0">
 
-          {/* Main Content Grid - Matching Control Tower Layout */}
-          <div className={`flex-1 grid grid-cols-1 gap-6 min-h-0 ${
+          {/* Main Content Grid */}
+          <div className={`grid grid-cols-1 gap-3 lg:gap-6 min-h-0 ${
             isDetailView
               ? 'lg:grid-cols-1 items-start'
-              : 'lg:grid-cols-[380px_320px] items-start'
+              : 'lg:flex-1 lg:grid-cols-[380px_1fr] items-start'
           }`}>
             {/* Left Panel - Filters and Embryo List */}
-            <div className={`flex flex-col gap-6 min-w-0 h-full min-h-0 ${isDetailView ? 'hidden' : ''}`}>
-              {/* Filters Section */}
-              <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full lg:w-[380px] flex-shrink-0 flex flex-col justify-center shadow-sm">
+            <div className={`flex flex-col gap-3 lg:gap-6 min-w-0 ${isDetailView ? 'hidden' : ''}`}>
+              {/* Filters Section — desktop only */}
+              <div className="hidden md:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-full shrink-0">
                 <div className="mb-3 pb-2 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-black">Filters</h2>
                   <p className="text-xs text-gray-500">Refine embryos by direction, branch and status</p>
@@ -808,108 +831,25 @@ export default function EmbryoGradingPage() {
                     </div>
                   </div>
 
-                  {/* Branch Filter */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Branch
-                    </label>
-                    <div className="relative" ref={branchDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsBranchDropdownOpen(!isBranchDropdownOpen);
-                        }}
-                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                      >
-                        <span className={selectedBranch !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                          {selectedBranch === 'All' ? 'All Branches' : selectedBranch}
-                        </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {isBranchDropdownOpen && (
-                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                          {branchOptions.map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedBranch(option);
-                                setIsBranchDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                selectedBranch === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
-                              }`}
-                            >
-                              {option === 'All' ? 'All Branches' : option}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status
-                    </label>
-                    <div className="relative" ref={statusDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsStatusDropdownOpen(!isStatusDropdownOpen);
-                        }}
-                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                      >
-                        <span className={selectedStatus !== 'All' ? 'text-[#6b1176]' : 'text-gray-700'}>
-                          {selectedStatus === 'All' ? 'All Statuses' : selectedStatus}
-                        </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {isStatusDropdownOpen && (
-                        <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                          {statusOptions.map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedStatus(option);
-                                setIsStatusDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                selectedStatus === option ? 'bg-[#6b1176] text-white' : 'text-[#6b1176] hover:bg-gray-100'
-                              }`}
-                            >
-                              {option === 'All' ? 'All Statuses' : option}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <FilterSelect
+                    label="Branch"
+                    value={selectedBranch}
+                    onChange={setSelectedBranch}
+                    options={branchOptions}
+                    allLabel="All Branches"
+                  />
+                  <FilterSelect
+                    label="Status"
+                    value={selectedStatus}
+                    onChange={setSelectedStatus}
+                    options={statusOptions}
+                    allLabel="All Statuses"
+                  />
                 </div>
               </div>
 
               {/* Active Embryos List */}
-              <div className={`bg-white border border-[#E7E1E1] rounded-lg p-3 w-full lg:w-[380px] flex-1 flex flex-col overflow-hidden min-h-80 shadow-sm`}>
+              <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="font-bold text-black text-base">
                   Active Embryos
@@ -986,7 +926,7 @@ export default function EmbryoGradingPage() {
             {/* Right Panel - Embryology Log Sheet */}
             {isDetailView && (
             <div className="flex flex-col gap-6 min-w-0 w-full h-full min-h-0">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col h-full">
                 <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">Embryology Log Sheet</h2>
@@ -1158,7 +1098,7 @@ export default function EmbryoGradingPage() {
 
             {!isDetailView && (
             <div className="lg:sticky lg:top-4 self-start w-full lg:w-[340px]">
-              <div className="rounded-lg border border-[#E7E1E1] bg-white shadow-sm p-5 space-y-4">
+              <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 space-y-4">
                 <div className="border-b border-[#F0EAF4] pb-4">
                   <p className="text-xs uppercase tracking-widest font-semibold text-[#8A7892]">Status Overview</p>
                   <p className="text-sm font-bold text-[#6b1176] mt-2">Embryo Snapshot</p>
@@ -1197,7 +1137,6 @@ export default function EmbryoGradingPage() {
             )}
           </div>
         </div>
-      </main>
 
       <Modal
         isOpen={isAddEmbryoFormOpen}
@@ -1263,7 +1202,7 @@ export default function EmbryoGradingPage() {
           </div>
           
           {/* Oocyte Identity (always visible) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-4 shadow-sm">
+          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Oocyte Identity</h3>
             <div className="grid grid-cols-1 gap-2 w-full sm:max-w-[220px]">
               <input className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm" placeholder="Oocyte No" value={logForm.oocyteNo} onChange={(e) => handleLogFieldChange('oocyteNo', e.target.value)} />
@@ -1271,7 +1210,7 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Day 0: Fertilization Check (PN Stage) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3">
             <button
               type="button"
               onClick={() => setOpenDaySection((prev) => (prev === 'day0' ? null : 'day0'))}
@@ -1304,7 +1243,7 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Day 3 Entry */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3">
             <button
               type="button"
               onClick={() => setOpenDaySection((prev) => (prev === 'day3' ? null : 'day3'))}
@@ -1356,7 +1295,7 @@ export default function EmbryoGradingPage() {
           </div>
 
           {/* Day 5 Blastocyst Assessment */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3">
             <button
               type="button"
               onClick={() => setOpenDaySection((prev) => (prev === 'day5' ? null : 'day5'))}
@@ -1426,7 +1365,7 @@ export default function EmbryoGradingPage() {
 
           {/* Day 6 Blastocyst Assessment (optional if Day 5 not blastocyst) */}
           {logForm.day5Stage && logForm.day5Stage !== 'Blastocyst' && (
-            <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-xl border border-[#E7E1E1] bg-white px-4 py-3">
               <button
                 type="button"
                 onClick={() => setOpenDaySection((prev) => (prev === 'day6' ? null : 'day6'))}
@@ -1506,7 +1445,7 @@ export default function EmbryoGradingPage() {
           )}
 
           {/* Fate & Freeze Details (Final Decision) */}
-          <div className="rounded-xl border border-[#E7E1E1] bg-gradient-to-r from-[#FCF9FF] to-white px-4 py-4 shadow-sm">
+          <div className="rounded-xl border border-[#E7E1E1] bg-gradient-to-r from-[#FCF9FF] to-white px-4 py-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">🎯 Final Decision</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <select className="h-10 rounded-md border border-[#E7E1E1] px-3 text-sm bg-white" value={logForm.fate} onChange={(e) => handleLogFieldChange('fate', e.target.value)}>
@@ -1541,13 +1480,13 @@ export default function EmbryoGradingPage() {
             <button
               type="button"
               onClick={handleAddLogEntry}
-              className="px-4 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62] shadow-sm"
+              className="px-4 py-2 rounded-md bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0f62]"
             >
               {editingLogId ? "Update Entry" : "Save Entry"}
             </button>
           </div>
         </div>
       </Modal>
-    </div>
+    </PageLayout>
   );
 }
