@@ -172,13 +172,13 @@ const ApprovalScreen: React.FC = () => {
     }
 
     return (
-      <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 overflow-hidden">
         <div className="w-full max-w-[28rem]">
           <div className="flex items-center gap-3 mb-2">
             <img src={MyTasksIcon} alt="Pending approvals" className="w-8 h-8" />
-            <h2 className="text-[32px] font-black text-gray-700 tracking-tighter">Pending approvals</h2>
+            <h2 className="text-[28px] sm:text-[32px] font-black text-gray-700 tracking-tighter">Pending approvals</h2>
           </div>
-          <p className="text-gray-500 mb-6">Select a user to review and approve or reject their registration.</p>
+          <p className="text-gray-500 mb-6 text-sm sm:text-base">Select a user to review and approve or reject their registration.</p>
           {pendingListLoading ? (
             <p className="text-gray-500">Loading...</p>
           ) : pendingListError ? (
@@ -188,15 +188,15 @@ const ApprovalScreen: React.FC = () => {
           ) : (
             <ul className="space-y-2">
               {pendingList.map((u) => (
-                <li key={u.user_id} className="flex items-center justify-between gap-4 py-3 px-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <span className="text-gray-800">
-                    {u.first_name} {u.last_name}
-                    {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
-                  </span>
+                <li key={u.user_id} className="flex items-center justify-between gap-x-4 gap-y-2 flex-wrap py-3 px-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-gray-800 font-medium truncate">{u.first_name} {u.last_name}</span>
+                    {u.email && <span className="text-gray-500 text-sm truncate">{u.email}</span>}
+                  </div>
                   <button
                     type="button"
                     onClick={() => navigate(`/approval?registration_id=${encodeURIComponent(u.user_id)}`)}
-                    className="py-2 px-4 bg-[#8b2a96] text-white rounded-md font-medium hover:bg-[#7a247e] transition"
+                    className="shrink-0 py-2 px-4 bg-[#8b2a96] text-white rounded-md font-medium hover:bg-[#7a247e] transition"
                   >
                     Review
                   </button>

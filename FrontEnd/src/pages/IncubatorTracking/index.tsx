@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Thermometer } from 'lucide-react';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
 import PageLayout from '../../components/PageLayout';
 
@@ -75,7 +76,7 @@ export default function IncubatorTrackingDashboardPage() {
   }, []);
 
   return (
-    <PageLayout title="Incubator Tracking" icon={IncubatorQualityTrackingIcon}>
+    <PageLayout title="Incubator Tracking" lucideIcon={Thermometer}>
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#9c3aa6] border-t-transparent" />

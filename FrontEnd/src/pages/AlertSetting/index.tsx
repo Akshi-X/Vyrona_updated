@@ -94,7 +94,6 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
         label: "Shock Detection",
         description: "Alert for physical impacts or sudden movements",
         icon: <Zap size={20} />,
-        unit: "g",
     },
     [KPI_NAMES.IVF_TIVE_BATTERY_PERCENTAGE]: {
         label: "Battery Level",
@@ -264,6 +263,62 @@ const getKpiValidation = (
             return validateMinMax(min, max);
     }
 };
+
+const AlertStatusBadge = ({
+    isAlertEnabled,
+    isCritical,
+    hasAnyValue,
+    onClear,
+    showUnset,
+    className = "",
+}: {
+    isAlertEnabled: boolean;
+    isCritical: boolean;
+    hasAnyValue?: boolean;
+    onClear?: () => void;
+    showUnset?: boolean;
+    className?: string;
+}) => (
+    <div className={`flex items-center gap-2 flex-shrink-0 ${className}`}>
+        {showUnset && (
+            <div className="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                <Minus size={10} />
+                Unset
+            </div>
+        )}
+        {isAlertEnabled ? (
+            <div className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${isCritical ? "bg-red-100" : "bg-[#F2E4FF]"}`}>
+                {isCritical ? (
+                    <Mail size={16} className="text-red-500" />
+                ) : (
+                    <Bell size={16} className="text-[#6b1176]" />
+                )}
+                <span className="mx-1.5 text-[10px]">
+                    {isCritical ? "Email Alert Enabled" : "Notification only"}
+                </span>
+            </div>
+        ) : (
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
+                <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
+                </div>
+            </div>
+        )}
+        {hasAnyValue && onClear && (
+            <button
+                type="button"
+                onClick={onClear}
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                title="Clear configuration"
+            >
+                <X size={18} className="text-gray-500" />
+            </button>
+        )}
+    </div>
+);
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
@@ -555,6 +610,12 @@ export default function AlertSetting() {
     useEffect(() => {
         setDraftConfig({});
         setMultiDraftConfig({});
+    }, [primaryContainer?.tank_id]);
+
+    useEffect(() => {
+        if (primaryContainer) {
+            setShowKpiPanel(true);
+        }
     }, [primaryContainer?.tank_id]);
 
     const closeUnsetConfirm = () => {
@@ -1251,9 +1312,9 @@ export default function AlertSetting() {
                         </>
                     }
                 >
-                    <div className="flex gap-6 flex-1 min-h-0">
+                    <div className="flex flex-col xl1:flex-row gap-6 flex-1 min-h-0">
                         {/* Left: filters + containers (Control Tower UI) */}
-                        <div className="w-[380px] shrink-0 flex flex-col gap-6">
+                        <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
                             <div className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
                                 <div>
@@ -1438,26 +1499,12 @@ export default function AlertSetting() {
                             </div>
                         </div>
 
-                        {/* Configure Alerts button — visible only below xl1 (1200px) */}
-                        {primaryContainer && (
-                            <button
-                                type="button"
-                                onClick={() => setShowKpiPanel(true)}
-                                className="xl1:hidden mt-2 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors"
-                            >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
-                                </svg>
-                                Configure Alerts
-                            </button>
-                        )}
-
                         {/* Right: KPI config cards */}
                         {/* Overlay backdrop — mobile only */}
                         {showKpiPanel && (
                             <div
                                 className="xl1:hidden fixed inset-0 bg-black/40 z-40"
-                                onClick={() => setShowKpiPanel(false)}
+                                onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
                             />
                         )}
                         <section className={`bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
@@ -1472,7 +1519,7 @@ export default function AlertSetting() {
                                 </h2>
                                 <button
                                     type="button"
-                                    onClick={() => setShowKpiPanel(false)}
+                                    onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
                                     className="xl1:hidden p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                                     aria-label="Close"
                                 >
@@ -1627,19 +1674,27 @@ export default function AlertSetting() {
                                                                             : "border-gray-200 bg-gray-50/30"
                                                                     }`}
                                                                 >
-                                                                    <div className="flex items-center gap-4">
-                                                                        <div
-                                                                            className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
-                                                                                isAlertEnabled
-                                                                                    ? isCritical
-                                                                                        ? "bg-red-100 text-red-500"
+                                                                    <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
+                                                                        <div className="flex items-center justify-between md:block">
+                                                                            <div
+                                                                                className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
+                                                                                    isAlertEnabled
+                                                                                        ? isCritical
+                                                                                            ? "bg-red-100 text-red-500"
+                                                                                            : "bg-[#F2E4FF] text-[#6b1176]"
                                                                                         : "bg-[#F2E4FF] text-[#6b1176]"
-                                                                                    : "bg-[#F2E4FF] text-[#6b1176]"
-                                                                            }`}
-                                                                        >
-                                                                            {
-                                                                                metadata.icon
-                                                                            }
+                                                                                }`}
+                                                                            >
+                                                                                {metadata.icon}
+                                                                            </div>
+                                                                            <AlertStatusBadge
+                                                                                className="md:hidden"
+                                                                                isAlertEnabled={isAlertEnabled}
+                                                                                isCritical={isCritical}
+                                                                                hasAnyValue={hasAnyValue}
+                                                                                onClear={() => clearMultiDraft(kpiName)}
+                                                                                showUnset
+                                                                            />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="flex items-start justify-between gap-4">
@@ -1657,79 +1712,14 @@ export default function AlertSetting() {
                                                                                         }
                                                                                     </p>
                                                                                 </div>
-                                                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                                                    <div className="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                                                                                        <Minus
-                                                                                            size={
-                                                                                                10
-                                                                                            }
-                                                                                        />
-                                                                                        Unset
-                                                                                    </div>
-                                                                                    {isAlertEnabled ? (
-                                                                                        <div
-                                                                                            className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${
-                                                                                                isCritical
-                                                                                                    ? "bg-red-100"
-                                                                                                    : "bg-[#F2E4FF]"
-                                                                                            }`}
-                                                                                        >
-                                                                                            {isCritical ? (
-                                                                                                <Mail
-                                                                                                    size={
-                                                                                                        16
-                                                                                                    }
-                                                                                                    className="text-red-500"
-                                                                                                />
-                                                                                            ) : (
-                                                                                                <Bell
-                                                                                                    size={
-                                                                                                        16
-                                                                                                    }
-                                                                                                    className="text-[#6b1176]"
-                                                                                                />
-                                                                                            )}
-                                                                                            <span className="mx-1.5 text-[10px]">
-                                                                                                {isCritical
-                                                                                                    ? "Email Alert Enabled"
-                                                                                                    : "Notification only"}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
-                                                                                            <svg
-                                                                                                className="w-5 h-5 text-gray-400"
-                                                                                                viewBox="0 0 24 24"
-                                                                                                fill="currentColor"
-                                                                                            >
-                                                                                                <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
-                                                                                            </svg>
-                                                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {/* Clear button */}
-                                                                                    {hasAnyValue && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() =>
-                                                                                                clearMultiDraft(
-                                                                                                    kpiName,
-                                                                                                )
-                                                                                            }
-                                                                                            className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                                                                                            title="Clear configuration"
-                                                                                        >
-                                                                                            <X
-                                                                                                size={
-                                                                                                    18
-                                                                                                }
-                                                                                                className="text-gray-500"
-                                                                                            />
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
+                                                                                <AlertStatusBadge
+                                                                                    className="hidden md:flex"
+                                                                                    isAlertEnabled={isAlertEnabled}
+                                                                                    isCritical={isCritical}
+                                                                                    hasAnyValue={hasAnyValue}
+                                                                                    onClear={() => clearMultiDraft(kpiName)}
+                                                                                    showUnset
+                                                                                />
                                                                             </div>
 
                                                                             {/* Validation error */}
@@ -1741,12 +1731,12 @@ export default function AlertSetting() {
                                                                                 </p>
                                                                             )}
 
-                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
+                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
                                                                                 {/* Lid State - special select input */}
                                                                                 {inputType ===
                                                                                 "lid_state" ? (
                                                                                     <div className="flex items-center gap-2">
-                                                                                        <div className="relative w-48">
+                                                                                        <div className="relative w-64">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="dropdown-button w-full px-3 h-10 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
@@ -1829,11 +1819,9 @@ export default function AlertSetting() {
                                                                                 ) : inputType ===
                                                                                   "battery" ? (
                                                                                     /* Battery - only min input, max is always 100 */
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-xs text-gray-500">
-                                                                                            Alert
-                                                                                            below
-                                                                                        </span>
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-xs text-gray-400 block">Min</span>
+                                                                                        <div className="flex items-center gap-1">
                                                                                         <input
                                                                                             ref={(
                                                                                                 el,
@@ -1900,24 +1888,17 @@ export default function AlertSetting() {
                                                                                                 )
                                                                                             }
                                                                                             placeholder="Min"
-                                                                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                         />
-                                                                                        {metadata.unit && (
-                                                                                            <span className="text-xs text-gray-400">
-                                                                                                {
-                                                                                                    metadata.unit
-                                                                                                }
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
+                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                        </div>
+                                                                                    </label>
                                                                                 ) : kpiName ===
                                                                                   KPI_NAMES.IVF_LN2_LEVEL ? (
                                                                                     /* LN2 - single threshold like battery */
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-xs text-gray-500">
-                                                                                            Alert
-                                                                                            below
-                                                                                        </span>
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-xs text-gray-400 block">Min</span>
+                                                                                        <div className="flex items-center gap-1">
                                                                                         <input
                                                                                             ref={(
                                                                                                 el,
@@ -1985,21 +1966,17 @@ export default function AlertSetting() {
                                                                                                 )
                                                                                             }
                                                                                             placeholder="Min"
-                                                                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                         />
-                                                                                        {metadata.unit && (
-                                                                                            <span className="text-xs text-gray-400">
-                                                                                                {
-                                                                                                    metadata.unit
-                                                                                                }
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
+                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                        </div>
+                                                                                    </label>
                                                                                 ) : (
                                                                                     /* Standard/Temperature/Percentage inputs */
                                                                                     <>
-                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="text-xs text-gray-400 block">Min</span>
+                                                                                            <div className="flex items-center gap-1">
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2060,11 +2037,14 @@ export default function AlertSetting() {
                                                                                                         "min",
                                                                                                     )
                                                                                                 }
-                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
+                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                            </div>
                                                                                         </label>
-                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="text-xs text-gray-400 block">Max</span>
+                                                                                            <div className="flex items-center gap-1">
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2125,12 +2105,14 @@ export default function AlertSetting() {
                                                                                                         "max",
                                                                                                     )
                                                                                                 }
-                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
+                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                            </div>
                                                                                         </label>
                                                                                     </>
                                                                                 )}
-                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="flex flex-wrap items-center gap-3">
                                                                                 <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
@@ -2230,13 +2212,10 @@ export default function AlertSetting() {
                                                                                 </div>
                                                                                 {/* Cooldown Minutes */}
                                                                                 {isAlertEnabled && (
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        <Clock
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                            className="text-gray-400 shrink-0"
-                                                                                        />
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-[10px] text-gray-400 block">Cooldown</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                        <Clock size={14} className="text-gray-400 shrink-0" />
                                                                                         <input
                                                                                             type="number"
                                                                                             min={
@@ -2286,13 +2265,11 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="w-16 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
                                                                                         />
-                                                                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                                                            min
-                                                                                            cooldown
-                                                                                        </span>
-                                                                                    </div>
+                                                                                        <span className="text-sm text-gray-500 shrink-0">mins</span>
+                                                                                        </div>
+                                                                                    </label>
                                                                                 )}
                                                                                 </div>
                                                                             </div>
@@ -2376,8 +2353,8 @@ export default function AlertSetting() {
                                                                 );
 
                                                             const isAlertEnabled =
-                                                                typeVal &&
-                                                                typeVal !== "";
+                                                                !!(typeVal &&
+                                                                typeVal !== "");
                                                             const isCritical =
                                                                 typeVal ===
                                                                 "critical";
@@ -2393,20 +2370,27 @@ export default function AlertSetting() {
                                                                             : "border-gray-200 bg-gray-50/30"
                                                                     }`}
                                                                 >
-                                                                    <div className="flex items-center gap-4">
-                                                                        {/* Icon */}
-                                                                        <div
-                                                                            className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
-                                                                                isAlertEnabled
-                                                                                    ? isCritical
-                                                                                        ? "bg-red-100 text-red-500"
+                                                                    <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
+                                                                        {/* Icon + mobile badge row */}
+                                                                        <div className="flex items-center justify-between md:block">
+                                                                            <div
+                                                                                className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 transform ${
+                                                                                    isAlertEnabled
+                                                                                        ? isCritical
+                                                                                            ? "bg-red-100 text-red-500"
+                                                                                            : "bg-[#F2E4FF] text-[#6b1176]"
                                                                                         : "bg-[#F2E4FF] text-[#6b1176]"
-                                                                                    : "bg-[#F2E4FF] text-[#6b1176]"
-                                                                            }`}
-                                                                        >
-                                                                            {
-                                                                                metadata.icon
-                                                                            }
+                                                                                }`}
+                                                                            >
+                                                                                {metadata.icon}
+                                                                            </div>
+                                                                            <AlertStatusBadge
+                                                                                className="md:hidden"
+                                                                                isAlertEnabled={isAlertEnabled}
+                                                                                isCritical={isCritical}
+                                                                                hasAnyValue
+                                                                                onClear={() => clearDraft(r.id)}
+                                                                            />
                                                                         </div>
 
                                                                         {/* Content */}
@@ -2427,71 +2411,13 @@ export default function AlertSetting() {
                                                                                         }
                                                                                     </p>
                                                                                 </div>
-
-                                                                                {/* Alert Toggle Icon + Clear Button */}
-                                                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                                                    {isAlertEnabled ? (
-                                                                                        <div
-                                                                                            className={`w-auto pl-1.5 pr-1.5 h-6 rounded-lg flex items-center justify-center ${
-                                                                                                isCritical
-                                                                                                    ? "bg-red-100"
-                                                                                                    : "bg-[#F2E4FF]"
-                                                                                            }`}
-                                                                                        >
-                                                                                            {isCritical ? (
-                                                                                                <Mail
-                                                                                                    size={
-                                                                                                        16
-                                                                                                    }
-                                                                                                    className="text-red-500"
-                                                                                                />
-                                                                                            ) : (
-                                                                                                <Bell
-                                                                                                    size={
-                                                                                                        16
-                                                                                                    }
-                                                                                                    className="text-[#6b1176]"
-                                                                                                />
-                                                                                            )}
-                                                                                            <span className="mx-1.5 text-[10px]">
-                                                                                                {isCritical
-                                                                                                    ? "Email Alert Enabled"
-                                                                                                    : "Notification only"}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
-                                                                                            <svg
-                                                                                                className="w-5 h-5 text-gray-400"
-                                                                                                viewBox="0 0 24 24"
-                                                                                                fill="currentColor"
-                                                                                            >
-                                                                                                <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
-                                                                                            </svg>
-                                                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {/* Clear button */}
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() =>
-                                                                                            clearDraft(
-                                                                                                r.id,
-                                                                                            )
-                                                                                        }
-                                                                                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                                                                                        title="Clear configuration"
-                                                                                    >
-                                                                                        <X
-                                                                                            size={
-                                                                                                18
-                                                                                            }
-                                                                                            className="text-gray-500"
-                                                                                        />
-                                                                                    </button>
-                                                                                </div>
+                                                                                <AlertStatusBadge
+                                                                                    className="hidden md:flex"
+                                                                                    isAlertEnabled={isAlertEnabled}
+                                                                                    isCritical={isCritical}
+                                                                                    hasAnyValue
+                                                                                    onClear={() => clearDraft(r.id)}
+                                                                                />
                                                                             </div>
 
                                                                             {/* Validation error */}
@@ -2504,12 +2430,12 @@ export default function AlertSetting() {
                                                                             )}
 
                                                                             {/* Inputs Row */}
-                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
+                                                                            <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
                                                                                 {/* Lid State - special select input */}
                                                                                 {inputType ===
                                                                                 "lid_state" ? (
                                                                                     <div className="flex items-center gap-2">
-                                                                                        <div className="relative w-48">
+                                                                                        <div className="relative w-64">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
@@ -2594,11 +2520,9 @@ export default function AlertSetting() {
                                                                                   r.kpi_name ===
                                                                                       KPI_NAMES.IVF_LN2_LEVEL ? (
                                                                                     /* Battery - only min input, max is always 100 */
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-xs text-gray-500">
-                                                                                            Alert
-                                                                                            below
-                                                                                        </span>
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-xs text-gray-400 block">Min</span>
+                                                                                        <div className="flex items-center gap-1">
                                                                                         <input
                                                                                             ref={(
                                                                                                 el,
@@ -2671,21 +2595,17 @@ export default function AlertSetting() {
                                                                                                 )
                                                                                             }
                                                                                             placeholder="Min"
-                                                                                            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                         />
-                                                                                        {metadata.unit && (
-                                                                                            <span className="text-xs text-gray-400">
-                                                                                                {
-                                                                                                    metadata.unit
-                                                                                                }
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
+                                                                                        {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                        </div>
+                                                                                    </label>
                                                                                 ) : (
                                                                                     /* Standard/Temperature/Percentage inputs */
                                                                                     <>
-                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="text-xs text-gray-400 block">Min</span>
+                                                                                            <div className="flex items-center gap-1">
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2746,11 +2666,14 @@ export default function AlertSetting() {
                                                                                                         "min",
                                                                                                     )
                                                                                                 }
-                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
+                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                            </div>
                                                                                         </label>
-                                                                                        <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                            <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                        <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                            <span className="text-xs text-gray-400 block">Max</span>
+                                                                                            <div className="flex items-center gap-1">
                                                                                             <input
                                                                                                 ref={(
                                                                                                     el,
@@ -2811,14 +2734,16 @@ export default function AlertSetting() {
                                                                                                         "max",
                                                                                                     )
                                                                                                 }
-                                                                                                className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                                className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                             />
+                                                                                                {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                            </div>
                                                                                         </label>
                                                                                     </>
                                                                                 )}
 
                                                                                 {/* Alert Type Select */}
-                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="flex flex-wrap items-center gap-3">
                                                                                 <div className="relative w-44 min-w-[140px]">
                                                                                     <button
                                                                                         type="button"
@@ -2918,13 +2843,10 @@ export default function AlertSetting() {
                                                                                 </div>
                                                                                 {/* Cooldown Minutes */}
                                                                                 {isAlertEnabled && (
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        <Clock
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                            className="text-gray-400 shrink-0"
-                                                                                        />
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-[10px] text-gray-400 block">Cooldown</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                        <Clock size={14} className="text-gray-400 shrink-0" />
                                                                                         <input
                                                                                             type="number"
                                                                                             min={
@@ -2974,13 +2896,11 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="w-16 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
                                                                                         />
-                                                                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                                                            min
-                                                                                            cooldown
-                                                                                        </span>
-                                                                                    </div>
+                                                                                        <span className="text-sm text-gray-500 shrink-0">mins</span>
+                                                                                        </div>
+                                                                                    </label>
                                                                                 )}
                                                                                 </div>
                                                                             </div>
@@ -3036,11 +2956,20 @@ export default function AlertSetting() {
                                                                         key={`missing-${kpiName}`}
                                                                         className="relative rounded-xl border-2 border-gray-200 bg-gray-50/30 p-5 transition-all duration-200"
                                                                     >
-                                                                        <div className="flex items-center gap-4">
-                                                                            <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 bg-[#F2E4FF] text-[#6b1176]">
-                                                                                {
-                                                                                    metadata.icon
-                                                                                }
+                                                                        <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
+                                                                            {/* Icon + mobile badge row */}
+                                                                            <div className="flex items-center justify-between md:block">
+                                                                                <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center p-1 bg-[#F2E4FF] text-[#6b1176]">
+                                                                                    {metadata.icon}
+                                                                                </div>
+                                                                                <AlertStatusBadge
+                                                                                    className="md:hidden"
+                                                                                    isAlertEnabled={false}
+                                                                                    isCritical={false}
+                                                                                    hasAnyValue={minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== ""}
+                                                                                    onClear={() => clearMultiDraft(kpiName)}
+                                                                                    showUnset
+                                                                                />
                                                                             </div>
                                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="flex items-center justify-between gap-3">
@@ -3057,61 +2986,21 @@ export default function AlertSetting() {
                                                                                             }
                                                                                         </p>
                                                                                     </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 relative">
-                                                                                            <svg
-                                                                                                className="w-5 h-5 text-gray-400"
-                                                                                                viewBox="0 0 24 24"
-                                                                                                fill="currentColor"
-                                                                                            >
-                                                                                                <path d="M12 2C10.9 2 10 2.9 10 4V5.29C7.12 6.14 5 8.82 5 12V17L3 19V20H21V19L19 17V12C19 8.82 16.88 6.14 14 5.29V4C14 2.9 13.1 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" />
-                                                                                            </svg>
-                                                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-7 h-0.5 bg-red-400 transform rotate-45 rounded"></div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <div className="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                                                                                            <Minus
-                                                                                                size={
-                                                                                                    10
-                                                                                                }
-                                                                                            />
-                                                                                            Unset
-                                                                                        </div>
-                                                                                        {(minVal !==
-                                                                                            null ||
-                                                                                            maxVal !==
-                                                                                                null ||
-                                                                                            typeVal !==
-                                                                                                null ||
-                                                                                            lidStateVal !==
-                                                                                                "") && (
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                onClick={() =>
-                                                                                                    clearMultiDraft(
-                                                                                                        kpiName,
-                                                                                                    )
-                                                                                                }
-                                                                                                className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                                                                                                title="Clear configuration"
-                                                                                            >
-                                                                                                <X
-                                                                                                    size={
-                                                                                                        18
-                                                                                                    }
-                                                                                                    className="text-gray-500"
-                                                                                                />
-                                                                                            </button>
-                                                                                        )}
-                                                                                    </div>
+                                                                                    <AlertStatusBadge
+                                                                                        className="hidden md:flex"
+                                                                                        isAlertEnabled={false}
+                                                                                        isCritical={false}
+                                                                                        hasAnyValue={minVal !== null || maxVal !== null || typeVal !== null || lidStateVal !== ""}
+                                                                                        onClear={() => clearMultiDraft(kpiName)}
+                                                                                        showUnset
+                                                                                    />
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-4">
+                                                                        <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
                                                                             {inputType ===
                                                                             "lid_state" ? (
-                                                                                <div className="relative w-48">
+                                                                                <div className="relative w-64">
                                                                                     <button
                                                                                         type="button"
                                                                                         className="dropdown-button w-full px-3 h-12 border border-gray-200 rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white text-gray-900"
@@ -3194,11 +3083,9 @@ export default function AlertSetting() {
                                                                                   "battery" ||
                                                                               kpiName ===
                                                                                   KPI_NAMES.IVF_LN2_LEVEL ? (
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-xs text-gray-500">
-                                                                                        Alert
-                                                                                        below
-                                                                                    </span>
+                                                                                <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                    <span className="text-xs text-gray-400 block">Min</span>
+                                                                                    <div className="flex items-center gap-1">
                                                                                     <input
                                                                                         ref={(
                                                                                             el,
@@ -3271,20 +3158,16 @@ export default function AlertSetting() {
                                                                                             )
                                                                                         }
                                                                                         placeholder="Min"
-                                                                                        className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white"
+                                                                                        className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                     />
-                                                                                    {metadata.unit && (
-                                                                                        <span className="text-xs text-gray-400">
-                                                                                            {
-                                                                                                metadata.unit
-                                                                                            }
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
+                                                                                    {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                    </div>
+                                                                                </label>
                                                                             ) : (
                                                                                 <>
-                                                                                    <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Min{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-xs text-gray-400 block">Min</span>
+                                                                                        <div className="flex items-center gap-1">
                                                                                         <input
                                                                                             ref={(
                                                                                                 el,
@@ -3345,11 +3228,14 @@ export default function AlertSetting() {
                                                                                                     "min",
                                                                                                 )
                                                                                             }
-                                                                                            className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                         />
+                                                                                            {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                        </div>
                                                                                     </label>
-                                                                                    <label className="group relative block border border-gray-200 rounded-lg mt-3 px-3 py-2 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
-                                                                                        <span className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-400 group-focus-within:text-[#6b1176] transition-colors pointer-events-none">Max{metadata.unit ? ` ${metadata.unit}` : ""}</span>
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-xs text-gray-400 block">Max</span>
+                                                                                        <div className="flex items-center gap-1">
                                                                                         <input
                                                                                             ref={(
                                                                                                 el,
@@ -3410,12 +3296,14 @@ export default function AlertSetting() {
                                                                                                     "max",
                                                                                                 )
                                                                                             }
-                                                                                            className="w-full text-sm text-gray-900 bg-transparent outline-none"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none"
                                                                                         />
+                                                                                            {metadata.unit && <span className="text-sm text-gray-500 shrink-0">{metadata.unit}</span>}
+                                                                                        </div>
                                                                                     </label>
                                                                                 </>
                                                                             )}
-                                                                            <div className="flex items-center gap-3">
+                                                                            <div className="flex flex-wrap items-center gap-3">
                                                                             <div className="relative w-44 min-w-[140px]">
                                                                                 <button
                                                                                     type="button"
@@ -3513,13 +3401,10 @@ export default function AlertSetting() {
                                                                             {typeVal &&
                                                                                 typeVal !==
                                                                                     "" && (
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        <Clock
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                            className="text-gray-400 shrink-0"
-                                                                                        />
+                                                                                    <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
+                                                                                        <span className="text-[10px] text-gray-400 block">Cooldown</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                        <Clock size={14} className="text-gray-400 shrink-0" />
                                                                                         <input
                                                                                             type="number"
                                                                                             min={
@@ -3569,13 +3454,11 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="w-16 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#6b1176] focus:border-transparent bg-white text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
                                                                                         />
-                                                                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                                                            min
-                                                                                            cooldown
-                                                                                        </span>
-                                                                                    </div>
+                                                                                        <span className="text-sm text-gray-500 shrink-0">mins</span>
+                                                                                        </div>
+                                                                                    </label>
                                                                                 )}
                                                                             </div>
                                                                         </div>
@@ -3586,14 +3469,14 @@ export default function AlertSetting() {
                                                     </>
                                                 )}
                                             </div>
-                                            <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex items-center justify-end gap-3">
+                                            <div className="mt-4 pt-4 border-t border-gray-100 shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-end gap-3">
                                                 {/* Save to Additional Branches */}
-                                                <div className="relative">
+                                                <div className="relative w-full md:w-auto">
                                                     <button
                                                         type="button"
                                                         disabled={!primaryContainer || configList.length === 0}
                                                         onClick={() => setShowBranchDropdown((v) => !v)}
-                                                        className="px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                                                        className="w-full md:w-auto px-4 py-2.5 border border-[#6b1176] text-[#6b1176] rounded-lg text-sm font-medium hover:bg-[#F7ECFF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                     >
                                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
@@ -3694,7 +3577,7 @@ export default function AlertSetting() {
                                                     type="button"
                                                     onClick={handleSaveAll}
                                                     disabled={saveAllLoading || !hasPendingChanges}
-                                                    className="px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                    className="w-full md:w-auto px-6 py-2.5 bg-[#6b1176] text-white rounded-lg text-sm font-medium hover:bg-[#8a2a95] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                 >
                                                     {saveAllLoading ? (
                                                         <>
