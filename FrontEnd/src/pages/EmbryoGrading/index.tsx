@@ -748,7 +748,7 @@ export default function EmbryoGradingPage() {
                 <FilterToggle
                   label="Direction"
                   value={direction}
-                  onChange={setDirection}
+                  onChange={(val) => setDirection(val as "fresh" | "frozen")}
                   options={[
                     { label: 'Fresh', value: 'fresh' },
                     { label: 'Frozen', value: 'frozen' },
@@ -1097,7 +1097,7 @@ export default function EmbryoGradingPage() {
             )}
 
             {!isDetailView && (
-            <div className="lg:sticky lg:top-4 self-start w-full lg:w-[340px]">
+            <div className="order-first lg:order-last lg:sticky lg:top-4 self-start w-full lg:w-[340px]">
               <div className="rounded-lg border border-[#E7E1E1] bg-white p-5 space-y-4">
                 <div className="border-b border-[#F0EAF4] pb-4">
                   <p className="text-xs uppercase tracking-widest font-semibold text-[#8A7892]">Status Overview</p>

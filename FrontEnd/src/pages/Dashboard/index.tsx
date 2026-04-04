@@ -1039,7 +1039,7 @@ export default function Dashboard({ }: DashboardProps) {
                     const displayName = [userFirstName, userLastName].filter(Boolean).join(' ') || 'User';
                     return (
                       <p className="text-black font-semibold text-xl leading-tight flex flex-wrap items-center gap-2">
-                        <span>Good {greeting},<br className="md:hidden" /></span>
+                        <span>Good {greeting},<br className="sm:hidden" /></span>
                         {loadingUserProfile ? (
                           <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
                         ) : (
@@ -1062,13 +1062,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Cryolocks
+                            Total <br className="sm:hidden" />Cryolocks
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfTotals
@@ -1081,13 +1081,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Total number of Containers */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total number of Containers
+                            Total number<br className="sm:hidden" /> of Containers
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfContainers
@@ -1106,13 +1106,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Quality Deviations Flagged
+                            Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfQualityDeviations
@@ -1125,13 +1125,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Top Deviation Driver
+                            Top Deviation<br className="sm:hidden" /> Driver
                           </div>
                           <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfTopDeviationDriverName || undefined}>
                             {loadingIvfTopDeviationDriver
@@ -1150,13 +1150,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Quality Deviations Flagged
+                            Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
@@ -1170,13 +1170,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Deviations */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Top Deviation Driver
+                          Top Deviation<br className="sm:hidden" /> Driver
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
@@ -1312,7 +1312,7 @@ export default function Dashboard({ }: DashboardProps) {
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
                             <img
-                              className="w-[18px] h-[18px]"
+                              className="w-[18px] h-[18px] brightness-0 invert"
                               alt="Incubator Quality Tracking"
                               src={IncubatorQualityTrackingIcon}
                             />
@@ -1454,7 +1454,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Patient Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1473,7 +1473,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Treatment Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1503,7 +1503,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Cold Chain Packaging Failure */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 mr-4 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1526,7 +1526,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Quality Lost per Patient */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1560,7 +1560,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* On Time Percentage */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1583,7 +1583,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Lead Time */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img

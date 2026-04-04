@@ -165,7 +165,13 @@ const RefillLog = () => {
                                 try {
                                     const res = await ivfService.getCanisterRefillLogs(c.tankId);
                                     return (res?.refill_logs ?? []).map((log) => ({
-                                        timestamp: `${log.refill_date ?? "-"}${log.refill_time ? ", " + log.refill_time : ""}`,
+                                        timestamp: (() => {
+                                            if (!log.refill_date) return "-";
+                                            const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
+                                            const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                                            const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                                            return time ? `${date}, ${time}` : date;
+                                        })(),
                                         sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
                                         tankCode: c.tankCode,
                                         branch: c.branch,
@@ -382,7 +388,7 @@ const RefillLog = () => {
                             </svg>
                         </button>
 
-                        <div className="flex items-end gap-4">
+                        <div className="flex items-end gap-4 max-[500px]:flex-col max-[500px]:items-start">
                             {/* Droplet icon */}
                             <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2E4FF] text-[#6b1176] self-start">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -508,9 +514,9 @@ const RefillLog = () => {
                         <div className="px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
-                        <div className="flex flex-1 min-h-0 overflow-hidden">
+                        <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG illustration */}
-                            <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1]">
+                            <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
                                 <svg width="200" height="320" viewBox="0 0 200 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
                                     <defs>
                                         <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">

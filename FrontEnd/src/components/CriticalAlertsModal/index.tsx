@@ -552,9 +552,18 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                     : undefined
                                             }
                                         >
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex min-w-0 items-start gap-3 text-left flex-1">
+                                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+                                                {/* Icon — top on mobile, inline on desktop */}
+                                                <div className="flex items-center gap-2 md:hidden">
                                                     <div className="flex flex-col items-center">
+                                                        {getSeverityIcon(latestAlert.severity)}
+                                                        {hiddenCount > 0 && !isExpanded && (
+                                                            <span className="mt-1 text-[11px] font-semibold text-[#6b1176]">+{hiddenCount}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex min-w-0 items-start gap-3 text-left flex-1">
+                                                    <div className="hidden md:flex flex-col items-center">
                                                         {getSeverityIcon(
                                                             latestAlert.severity,
                                                         )}
@@ -646,73 +655,54 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2">
+                                                {/* Acknowledge — right on desktop */}
+                                                <div className="hidden md:flex items-center gap-2">
                                                     {hiddenCount > 0 && (
-                                                        <div
-                                                            className="p-2"
-                                                            title={
-                                                                isExpanded
-                                                                    ? "Collapse older alerts"
-                                                                    : "Show older alerts"
-                                                            }
-                                                        >
-                                                            <svg
-                                                                className={`w-4 h-4 text-gray-600 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                                                                fill="none"
-                                                                viewBox="0 0 24 24"
-                                                                stroke="currentColor"
-                                                            >
-                                                                <path
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                    strokeWidth={
-                                                                        2
-                                                                    }
-                                                                    d="M19 9l-7 7-7-7"
-                                                                />
+                                                        <div className="p-2" title={isExpanded ? "Collapse older alerts" : "Show older alerts"}>
+                                                            <svg className={`w-4 h-4 text-gray-600 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                             </svg>
                                                         </div>
                                                     )}
-
                                                     {onAcknowledge && (
-                                                        <>
-                                                            {latestAlert.status ===
-                                                            "Active" ? (
-                                                                <button
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        handleAcknowledgeRequest(
-                                                                            latestAlert.id,
-                                                                        );
-                                                                    }}
-                                                                    disabled={acknowledgingIds.has(
-                                                                        latestAlert.id,
-                                                                    )}
-                                                                    className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${
-                                                                        acknowledgingIds.has(
-                                                                            latestAlert.id,
-                                                                        )
-                                                                            ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                                                            : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"
-                                                                    }`}
-                                                                >
-                                                                    {acknowledgingIds.has(
-                                                                        latestAlert.id,
-                                                                    )
-                                                                        ? "Acknowledging..."
-                                                                        : "Acknowledge"}
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-gray-400 text-xs">
-                                                                    -
-                                                                </span>
-                                                            )}
-                                                        </>
+                                                        latestAlert.status === "Active" ? (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
+                                                                disabled={acknowledgingIds.has(latestAlert.id)}
+                                                                className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
+                                                            >
+                                                                {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs">-</span>
+                                                        )
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Acknowledge — bottom on mobile */}
+                                            {onAcknowledge && (
+                                                <div className="md:hidden mt-3 flex items-center justify-between gap-2">
+                                                    {hiddenCount > 0 && (
+                                                        <div className="p-1" title={isExpanded ? "Collapse older alerts" : "Show older alerts"}>
+                                                            <svg className={`w-4 h-4 text-gray-600 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    {latestAlert.status === "Active" ? (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
+                                                            disabled={acknowledgingIds.has(latestAlert.id)}
+                                                            className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
+                                                        >
+                                                            {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">Already acknowledged</span>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {isExpanded && hiddenCount > 0 && (
                                                 <div className="mt-3 border-t border-gray-200/70 pt-3 space-y-3">
