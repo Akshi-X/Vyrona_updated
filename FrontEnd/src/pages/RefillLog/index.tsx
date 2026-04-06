@@ -19,6 +19,8 @@ type ContainerItem = {
     lastLogTime?: string;
     ln2LevelKg?: number | null;   // raw kg from ln2_mass_kg
     ln2ConfigMin?: number | null;
+    tankMaxCapacity?: number | null;
+    tankMinCapacity?: number | null;
 };
 
 type RefillLogCreateForm = {
@@ -133,10 +135,11 @@ const RefillLog = () => {
                     const withLogs = await Promise.all(
                         flattened.map(async (c) => {
                             try {
-                                const [refillRes, ln2Res, configRes] = await Promise.all([
+                                const [refillRes, ln2Res, configRes, kpiConfigRes] = await Promise.all([
                                     ivfService.getCanisterRefillLogs(c.tankId),
                                     ivfService.getLn2HistoryById(c.tankId, 1).catch(() => null),
                                     ivfService.getKpiConfigList(Number(c.tankId)).catch(() => null),
+                                    ivfService.getTankKpiConfig(c.tankId).catch(() => null),
                                 ]);
                                 const logs = refillRes?.refill_logs ?? [];
                                 const last = logs[0];
@@ -149,6 +152,8 @@ const RefillLog = () => {
                                     lastLogTime: last?.refill_time ?? "-",
                                     ln2LevelKg: latestLn2?.ln2_mass_kg ?? null,
                                     ln2ConfigMin: configRes?.config?.find((cfg: { kpi_name: string; min: number | null }) => cfg.kpi_name === "ln2_level")?.min ?? null,
+                                    tankMaxCapacity: kpiConfigRes?.tank_max_capacity_reading ?? null,
+                                    tankMinCapacity: kpiConfigRes?.tank_min_capacity_reading ?? null,
                                 };
                             } catch {
                                 return c;
@@ -455,20 +460,26 @@ const RefillLog = () => {
                                     {/* LN2 Level progress bar */}
                                     <div className="px-2">
                                         {container.ln2LevelKg != null ? (() => {
-                                            // Same formula as IVFQualityParametersTable
-                                            const ln2_100per = container.tankId === '84' ? 45.2 : 34.894;
-                                            const ln2Pct = Math.min(100, Math.max(0, Math.round((container.ln2LevelKg / ln2_100per) * 100)));
-                                            const l2Pct = container.ln2ConfigMin != null
+                                            const ln2_100per =
+                                                container.tankMaxCapacity != null && container.tankMinCapacity != null
+                                                    ? container.tankMaxCapacity - container.tankMinCapacity
+                                                    : null;
+                                            const ln2Pct = ln2_100per != null && ln2_100per > 0
+                                                ? Math.min(100, Math.max(0, Math.round((container.ln2LevelKg / ln2_100per) * 100)))
+                                                : null;
+                                            const l2Pct = container.ln2ConfigMin != null && ln2_100per != null && ln2_100per > 0
                                                 ? Math.round(100 - ((ln2_100per - container.ln2ConfigMin) / ln2_100per) * 100)
                                                 : null;
                                             return (
                                                 <div className="flex flex-col items-stretch gap-0.5">
                                                     {/* Bar */}
                                                     <div className="relative h-2.5 rounded-full bg-[#E7D4F0] overflow-visible">
-                                                        <div
-                                                            className="absolute inset-y-0 left-0 rounded-full bg-[#6b1176]"
-                                                            style={{ width: `${ln2Pct}%` }}
-                                                        />
+                                                        {ln2Pct != null && (
+                                                            <div
+                                                                className="absolute inset-y-0 left-0 rounded-full bg-[#6b1176]"
+                                                                style={{ width: `${ln2Pct}%` }}
+                                                            />
+                                                        )}
                                                         {/* L2 threshold marker */}
                                                         {l2Pct != null && (
                                                             <div
@@ -478,7 +489,7 @@ const RefillLog = () => {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center justify-between mt-0.5">
-                                                        <span className="text-[10px] text-[#6b1176] font-medium">LN2 - {ln2Pct}%</span>
+                                                        <span className="text-[10px] text-[#6b1176] font-medium">{ln2Pct != null ? `LN2 - ${ln2Pct}%` : '—'}</span>
                                                         {l2Pct != null && (
                                                             <span className="text-[10px] text-orange-500 font-medium">L2 - {l2Pct}%</span>
                                                         )}

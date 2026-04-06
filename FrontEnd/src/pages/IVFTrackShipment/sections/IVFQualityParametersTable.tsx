@@ -177,6 +177,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const [shockTs, setShockTs] = useState<number | null>(null);
   const [l1, setL1] = useState<number | null>(null);
   const [l2, setL2] = useState<number | null>(null);
+  const [tankMaxCapacity, setTankMaxCapacity] = useState<number | null>(null);
+  const [tankMinCapacity, setTankMinCapacity] = useState<number | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState<number>(Date.now());
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
@@ -440,6 +442,8 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         const thresholds = extractLn2Thresholds(res?.kpi_limits);
         setL1(thresholds.l1);
         setL2(thresholds.l2);
+        setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
+        setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
       })
       .catch(() => {});
 
@@ -592,9 +596,15 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const isShockMissing = shockValue === '—';
   const isEvaporationMissing = evaporationRate == null;
 
-  const ln2_100per = normalizedTankId === '84' ? 45.2 : 34.894;
+  const ln2_100per =
+    tankMaxCapacity != null && tankMinCapacity != null
+      ? tankMaxCapacity - tankMinCapacity
+      : null;
 
-  const levelActualPercent = levelPercent != null ? Math.round((levelPercent / ln2_100per) * 100) : null;
+  const levelActualPercent =
+    levelPercent != null && ln2_100per != null && ln2_100per > 0
+      ? Math.floor((levelPercent / ln2_100per) * 100)
+      : null;
 
   // Tank dimensions for fill calculation
   const tankBodyTop = 50;
@@ -605,7 +615,10 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
   // L1/L2 level marker positions (calculate Y from percentage)
   const l1Y = l1 != null ? tankBodyBottom - (tankBodyHeight * l1) / 100 : null;
-  const l2Y = l2 != null ? tankBodyBottom - (tankBodyHeight * (100-((ln2_100per-l2)/ln2_100per)*100)) / 100 : null;
+  const l2Y =
+    l2 != null && ln2_100per != null && ln2_100per > 0
+      ? tankBodyBottom - (tankBodyHeight * (100 - ((ln2_100per - l2) / ln2_100per) * 100)) / 100
+      : null;
   
   // Alert color based on level thresholds
   const alertColor = levelPercent == null
@@ -817,7 +830,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
               fill="#6B1176"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
-              {levelPercent != null ? `${Math.round((levelPercent/ln2_100per)*100)}%` : '—'}
+              {levelPercent != null && ln2_100per != null && ln2_100per > 0 ? `${Math.min(100, Math.floor((levelPercent / ln2_100per) * 100))}%` : '—'}
             </text>
             <text
               x="100"

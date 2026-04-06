@@ -39,6 +39,7 @@ from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.ivf_geolocation_model import IVFGeolocation
 from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
 from app.models.IVF.tank_model import Tank
 from app.models.patient_model import Patient
 from app.models.user_model import User
@@ -622,6 +623,22 @@ class QualityService:
                     .first()
                 )
 
+            ln2_device = (
+                self.db.query(Ln2IotDevice)
+                .filter(Ln2IotDevice.tank_id == tank_id)
+                .first()
+            )
+            tank_max_capacity = (
+                float(ln2_device.tank_max_capacity_reading)
+                if ln2_device and ln2_device.tank_max_capacity_reading is not None
+                else None
+            )
+            tank_min_capacity = (
+                float(ln2_device.tank_min_capacity_reading)
+                if ln2_device and ln2_device.tank_min_capacity_reading is not None
+                else None
+            )
+
             rows = (
                 self.db.query(KpiConfig)
                 .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
@@ -657,6 +674,8 @@ class QualityService:
                 "tank_code": tank_code,
                 "branch_id": tank.branch_id if tank else None,
                 "branch_name": branch.branch_name if branch else None,
+                "tank_max_capacity_reading": tank_max_capacity,
+                "tank_min_capacity_reading": tank_min_capacity,
                 "kpi_limits": kpi_limits,
             }
         except Exception as e:
@@ -667,6 +686,8 @@ class QualityService:
                 "tank_code": tank_code,
                 "branch_id": None,
                 "branch_name": None,
+                "tank_max_capacity_reading": None,
+                "tank_min_capacity_reading": None,
                 "kpi_limits": {},
             }
 
