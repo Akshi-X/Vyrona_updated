@@ -35,6 +35,7 @@ from app.controller import (
 from app.controller.IVF import (
     critical_alert_controller,
     internal_alert_controller,
+    internal_refill_controller,
     ivf_controller,
     ivf_dashboard_controller,
     ivf_quality_controller,
@@ -239,6 +240,7 @@ app.include_router(ivf_quality_controller.router, prefix=API_PREFIX)
 app.include_router(critical_alert_controller.router, prefix=API_PREFIX)
 app.include_router(ivf_reports_controller.router, prefix=API_PREFIX)
 app.include_router(internal_alert_controller.router, prefix=API_PREFIX)
+app.include_router(internal_refill_controller.router, prefix=API_PREFIX)
 app.include_router(ui_variant_controller.router, prefix=API_PREFIX)
 
 
