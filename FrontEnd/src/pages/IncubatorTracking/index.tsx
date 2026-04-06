@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Thermometer } from 'lucide-react';
 import IncubatorQualityTrackingIcon from '../../assets/DashBoardIcons/IncubatorQualityTracking.svg';
+import PageLayout from '../../components/PageLayout';
 
 interface IncubatorCardItem {
   id: string;
@@ -74,21 +76,7 @@ export default function IncubatorTrackingDashboardPage() {
   }, []);
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full min-h-screen">
-      <main className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0 pt-10">
-        <div className="flex-1 p-6 overflow-y-auto min-h-0">
-          <div className="flex items-center gap-1 text-sm mb-6">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="text-gray-500 text-[12px] hover:text-gray-700 transition-colors"
-            >
-              Dashboard
-            </button>
-            <span className="text-gray-500">/</span>
-            <span className="text-black font-semibold">Incubators</span>
-          </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-6">Incubators</h1>
+    <PageLayout title="Incubator Tracking" lucideIcon={Thermometer}>
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#9c3aa6] border-t-transparent" />
@@ -128,8 +116,6 @@ export default function IncubatorTrackingDashboardPage() {
               No incubators found. Data will appear when available.
             </div>
           )}
-        </div>
-      </main>
-    </div>
+    </PageLayout>
   );
 }

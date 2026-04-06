@@ -530,9 +530,48 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
                   </tr>
                 )}
                 {rows.length === 0 && !isAdding ? (
-                  <tr className="text-black text-[14px] h-[56px] bg-white">
-                    <td className="px-3 py-2 text-gray-500" colSpan={9}>
-                      No refill logs found
+                  <tr className="text-black text-[14px] bg-white">
+                    <td className="px-3 py-2" colSpan={9}>
+                      <div className="relative">
+                        <div className="space-y-2">
+                          {[
+                            ['2026-02-14', '09:15:00', 'Nurse A', 'Routine check', 'R-12', '2026-02-12', '2026-02-13', 'In progress', 'Edit'],
+                            ['2026-03-01', '11:45:00', 'Tech B', 'Top-up', 'R-05', '2026-02-28', '2026-03-01', 'Done', 'Edit'],
+                            ['2026-03-01', '11:45:00', 'Tech B', 'Top-up', 'R-05', '2026-02-28', '2026-03-01', 'Done', 'Edit'],
+                            ['2026-03-01', '11:45:00', 'Tech B', 'Top-up', 'R-05', '2026-02-28', '2026-03-01', 'Done', 'Edit'],
+                          ].map((cells, i) => (
+                            <div
+                              key={i}
+                              className="grid grid-cols-9 gap-3 items-center h-12 bg-white px-3 rounded blur-[1px] opacity-70"
+                            >
+                              {cells.map((cell, col) => (
+                                <div key={col} className="text-[13px] text-gray-500 truncate">
+                                  {cell}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-1.5 bg-white/80 text-gray-700 text-sm px-4 py-2 rounded shadow-sm text-center">
+                            <svg
+                              className="w-6 h-6 text-[#6B1176]"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"
+                              />
+                            </svg>
+                            <span>No logs added yet.</span>
+                          </div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ) : (

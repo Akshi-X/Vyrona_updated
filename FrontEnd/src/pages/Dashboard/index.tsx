@@ -21,6 +21,8 @@ import { complianceService, type ComplianceMetrics } from '../../services/compli
 import { chatService, type UnreadMessageResponse } from '../../services/chatService';
 import { userService } from '../../services/userService';
 import { useDashboardChatWebSocket } from '../../hooks/useChatWebSocket';
+import DashboardIconDark from '../../assets/DashBoardIcons/DashBoardDark.svg';
+import PageLayout from '../../components/PageLayout';
 // Dashboard Icons
 import CriticalAlertsIcon from '../../assets/DashBoardIcons/Critical_Alerts.svg';
 import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
@@ -987,45 +989,47 @@ export default function Dashboard({ }: DashboardProps) {
     },
   ];
 
+  const dashboardActionIcons = (
+    <div className="flex items-center gap-4">
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="Critical Alerts" src={CriticalAlertsIcon}
+          onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }} />
+        {criticalAlertsCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+          </div>
+        )}
+      </div>
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="Stakeholder Chats" src={StakeholderChatsIcon}
+          onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }} />
+        {stakeholderChatCount > 0 && (
+          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
+            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+          </div>
+        )}
+      </div>
+      <div className="relative">
+        <img className="w-[22px] h-[22px] cursor-pointer" alt="My Tasks" src={MyTasksIcon}
+          onClick={() => { fetchMyTasks(); setShowMyTasks(true); }} />
+        {myTasksCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div
-      className="bg-[#FDFAFF] flex w-full h-[100vh] overflow-x-hidden"
-      style={{
-        maxWidth: '100vw',
-        touchAction: 'pan-y',
-        overscrollBehaviorX: 'none'
-      }}
-    >
-      {/* Main Content Area */}
-      <main
-        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden min-w-0"
-        style={{
-          maxWidth: '100vw',
-          touchAction: 'pan-y',
-          overscrollBehaviorX: 'none',
-          height: '100vh'
-        }}
-      >
-
-        {/* Dashboard Content */}
-        <div
-          className="flex-1 p-6 pt-10 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0"
-          style={{
-            touchAction: 'pan-y',
-            overscrollBehaviorX: 'none',
-            overscrollBehaviorY: 'auto',
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
-
+    <>
+      <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop>
           {userDepartment === 'IVF' ? (
             // IVF Dashboard Layout
             <>
-              {/* Single row: greeting (left) + alerts (right); on mobile: alerts on top, greeting below */}
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                {/* Greeting - below alerts on mobile, left on desktop */}
-                <div className="order-2 lg:order-1 flex flex-col gap-0.5">
+              {/* Greeting row: greeting left + actions right on desktop */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
                   <p className="text-sm text-gray-500 font-normal min-h-[1.25rem]">
                     {userWorkspaceName || '\u00A0'}
                   </p>
@@ -1034,8 +1038,8 @@ export default function Dashboard({ }: DashboardProps) {
                     const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
                     const displayName = [userFirstName, userLastName].filter(Boolean).join(' ') || 'User';
                     return (
-                      <p className="text-black font-semibold text-xl flex items-center gap-2">
-                        <span>Good {greeting},</span>
+                      <p className="text-black font-semibold text-xl leading-tight flex flex-wrap items-center gap-2">
+                        <span>Good {greeting},<br className="sm:hidden" /></span>
                         {loadingUserProfile ? (
                           <span className="inline-block h-7 w-[150px] max-w-full animate-pulse rounded-md bg-gray-200" />
                         ) : (
@@ -1045,64 +1049,8 @@ export default function Dashboard({ }: DashboardProps) {
                     );
                   })()}
                 </div>
-                {/* Critical Alerts, Stakeholder Chats, My Tasks - on top on mobile, right on desktop */}
-                <section className="order-1 lg:order-2 w-full lg:w-auto">
-                  <div className="flex justify-end gap-8">
-                    {/* Critical Alerts */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="Critical Alerts"
-                        src={CriticalAlertsIcon}
-                        onClick={() => {
-                          fetchCriticalAlerts();
-                          setShowCriticalAlerts(true);
-                        }}
-                      />
-                      {criticalAlertsCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                          <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Stakeholder Chats */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="Stakeholder Chats"
-                        src={StakeholderChatsIcon}
-                        onClick={() => {
-                          refreshUnread();
-                          fetchStakeholderChats();
-                          setShowStakeholderChats(true);
-                        }}
-                      />
-                      {stakeholderChatCount > 0 && (
-                        <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center ${
-                          stakeholderChatCount > 9 ? 'px-1 min-w-[20px]' : 'w-4 h-4'
-                        }`}>
-                          <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
-                        </div>
-                      )}
-                    </div>
-                    {/* My Tasks */}
-                    <div className="relative group">
-                      <img
-                        className="w-[25px] h-[25px] cursor-pointer"
-                        alt="My Tasks"
-                        src={MyTasksIcon}
-                        onClick={() => {
-                          fetchMyTasks();
-                          setShowMyTasks(true);
-                        }}
-                      />
-                      {myTasksCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
-                          <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <section className="hidden md:flex justify-end">
+                  {dashboardActionIcons}
                 </section>
               </div>
 
@@ -1114,13 +1062,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total Cryolocks
+                            Total <br className="sm:hidden" />Cryolocks
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfTotals
@@ -1133,13 +1081,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Total number of Containers */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Total number of Containers
+                            Total number<br className="sm:hidden" /> of Containers
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfContainers
@@ -1158,13 +1106,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Quality Deviations Flagged
+                            Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             {loadingIvfQualityDeviations
@@ -1177,13 +1125,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
-                        <div className="flex flex-col items-start mb-2 ml-3 w-full min-w-0">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 sm:h-[123px]">
+                        <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Top Deviation Driver
+                            Top Deviation<br className="sm:hidden" /> Driver
                           </div>
                           <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfTopDeviationDriverName || undefined}>
                             {loadingIvfTopDeviationDriver
@@ -1202,13 +1150,13 @@ export default function Dashboard({ }: DashboardProps) {
                     <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                            Quality Deviations Flagged
+                            Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
@@ -1222,13 +1170,13 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Deviations */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px]">
+                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Top Deviation Driver
+                          Top Deviation<br className="sm:hidden" /> Driver
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
                             <AnimatedNumber value={0} />
@@ -1364,7 +1312,7 @@ export default function Dashboard({ }: DashboardProps) {
                           {/* Icon at Top Left */}
                           <div className="absolute top-4 left-4">
                             <img
-                              className="w-[18px] h-[18px]"
+                              className="w-[18px] h-[18px] brightness-0 invert"
                               alt="Incubator Quality Tracking"
                               src={IncubatorQualityTrackingIcon}
                             />
@@ -1465,6 +1413,68 @@ export default function Dashboard({ }: DashboardProps) {
                   </div>
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
+                ) : (ivfEmbryoTracking?.length ?? 0) === 0 ? (
+                  <div className="w-full">
+                    <table className="min-w-max w-full">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-[#FDF4FF]">
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">HIS # (PK)</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Canister #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Tank ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cane ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Goblet Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Date of Vitrification</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Site Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-white">
+                          <td className="px-4 py-3" colSpan={9}>
+                            <div className="relative">
+                              <div className="space-y-2">
+                                {[
+                                  ['HIS-2104', 'CRY-004-11', 'CAN-02', 'TANK-07', 'CANE-09', 'Blue', 'Green', '2026-02-11', 'Site A'],
+                                  ['HIS-2179', 'CRY-005-02', 'CAN-05', 'TANK-03', 'CANE-14', 'Red', 'Yellow', '2026-03-03', 'Site B'],
+                                ].map((cells, i) => (
+                                  <div
+                                    key={i}
+                                    className="grid grid-cols-9 gap-3 items-center h-12 bg-white px-3 rounded blur-[1px] opacity-70"
+                                  >
+                                    {cells.map((cell, col) => (
+                                      <div key={col} className="text-[13px] text-gray-500 truncate">
+                                        {cell}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="flex flex-col items-center gap-1.5 bg-white/80 text-gray-700 text-sm px-4 py-2 rounded shadow-sm text-center">
+                                  <svg
+                                    className="w-6 h-6 text-[#6B1176]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"
+                                    />
+                                  </svg>
+                                  <span>HMS system yet to be connected</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <div className="w-full">
                     <div>
@@ -1506,7 +1516,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Patient Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1525,7 +1535,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Treatment Count */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1555,7 +1565,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* Cold Chain Packaging Failure */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 mr-4 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1578,7 +1588,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Quality Lost per Patient */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fef2ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1612,7 +1622,7 @@ export default function Dashboard({ }: DashboardProps) {
                   <div className="grid grid-cols-2 gap-6 relative">
 
                     {/* On Time Percentage */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1635,7 +1645,7 @@ export default function Dashboard({ }: DashboardProps) {
                     </div>
 
                     {/* Average Lead Time */}
-                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 h-[123px] ">
+                    <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px] ">
                       <div className="flex flex-col items-start mb-2 ml-3">
                         <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                           <img
@@ -1944,8 +1954,7 @@ export default function Dashboard({ }: DashboardProps) {
               </section>
             </>
           )}
-        </div>
-      </main>
+      </PageLayout>
 
       {/* Critical Alerts Modal */}
       <CriticalAlertsModal
@@ -2026,6 +2035,6 @@ export default function Dashboard({ }: DashboardProps) {
           navigate(`/outbound-quality-tracking/${encodeURIComponent(canisterId)}`);
         }}
       />
-    </div>
+    </>
   );
 }
