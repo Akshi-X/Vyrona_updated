@@ -58,14 +58,14 @@ const AlertCard: React.FC<AlertCardProps> = ({
         headerAction={headerAction}
         scrollableContainerClassName={thinScrollbar ? 'alert-card-thin-scrollbar' : ''}
       >
-      <div className="w-full">
+      <div className="w-full flex flex-col flex-1 min-h-0">
         {loading ? (
-          <div className={`flex items-center justify-center py-12 ${contentHeightClassName}`}>
+          <div className={`flex items-center justify-center py-12 flex-1 md:flex-none md:${contentHeightClassName}`}>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
             <span className="ml-3 text-gray-600">{loadingText}</span>
           </div>
         ) : dataLength === 0 ? (
-          <div className={`text-center py-12 ${contentHeightClassName} flex flex-col items-center justify-center`}>
+          <div className={`flex-1 md:flex-none md:${contentHeightClassName} text-center py-12 flex flex-col items-center justify-center`}>
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -74,7 +74,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
             <p className="text-gray-500 text-lg">{emptyText}</p>
           </div>
         ) : disableInnerScroll ? (
-          <div className="w-full">
+          <div className="w-full flex-1 min-h-0">
             <style>{`
               .alert-card-table thead {
                 position: sticky;
@@ -86,7 +86,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
             {children}
           </div>
         ) : (
-            <div className={`w-full ${contentHeightClassName} overflow-x-auto overflow-y-auto relative ${thinScrollbar ? 'alert-card-thin-scrollbar' : ''}`}>
+          <div className={`w-full flex-1 min-h-0 md:flex-none md:${contentHeightClassName} overflow-x-auto overflow-y-auto relative ${thinScrollbar ? 'alert-card-thin-scrollbar' : ''}`}>
             {children}
           </div>
         )}

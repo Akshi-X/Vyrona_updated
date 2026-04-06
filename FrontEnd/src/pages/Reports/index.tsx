@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
+import PageLayout from "../../components/PageLayout";
 
 
 import { useAuth } from "../../contexts/AuthContext";
@@ -405,18 +407,7 @@ export default function ReportsPage() {
     }
 
     return (
-        <div className="bg-[#FDFAFF] flex w-full" style={{ minHeight: "100vh" }}>
-            <main className="flex-1 flex flex-col overflow-hidden">
-
-                <div
-                    className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto min-h-0"
-                    style={{ paddingTop: "calc(63px + 1rem)" }}
-                >
-                    <div className="flex items-center justify-between">
-                        <h1 className="font-semibold text-black text-2xl">
-                            Reports
-                        </h1>
-                    </div>
+                <PageLayout title="Reports" lucideIcon={Download}>
 
                     <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -991,8 +982,6 @@ export default function ReportsPage() {
                             )}
                         </div>
                     </section>
-                </div>
-            </main>
-        </div>
+                </PageLayout>
     );
 }

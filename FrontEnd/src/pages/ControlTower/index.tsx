@@ -1,11 +1,13 @@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
 import { Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import ControlTowerIconDark from '../../assets/DashBoardIcons/ControlTowerDark.svg';
+import PageLayout from '../../components/PageLayout';
+import FilterPanel, { FilterSelect, FilterToggle } from '../../components/FilterPanel';
 
 const toDeviationCount = (value: unknown): number => {
     const count = Number(value);
@@ -50,14 +52,6 @@ const ControlTower = () => {
     );
     const [department, setDepartment] = useState<string | null>(null);
     const [_userInitials, setUserInitials] = useState<string>("");
-    const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
-    const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-    const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
-    const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-    const regionDropdownRef = useRef<HTMLDivElement>(null);
-    const statusDropdownRef = useRef<HTMLDivElement>(null);
-    const carrierDropdownRef = useRef<HTMLDivElement>(null);
-    const branchDropdownRef = useRef<HTMLDivElement>(null);
 
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
@@ -473,6 +467,19 @@ const ControlTower = () => {
         return ["All", ...Array.from(set).sort()];
     }, [canisters]);
 
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (direction === "inbound") {
+            if (selectedBranch !== "All") count++;
+            if (selectedStatusInbound !== "All") count++;
+        } else {
+            if (selectedRegion !== "All") count++;
+            if (selectedStatusOutbound !== "All") count++;
+            if (selectedCarrier !== "All") count++;
+        }
+        return count;
+    }, [direction, selectedBranch, selectedStatusInbound, selectedRegion, selectedStatusOutbound, selectedCarrier]);
+
     // Apply filters to routes (outbound only)
     const filteredRoutes = useMemo(() => {
         return (routes || []).filter((r) => {
@@ -515,40 +522,6 @@ const ControlTower = () => {
         }
     }, [zoomToLocation, zoomToBranchName]);
 
-    // Close dropdowns when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                regionDropdownRef.current &&
-                !regionDropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsRegionDropdownOpen(false);
-            }
-            if (
-                statusDropdownRef.current &&
-                !statusDropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsStatusDropdownOpen(false);
-            }
-            if (
-                carrierDropdownRef.current &&
-                !carrierDropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsCarrierDropdownOpen(false);
-            }
-            if (
-                branchDropdownRef.current &&
-                !branchDropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsBranchDropdownOpen(false);
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, []);
 
     if (!isAuthenticated) {
         return (
@@ -563,475 +536,134 @@ const ControlTower = () => {
 
 
   return (
-    <div className="bg-[#FDFAFF] flex w-full" style={{ height: '100vh' }}>
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Control Tower Content */}
-        <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pt-10" >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={ControlTowerIconDark} alt="Control Tower" className="w-8 h-8" />
-              <h1 className="font-semibold text-black text-2xl">
-                Control Tower
-              </h1>
+        <PageLayout title="Control Tower" icon={ControlTowerIconDark} actions={
+            <div className="lg:hidden">
+                <FilterPanel activeCount={activeFilterCount}>
+                    {isIvfUser && (
+                        <FilterToggle
+                            label="Direction"
+                            value={direction}
+                            onChange={(v) => setDirection(v as "inbound" | "outbound")}
+                            options={[
+                                { label: "Cryotanks", value: "inbound" },
+                                { label: "Incubators", value: "outbound", disabled: isIvfUser },
+                            ]}
+                        />
+                    )}
+                    {direction === "inbound" && (
+                        <FilterSelect
+                            label="Branch"
+                            value={selectedBranch}
+                            onChange={(v) => {
+                                setSelectedBranch(v);
+                                setIsBranchFilterFromMap(false);
+                                if (v === "All") {
+                                    setZoomToLocation(null);
+                                    setZoomToBranchName(null);
+                                }
+                            }}
+                            options={branchOptions}
+                            allLabel="All Branches"
+                        />
+                    )}
+                    {direction === "outbound" && (
+                        <FilterSelect
+                            label="Region"
+                            value={selectedRegion}
+                            onChange={setSelectedRegion}
+                            options={regionOptions}
+                            allLabel="All Regions"
+                        />
+                    )}
+                    <FilterSelect
+                        label="Status"
+                        value={direction === "inbound" ? selectedStatusInbound : selectedStatusOutbound}
+                        onChange={(v) => direction === "inbound" ? setSelectedStatusInbound(v) : setSelectedStatusOutbound(v)}
+                        options={statusOptions}
+                        allLabel="All Status"
+                    />
+                    {direction === "outbound" && (
+                        <FilterSelect
+                            label="Carrier"
+                            value={selectedCarrier}
+                            onChange={setSelectedCarrier}
+                            options={carrierOptions}
+                            allLabel="All Carriers"
+                        />
+                    )}
+                </FilterPanel>
             </div>
-            {/**
-            <div className="relative group">
-              <button
-                type="button"
-                onClick={async () => {
-                  shipmentService.getIVFStorage().catch((error) => {
-                    console.error('Failed to fetch latest IVF storage data:', error);
-                  });
-                }}
-                className="px-4 py-2 bg-[#6b1176] text-white text-sm font-medium rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#6b1176] focus:ring-offset-2"
-              >
-                Get latest Data
-              </button>
-              <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-white border border-[#E7E1E1] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                <div className="font-semibold text-black text-xs whitespace-nowrap">
-                  Retrieve new patient data from the connected system?
-                </div>
-              </div>
-            </div>
-            */}
-                    </div>
+        }>
 
                     {/* Main Content Grid */}
-                    <div className="flex-1 h-full grid grid-cols-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] gap-6 min-h-0 items-stretch">
-                        {/* Left Panel - Filters and Routes */}
-                        <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 h-full min-h-0 lg:row-span-2">
-                            {/* Filters Section */}
-                            <div className="bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 w-[380px] flex-shrink-0 flex flex-col justify-center">
-                                <div className="flex flex-col gap-3">
-                                    {/* Direction Toggle - Only show for IVF department */}
-                                    {isIvfUser && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Direction
-                                            </label>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setDirection("inbound")
-                                                    }
-                                                    className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                                                        direction === "inbound"
-                                                            ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                                            : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
-                                                    }`}
-                                                >
-                                                    Cryotanks
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (!isIvfUser) {
-                                                            setDirection(
-                                                                "outbound",
-                                                            );
-                                                        }
-                                                    }}
-                                                    disabled={isIvfUser}
-                                                    className={`flex-1 px-3 h-12 border rounded-lg text-sm font-medium transition-colors duration-150 ${
-                                                        direction === "outbound"
-                                                            ? "bg-[#6b1176] text-white border-[#6b1176]"
-                                                            : "bg-white text-gray-700 border-[#E7E1E1] hover:bg-gray-50"
-                                                    } ${isIvfUser ? "opacity-50 cursor-not-allowed hover:bg-white" : ""}`}
-                                                >
-                                                    Incubators
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                    <div className="grid grid-cols-1 lg:flex-1 lg:grid-cols-[380px_1fr] lg:grid-rows-[340px_1fr] lg:h-full gap-3 lg:gap-6 lg:min-h-0 lg:items-stretch">
+                        {/* Left Panel - Filters (desktop) + Routes */}
+                        <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 lg:h-full lg:min-h-0 lg:row-span-2">
 
-                                    {/* Branch Filter (Inbound only) */}
-                                    {direction === "inbound" && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Branch
-                                            </label>
-                                            <div
-                                                className="relative"
-                                                ref={branchDropdownRef}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsBranchDropdownOpen(
-                                                            !isBranchDropdownOpen,
-                                                        );
-                                                    }}
-                                                    className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                                                >
-                                                    <span
-                                                        className={
-                                                            selectedBranch !==
-                                                            "All"
-                                                                ? "text-[#6b1176]"
-                                                                : "text-gray-700"
-                                                        }
-                                                    >
-                                                        {selectedBranch ===
-                                                        "All"
-                                                            ? "All Branches"
-                                                            : selectedBranch}
-                                                    </span>
-                                                    <svg
-                                                        className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? "rotate-180" : ""}`}
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M19 9l-7 7-7-7"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                                {isBranchDropdownOpen && (
-                                                    <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                        {branchOptions.map(
-                                                            (option) => (
-                                                                <button
-                                                                    key={option}
-                                                                    type="button"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedBranch(
-                                                                            option,
-                                                                        );
-                                                                        setIsBranchFilterFromMap(
-                                                                            false,
-                                                                        );
-                                                                        if (
-                                                                            option ===
-                                                                            "All"
-                                                                        ) {
-                                                                            setZoomToLocation(
-                                                                                null,
-                                                                            );
-                                                                            setZoomToBranchName(
-                                                                                null,
-                                                                            );
-                                                                        }
-                                                                        setIsBranchDropdownOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                        selectedBranch ===
-                                                                        option
-                                                                            ? "bg-[#6b1176] text-white"
-                                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                                    }`}
-                                                                >
-                                                                    {option ===
-                                                                    "All"
-                                                                        ? "All Branches"
-                                                                        : option}
-                                                                </button>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Region Filter (Outbound only) */}
-                                    {direction === "outbound" && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Region
-                                            </label>
-                                            <div
-                                                className="relative"
-                                                ref={regionDropdownRef}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsRegionDropdownOpen(
-                                                            !isRegionDropdownOpen,
-                                                        );
-                                                    }}
-                                                    className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                                                >
-                                                    <span
-                                                        className={
-                                                            selectedRegion !==
-                                                            "All"
-                                                                ? "text-[#6b1176]"
-                                                                : "text-gray-700"
-                                                        }
-                                                    >
-                                                        {selectedRegion ===
-                                                        "All"
-                                                            ? "All Regions"
-                                                            : selectedRegion}
-                                                    </span>
-                                                    <svg
-                                                        className={`w-4 h-4 transition-transform ${isRegionDropdownOpen ? "rotate-180" : ""}`}
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M19 9l-7 7-7-7"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                                {isRegionDropdownOpen && (
-                                                    <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                                                        {regionOptions.map(
-                                                            (option) => (
-                                                                <button
-                                                                    key={option}
-                                                                    type="button"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedRegion(
-                                                                            option,
-                                                                        );
-                                                                        setIsRegionDropdownOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                        selectedRegion ===
-                                                                        option
-                                                                            ? "bg-[#6b1176] text-white"
-                                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                                    }`}
-                                                                >
-                                                                    {option ===
-                                                                    "All"
-                                                                        ? "All Regions"
-                                                                        : option}
-                                                                </button>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Status Filter */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Status
-                                        </label>
-                                        <div
-                                            className="relative"
-                                            ref={statusDropdownRef}
-                                        >
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setIsStatusDropdownOpen(
-                                                        !isStatusDropdownOpen,
-                                                    );
-                                                }}
-                                                className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                                            >
-                                                <span
-                                                    className={
-                                                        (direction === "inbound"
-                                                            ? selectedStatusInbound
-                                                            : selectedStatusOutbound) !==
-                                                        "All"
-                                                            ? "text-[#6b1176]"
-                                                            : "text-gray-700"
-                                                    }
-                                                >
-                                                    {(direction === "inbound"
-                                                        ? selectedStatusInbound
-                                                        : selectedStatusOutbound) ===
-                                                    "All"
-                                                        ? "All Status"
-                                                        : direction ===
-                                                            "inbound"
-                                                          ? selectedStatusInbound
-                                                          : selectedStatusOutbound}
-                                                </span>
-                                                <svg
-                                                    className={`w-4 h-4 transition-transform ${isStatusDropdownOpen ? "rotate-180" : ""}`}
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M19 9l-7 7-7-7"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            {isStatusDropdownOpen && (
-                                                <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                                                    {statusOptions.map(
-                                                        (option) => {
-                                                            const currentStatus =
-                                                                direction ===
-                                                                "inbound"
-                                                                    ? selectedStatusInbound
-                                                                    : selectedStatusOutbound;
-                                                            return (
-                                                                <button
-                                                                    key={option}
-                                                                    type="button"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        if (
-                                                                            direction ===
-                                                                            "inbound"
-                                                                        ) {
-                                                                            setSelectedStatusInbound(
-                                                                                option,
-                                                                            );
-                                                                        } else {
-                                                                            setSelectedStatusOutbound(
-                                                                                option,
-                                                                            );
-                                                                        }
-                                                                        setIsStatusDropdownOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                        currentStatus ===
-                                                                        option
-                                                                            ? "bg-[#6b1176] text-white"
-                                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                                    }`}
-                                                                >
-                                                                    {option ===
-                                                                    "All"
-                                                                        ? "All Status"
-                                                                        : option}
-                                                                </button>
-                                                            );
-                                                        },
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Carrier Filter (Outbound only) */}
-                                    {direction === "outbound" && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Carrier
-                                            </label>
-                                            <div
-                                                className="relative"
-                                                ref={carrierDropdownRef}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsCarrierDropdownOpen(
-                                                            !isCarrierDropdownOpen,
-                                                        );
-                                                    }}
-                                                    className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
-                                                >
-                                                    <span
-                                                        className={
-                                                            selectedCarrier !==
-                                                            "All"
-                                                                ? "text-[#6b1176]"
-                                                                : "text-gray-700"
-                                                        }
-                                                    >
-                                                        {selectedCarrier ===
-                                                        "All"
-                                                            ? "All Carriers"
-                                                            : selectedCarrier}
-                                                    </span>
-                                                    <svg
-                                                        className={`w-4 h-4 transition-transform ${isCarrierDropdownOpen ? "rotate-180" : ""}`}
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M19 9l-7 7-7-7"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                                {isCarrierDropdownOpen && (
-                                                    <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                                                        {carrierOptions.map(
-                                                            (option) => (
-                                                                <button
-                                                                    key={option}
-                                                                    type="button"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        setSelectedCarrier(
-                                                                            option,
-                                                                        );
-                                                                        setIsCarrierDropdownOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                        selectedCarrier ===
-                                                                        option
-                                                                            ? "bg-[#6b1176] text-white"
-                                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                                    }`}
-                                                                >
-                                                                    {option ===
-                                                                    "All"
-                                                                        ? "All Carriers"
-                                                                        : option}
-                                                                </button>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                            {/* Inline Filter Panel — desktop only */}
+                            <div className="hidden lg:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 shrink-0">
+                                {isIvfUser && (
+                                    <FilterToggle
+                                        label="Direction"
+                                        value={direction}
+                                        onChange={(v) => setDirection(v as "inbound" | "outbound")}
+                                        options={[
+                                            { label: "Cryotanks", value: "inbound" },
+                                            { label: "Incubators", value: "outbound", disabled: isIvfUser },
+                                        ]}
+                                    />
+                                )}
+                                {direction === "inbound" && (
+                                    <FilterSelect
+                                        label="Branch"
+                                        value={selectedBranch}
+                                        onChange={(v) => {
+                                            setSelectedBranch(v);
+                                            setIsBranchFilterFromMap(false);
+                                            if (v === "All") {
+                                                setZoomToLocation(null);
+                                                setZoomToBranchName(null);
+                                            }
+                                        }}
+                                        options={branchOptions}
+                                        allLabel="All Branches"
+                                    />
+                                )}
+                                {direction === "outbound" && (
+                                    <FilterSelect
+                                        label="Region"
+                                        value={selectedRegion}
+                                        onChange={setSelectedRegion}
+                                        options={regionOptions}
+                                        allLabel="All Regions"
+                                    />
+                                )}
+                                <FilterSelect
+                                    label="Status"
+                                    value={direction === "inbound" ? selectedStatusInbound : selectedStatusOutbound}
+                                    onChange={(v) => direction === "inbound" ? setSelectedStatusInbound(v) : setSelectedStatusOutbound(v)}
+                                    options={statusOptions}
+                                    allLabel="All Status"
+                                />
+                                {direction === "outbound" && (
+                                    <FilterSelect
+                                        label="Carrier"
+                                        value={selectedCarrier}
+                                        onChange={setSelectedCarrier}
+                                        options={carrierOptions}
+                                        allLabel="All Carriers"
+                                    />
+                                )}
                             </div>
 
                             {/* Active Routes/Canisters List */}
-                            <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-[380px] flex-1 flex flex-col overflow-hidden min-h-80">
+                            <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
                                         ? "Active Containers"
                                         : "Active Routes"}
                                 </h2>
-                                <div className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
+                                <div className="grid grid-cols-3 pl-2 pr-2 py-2 rounded-t-lg bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] gap-3">
                                     <div className="text-left">
                                         {isIvfUser
                                             ? "Containers #"
@@ -1058,7 +690,7 @@ const ControlTower = () => {
                                             ).map((i) => (
                                                 <div
                                                     key={i}
-                                                    className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 items-center gap-3"
+                                                    className="grid grid-cols-3 pl-2 pr-2 py-2 items-center gap-3"
                                                 >
                                                     <div className="min-w-0 overflow-hidden space-y-2">
                                                         <div className="relative overflow-hidden h-3.5 w-24 rounded-md bg-gray-200">
@@ -1184,7 +816,7 @@ const ControlTower = () => {
                                                                         route?.id ??
                                                                         Math.random()
                                                                     }
-                                                                    className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                                                                    className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={
                                                                         handleRouteClick
                                                                     }
@@ -1287,7 +919,7 @@ const ControlTower = () => {
                                                                     key={
                                                                         canister.id
                                                                     }
-                                                                    className="grid grid-cols-[minmax(0,130px)_minmax(0,70px)_minmax(0,90px)] pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
+                                                                    className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
                                                                             if (
@@ -1386,7 +1018,7 @@ const ControlTower = () => {
                         </div>
 
                         {/* Right Panel - Map Visualization */}
-                        <div className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full row-span-2 h-full min-h-0">
+                        <div className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full h-[45vh] lg:row-span-2 lg:h-full lg:min-h-0">
                             <ControlTowerMap
                                 filters={{
                                     selectedRegion,
@@ -1415,9 +1047,7 @@ const ControlTower = () => {
                             />
                         </div>
                     </div>
-                </div>
-            </main>
-        </div>
+        </PageLayout>
     );
 };
 

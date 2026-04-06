@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Sidebar } from "./Sidebar";
 import ApprovalScreen from "../pages/ApprovalScreen";
+import HamburgerButton from "./HamburgerButton";
 
 export const ApprovalLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -24,10 +25,14 @@ export const ApprovalLayout: React.FC = () => {
     >
       <Sidebar onLogout={handleLogout} />
 
+      <div className="fixed top-3 left-4 z-30 md:hidden">
+        <HamburgerButton />
+      </div>
+
       <main
-        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden ml-60 min-w-0"
+        className="flex-1 flex flex-col overflow-x-hidden overflow-y-hidden ml-0 md:ml-60 min-w-0"
         style={{
-          maxWidth: "calc(100vw - 15rem)",
+          maxWidth: "100vw",
           touchAction: "pan-y",
           overscrollBehaviorX: "none",
           height: "100vh",

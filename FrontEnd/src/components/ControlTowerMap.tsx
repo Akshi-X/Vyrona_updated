@@ -65,6 +65,7 @@ import MarkerGreen from "../assets/ControlTower/MarkerGreen.svg";
 import MarkerRed from "../assets/ControlTower/MarkerRed.svg";
 import MarkerYellow from "../assets/ControlTower/MarkerYellow.svg";
 import { useGoogleMaps } from "../contexts/GoogleMapsProvider";
+import InfoPopup from "./InfoPopup";
 
 type MapRoute = {
     shipment_id: number | string;
@@ -716,7 +717,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
 
 
     return (
-        <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-[60vh] min-h-[420px] lg:h-full lg:min-h-[544px]">
+        <div className="bg-white border border-[#E7E1E1] rounded-lg relative overflow-hidden w-full h-full lg:min-h-[544px]">
             <div className="absolute inset-0 bg-[#272626]">
                 <div className="w-full h-full relative">
                     {/* Undo branch filter overlay (top-left) */}
@@ -740,7 +741,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                     <div className="absolute top-3 right-3 bg-white/15 backdrop-blur-sm border border-white/30 rounded-lg px-3 py-2 shadow-sm z-10">
                         <div className="flex items-center justify-between gap-6">
                             <div className="text-[12px] font-medium text-[#FFFFFF]">
-                                Last updated: {new Date().toLocaleTimeString()}
+                                Last updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                         </div>
                     </div>
@@ -1039,35 +1040,40 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                         </div>
                     )}
 
-                    {/* Legend card */}
-
-                    <div className="absolute bottom-6 left-6 text-white z-10">
-                        <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl shadow-lg px-4 py-3 w-[230px]">
-                            <div className="text-sm font-semibold">
-                                Cryocan Quality Status
-                            </div>
-
-                            <div className="mt-3 flex flex-col gap-2">
-                                <div className="flex items-center gap-3">
-                                    <span className="inline-block w-4 h-1.5 rounded-full bg-[#22DC0E]" />
-
-                                    <span className="text-[12px]">Safe</span>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
-
-                                    <span className="text-[12px]">
-                                        Critical
-                                    </span>
+                    {/* Legend — (i) popup on mobile, always visible on desktop */}
+                    {(() => {
+                        const legendContent = (
+                            <div className="text-white bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl shadow-lg px-4 py-3 w-[200px]">
+                                <div className="text-sm font-semibold mb-3">Cryocan Quality Status</div>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="inline-block w-4 h-1.5 rounded-full bg-[#22DC0E]" />
+                                        <span className="text-[12px]">Safe</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="inline-block w-4 h-1.5 rounded-full bg-[#E80000]" />
+                                        <span className="text-[12px]">Critical</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                        return (
+                            <>
+                                {/* Mobile: (i) toggle, bottom-right */}
+                                <div className="absolute bottom-6 right-6 z-10 lg:hidden">
+                                    <InfoPopup align="right">{legendContent}</InfoPopup>
+                                </div>
+                                {/* Desktop: always visible, bottom-left */}
+                                <div className="absolute bottom-6 left-6 z-10 hidden lg:block">
+                                    {legendContent}
+                                </div>
+                            </>
+                        );
+                    })()}
 
-                    {/* Custom zoom controls - above legend */}
+                    {/* Custom zoom controls */}
 
-                    <div className="absolute left-6 bottom-[190px] z-10">
+                    <div className="absolute left-6 bottom-6 lg:bottom-[140px] z-10">
                         <div className="flex flex-col items-stretch rounded-xl border border-white/40 shadow-[0_2px_10px_rgba(0,0,0,0.45)] overflow-hidden backdrop-blur-sm w-[38px] h-[69px] bg-gradient-to-b from-white/[0.28] to-white/[0.08]">
                             <button
                                 type="button"

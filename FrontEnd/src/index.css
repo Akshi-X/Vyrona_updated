@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --breakpoint-xl1: 1200px;
+  --breakpoint-xl2: 1412px;
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
