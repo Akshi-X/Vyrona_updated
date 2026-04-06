@@ -52,6 +52,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     # Internal service-to-service alert endpoints (authenticated via X-Internal-Api-Key)
     ("POST", "/api/internal/alerts/send-immediate"),
     ("POST", "/api/internal/alerts/check-and-create"),
+    # Internal service-to-service refill detection endpoint
+    ("POST", "/api/internal/refill-detections"),
 }
 
 
