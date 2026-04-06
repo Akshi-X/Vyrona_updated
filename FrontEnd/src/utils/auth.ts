@@ -12,11 +12,10 @@ export const authUtils = {
     const expirationDate = new Date();
     expirationDate.setTime(expirationDate.getTime() + (expirationHours * 60 * 60 * 1000));
     
-    const isProd = window.location.protocol === 'https:';
     Cookies.set(AUTH_TOKEN_KEY, token, {
       expires: expirationDate,
-      secure: isProd, // Only enforce HTTPS in production
-      sameSite: isProd ? 'strict' : 'lax' // Relaxed for local dev over HTTP
+      secure: true, // Only send over HTTPS
+      sameSite: 'strict' // CSRF protection
     });
   },
 
