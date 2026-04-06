@@ -1413,6 +1413,68 @@ export default function Dashboard({ }: DashboardProps) {
                   </div>
                 ) : ivfEmbryoTrackingError ? (
                   <div className="px-4 py-8 text-center text-red-600 text-xs">{ivfEmbryoTrackingError}</div>
+                ) : (ivfEmbryoTracking?.length ?? 0) === 0 ? (
+                  <div className="w-full">
+                    <table className="min-w-max w-full">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-[#FDF4FF]">
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">HIS # (PK)</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Canister #</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Tank ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cane ID</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Goblet Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Cryolock Color</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Date of Vitrification</th>
+                          <th className="px-4 py-3 text-left h-[56px] font-semibold text-[#6B1176] text-xs whitespace-nowrap">Site Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-white">
+                          <td className="px-4 py-3" colSpan={9}>
+                            <div className="relative">
+                              <div className="space-y-2">
+                                {[
+                                  ['HIS-2104', 'CRY-004-11', 'CAN-02', 'TANK-07', 'CANE-09', 'Blue', 'Green', '2026-02-11', 'Site A'],
+                                  ['HIS-2179', 'CRY-005-02', 'CAN-05', 'TANK-03', 'CANE-14', 'Red', 'Yellow', '2026-03-03', 'Site B'],
+                                ].map((cells, i) => (
+                                  <div
+                                    key={i}
+                                    className="grid grid-cols-9 gap-3 items-center h-12 bg-white px-3 rounded blur-[1px] opacity-70"
+                                  >
+                                    {cells.map((cell, col) => (
+                                      <div key={col} className="text-[13px] text-gray-500 truncate">
+                                        {cell}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="flex flex-col items-center gap-1.5 bg-white/80 text-gray-700 text-sm px-4 py-2 rounded shadow-sm text-center">
+                                  <svg
+                                    className="w-6 h-6 text-[#6B1176]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"
+                                    />
+                                  </svg>
+                                  <span>HMS system yet to be connected</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
                   <div className="w-full">
                     <div>
