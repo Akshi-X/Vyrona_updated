@@ -181,6 +181,7 @@ const VerifyOtp: React.FC = () => {
                         <div className="relative mb-3">
                             <input
                                 type="text"
+                                inputMode="numeric"
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value)}
                                 maxLength={6}

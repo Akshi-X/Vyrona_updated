@@ -289,8 +289,8 @@ const Login: React.FC = () => {
                     </p>
 
                 </div>
-                <p className="mt-2 text-center text-[#9a9a9a] text-sm whitespace-nowrap">
-                    Having trouble signing in? Contact <a href="#" className="text-[#6b1176] inline">
+                <p className="mt-2 text-center text-[#9a9a9a] text-sm">
+                    Having trouble signing in?<br className="md:hidden" /> Contact <a href="#" className="text-[#6b1176] inline">
                         admin@mygrape.org
                     </a>{" "} for help.
                 </p>

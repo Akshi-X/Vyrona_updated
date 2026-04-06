@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import PageLayout from "../../components/PageLayout";
+import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
 import { useAuth } from "../../contexts/AuthContext";
 import { ivfService, type IvfBranch, type RefillLogItem } from "../../services/ivfService";
 import { shipmentService } from "../../services/shipmentService";
@@ -163,7 +165,13 @@ const RefillLog = () => {
                                 try {
                                     const res = await ivfService.getCanisterRefillLogs(c.tankId);
                                     return (res?.refill_logs ?? []).map((log) => ({
-                                        timestamp: `${log.refill_date ?? "-"}${log.refill_time ? ", " + log.refill_time : ""}`,
+                                        timestamp: (() => {
+                                            if (!log.refill_date) return "-";
+                                            const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
+                                            const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                                            const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                                            return time ? `${date}, ${time}` : date;
+                                        })(),
                                         sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
                                         tankCode: c.tankCode,
                                         branch: c.branch,
@@ -351,22 +359,20 @@ const RefillLog = () => {
     };
 
     return (
-        <main className="flex flex-col h-screen overflow-hidden">
-            <div className="flex-1 px-8 py-8 flex flex-col gap-6 overflow-y-auto overflow-x-hidden min-h-0 pb-8">
-
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <h1 className="font-semibold text-black text-2xl tracking-tight">Refill Logs</h1>
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
-                            className="px-5 h-9 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-medium hover:bg-[#f7ecff] transition-colors"
-                        >
-                            Add Logs
-                        </button>
-                    </div>
-                </div>
+        <>
+        <PageLayout
+                title="Refill Logs"
+                icon={ContainersIcon}
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => { resetAddForm(); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
+                        className="px-5 h-9 rounded-lg border border-[#6b1176] text-[#6b1176] text-sm font-medium hover:bg-[#f7ecff] transition-colors"
+                    >
+                        Add Logs
+                    </button>
+                }
+            >
 
                 {/* Banner */}
                 {showBanner && (
@@ -382,7 +388,7 @@ const RefillLog = () => {
                             </svg>
                         </button>
 
-                        <div className="flex items-end gap-4">
+                        <div className="flex items-end gap-4 max-[500px]:flex-col max-[500px]:items-start">
                             {/* Droplet icon */}
                             <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2E4FF] text-[#6b1176] self-start">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -414,7 +420,7 @@ const RefillLog = () => {
                 )}
 
                 {/* Two panels */}
-                <div className="grid grid-cols-2 gap-6" style={{ height: "400px" }}>
+                <div className="grid grid-cols-1 min-[1436px]:grid-cols-2 min-[1436px]:h-[400px] gap-6">
 
                     {/* Left: Active Tank Status */}
                     <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
@@ -508,10 +514,10 @@ const RefillLog = () => {
                         <div className="px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
-                        <div className="flex flex-1 min-h-0 overflow-hidden">
+                        <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG illustration */}
-                            <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1]">
-                                <svg width="220" height="320" viewBox="0 0 240 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
+                            <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                                <svg width="200" height="320" viewBox="0 0 200 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
                                     <defs>
                                         <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">
                                             <stop offset="0%" stopColor="#9B72B0" />
@@ -557,7 +563,7 @@ const RefillLog = () => {
                             {/* Right: table */}
                             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                 {/* Table header */}
-                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,110px)_minmax(0,110px)_36px] px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
+                                <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 bg-[#F7ECFF] text-xs font-semibold text-[#6b1176] shrink-0">
                                     <div>Reservoir</div>
                                     <div>LN2 Ordered</div>
                                     <div>LN2 Received</div>
@@ -575,10 +581,10 @@ const RefillLog = () => {
                                         return (
                                             <div
                                                 key={log.log_id}
-                                                className="grid grid-cols-[minmax(0,1fr)_minmax(0,110px)_minmax(0,110px)_36px] px-4 py-2 items-center hover:bg-gray-50"
+                                                className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 items-center hover:bg-gray-50"
                                             >
                                                 <div className="flex items-center min-w-0">
-                                                    <span className="text-sm font-medium text-gray-800 truncate">{log.reservoir_name}</span>
+                                                    <span className="text-sm font-medium text-gray-800 break-words">{log.reservoir_name}</span>
                                                 </div>
                                                 {isEditing ? (
                                                     <input
@@ -588,7 +594,7 @@ const RefillLog = () => {
                                                         className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="text-xs text-gray-600 truncate">{log.ln2_ordered_date ?? "—"}</span>
+                                                    <span className="text-xs text-gray-600 truncate text-center">{log.ln2_ordered_date ?? "—"}</span>
                                                 )}
                                                 {isEditing ? (
                                                     <input
@@ -598,7 +604,7 @@ const RefillLog = () => {
                                                         className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="text-xs text-gray-600 truncate">{log.ln2_received_date ?? "—"}</span>
+                                                    <span className="text-xs text-gray-600 truncate text-center">{log.ln2_received_date ?? "—"}</span>
                                                 )}
                                                 <div className="flex items-center justify-end">
                                                     {isEditing ? (
@@ -727,7 +733,7 @@ const RefillLog = () => {
                         )}
                     </div>
                 </div>
-            </div>
+            </PageLayout>
 
             {/* Add Refill / Reservoir Modal */}
             {isAddRefillOpen && (
@@ -958,7 +964,7 @@ const RefillLog = () => {
                     </div>
                 </div>
             )}
-        </main>
+        </>
     );
 };
 

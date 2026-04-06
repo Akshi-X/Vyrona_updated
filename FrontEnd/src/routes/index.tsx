@@ -4,6 +4,7 @@ import Signup from "../pages/Signup";
 import TrackAndTrace from "../pages/TrackAndTrace";
 import TrackPage from "../pages/Track";
 import IVFTrackShipmentPage from "../pages/IVFTrackShipment";
+import IVFTrackShipmentSearchPage from "../pages/IVFTrackShipment/IVFTrackShipmentSearch";
 import OutboundQualityTrackingPage from "../pages/OutboundQualityTracking";
 import UserProfilePage from "../pages/UserProfilePage";
 import Support from "../pages/Support";
@@ -93,17 +94,14 @@ const TrackPageWithVariant = () => (
 );
 
 /**
- * IVF Track Shipment with variant support
+ * IVF Track Shipment search page (no tank ID)
  */
 const IVFTrackShipmentWithVariant = () => (
     <RoleBasedRoute
         restrictedRoles={["mygrape_admin"]}
         restrictIVFAdmin={false}
     >
-        <VariantRoute
-            routePath="/ivf-track-shipment"
-            defaultComponent={<IVFTrackShipmentPage />}
-        />
+        <IVFTrackShipmentSearchPage />
     </RoleBasedRoute>
 );
 

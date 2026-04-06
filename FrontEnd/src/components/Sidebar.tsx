@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+
+import { useSidebar } from "../contexts/SidebarContext";
 import { ChevronRight
     // , Download
  } from "lucide-react";
@@ -16,7 +18,7 @@ import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg"
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
-//import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
+// import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";
 import UserIcon from "../assets/DashBoardIcons/User.svg";
 //import EmbryosIcon from "../assets/DashBoardIcons/Embryos.svg";
@@ -57,6 +59,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { isAuthenticated, userRole } = useAuth();
+    const { isMobileOpen, closeMobile } = useSidebar();
 
     // User department (CGT or IVF) - initialize from localStorage
     const [userDepartment, setUserDepartment] = useState<string | null>(() => {
@@ -180,11 +183,18 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
     const handleNavigation = (path: string) => {
         navigate(path);
+        closeMobile();
     };
 
     return (
+        <>
+            {/* Mobile backdrop */}
+            <div
+                className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300 ${isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+                onClick={closeMobile}
+            />
         <aside
-            className="fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-10 overflow-hidden"
+            className={`fixed left-0 top-0 w-60 bg-gradient-to-b from-[#7b2f83] to-[#29053f] flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
             style={{ height: `${sidebarHeight}px` }}
         >
             {/* Decorative DNA/Wave Pattern Background */}
@@ -393,5 +403,6 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 <span className="font-bold text-white text-sm">Log Out</span>
             </button>
         </aside>
+        </>
     );
 };
