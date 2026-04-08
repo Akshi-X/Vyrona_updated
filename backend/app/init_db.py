@@ -537,6 +537,50 @@ def _migrate_reservoir_tables():
         db.close()
 
 
+def _migrate_ln2_refill_detections():
+    """
+    Create ln2_refill_detections table (safe, idempotent — never drops the table).
+    If the table already exists it is left untouched.
+    """
+    db = SessionLocal()
+    try:
+        insp = sa_inspect(db.get_bind())
+        existing_tables = insp.get_table_names()
+
+        if "ln2_refill_detections" in existing_tables:
+            logger.info("Table ln2_refill_detections already exists — skipped")
+            return
+
+        db.execute(text("""
+            CREATE TABLE ln2_refill_detections (
+                id            SERIAL       PRIMARY KEY,
+                tank_id       INTEGER      NOT NULL REFERENCES tanks(tank_id) ON DELETE CASCADE,
+                hospital_id   INTEGER      REFERENCES hospitals(hospital_id) ON DELETE SET NULL,
+                branch_id     INTEGER      REFERENCES hospital_branches(branch_id) ON DELETE SET NULL,
+                detected_at   TIMESTAMPTZ  NOT NULL,
+                refill_weight NUMERIC(12, 4),
+                is_confirmed  BOOLEAN      DEFAULT NULL,
+                confirmed_by  VARCHAR(255),
+                confirmed_at  TIMESTAMPTZ,
+                notes         TEXT,
+                created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+                updated_at    TIMESTAMPTZ           DEFAULT NOW()
+            )
+        """))
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_refill_det_tank_detected   ON ln2_refill_detections (tank_id, detected_at)"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_refill_det_branch_detected ON ln2_refill_detections (branch_id, detected_at)"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_refill_det_confirmed       ON ln2_refill_detections (is_confirmed)"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_refill_det_hospital        ON ln2_refill_detections (hospital_id)"))
+        db.commit()
+        logger.info("Created table: ln2_refill_detections")
+
+    except Exception as e:
+        logger.warning(f"_migrate_ln2_refill_detections skipped or failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def sync_chat_schema():
     """
     Ensure chat tables have required columns for IVF canister chat.
