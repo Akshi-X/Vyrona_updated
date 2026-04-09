@@ -7,6 +7,7 @@ import type {
     OnboardingState,
     OnboardingStep,
 } from "../types/onboarding";
+import { useAuth } from "./AuthContext";
 import {
     onboardingLevels,
     onboardingQuizByLevel,
@@ -258,11 +259,16 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const [state, dispatch] = useReducer(reducer, initialState);
     const saveTimeoutRef = useRef<number | null>(null);
     const lastEventIndexRef = useRef(0);
+    const { isAuthenticated } = useAuth();
 
     useEffect(() => {
         const storedState = loadFromStorage();
         if (storedState) {
             dispatch({ type: "HYDRATE", payload: storedState });
+        }
+
+        if (!isAuthenticated) {
+            return;
         }
 
         (async () => {
@@ -271,25 +277,31 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 dispatch({ type: "HYDRATE", payload: remoteState });
             }
         })();
-    }, []);
+    }, [isAuthenticated]);
 
     useEffect(() => {
         persistToStorage(state);
+        if (!isAuthenticated) {
+            return;
+        }
         if (saveTimeoutRef.current) {
             window.clearTimeout(saveTimeoutRef.current);
         }
         saveTimeoutRef.current = window.setTimeout(() => {
             onboardingService.saveState(state);
         }, 600);
-    }, [state]);
+    }, [state, isAuthenticated]);
 
     useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
         const newEvents = state.events.slice(lastEventIndexRef.current);
         if (newEvents.length > 0) {
             onboardingService.appendEvents(newEvents);
             lastEventIndexRef.current = state.events.length;
         }
-    }, [state.events]);
+    }, [state.events, isAuthenticated]);
 
     useEffect(() => {
         const interval = window.setInterval(() => {
