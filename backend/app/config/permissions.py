@@ -124,6 +124,9 @@ AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/feedback/{feedback_id}/comments"),   # Get comments
     ("PATCH", "/api/feedback/{feedback_id}/status"),   # Update status
     ("GET", "/api/profile"),  # View own profile
+    ("GET", "/api/onboarding/state"),
+    ("PATCH", "/api/onboarding/state"),
+    ("POST", "/api/onboarding/events"),
     # Task endpoints - all authenticated users can view and update status
     ("GET", "/api/tasks"),                        # Get all tasks (filtered by ownership)
     ("GET", "/api/tasks/{task_id}"),              # Get task by ID (if creator or assignee)
