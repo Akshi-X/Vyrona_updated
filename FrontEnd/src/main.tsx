@@ -9,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { GoogleMapsProvider } from "./contexts/GoogleMapsProvider";
 import { UIVariantProvider } from "./contexts/UIVariantContext";
 import { SidebarProvider } from "./contexts/SidebarContext";
+import { OnboardingProvider } from "./contexts/OnboardingContext";
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
@@ -16,7 +17,9 @@ createRoot(document.getElementById("root")!).render(
             <UIVariantProvider>
                 <GoogleMapsProvider>
                     <SidebarProvider>
-                        <RouterProvider router={router} />
+                        <OnboardingProvider>
+                            <RouterProvider router={router} />
+                        </OnboardingProvider>
                     </SidebarProvider>
                 </GoogleMapsProvider>
             </UIVariantProvider>
