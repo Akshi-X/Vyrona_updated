@@ -1,5 +1,6 @@
 import { BaseApiService } from "./baseApiService";
 import type { OnboardingState, OnboardingEvent } from "../types/onboarding";
+import { authUtils } from "../utils/auth";
 
 export interface OnboardingStateResponse {
     state: OnboardingState;
@@ -7,6 +8,9 @@ export interface OnboardingStateResponse {
 
 export class OnboardingService extends BaseApiService {
     async getState(): Promise<OnboardingState | null> {
+        if (!authUtils.getToken()) {
+            return null;
+        }
         try {
             const response = await this.request<OnboardingStateResponse>("/api/onboarding/state", {
                 method: "GET",
@@ -18,6 +22,9 @@ export class OnboardingService extends BaseApiService {
     }
 
     async saveState(state: OnboardingState): Promise<void> {
+        if (!authUtils.getToken()) {
+            return;
+        }
         try {
             await this.request("/api/onboarding/state", {
                 method: "PATCH",
@@ -30,6 +37,9 @@ export class OnboardingService extends BaseApiService {
 
     async appendEvents(events: OnboardingEvent[]): Promise<void> {
         if (events.length === 0) return;
+        if (!authUtils.getToken()) {
+            return;
+        }
         try {
             await this.request("/api/onboarding/events", {
                 method: "POST",
