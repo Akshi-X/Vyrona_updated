@@ -1,0 +1,26 @@
+[
+    {
+        "id": "dash-kpis",
+        "target": "#onboarding-dashboard-kpis",
+        "title": "KPI Pulse",
+        "content": "These KPIs summarize temperature stability and shipment health. Click a KPI card to continue.",
+        "placement": "bottom",
+        "requireClick": true
+    },
+    {
+        "id": "dash-alerts",
+        "target": "#onboarding-dashboard-alerts",
+        "title": "Live Alerts",
+        "content": "Here you can review alerts that need attention. Click the alert list to continue.",
+        "placement": "left",
+        "requireClick": true
+    },
+    {
+        "id": "dash-shipments",
+        "target": "#onboarding-dashboard-shipments",
+        "title": "Shipment Board",
+        "content": "This board tracks critical shipments. Click any row to continue.",
+        "placement": "top",
+        "requireClick": true
+    }
+]

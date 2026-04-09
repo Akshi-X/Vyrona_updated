@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 import TrackAndTrace from "../pages/TrackAndTrace";
@@ -27,6 +27,14 @@ import SuccessAlert from "../pages/SuccessAlert";
 import { RoleBasedRoute } from "../components/RoleBasedRoute";
 import { AuthRedirect } from "../components/AuthRedirect";
 import { VariantRoute } from "../components/VariantRoute";
+import { OnboardingGate } from "../components/OnboardingGate";
+import {
+    OnboardingLayout,
+    OnboardingLevel,
+    OnboardingStatus,
+    OnboardingTimeline,
+    OnboardingWelcome,
+} from "../pages/Onboarding";
 
 /**
  * Dashboard with variant support
@@ -215,6 +223,26 @@ export const router = createBrowserRouter([
     { path: "/forgot-password", element: <ForgotPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
     { path: "/success", element: <SuccessAlert /> },
+
+    // ============================================================
+    // ONBOARDING ROUTES
+    // ============================================================
+    {
+        path: "/onboarding",
+        element: (
+            <OnboardingGate>
+                <OnboardingLayout />
+            </OnboardingGate>
+        ),
+        children: [
+            { path: "/onboarding", element: <Navigate to="/onboarding/welcome" replace /> },
+            { path: "/onboarding/welcome", element: <OnboardingWelcome /> },
+            { path: "/onboarding/timeline", element: <OnboardingTimeline /> },
+            { path: "/onboarding/status", element: <OnboardingStatus /> },
+            { path: "/onboarding/level-1", element: <OnboardingLevel levelId="level-1" /> },
+            { path: "/onboarding/level-2", element: <OnboardingLevel levelId="level-2" /> },
+        ],
+    },
 
     // ============================================================
     // PROTECTED ROUTES WITH SHARED APP LAYOUT

@@ -1,0 +1,17 @@
+{
+    "kpis": [
+        { "id": "risk", "label": "Delay Risk", "value": "12%" },
+        { "id": "lanes", "label": "Active Lanes", "value": "9" },
+        { "id": "mitigation", "label": "Mitigations", "value": "4" }
+    ],
+    "actions": [
+        { "id": "m1", "title": "Escalate Lane A2", "detail": "Notify ops lead" },
+        { "id": "m2", "title": "Switch Carrier", "detail": "Lane C1 backup" },
+        { "id": "m3", "title": "Rebalance Cold Boxes", "detail": "Lane B3" }
+    ],
+    "lanes": [
+        { "id": "l1", "route": "BLR → MAA", "risk": "Low" },
+        { "id": "l2", "route": "DEL → BOM", "risk": "High" },
+        { "id": "l3", "route": "HYD → BLR", "risk": "Medium" }
+    ]
+}

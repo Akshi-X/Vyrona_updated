@@ -1,0 +1,37 @@
+[
+    {
+        "id": "dash-q1",
+        "prompt": "Which KPI helps you quickly assess temperature stability?",
+        "choices": ["Stability Index", "Shipment Count", "User Activity", "Branch Coverage"],
+        "correctIndex": 0,
+        "points": 15
+    },
+    {
+        "id": "dash-q2",
+        "prompt": "Where do you review alerts that need immediate attention?",
+        "choices": ["Timeline", "Alert List", "Settings", "Profile"],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "dash-q3",
+        "prompt": "What does the shipment board primarily track?",
+        "choices": ["Invoices", "Critical Shipments", "User Roles", "Inventory Levels"],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "dash-q4",
+        "prompt": "What is a good first action when an alert is raised?",
+        "choices": ["Ignore it", "Check alert details", "Delete shipment", "Disable sensors"],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "dash-q5",
+        "prompt": "Why are KPI cards useful?",
+        "choices": ["They replace the database", "They provide at-a-glance insights", "They send invoices", "They approve users"],
+        "correctIndex": 1,
+        "points": 10
+    }
+]
