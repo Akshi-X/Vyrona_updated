@@ -1,11 +1,21 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { TourProvider } from "@reactour/tour";
+import { useEffect } from "react";
+import { OnboardingModeProvider } from "../../contexts/OnboardingModeContext";
+import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/mockApi";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
 export default function OnboardingLayout() {
     const { levels, state } = useOnboarding();
     const location = useLocation();
     const completedCount = levels.filter((level) => state.levels[level.id]?.status === "completed").length;
+
+    useEffect(() => {
+        enableOnboardingMocks();
+        return () => {
+            disableOnboardingMocks();
+        };
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#F6F0FF] via-[#FDF9F2] to-[#F2FBFF] text-slate-900">
@@ -29,19 +39,21 @@ export default function OnboardingLayout() {
                 </div>
             </header>
             <main className="px-6 pb-10 md:px-10">
-                <TourProvider
-                    steps={[]}
-                    disableInteraction={false}
-                    styles={{
-                        popover: (base) => ({
-                            ...base,
-                            borderRadius: 16,
-                            padding: 16,
-                        }),
-                    }}
-                >
-                    <Outlet />
-                </TourProvider>
+                <OnboardingModeProvider value={true}>
+                    <TourProvider
+                        steps={[]}
+                        disableInteraction={false}
+                        styles={{
+                            popover: (base) => ({
+                                ...base,
+                                borderRadius: 16,
+                                padding: 16,
+                            }),
+                        }}
+                    >
+                        <Outlet />
+                    </TourProvider>
+                </OnboardingModeProvider>
             </main>
         </div>
     );

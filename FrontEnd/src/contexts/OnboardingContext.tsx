@@ -77,12 +77,54 @@ type Action =
 const reducer = (state: OnboardingState, action: Action): OnboardingState => {
     switch (action.type) {
         case "HYDRATE": {
+            const statusRank: Record<OnboardingLevelProgress["status"], number> = {
+                locked: 0,
+                available: 1,
+                in_progress: 2,
+                completed: 3,
+            };
+
+            const mergedLevels: Record<string, OnboardingLevelProgress> = {
+                ...state.levels,
+            };
+
+            if (action.payload.levels) {
+                Object.entries(action.payload.levels).forEach(([levelId, incoming]) => {
+                    const current = state.levels[levelId];
+                    if (!current) {
+                        mergedLevels[levelId] = incoming as OnboardingLevelProgress;
+                        return;
+                    }
+
+                    const incomingLevel = incoming as OnboardingLevelProgress;
+                    const mergedStatus =
+                        statusRank[incomingLevel.status] >= statusRank[current.status]
+                            ? incomingLevel.status
+                            : current.status;
+
+                    mergedLevels[levelId] = {
+                        ...current,
+                        ...incomingLevel,
+                        status: mergedStatus,
+                        attempts: Math.max(current.attempts, incomingLevel.attempts),
+                        lastStepIndex: Math.max(current.lastStepIndex, incomingLevel.lastStepIndex),
+                        lastQuizIndex: Math.max(current.lastQuizIndex, incomingLevel.lastQuizIndex),
+                        score: Math.max(current.score, incomingLevel.score),
+                        startedAt: current.startedAt || incomingLevel.startedAt,
+                        completedAt: current.completedAt || incomingLevel.completedAt,
+                    };
+                });
+            }
+
+            console.log("[onboarding] hydrate", {
+                activeLevelId: action.payload.activeLevelId,
+                levels: action.payload.levels,
+            });
             return {
                 ...state,
                 ...action.payload,
                 levels: {
-                    ...state.levels,
-                    ...action.payload.levels,
+                    ...mergedLevels,
                 },
                 quizAnswers: {
                     ...state.quizAnswers,
@@ -120,6 +162,11 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
         case "SET_STEP_INDEX": {
             const level = state.levels[action.levelId];
             if (!level) return state;
+            console.log("[onboarding] set step index", {
+                levelId: action.levelId,
+                from: level.lastStepIndex,
+                to: action.index,
+            });
             return {
                 ...state,
                 levels: {
@@ -259,23 +306,36 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const [state, dispatch] = useReducer(reducer, initialState);
     const saveTimeoutRef = useRef<number | null>(null);
     const lastEventIndexRef = useRef(0);
+    const didHydrateFromStorageRef = useRef(false);
+    const didHydrateFromApiRef = useRef(false);
     const { isAuthenticated } = useAuth();
 
     useEffect(() => {
+        if (didHydrateFromStorageRef.current) return;
         const storedState = loadFromStorage();
         if (storedState) {
             dispatch({ type: "HYDRATE", payload: storedState });
         }
+        didHydrateFromStorageRef.current = true;
+    }, []);
 
+    useEffect(() => {
         if (!isAuthenticated) {
             return;
         }
-
+        if (didHydrateFromApiRef.current) {
+            return;
+        }
         (async () => {
             const remoteState = await onboardingService.getState();
             if (remoteState) {
+                console.log("[onboarding] hydrate from api", {
+                    activeLevelId: remoteState.activeLevelId,
+                    levels: remoteState.levels,
+                });
                 dispatch({ type: "HYDRATE", payload: remoteState });
             }
+            didHydrateFromApiRef.current = true;
         })();
     }, [isAuthenticated]);
 

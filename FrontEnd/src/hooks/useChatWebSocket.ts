@@ -6,7 +6,8 @@ import { chatService, type UnreadMessagesResponse, type PatientMessagesResponse 
  * WebSocket hook for Dashboard - tracks unread tagged messages count
  * Does NOT mark messages as read
  */
-export function useDashboardChatWebSocket() {
+export function useDashboardChatWebSocket(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const { token, isAuthenticated } = useAuth();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [unreadMessages, setUnreadMessages] = useState<UnreadMessagesResponse['unread_messages']>([]);
@@ -35,6 +36,9 @@ export function useDashboardChatWebSocket() {
   }, []);
 
   const connect = useCallback(() => {
+    if (!enabled) {
+      return;
+    }
     if (isIvfUser()) {
       return;
     }
@@ -120,7 +124,7 @@ export function useDashboardChatWebSocket() {
     } catch (error) {
       setIsConnected(false);
     }
-  }, [isAuthenticated, token, getWebSocketUrl]);
+  }, [enabled, isAuthenticated, token, getWebSocketUrl]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -136,6 +140,10 @@ export function useDashboardChatWebSocket() {
 
   // Connect on mount and when auth changes
   useEffect(() => {
+    if (!enabled) {
+      disconnect();
+      return;
+    }
     if (isIvfUser()) {
       disconnect();
       return;
@@ -150,11 +158,11 @@ export function useDashboardChatWebSocket() {
     return () => {
       disconnect();
     };
-  }, [isAuthenticated, token, connect, disconnect, isIvfUser]);
+  }, [enabled, isAuthenticated, token, connect, disconnect, isIvfUser]);
 
   // Request unread messages periodically (fallback)
   useEffect(() => {
-    if (!isConnected || !wsRef.current) return;
+    if (!enabled || !isConnected || !wsRef.current) return;
 
     const interval = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -165,13 +173,16 @@ export function useDashboardChatWebSocket() {
     }, 30000); // Every 30 seconds as fallback
 
     return () => clearInterval(interval);
-  }, [isConnected]);
+  }, [enabled, isConnected]);
 
   return {
     unreadCount,
     unreadMessages,
     isConnected,
     refresh: () => {
+      if (!enabled) {
+        return;
+      }
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'get_unread_messages'

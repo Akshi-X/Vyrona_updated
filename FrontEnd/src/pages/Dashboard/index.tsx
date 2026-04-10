@@ -51,6 +51,7 @@ import { ivfService } from '../../services/ivfService';
 import type { IVFTreatment } from '../../types/ivf.ts';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { Microscope } from 'lucide-react';
+import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 
 interface StakeholderChat {
   id: string;
@@ -70,6 +71,7 @@ interface DashboardProps { }
 
 export default function Dashboard({ }: DashboardProps) {
   const { isAuthenticated, userRole } = useAuth();
+  const isOnboarding = useOnboardingMode();
   const navigate = useNavigate();
   const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
   const [showMyTasks, setShowMyTasks] = useState(false);
@@ -91,7 +93,9 @@ export default function Dashboard({ }: DashboardProps) {
   const [apiUnreadCount, setApiUnreadCount] = useState<number>(0);
 
   // WebSocket for unread chat count (tagged messages only)
-  const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket();
+  const { unreadCount: wsUnreadCount, unreadMessages: wsUnreadMessages, refresh: refreshUnread } = useDashboardChatWebSocket({
+    enabled: !isOnboarding,
+  });
 
   // User initials for avatar (set for potential future use)
   const [_userInitials, setUserInitials] = useState<string>('');
@@ -1021,6 +1025,12 @@ export default function Dashboard({ }: DashboardProps) {
     </div>
   );
 
+  const dashboardActionIconsWithId = (
+    <div id="onboarding-dashboard-alerts" className="flex items-center gap-4">
+      {dashboardActionIcons}
+    </div>
+  );
+
   return (
     <>
       <PageLayout title="Dashboard" icon={DashboardIconDark} actions={dashboardActionIcons} hideHeaderOnDesktop>
@@ -1050,7 +1060,7 @@ export default function Dashboard({ }: DashboardProps) {
                   })()}
                 </div>
                 <section className="hidden md:flex justify-end">
-                  {dashboardActionIcons}
+                  {dashboardActionIconsWithId}
                 </section>
               </div>
 
@@ -1060,7 +1070,7 @@ export default function Dashboard({ }: DashboardProps) {
                   {/* Volume Section */}
                   <section>
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div id="onboarding-dashboard-kpis" className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
                       <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
@@ -1364,7 +1374,7 @@ export default function Dashboard({ }: DashboardProps) {
               </div>
 
               {/* Ongoing Treatments Section */}
-              <section className="w-full">
+              <section id="onboarding-dashboard-shipments" className="w-full">
                 <div className="flex flex-col border border-[#E7E1E1] rounded-2xl p-4 w-full overflow-x-auto">
                 <h2 className="font-semibold text-black text-base mb-4">Site Level Information</h2>
                 {loadingIvfEmbryoTracking ? (
