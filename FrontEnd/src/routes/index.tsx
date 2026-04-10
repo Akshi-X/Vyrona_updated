@@ -10,7 +10,6 @@ import UserProfilePage from "../pages/UserProfilePage";
 import Support from "../pages/Support";
 import NotFound from "../pages/NotFound";
 import VerifyOtp from "../pages/Verify";
-import Dashboard from "../pages/Dashboard";
 import Database from "../pages/Database";
 import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
@@ -29,12 +28,10 @@ import { AuthRedirect } from "../components/AuthRedirect";
 import { VariantRoute } from "../components/VariantRoute";
 import { OnboardingGate } from "../components/OnboardingGate";
 import {
-    OnboardingLayout,
     OnboardingLevel,
-    OnboardingStatus,
-    OnboardingTimeline,
-    OnboardingWelcome,
+    OnboardingShell,
 } from "../pages/Onboarding";
+import Dashboard from "../pages/Dashboard";
 
 /**
  * Dashboard with variant support
@@ -231,14 +228,14 @@ export const router = createBrowserRouter([
         path: "/onboarding",
         element: (
             <OnboardingGate>
-                <OnboardingLayout />
+                <OnboardingShell />
             </OnboardingGate>
         ),
         children: [
             { path: "/onboarding", element: <Navigate to="/onboarding/welcome" replace /> },
-            { path: "/onboarding/welcome", element: <OnboardingWelcome /> },
-            { path: "/onboarding/timeline", element: <OnboardingTimeline /> },
-            { path: "/onboarding/status", element: <OnboardingStatus /> },
+            { path: "/onboarding/welcome", element: <Dashboard /> },
+            { path: "/onboarding/timeline", element: <Dashboard /> },
+            { path: "/onboarding/status", element: <Dashboard /> },
             { path: "/onboarding/level-1", element: <OnboardingLevel levelId="level-1" /> },
             { path: "/onboarding/level-2", element: <OnboardingLevel levelId="level-2" /> },
         ],
