@@ -394,7 +394,7 @@ export default function IVFTrackShipmentPage() {
                     dedupKey: (a as typeof a & { dedup_key?: string })
                         .dedup_key,
                     message: a.message,
-                    timestamp: new Date(a.occurred_at + "Z").toLocaleString(),
+                    timestamp: new Date(a.occurred_at + "Z"),
                     status: a.status === "Active" ? "Active" : "Acknowledged",
                 }))}
                 loading={loadingAlerts}
