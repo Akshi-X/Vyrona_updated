@@ -181,7 +181,7 @@ export default function IVFTrackShipmentPage() {
             const month = currentDate.getMonth() + 1; // getMonth() returns 0-11, so add 1
 
             await ivfService.exportCombinedReportExcel(tankId, year, month);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Error exporting report:", e);
             // You could show a toast notification here
         } finally {
@@ -394,7 +394,7 @@ export default function IVFTrackShipmentPage() {
                     dedupKey: (a as typeof a & { dedup_key?: string })
                         .dedup_key,
                     message: a.message,
-                    timestamp: new Date(a.occurred_at + "Z"),
+                    timestamp: new Date(a.occurred_at + "Z")+"" ,
                     status: a.status === "Active" ? "Active" : "Acknowledged",
                 }))}
                 loading={loadingAlerts}

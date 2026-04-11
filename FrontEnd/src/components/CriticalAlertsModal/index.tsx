@@ -10,7 +10,7 @@ interface CriticalAlert {
     branchName?: string;
     dedupKey?: string;
     message: string;
-    timestamp: string|Date;
+    timestamp: string;
     status: "Active" | "Acknowledged" | "Resolved" | "Escalated";
 }
 
