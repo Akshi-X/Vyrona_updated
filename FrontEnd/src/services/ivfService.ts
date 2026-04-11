@@ -321,6 +321,8 @@ export class IvfService extends BaseApiService {
             branch_id: number | null;
             hospital_id: number | null;
             branch_name: string | null;
+            current_weight: number | null;
+            max_weight: number | null;
             created_at: string | null;
         }>;
     }> {
@@ -1103,6 +1105,72 @@ export class IvfService extends BaseApiService {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(downloadUrl);
+    }
+
+    async getAllTanksRefillLogs(tankIds: number[]): Promise<{
+        logs: Array<{
+            tank_id: number;
+            tank_code: string | null;
+            branch_name: string | null;
+            refill_date: string | null;
+            refill_time: string | null;
+            refilled_by: string | null;
+            description: string | null;
+            status: string | null;
+        }>;
+    }> {
+        return await this.request(
+            `/api/quality-tracking/tanks/all-refill-logs?tank_ids=${tankIds.join(",")}`,
+            { method: "GET" },
+        );
+    }
+
+    async getTanksRefillSummary(tankIds: number[]): Promise<{
+        summary: Record<string, {
+            last_refill_date?: string | null;
+            last_refill_time?: string | null;
+            last_refilled_by?: string | null;
+            last_description?: string | null;
+            ln2_mass_kg?: number | null;
+            ln2_config_min?: number | null;
+            tank_max_capacity?: number | null;
+            tank_min_capacity?: number | null;
+        }>;
+    }> {
+        return await this.request(
+            `/api/quality-tracking/tanks/refill-summary?tank_ids=${tankIds.join(",")}`,
+            { method: "GET" },
+        );
+    }
+
+    async getPendingRefillDetections(): Promise<{
+        detections: Array<{
+            id: number;
+            tank_id: number;
+            tank_code: string | null;
+            branch_name: string | null;
+            detected_at: string | null;
+            refill_weight: number | null;
+        }>;
+    }> {
+        return await this.request("/api/quality-tracking/refill-detections/pending", {
+            method: "GET",
+        });
+    }
+
+    async reviewRefillDetection(
+        detectionId: number,
+        isConfirmed: boolean,
+        notes?: string,
+    ): Promise<{ success: boolean; detection_id: number; is_confirmed: boolean }> {
+        return await this.request(
+            `/api/quality-tracking/refill-detections/${detectionId}/review`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_confirmed: isConfirmed, notes }),
+            },
+        );
     }
 }
 

@@ -36,6 +36,9 @@ class CanisterLn2Log(Base):
     status = Column(SQLEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj], name="refill_status"), 
                    nullable=True, index=True, comment="Status of the refill log (Done, In progress, Not started)")
     
+    # Refill weight (kg) — from auto-detected refill event, stored for traceability
+    refill_weight = Column(Float, nullable=True, comment="Weight of LN2 added in kg")
+
     # Additional refill log fields
     cryoshipper = Column(String(255), nullable=True, comment="Cryoshipper information")
     disinfected_shipper_infected_tank_description = Column(Text, nullable=True, comment="Description of disinfected shipper/infected tank")

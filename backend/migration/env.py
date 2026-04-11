@@ -71,26 +71,40 @@ from app.models.IVF import (
     hospital_model,
     hospital_branch_model,
     tank_model,
-    canister_model,
     canister_ln2_log_model,
-    cane_model,
-    cryolock_model,
-    patient_model as ivf_patient_model,
-    embryo_model,
-    critical_alert_model
+    critical_alert_model,
+    ivf_telemetry_data_model,
+    ivf_quality_log_model,
+    ivf_geolocation_model,
+    ivf_shipment_model,
+    patient_crylock_info_model,
+    reservoir_model,
+    reservoir_log_model,
+    ln2_iot_device_model,
+    ln2_iot_raw_data_model,
+    ln2_readings_model,
+    ln2_refill_detection_model,
+    device_model,
 )
 
 # Import IVF model classes explicitly
 from app.models.IVF.hospital_model import Hospital
 from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.tank_model import Tank
-from app.models.IVF.canister_model import Canister
 from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
-from app.models.IVF.cane_model import Cane
-from app.models.IVF.cryolock_model import Cryolock
-from app.models.IVF.patient_model import IVFPatient
-from app.models.IVF.embryo_model import Embryo
 from app.models.IVF.critical_alert_model import CriticalAlert
+from app.models.IVF.ivf_telemetry_data_model import IVFTelemetryData
+from app.models.IVF.ivf_quality_log_model import IVFQualityLog
+from app.models.IVF.ivf_geolocation_model import IVFGeolocation
+from app.models.IVF.ivf_shipment_model import IVFShipment
+from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
+from app.models.IVF.reservoir_model import Reservoir
+from app.models.IVF.reservoir_log_model import ReservoirLog
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
+from app.models.IVF.ln2_readings_model import Ln2Reading
+from app.models.IVF.ln2_refill_detection_model import Ln2RefillDetection
+from app.models.IVF.device_model import Device
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

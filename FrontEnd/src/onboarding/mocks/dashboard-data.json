@@ -1,0 +1,373 @@
+{
+    "profile": {
+        "user_id": "USR-ONB-001",
+        "email": "onboarding.user@mygrape.io",
+        "first_name": "Avery",
+        "last_name": "Reed",
+        "role": "User",
+        "pharma_id": null,
+        "company_name": "Iris Fertility",
+        "approved_status": "approved",
+        "status": true,
+        "session_timeout": 30,
+        "phone_number": null,
+        "last_login": "2026-04-10T08:30:00.000Z",
+        "created_at": "2026-01-12T09:10:00.000Z",
+        "updated_at": "2026-04-09T10:45:00.000Z",
+        "department": "IVF",
+        "hospital_id": 2,
+        "branch_id": 4
+    },
+    "alerts": {
+        "total_alerts": 3,
+        "active_alerts": 2,
+        "acknowledged_alerts": 1,
+        "resolved_alerts": 0,
+        "alerts": [
+            {
+                "id": "ALT-1",
+                "type": "Temperature",
+                "severity": "High",
+                "patient_id": "PT-092",
+                "message": "Temperature spike in lane A2",
+                "timestamp": "2026-04-10T07:10:00.000Z",
+                "status": "Active"
+            },
+            {
+                "id": "ALT-2",
+                "type": "Delay",
+                "severity": "Medium",
+                "patient_id": "PT-104",
+                "message": "Carrier delay exceeded threshold",
+                "timestamp": "2026-04-10T06:40:00.000Z",
+                "status": "Active"
+            },
+            {
+                "id": "ALT-3",
+                "type": "Sensor",
+                "severity": "Low",
+                "patient_id": "PT-118",
+                "message": "Sensor offline - rerouted",
+                "timestamp": "2026-04-09T18:05:00.000Z",
+                "status": "Acknowledged"
+            }
+        ],
+        "last_updated": "2026-04-10T08:00:00.000Z"
+    },
+    "tasks": {
+        "created_tasks": [
+            {
+                "id": 21,
+                "task_name": "Verify shipment seal",
+                "description": "Confirm seal integrity",
+                "assignee": {
+                    "user_id": "USR-001",
+                    "first_name": "Avery",
+                    "last_name": "Reed",
+                    "email": "avery@mygrape.io",
+                    "role": "Manager"
+                },
+                "created_by": {
+                    "user_id": "USR-002",
+                    "first_name": "Riya",
+                    "last_name": "Singh",
+                    "email": "riya@mygrape.io",
+                    "role": "Admin"
+                },
+                "patient_id": "PT-092",
+                "due_date": "2026-04-11T09:00:00.000Z",
+                "priority": "High",
+                "status": "In progress",
+                "created_at": "2026-04-09T14:00:00.000Z"
+            }
+        ],
+        "assigned_tasks": [
+            {
+                "id": 22,
+                "task_name": "Update risk note",
+                "description": "Log route deviation",
+                "assignee": {
+                    "user_id": "USR-001",
+                    "first_name": "Avery",
+                    "last_name": "Reed",
+                    "email": "avery@mygrape.io",
+                    "role": "Manager"
+                },
+                "created_by": {
+                    "user_id": "USR-003",
+                    "first_name": "Noah",
+                    "last_name": "Das",
+                    "email": "noah@mygrape.io",
+                    "role": "User"
+                },
+                "patient_id": "PT-104",
+                "due_date": "2026-04-12T09:00:00.000Z",
+                "priority": "Medium",
+                "status": "Not started",
+                "created_at": "2026-04-09T15:30:00.000Z"
+            }
+        ],
+        "total_created": 1,
+        "total_assigned": 1
+    },
+    "chats": {
+        "unread_messages": [
+            {
+                "message_id": 301,
+                "message_content": "Lane A2 update ready",
+                "patient_id": "PT-092",
+                "sender_id": "USR-005",
+                "sender_name": "Ops Desk",
+                "created_at": "2026-04-10T07:55:00.000Z"
+            },
+            {
+                "message_id": 302,
+                "message_content": "Temperature stabilized",
+                "patient_id": "PT-104",
+                "sender_id": "USR-006",
+                "sender_name": "Monitoring",
+                "created_at": "2026-04-10T07:50:00.000Z"
+            }
+        ],
+        "total_unread": 2,
+        "unread_by_patient": {
+            "PT-092": 1,
+            "PT-104": 1
+        },
+        "unread_by_canister": {}
+    },
+    "ivfAlerts": {
+        "alerts": [
+            {
+                "alert_id": "IVF-AL-1",
+                "canister_id": 101,
+                "canister_number": "CAN-101",
+                "tank_id": 12,
+                "tank_code": "T-12",
+                "hospital_id": 2,
+                "branch_id": 4,
+                "alert_type": "LN2",
+                "source": "sensor",
+                "severity": "High",
+                "message": "LN2 drop detected",
+                "status": "Active",
+                "triggered_by": "system",
+                "occurred_at": "2026-04-10T07:40:00.000Z",
+                "created_at": "2026-04-10T07:40:00.000Z"
+            }
+        ],
+        "total_count": 1,
+        "active_count": 1,
+        "acknowledged_count": 0
+    },
+    "ongoingTreatments": [
+        {
+            "patient_id": "PT-092",
+            "condition": "Therapy A",
+            "hospital": "City Care",
+            "stage": "Packaging",
+            "treatment_status": "In Transit",
+            "provider_name": "Atlas Care",
+            "location": "Bangalore"
+        },
+        {
+            "patient_id": "PT-104",
+            "condition": "Therapy B",
+            "hospital": "Green Cross",
+            "stage": "Preparation",
+            "treatment_status": "Scheduled",
+            "provider_name": "Zenith Labs",
+            "location": "Chennai"
+        }
+    ],
+    "ivfEmbryoTrackingFilters": {
+        "site_names": ["Clinic A", "Clinic B"],
+        "statuses": ["Stored", "In Transit"],
+        "goblet_colors": ["Red", "Blue"],
+        "crylock_colors": ["Green", "Yellow"],
+        "total": 12,
+        "site_name_counts": { "Clinic A": 7, "Clinic B": 5 },
+        "status_counts": { "Stored": 9, "In Transit": 3 },
+        "goblet_color_counts": { "Red": 6, "Blue": 6 },
+        "crylock_color_counts": { "Green": 5, "Yellow": 7 }
+    },
+    "ivfEmbryoTracking": {
+        "data": [
+            {
+                "his_number": "HIS-1001",
+                "cryolock_number": "CRY-21",
+                "canister_number": 4,
+                "tank_code": "T-11",
+                "cane_code": "C-01",
+                "goblet_color": "Red",
+                "cryolock_color": "Green",
+                "date_of_vitrification": "2025-11-18",
+                "embryo_grading": "AA",
+                "site_name": "Clinic A",
+                "status": "Stored",
+                "description": "Mock sample"
+            }
+        ],
+        "total": 12,
+        "offset": 0,
+        "limit": 50,
+        "has_more": false,
+        "next_offset": null,
+        "message": "mock"
+    },
+    "ivfMetricsTotalEmbryosCryolocks": {
+        "total_embryos": 124,
+        "total_cryolocks": 80,
+        "total_embryos_cryolocks": 204,
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "ivfMetricsTotalContainers": {
+        "total_containers": 12,
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "ivfMetricsTotalDeviations": {
+        "total_deviations": 6,
+        "deviations_by_kpi": {
+            "temperature": 2,
+            "shock": 1,
+            "LN2 State": 3
+        }
+    },
+    "ivfMetricsTopDeviationDriver": {
+        "driver_name": "Temperature",
+        "count": 3,
+        "percentage": 40,
+        "all_drivers": {
+            "Temperature": 3,
+            "Shock": 2,
+            "LN2 Level": 1
+        },
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "ivfMetricsAvgQualityLossPerContainer": {
+        "avg_quality_loss_per_container": 1.2,
+        "total_containers": 12,
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "ivfMetricsOutboundShipments": {
+        "total_outbound_shipments": 4,
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "ivfMetricsDeviationsGraph": [
+        {
+            "alert_name": "Temperature",
+            "branch_name": "Clinic A",
+            "tank_code": "T-11",
+            "deviation_count": 3
+        },
+        {
+            "alert_name": "Shock",
+            "branch_name": "Clinic B",
+            "tank_code": "T-22",
+            "deviation_count": 2
+        }
+    ],
+    "ivfStorage": {
+        "status": "success",
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "tanks": []
+    },
+    "patientStats": {
+        "pharma_id": 1,
+        "current_month_patient_count": 18,
+        "quality_deviation_flagged": 2
+    },
+    "logistics": {
+        "category": "logistics",
+        "metrics": {
+            "cold_chain_packaging_failure_percentage": 2.1,
+            "avg_quality_lost_per_patient_percentage": 1.4,
+            "total_shipments": 120,
+            "successful_deliveries": 112,
+            "failed_deliveries": 8,
+            "average_transit_time_hours": 12.6
+        },
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "risk": {
+        "category": "risk",
+        "metrics": {
+            "deviation_percentage": 8,
+            "top_risk_driver": {
+                "name": "Customs Delay",
+                "percentage": 36,
+                "severity": "High",
+                "trend": "up"
+            },
+            "total_risks": 22,
+            "high_risks": 6,
+            "medium_risks": 10,
+            "low_risks": 6
+        },
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "compliance": {
+        "category": "compliance",
+        "metrics": {
+            "audit_coverage_percentage": 88,
+            "emissions_per_treatment_tco2e": 0.62,
+            "total_audits": 32,
+            "passed_audits": 28,
+            "failed_audits": 2,
+            "pending_audits": 2
+        },
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "performance": {
+        "category": "performance",
+        "metrics": {
+            "on_time_percentage": 92,
+            "avg_lead_time_days": 3.2,
+            "failure_cost_million": 1.1,
+            "total_shipments": 120,
+            "completed_shipments": 110,
+            "pending_shipments": 10
+        },
+        "last_updated": "2026-04-10T08:10:00.000Z",
+        "status": "success"
+    },
+    "performanceAvgQualityDeviations": {
+        "pharma_id": 1,
+        "avg_quality_deviations": 1.6,
+        "total_deviations": 12,
+        "total_treatments": 120,
+        "status": "success",
+        "last_updated": "2026-04-10T08:10:00.000Z"
+    },
+    "performanceOnTime": {
+        "on_time_percentage": 92,
+        "on_time_deliveries": 92,
+        "total_deliveries": 100,
+        "status": "success",
+        "last_updated": "2026-04-10T08:10:00.000Z"
+    },
+    "performanceAvgLeadTime": {
+        "avg_lead_time_days": 3.2,
+        "total_shipments": 120,
+        "completed_shipments": 110,
+        "pending_shipments": 10,
+        "status": "success",
+        "last_updated": "2026-04-10T08:10:00.000Z"
+    },
+    "performanceSuccessRate": {
+        "pharma_id": 1,
+        "success_rate": 96,
+        "successful_outcomes": 96,
+        "total_outcomes": 100,
+        "status": "success",
+        "last_updated": "2026-04-10T08:10:00.000Z"
+    }
+}

@@ -1,0 +1,120 @@
+{
+    "activeRoutes": {
+        "routes": [
+            {
+                "id": 1,
+                "patient_id": "PT-092",
+                "origin": "Bangalore",
+                "destination": "Chennai",
+                "provider": "Atlas Care",
+                "status": "Safe",
+                "start_date": "2026-04-10T06:00:00.000Z",
+                "region": "South",
+                "source_region": "South",
+                "destination_region": "South"
+            },
+            {
+                "id": 2,
+                "patient_id": "PT-104",
+                "origin": "Delhi",
+                "destination": "Mumbai",
+                "provider": "Zenith",
+                "status": "Risk",
+                "start_date": "2026-04-10T05:30:00.000Z",
+                "region": "North",
+                "source_region": "North",
+                "destination_region": "West"
+            }
+        ]
+    },
+    "controlTowerMap": {
+        "routes": [
+            {
+                "shipment_id": 1,
+                "patient_id": "PT-092",
+                "source_location": "Bangalore",
+                "destination_location": "Chennai",
+                "source_latitude": 12.9716,
+                "source_longitude": 77.5946,
+                "destination_latitude": 13.0827,
+                "destination_longitude": 80.2707,
+                "route_status": "Safe"
+            },
+            {
+                "shipment_id": 2,
+                "patient_id": "PT-104",
+                "source_location": "Delhi",
+                "destination_location": "Mumbai",
+                "source_latitude": 28.6139,
+                "source_longitude": 77.209,
+                "destination_latitude": 19.076,
+                "destination_longitude": 72.8777,
+                "route_status": "Risk"
+            }
+        ]
+    },
+    "ivfControlTower": {
+        "hospitalName": "Iris Fertility",
+        "hospital_type": "IVF",
+        "highest_branch_count_country": "India",
+        "states": {
+            "Karnataka": [
+                {
+                    "branch_name": "Clinic A",
+                    "branch_status": "safe",
+                    "country_name": "India",
+                    "address": {
+                        "area": "Koramangala",
+                        "district": "Bangalore",
+                        "pincode": "560034"
+                    },
+                    "geoLocation": {
+                        "latitude": 12.9352,
+                        "longitude": 77.6245
+                    }
+                }
+            ],
+            "TamilNadu": [
+                {
+                    "branch_name": "Clinic B",
+                    "branch_status": "risk",
+                    "country_name": "India",
+                    "address": {
+                        "area": "Adyar",
+                        "district": "Chennai",
+                        "pincode": "600020"
+                    },
+                    "geoLocation": {
+                        "latitude": 13.0067,
+                        "longitude": 80.2206
+                    }
+                }
+            ]
+        }
+    },
+    "activeCanisters": {
+        "branches": [
+            {
+                "branch_id": 1,
+                "branch_name": "Clinic A",
+                "tanks": [
+                    {
+                        "tank_id": 11,
+                        "tank_code": "T-11",
+                        "updated_at": "2026-04-10T07:50:00.000Z",
+                        "status": "Safe",
+                        "deviations": 0
+                    },
+                    {
+                        "tank_id": 12,
+                        "tank_code": "T-12",
+                        "updated_at": "2026-04-10T07:40:00.000Z",
+                        "status": "Critical",
+                        "deviations": 2
+                    }
+                ]
+            }
+        ],
+        "total": 2
+    }
+}

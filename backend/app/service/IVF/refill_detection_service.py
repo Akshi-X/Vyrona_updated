@@ -2,8 +2,8 @@
 Service for creating and managing LN2 refill detection records.
 """
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -78,4 +78,68 @@ class RefillDetectionService:
         self.db.commit()
         self.db.refresh(detection)
 
+        return detection
+
+    def get_pending_detections(
+        self, hospital_id: Optional[int]
+    ) -> List[Ln2RefillDetection]:
+        """
+        Return unconfirmed (is_confirmed IS NULL) detections for a hospital.
+
+        Args:
+            hospital_id: Filter by this hospital, or None to return all.
+
+        Returns:
+            List of Ln2RefillDetection rows ordered by detected_at descending.
+        """
+        query = self.db.query(Ln2RefillDetection).filter(
+            Ln2RefillDetection.is_confirmed == None  # noqa: E711
+        )
+        if hospital_id is not None:
+            query = query.filter(Ln2RefillDetection.hospital_id == hospital_id)
+        return query.order_by(Ln2RefillDetection.detected_at.asc()).all()
+
+    def review_detection(
+        self,
+        detection_id: int,
+        is_confirmed: bool,
+        confirmed_by: str,
+        notes: Optional[str] = None,
+    ) -> Ln2RefillDetection:
+        """
+        Confirm or reject a detected refill event.
+
+        Args:
+            detection_id: Primary key of the detection record.
+            is_confirmed: True to confirm, False to reject.
+            confirmed_by: Identifier of the staff member reviewing.
+            notes:        Optional staff notes.
+
+        Returns:
+            The updated Ln2RefillDetection row.
+
+        Raises:
+            ValueError: If the detection_id does not exist.
+        """
+        detection: Optional[Ln2RefillDetection] = (
+            self.db.query(Ln2RefillDetection)
+            .filter(Ln2RefillDetection.id == detection_id)
+            .first()
+        )
+        if detection is None:
+            raise ValueError(f"Refill detection with id={detection_id} not found")
+
+        detection.is_confirmed = is_confirmed
+        detection.acknowledged_by = confirmed_by
+        detection.acknowledged_at = datetime.now(timezone.utc)
+        if notes is not None:
+            detection.notes = notes
+
+        self.db.commit()
+        self.db.refresh(detection)
+
+        logger.info(
+            f"Refill detection id={detection_id} reviewed: "
+            f"is_confirmed={is_confirmed}, confirmed_by={confirmed_by}"
+        )
         return detection
