@@ -48,7 +48,6 @@ const formatDaysAgo = (dateStr: string): string => {
 
 const RefillLog = () => {
     const { isAuthenticated, userRole } = useAuth();
-    const isManagerAdmin = ["manager", "admin"].some((r) => (userRole || "").trim().toLowerCase().includes(r));
     const [selectedBranch] = useState<string>("All");
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
@@ -282,10 +281,9 @@ const RefillLog = () => {
     const loadReservoirData = async () => {
         setReservoirLogsLoading(true);
         try {
-            const [resRes, logsRes, profile] = await Promise.all([
+            const [resRes, logsRes] = await Promise.all([
                 ivfService.getReservoirs().catch(() => null),
                 ivfService.getReservoirLogs().catch(() => null),
-                userService.getProfile().catch(() => null),
             ]);
             const allReservoirs = Array.isArray(resRes?.reservoirs) ? resRes.reservoirs : [];
             const filtered = allReservoirs;
@@ -764,7 +762,7 @@ const RefillLog = () => {
                                                 {/* Percentage */}
                                                 <text x="100" y="163" textAnchor="middle" fontSize="24" fontWeight="bold" fill="#6B1176" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{pct}%</text>
                                                 {/* Reservoir name — one word per line */}
-                                                {(selected?.reservoir_name ?? "").split(" ").map((word, i, arr) => (
+                                                {(selected?.reservoir_name ?? "").split(" ").map((word, i) => (
                                                     <text key={i} x="100" y={183 + i * 14} textAnchor="middle" fontSize="11" fill="#6B1176" opacity="0.7" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{word}</text>
                                                 ))}
                                             </svg>
