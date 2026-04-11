@@ -781,20 +781,30 @@ def get_reservoirs(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """List all reservoirs, optionally filtered by the caller's branch."""
+    """List reservoirs scoped by hospital (all roles) and additionally by branch for Users."""
     from app.models.IVF.reservoir_model import Reservoir
 
     branch_id, role = get_branch_filter_info(request)
+    user = request.state.current_user
+    hospital_id = user.hospital_id if hasattr(user, "hospital_id") else None
+
     query = db.query(
         Reservoir.reservoir_id,
         Reservoir.reservoir_name,
         Reservoir.branch_id,
         Reservoir.hospital_id,
+        Reservoir.current_weight,
+        Reservoir.max_weight,
         Reservoir.created_at,
         HospitalBranch.branch_name,
     ).outerjoin(HospitalBranch, HospitalBranch.branch_id == Reservoir.branch_id)
 
-    if role != "Admin" and branch_id is not None:
+    # Always scope by hospital_id (default for all roles)
+    if hospital_id is not None:
+        query = query.filter(Reservoir.hospital_id == hospital_id)
+
+    # Additionally scope by branch for regular Users
+    if role == "User" and branch_id is not None:
         query = query.filter(Reservoir.branch_id == branch_id)
 
     rows = query.order_by(Reservoir.reservoir_id).all()
@@ -806,6 +816,8 @@ def get_reservoirs(
                 "branch_id": r.branch_id,
                 "hospital_id": r.hospital_id,
                 "branch_name": r.branch_name,
+                "current_weight": float(r.current_weight) if r.current_weight is not None else None,
+                "max_weight": float(r.max_weight) if r.max_weight is not None else None,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rows

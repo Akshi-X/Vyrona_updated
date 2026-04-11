@@ -1,0 +1,17 @@
+{
+    "kpis": [
+        { "id": "temp", "label": "Temp Stability", "value": "98.6%" },
+        { "id": "shipments", "label": "Active Shipments", "value": "24" },
+        { "id": "alerts", "label": "Open Alerts", "value": "3" }
+    ],
+    "alerts": [
+        { "id": "a1", "title": "LN2 Drop Detected", "detail": "Zone 3 - Tank 04" },
+        { "id": "a2", "title": "Route Delay", "detail": "Lane A2 - 18 min" },
+        { "id": "a3", "title": "Sensor Offline", "detail": "Storage Bay 7" }
+    ],
+    "shipments": [
+        { "id": "s1", "lane": "BLR → MAA", "status": "On Track", "eta": "2h 10m" },
+        { "id": "s2", "lane": "DEL → BOM", "status": "Risk", "eta": "4h 05m" },
+        { "id": "s3", "lane": "HYD → BLR", "status": "On Track", "eta": "1h 25m" }
+    ]
+}

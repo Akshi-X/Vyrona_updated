@@ -35,6 +35,7 @@ class RefillLogCreate(BaseModel):
     disinfected_shipper_infected_tank_description: Optional[str] = Field(None, description="Description of disinfected shipper/infected tank")
     reservoir: Optional[str] = Field(None, description="Reservoir name")
     reservoir_id: Optional[int] = Field(None, description="Reservoir ID foreign key")
+    refill_weight: Optional[float] = Field(None, description="Weight of LN2 added in kg (deducted from branch reservoir)")
     ln2_ordered_date: Optional[date] = Field(None, description="Date when LN2 was ordered")
     ln2_received_date: Optional[date] = Field(None, description="Date when LN2 was received")
 

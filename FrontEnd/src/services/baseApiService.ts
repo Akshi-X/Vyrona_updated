@@ -22,12 +22,24 @@ export class BaseApiService {
   protected baseUrl: string;
   protected useMock: boolean;
   private requestCache: Map<string, Promise<any>> = new Map();
+  private static mockEnabled = false;
+  private static mockResolver?: (endpoint: string, options: RequestInit) => any | undefined;
 
   constructor() {
     // Get the API base URL from environment variables
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
     this.baseUrl = envBaseUrl && envBaseUrl !== 'undefined' ? envBaseUrl : 'http://localhost:8000';
     this.useMock = false; // Set to true for mock responses
+  }
+
+  static setMockEnabled(enabled: boolean): void {
+    BaseApiService.mockEnabled = enabled;
+  }
+
+  static setMockResolver(
+    resolver?: (endpoint: string, options: RequestInit) => any | undefined,
+  ): void {
+    BaseApiService.mockResolver = resolver;
   }
 
   /**
@@ -49,6 +61,12 @@ export class BaseApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+      const mocked = await BaseApiService.mockResolver(endpoint, options);
+      if (mocked !== undefined) {
+        return mocked as T;
+      }
+    }
     const url = `${this.baseUrl}${endpoint}`;
     const cacheKey = `${options.method || 'GET'}:${url}`;
     
@@ -131,6 +149,12 @@ export class BaseApiService {
     formData: FormData,
     options: RequestInit = {}
   ): Promise<T> {
+    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+      const mocked = await BaseApiService.mockResolver(endpoint, options);
+      if (mocked !== undefined) {
+        return mocked as T;
+      }
+    }
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
       ...this.getAuthHeaders(),
@@ -175,6 +199,12 @@ export class BaseApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+      const mocked = await BaseApiService.mockResolver(endpoint, options);
+      if (mocked !== undefined) {
+        return mocked as T;
+      }
+    }
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
