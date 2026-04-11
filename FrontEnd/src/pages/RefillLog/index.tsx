@@ -12,6 +12,7 @@ type ContainerItem = {
     tankCode: string;
     containerNo: string;
     branch: string;
+    branchId?: number | null;
     lastRefillDate: string;
     lastRefilledBy?: string;
     lastDescription?: string;
@@ -30,6 +31,7 @@ type RefillLogCreateForm = {
     description: string;
     status: string;
     reservoir_id: string;
+    refill_weight: string;
 };
 
 const formatDaysAgo = (dateStr: string): string => {
@@ -55,7 +57,25 @@ const RefillLog = () => {
     const [activityBranch, setActivityBranch] = useState<string>("All");
     const [isActivityBranchOpen, setIsActivityBranchOpen] = useState(false);
     const activityBranchRef = useRef<HTMLDivElement>(null);
-    const [showBanner, setShowBanner] = useState(true);
+    const [pendingDetections, setPendingDetections] = useState<{
+        id: number;
+        tank_id: number;
+        tank_code: string | null;
+        branch_name: string | null;
+        detected_at: string | null;
+        refill_weight: number | null;
+    }[]>([]);
+    const [dismissingId, setDismissingId] = useState<number | null>(null);
+    const [rejectDialogId, setRejectDialogId] = useState<number | null>(null);
+    const [rejectReason, setRejectReason] = useState("");
+    const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const [pendingAddDetectionId, setPendingAddDetectionId] = useState<number | null>(null);
+    const [detectionsLoading, setDetectionsLoading] = useState(true);
+    const detectionScrollRef = useRef<HTMLDivElement>(null);
+    const scrollDetections = (dir: "left" | "right") => {
+        if (!detectionScrollRef.current) return;
+        detectionScrollRef.current.scrollBy({ left: dir === "right" ? 280 : -280, behavior: "smooth" });
+    };
     const [isAddRefillOpen, setIsAddRefillOpen] = useState(false);
     const [addSubmitting, setAddSubmitting] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
@@ -71,7 +91,10 @@ const RefillLog = () => {
         status: string;
     }[]>([]);
     const [activityLoading, setActivityLoading] = useState(true);
-    const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; hospital_id: number | null; branch_id: number | null; branch_name: string | null }[]>([]);
+    const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; hospital_id: number | null; branch_id: number | null; branch_name: string | null; current_weight: number | null; max_weight: number | null }[]>([]);
+    const [selectedReservoirId, setSelectedReservoirId] = useState<number | null>(null);
+    const [isReservoirDropdownOpen, setIsReservoirDropdownOpen] = useState(false);
+    const reservoirDropdownRef = useRef<HTMLDivElement>(null);
     const [reservoirLogs, setReservoirLogs] = useState<{ log_id: number; reservoir_id: number; reservoir_name: string; branch_name: string | null; ln2_ordered_date: string | null; ln2_received_date: string | null; created_at: string | null }[]>([]);
     const [reservoirLogsLoading, setReservoirLogsLoading] = useState(false);
     // Modal tab: "refill" | "reservoir"
@@ -93,7 +116,45 @@ const RefillLog = () => {
         description: "",
         status: "Not started",
         reservoir_id: "",
+        refill_weight: "",
     });
+
+    useEffect(() => {
+        const loadPendingDetections = async () => {
+            setDetectionsLoading(true);
+            try {
+                const res = await ivfService.getPendingRefillDetections();
+                setPendingDetections(Array.isArray(res?.detections) ? res.detections : []);
+            } catch {
+                setPendingDetections([]);
+            } finally {
+                setDetectionsLoading(false);
+            }
+        };
+        if (isAuthenticated) loadPendingDetections();
+    }, [isAuthenticated]);
+
+    const dismissDetection = async (id: number, isConfirmed: boolean, notes?: string) => {
+        setDismissingId(id);
+        try {
+            await ivfService.reviewRefillDetection(id, isConfirmed, notes);
+        } catch {
+            // best-effort — still remove from UI
+        }
+        setTimeout(() => {
+            setPendingDetections((prev) => prev.filter((d) => d.id !== id));
+            setDismissingId(null);
+        }, 300);
+    };
+
+    const submitReject = async () => {
+        if (!rejectDialogId) return;
+        setRejectSubmitting(true);
+        await dismissDetection(rejectDialogId, false, rejectReason.trim() || undefined);
+        setRejectDialogId(null);
+        setRejectReason("");
+        setRejectSubmitting(false);
+    };
 
     const branchDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +165,9 @@ const RefillLog = () => {
             }
             if (activityBranchRef.current && !activityBranchRef.current.contains(e.target as Node)) {
                 setIsActivityBranchOpen(false);
+            }
+            if (reservoirDropdownRef.current && !reservoirDropdownRef.current.contains(e.target as Node)) {
+                setIsReservoirDropdownOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -125,73 +189,53 @@ const RefillLog = () => {
                                 tankCode: String(c.tank_code ?? `T${idx + 1}`),
                                 containerNo: String(c.tank_code ?? `Container ${idx + 1}`),
                                 branch: branch.branch_name ?? "N/A",
+                                branchId: branch.branch_id ?? null,
                                 lastRefillDate: c.updated_at
                                     ? new Date(c.updated_at).toLocaleDateString("en-GB")
                                     : "NA",
                             }),
                         );
                     });
-                    // Fetch last refill log + LN2 level for each container
-                    const withLogs = await Promise.all(
-                        flattened.map(async (c) => {
-                            try {
-                                const [refillRes, ln2Res, configRes, kpiConfigRes] = await Promise.all([
-                                    ivfService.getCanisterRefillLogs(c.tankId),
-                                    ivfService.getLn2HistoryById(c.tankId, 1).catch(() => null),
-                                    ivfService.getKpiConfigList(Number(c.tankId)).catch(() => null),
-                                    ivfService.getTankKpiConfig(c.tankId).catch(() => null),
-                                ]);
-                                const logs = refillRes?.refill_logs ?? [];
-                                const last = logs[0];
-                                const latestLn2 = ln2Res?.history?.[0];
-                                return {
-                                    ...c,
-                                    lastRefilledBy: last?.refilled_by ?? "-",
-                                    lastDescription: last?.description ?? "-",
-                                    lastLogDate: last?.refill_date ?? "-",
-                                    lastLogTime: last?.refill_time ?? "-",
-                                    ln2LevelKg: latestLn2?.ln2_mass_kg ?? null,
-                                    ln2ConfigMin: configRes?.config?.find((cfg: { kpi_name: string; min: number | null }) => cfg.kpi_name === "ln2_level")?.min ?? null,
-                                    tankMaxCapacity: kpiConfigRes?.tank_max_capacity_reading ?? null,
-                                    tankMinCapacity: kpiConfigRes?.tank_min_capacity_reading ?? null,
-                                };
-                            } catch {
-                                return c;
-                            }
-                        }),
-                    );
+                    // Single bulk call instead of 4 per tank
+                    const tankIdList = flattened.map((c) => Number(c.tankId));
+                    const summaryRes = await ivfService.getTanksRefillSummary(tankIdList).catch(() => null);
+                    const summary = summaryRes?.summary ?? {};
+
+                    const withLogs = flattened.map((c) => {
+                        const s = summary[c.tankId] ?? {};
+                        return {
+                            ...c,
+                            lastRefilledBy: s.last_refilled_by ?? "-",
+                            lastDescription: s.last_description ?? "-",
+                            lastLogDate: s.last_refill_date ?? "-",
+                            lastLogTime: s.last_refill_time ?? "-",
+                            ln2LevelKg: s.ln2_mass_kg ?? null,
+                            ln2ConfigMin: s.ln2_config_min ?? null,
+                            tankMaxCapacity: s.tank_max_capacity ?? null,
+                            tankMinCapacity: s.tank_min_capacity ?? null,
+                        };
+                    });
                     setContainers(withLogs);
 
-                    // Fetch all logs from all containers for activity log
+                    // Single bulk call for all refill logs (activity log)
                     setActivityLoading(true);
                     try {
-                        const allLogs = await Promise.all(
-                            flattened.map(async (c) => {
-                                try {
-                                    const res = await ivfService.getCanisterRefillLogs(c.tankId);
-                                    return (res?.refill_logs ?? []).map((log) => ({
-                                        timestamp: (() => {
-                                            if (!log.refill_date) return "-";
-                                            const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
-                                            const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-                                            const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
-                                            return time ? `${date}, ${time}` : date;
-                                        })(),
-                                        sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
-                                        tankCode: c.tankCode,
-                                        branch: c.branch,
-                                        operator: log.refilled_by ?? "-",
-                                        description: log.description ?? "-",
-                                        status: log.status ?? "-",
-                                    }));
-                                } catch {
-                                    return [];
-                                }
-                            }),
-                        );
-                        const merged = allLogs
-                            .flat()
-                            .sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+                        const logsRes = await ivfService.getAllTanksRefillLogs(tankIdList).catch(() => null);
+                        const merged = (logsRes?.logs ?? []).map((log) => ({
+                            timestamp: (() => {
+                                if (!log.refill_date) return "-";
+                                const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
+                                const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                                const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                                return time ? `${date}, ${time}` : date;
+                            })(),
+                            sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
+                            tankCode: log.tank_code ?? "-",
+                            branch: log.branch_name ?? "-",
+                            operator: log.refilled_by ?? "-",
+                            description: log.description ?? "-",
+                            status: log.status ?? "-",
+                        }));
                         setAllActivityLogs(merged);
                     } finally {
                         setActivityLoading(false);
@@ -244,13 +288,9 @@ const RefillLog = () => {
                 userService.getProfile().catch(() => null),
             ]);
             const allReservoirs = Array.isArray(resRes?.reservoirs) ? resRes.reservoirs : [];
-            const filtered = allReservoirs.filter((r) => {
-                if (isManagerAdmin) {
-                    return profile?.hospital_id == null || r.hospital_id === profile.hospital_id;
-                }
-                return profile?.branch_id == null || r.branch_id === profile.branch_id;
-            });
+            const filtered = allReservoirs;
             setReservoirs(filtered);
+            if (filtered.length > 0) setSelectedReservoirId((prev) => prev ?? filtered[0].reservoir_id);
             setReservoirLogs(Array.isArray(logsRes?.logs) ? logsRes.logs : []);
         } finally {
             setReservoirLogsLoading(false);
@@ -272,11 +312,15 @@ const RefillLog = () => {
         return containers.filter((c) => c.branch === selectedBranch);
     }, [containers, selectedBranch]);
 
-    // Banner detected data (hardcoded from detection; replace with real data when API ready)
-    const BANNER_DATE = "2026-02-19"; // 19/02/26
-    const BANNER_TIME = "12:30";
+    const formatDetectedAt = (isoStr: string | null): string => {
+        if (!isoStr) return "—";
+        const dt = new Date(isoStr);
+        const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+        const time = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+        return `${date} ${time}`;
+    };
 
-    const resetAddForm = (prefillDate?: string, prefillTime?: string) => {
+    const resetAddForm = (prefillDate?: string, prefillTime?: string, prefillWeight?: number | null) => {
         setAddForm({
             refill_date: prefillDate ?? new Date().toISOString().slice(0, 10),
             refill_time: prefillTime ?? "09:00",
@@ -284,6 +328,7 @@ const RefillLog = () => {
             description: "",
             status: "Not started",
             reservoir_id: "",
+            refill_weight: prefillWeight != null ? String(prefillWeight) : "",
         });
         setAddError(null);
     };
@@ -343,6 +388,8 @@ const RefillLog = () => {
     const submitAddRefillLog = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!selectedTankId) { setAddError("Select a container before adding log."); return; }
+        if (!addForm.reservoir_id) { setAddError("Reservoir is required."); return; }
+        if (!addForm.refill_weight) { setAddError("Refill Weight is required."); return; }
         if (!addForm.refilled_by.trim()) { setAddError("Refilled By is required."); return; }
         setAddSubmitting(true);
         setAddError(null);
@@ -354,8 +401,14 @@ const RefillLog = () => {
                 description: addForm.description.trim(),
                 status: addForm.status,
                 ...(addForm.reservoir_id ? { reservoir_id: Number(addForm.reservoir_id) } : {}),
+                ...(addForm.refill_weight !== "" ? { refill_weight: Number(addForm.refill_weight) } : {}),
             });
+            if (pendingAddDetectionId !== null) {
+                dismissDetection(pendingAddDetectionId, true);
+                setPendingAddDetectionId(null);
+            }
             setIsAddRefillOpen(false);
+            loadReservoirData();
         } catch (error) {
             setAddError((error as Error)?.message || "Failed to create refill log");
         } finally {
@@ -379,49 +432,174 @@ const RefillLog = () => {
                 }
             >
 
-                {/* Banner */}
-                {showBanner && (
-                    <div className="relative rounded-xl border-2 p-5 transition-all duration-200 border-[#E7D4F0] bg-gradient-to-r from-[#F7ECFF]/50 to-white">
-                        {/* Close — top right */}
-                        <button
-                            type="button"
-                            onClick={() => setShowBanner(false)}
-                            className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500" aria-hidden="true">
-                                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-                            </svg>
-                        </button>
-
-                        <div className="flex items-end gap-4 max-[500px]:flex-col max-[500px]:items-start">
-                            {/* Droplet icon */}
-                            <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[#F2E4FF] text-[#6b1176] self-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {/* Refill Detection Tiles — shimmer while loading */}
+                {detectionsLoading && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
                                 </svg>
                             </div>
-                            {/* Content */}
-                            <div className="flex-1 min-w-0 pr-8">
-                                <h3 className="font-semibold text-sm text-gray-900">Refill Detected</h3>
-                                <div className="mt-1.5 flex flex-col gap-0.5">
-                                    <p className="text-sm text-gray-700">Tank Code: <span className="font-medium text-gray-900">T20</span></p>
-                                    <p className="text-sm text-gray-700">Branch Name: <span className="font-medium text-gray-900">Tambaram</span></p>
-                                    <p className="text-sm text-gray-700">Date & Time: <span className="font-medium text-gray-900">19/02/26 12:30 PM</span></p>
+                            <span className="text-sm font-semibold text-gray-800">Refill Detected</span>
+                        </div>
+                        <div className="flex gap-3 overflow-hidden">
+                            {[0, 1, 2].map((i) => (
+                                <div key={i} className="flex-none w-[460px] rounded-xl border-2 border-gray-100 bg-gray-50 p-4 flex flex-col gap-3">
+                                    <div className="flex items-start justify-between">
+                                        <div className="w-20 h-6 rounded-lg bg-gray-200 animate-pulse" />
+                                        <div className="w-6 h-6 rounded-md bg-gray-200 animate-pulse" />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <div className="w-16 h-3 rounded bg-gray-200 animate-pulse" />
+                                            <div className="w-24 h-3 rounded bg-gray-200 animate-pulse" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="w-16 h-3 rounded bg-gray-200 animate-pulse" />
+                                            <div className="w-28 h-3 rounded bg-gray-200 animate-pulse" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="w-16 h-3 rounded bg-gray-200 animate-pulse" />
+                                            <div className="w-16 h-3 rounded bg-gray-200 animate-pulse" />
+                                        </div>
+                                    </div>
+                                    <div className="w-full h-8 rounded-lg bg-gray-200 animate-pulse mt-auto" />
                                 </div>
-                            </div>
-                            {/* Add Refill — aligned to bottom */}
-                            <button
-                                type="button"
-                                onClick={() => { resetAddForm(BANNER_DATE, BANNER_TIME); setAddModalTab("refill"); setIsAddRefillOpen(true); }}
-                                className="flex-shrink-0 flex items-center gap-1.5 px-4 h-8 rounded-lg bg-[#6b1176] text-white text-xs font-medium hover:bg-[#5a0e63] transition-colors"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-                                </svg>
-                                Add Logs
-                            </button>
+                            ))}
                         </div>
                     </div>
+                )}
+
+                {/* Refill Detection Tiles */}
+                {!detectionsLoading && pendingDetections.length > 0 && (
+                        <div className="relative">
+                            {/* Header row */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-[#F2E4FF] text-[#6b1176]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-semibold text-gray-800">Refill Detected</span>
+                                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[#6b1176] text-white text-[10px] font-bold">
+                                        {pendingDetections.length}
+                                    </span>
+                                </div>
+                                {/* Scroll arrows */}
+                                {pendingDetections.length > 1 && (
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => scrollDetections("left")}
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                                            aria-label="Scroll left"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => scrollDetections("right")}
+                                            className="w-7 h-7 rounded-lg border border-[#E7D4F0] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
+                                            aria-label="Scroll right"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Scrollable tile row */}
+                            <div
+                                ref={detectionScrollRef}
+                                className="flex gap-3 overflow-x-auto pb-1 w-fit max-w-full"
+                                style={{ scrollbarWidth: "none" }}
+                            >
+                                {pendingDetections.map((detection) => {
+                                    const isDismissing = dismissingId === detection.id;
+                                    const detectedAtParts = detection.detected_at
+                                        ? (() => {
+                                            const dt = new Date(detection.detected_at);
+                                            return {
+                                                date: dt.toISOString().slice(0, 10),
+                                                time: dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+                                            };
+                                          })()
+                                        : null;
+                                    return (
+                                        <div
+                                            key={detection.id}
+                                            className="flex-none w-[460px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-[#F7ECFF]/60 to-white p-4 flex flex-col gap-3"
+                                            style={{
+                                                transition: "opacity 0.25s ease, transform 0.25s ease",
+                                                opacity: isDismissing ? 0 : 1,
+                                                transform: isDismissing ? "scale(0.95)" : "scale(1)",
+                                            }}
+                                        >
+                                            {/* Tile top row: tank badge + dismiss */}
+                                            <div className="flex items-start justify-between">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F2E4FF] text-[#6b1176] text-xs font-semibold">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                                                    </svg>
+                                                    {detection.tank_code ?? "—"}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setRejectDialogId(detection.id); setRejectReason(""); }}
+                                                    className="w-6 h-6 rounded-md flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                                                    aria-label="Reject detection"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
+                                            {/* Info + Add Logs */}
+                                            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+                                                {/* Info rows */}
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] text-gray-400 w-20 shrink-0">Branch</span>
+                                                        <span className="text-[12px] font-medium text-gray-800 truncate">{detection.branch_name ?? "—"}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] text-gray-400 w-20 shrink-0">Date & Time</span>
+                                                        <span className="text-[12px] font-medium text-gray-800">{formatDetectedAt(detection.detected_at)}</span>
+                                                    </div>
+                                                    {detection.refill_weight !== null && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[11px] text-gray-400 w-20 shrink-0">Weight</span>
+                                                            <span className="text-[12px] font-medium text-gray-800">{detection.refill_weight} kg</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Add Logs button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPendingAddDetectionId(detection.id);
+                                                        resetAddForm(detectedAtParts?.date, detectedAtParts?.time, detection.refill_weight);
+                                                        setSelectedTankId(String(detection.tank_id));
+                                                        setAddModalTab("refill");
+                                                        setIsAddRefillOpen(true);
+                                                    }}
+                                                    className="w-full md:w-auto md:shrink-0 flex items-center justify-center gap-1.5 px-5 h-9 rounded-lg bg-[#6b1176] text-white text-xs font-medium hover:bg-[#5a0e63] transition-colors"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M12 5v14M5 12h14" />
+                                                    </svg>
+                                                    Add Logs
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                 )}
 
                 {/* Two panels */}
@@ -464,11 +642,11 @@ const RefillLog = () => {
                                                 container.tankMaxCapacity != null && container.tankMinCapacity != null
                                                     ? container.tankMaxCapacity - container.tankMinCapacity
                                                     : null;
-                                            const ln2Pct = ln2_100per != null && ln2_100per > 0
-                                                ? Math.min(100, Math.max(0, Math.round((container.ln2LevelKg / ln2_100per) * 100)))
+                                            const ln2Pct = container.ln2LevelKg != null && ln2_100per != null && ln2_100per > 0
+                                                ? Math.min(100, Math.floor((container.ln2LevelKg / ln2_100per) * 100))
                                                 : null;
                                             const l2Pct = container.ln2ConfigMin != null && ln2_100per != null && ln2_100per > 0
-                                                ? Math.round(100 - ((ln2_100per - container.ln2ConfigMin) / ln2_100per) * 100)
+                                                ? Math.floor((container.ln2ConfigMin / ln2_100per) * 100)
                                                 : null;
                                             return (
                                                 <div className="flex flex-col items-stretch gap-0.5">
@@ -526,49 +704,111 @@ const RefillLog = () => {
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
                         <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
-                            {/* Left: Cryocan SVG illustration */}
-                            <div className="flex items-center justify-center shrink-0 px-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
-                                <svg width="200" height="320" viewBox="0 0 200 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Cryocan tank">
-                                    <defs>
-                                        <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">
-                                            <stop offset="0%" stopColor="#9B72B0" />
-                                            <stop offset="100%" stopColor="#B58BC6" />
-                                        </linearGradient>
-                                        <linearGradient id="res-body-gradient" x1="0" x2="1" y1="0" y2="0">
-                                            <stop offset="0%" stopColor="#9580a8" />
-                                            <stop offset="50%" stopColor="#c9b3db" />
-                                            <stop offset="100%" stopColor="#9580a8" />
-                                        </linearGradient>
-                                        <clipPath id="res-body-clip">
-                                            <rect x="30" y="50" width="140" height="220" rx="30" />
-                                        </clipPath>
-                                    </defs>
-                                    {/* Tank lid/cap */}
-                                    <rect x="50" y="15" width="100" height="40" rx="10" fill="#a78bba" stroke="#8B6B9E" strokeWidth="2" />
-                                    <rect x="60" y="22" width="80" height="10" rx="5" fill="#c9b3db" />
-                                    <rect x="70" y="35" width="60" height="8" rx="4" fill="#b8a0cc" />
-                                    {/* Tank base/feet */}
-                                    <rect x="40" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
-                                    <rect x="130" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
-                                    <rect x="65" y="270" width="70" height="12" rx="3" fill="#a78bba" />
-                                    {/* Tank body */}
-                                    <rect x="30" y="50" width="140" height="220" rx="30" fill="url(#res-body-gradient)" stroke="#8B6B9E" strokeWidth="3" />
-                                    {/* LN2 fill ~60% */}
-                                    <g clipPath="url(#res-body-clip)">
-                                        <rect x="30" y="182" width="140" height="88" fill="url(#res-fill-gradient)" />
-                                        <path d="M30 0 Q55 -6 80 0 T130 0 T170 0" fill="#B58BC6" opacity="0.9" transform="translate(0,182)">
-                                            <animate attributeName="d" values="M30 0 Q55 -6 80 0 T130 0 T170 0;M30 0 Q55 6 80 0 T130 0 T170 0;M30 0 Q55 -6 80 0 T130 0 T170 0" dur="3s" repeatCount="indefinite" />
-                                        </path>
-                                        <ellipse cx="100" cy="182" rx="40" ry="3" fill="white" opacity="0.3">
-                                            <animate attributeName="opacity" values="0.3;0.5;0.3" dur="2s" repeatCount="indefinite" />
-                                        </ellipse>
-                                    </g>
-                                    {/* Inner shadow */}
-                                    <rect x="30" y="50" width="140" height="220" rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
-                                    {/* Percentage */}
-                                    <text x="100" y="175" textAnchor="middle" fontSize="24" fontWeight="bold" fill="#6B1176" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>60%</text>
-                                    <text x="100" y="195" textAnchor="middle" fontSize="12" fill="#6B1176" opacity="0.7" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>Reservoir</text>
-                                </svg>
+                            {/* Left: Cryocan SVG + reservoir dropdown */}
+                            <div className="flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                                {(() => {
+                                    const selected = reservoirs.find(r => r.reservoir_id === selectedReservoirId);
+                                    const cur = selected?.current_weight ?? 0;
+                                    const max = selected?.max_weight ?? 0;
+                                    const pct = max > 0 ? Math.min(100, Math.floor((cur / max) * 100)) : 0;
+                                    const tankBodyTop = 50;
+                                    const tankBodyHeight = 220;
+                                    const tankBodyBottom = tankBodyTop + tankBodyHeight;
+                                    const fillHeight = (tankBodyHeight * pct) / 100;
+                                    const fillY = tankBodyBottom - fillHeight;
+                                    const fillColor = pct <= 20 ? "#EF4444" : pct <= 50 ? "#F59E0B" : "#9B72B0";
+                                    const fillColorEnd = pct <= 20 ? "#FCA5A5" : pct <= 50 ? "#FCD34D" : "#B58BC6";
+                                    return (
+                                        <>
+                                            <svg width="200" height="320" viewBox="0 0 200 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Reservoir tank">
+                                                <defs>
+                                                    <linearGradient id="res-fill-gradient" x1="0" x2="0" y1="1" y2="0">
+                                                        <stop offset="0%" stopColor={fillColor} />
+                                                        <stop offset="100%" stopColor={fillColorEnd} />
+                                                    </linearGradient>
+                                                    <linearGradient id="res-body-gradient" x1="0" x2="1" y1="0" y2="0">
+                                                        <stop offset="0%" stopColor="#9580a8" />
+                                                        <stop offset="50%" stopColor="#c9b3db" />
+                                                        <stop offset="100%" stopColor="#9580a8" />
+                                                    </linearGradient>
+                                                    <clipPath id="res-body-clip">
+                                                        <rect x="30" y="50" width="140" height="220" rx="30" />
+                                                    </clipPath>
+                                                </defs>
+                                                {/* Tank lid/cap */}
+                                                <rect x="50" y="15" width="100" height="40" rx="10" fill="#a78bba" stroke="#8B6B9E" strokeWidth="2" />
+                                                <rect x="60" y="22" width="80" height="10" rx="5" fill="#c9b3db" />
+                                                <rect x="70" y="35" width="60" height="8" rx="4" fill="#b8a0cc" />
+                                                {/* Tank base/feet */}
+                                                <rect x="40" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+                                                <rect x="130" y="270" width="30" height="18" rx="6" fill="#8B6B9E" />
+                                                <rect x="65" y="270" width="70" height="12" rx="3" fill="#a78bba" />
+                                                {/* Tank body */}
+                                                <rect x="30" y="50" width="140" height="220" rx="30" fill="url(#res-body-gradient)" stroke="#8B6B9E" strokeWidth="3" />
+                                                {/* LN2 fill — dynamic */}
+                                                <g clipPath="url(#res-body-clip)">
+                                                    {pct > 0 && (
+                                                        <>
+                                                            <rect x="30" y={fillY} width="140" height={fillHeight} fill="url(#res-fill-gradient)" />
+                                                            <path d={`M30 0 Q55 -6 80 0 T130 0 T170 0`} fill={fillColorEnd} opacity="0.9" transform={`translate(0,${fillY})`}>
+                                                                <animate attributeName="d" values="M30 0 Q55 -6 80 0 T130 0 T170 0;M30 0 Q55 6 80 0 T130 0 T170 0;M30 0 Q55 -6 80 0 T130 0 T170 0" dur="3s" repeatCount="indefinite" />
+                                                            </path>
+                                                            <ellipse cx="100" cy={fillY} rx="40" ry="3" fill="white" opacity="0.3">
+                                                                <animate attributeName="opacity" values="0.3;0.5;0.3" dur="2s" repeatCount="indefinite" />
+                                                            </ellipse>
+                                                        </>
+                                                    )}
+                                                </g>
+                                                {/* Inner shadow */}
+                                                <rect x="30" y="50" width="140" height="220" rx="30" fill="none" stroke="#6B1176" strokeWidth="1" opacity="0.1" />
+                                                {/* Percentage */}
+                                                <text x="100" y="163" textAnchor="middle" fontSize="24" fontWeight="bold" fill="#6B1176" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{pct}%</text>
+                                                {/* Reservoir name — one word per line */}
+                                                {(selected?.reservoir_name ?? "").split(" ").map((word, i, arr) => (
+                                                    <text key={i} x="100" y={183 + i * 14} textAnchor="middle" fontSize="11" fill="#6B1176" opacity="0.7" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>{word}</text>
+                                                ))}
+                                            </svg>
+                                            {/* Reservoir dropdown — custom UI */}
+                                            <div className="relative w-full" ref={reservoirDropdownRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsReservoirDropdownOpen(!isReservoirDropdownOpen)}
+                                                    className="w-full flex items-center justify-between gap-2 px-3 h-8 rounded-lg border border-[#E7E1E1] text-xs text-gray-700 hover:bg-gray-50 transition-colors bg-white"
+                                                >
+                                                    <span className="truncate text-[#6b1176] font-medium">
+                                                        {reservoirs.find(r => r.reservoir_id === selectedReservoirId)?.branch_name
+                                                            ?? reservoirs.find(r => r.reservoir_id === selectedReservoirId)?.reservoir_name
+                                                            ?? "Select reservoir"}
+                                                    </span>
+                                                    <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-gray-400 ${isReservoirDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                                {isReservoirDropdownOpen && (
+                                                    <div className="absolute left-0 right-0 bottom-full mb-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                                        {reservoirs.length === 0 && (
+                                                            <div className="px-3 py-2 text-xs text-gray-400">No reservoirs</div>
+                                                        )}
+                                                        {reservoirs.map((r) => (
+                                                            <button
+                                                                key={r.reservoir_id}
+                                                                type="button"
+                                                                onClick={() => { setSelectedReservoirId(r.reservoir_id); setIsReservoirDropdownOpen(false); }}
+                                                                className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                                                    selectedReservoirId === r.reservoir_id
+                                                                        ? "bg-[#6b1176] text-white"
+                                                                        : "text-[#6b1176] hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                {r.branch_name ?? r.reservoir_name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
 
                             {/* Right: table */}
@@ -753,7 +993,7 @@ const RefillLog = () => {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-black">Add Log</h3>
-                            <button type="button" onClick={() => !(addSubmitting || reservoirSubmitting) && setIsAddRefillOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                            <button type="button" onClick={() => { if (!(addSubmitting || reservoirSubmitting)) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="text-gray-500 hover:text-gray-700">✕</button>
                         </div>
                         {/* Toggle */}
                         <div className="flex items-center gap-1 p-1 bg-[#F7ECFF] rounded-lg mb-4 w-fit">
@@ -783,10 +1023,11 @@ const RefillLog = () => {
                                                 const tankId = e.target.value || null;
                                                 setSelectedTankId(tankId);
                                                 const tank = containers.find((c) => c.tankId === tankId);
-                                                const matchedReservoir = tank
-                                                    ? reservoirs.find((r) => r.branch_name === tank.branch)
-                                                    : undefined;
-                                                setAddForm((p) => ({ ...p, reservoir_id: matchedReservoir ? String(matchedReservoir.reservoir_id) : "" }));
+                                                const branchReservoirs = tank
+                                                    ? reservoirs.filter((r) => r.branch_id === tank.branchId)
+                                                    : [];
+                                                const firstReservoir = branchReservoirs[0] ?? reservoirs[0];
+                                                setAddForm((p) => ({ ...p, reservoir_id: firstReservoir ? String(firstReservoir.reservoir_id) : "" }));
                                             }} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white" required>
                                             <option value="">Select tank</option>
                                             {containers.map((c) => (
@@ -800,12 +1041,20 @@ const RefillLog = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Reservoir</label>
-                                    <select value={addForm.reservoir_id} disabled className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
-                                        <option value="">None</option>
-                                        {reservoirs.map((r) => (
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Reservoir <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={addForm.reservoir_id}
+                                        onChange={(e) => setAddForm((p) => ({ ...p, reservoir_id: e.target.value }))}
+                                        className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm bg-white"
+                                        required
+                                    >
+                                        <option value="">Select reservoir</option>
+                                        {(selectedTankId
+                                            ? reservoirs.filter((r) => r.branch_id === containers.find((c) => c.tankId === selectedTankId)?.branchId)
+                                            : reservoirs
+                                        ).map((r) => (
                                             <option key={r.reservoir_id} value={r.reservoir_id}>
-                                                {r.reservoir_name}{r.branch_name ? ` — ${r.branch_name}` : ""}
+                                                {r.reservoir_name}
                                             </option>
                                         ))}
                                     </select>
@@ -831,13 +1080,28 @@ const RefillLog = () => {
                                         </select>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                                    <input type="text" value={addForm.description} onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Refill Weight (kg) <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={addForm.refill_weight}
+                                            onChange={(e) => setAddForm((p) => ({ ...p, refill_weight: e.target.value }))}
+                                            placeholder="e.g. 12.5"
+                                            className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                                        <input type="text" value={addForm.description} onChange={(e) => setAddForm((p) => ({ ...p, description: e.target.value }))} className="w-full h-10 px-3 border border-[#E7E1E1] rounded-lg text-sm" />
+                                    </div>
                                 </div>
                                 {addError && <div className="text-sm text-red-600">{addError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <button type="button" onClick={() => !addSubmitting && setIsAddRefillOpen(false)} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
+                                    <button type="button" onClick={() => { if (!addSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
                                     <button type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {addSubmitting ? "Saving..." : "Save"}
                                     </button>
@@ -871,7 +1135,7 @@ const RefillLog = () => {
                                 </div>
                                 {reservoirError && <div className="text-sm text-red-600">{reservoirError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
-                                    <button type="button" onClick={() => !reservoirSubmitting && setIsAddRefillOpen(false)} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
+                                    <button type="button" onClick={() => { if (!reservoirSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
                                     <button type="submit" disabled={reservoirSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {reservoirSubmitting ? "Saving..." : "Save"}
                                     </button>
@@ -971,6 +1235,64 @@ const RefillLog = () => {
                                     </tbody>
                                 </table>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Rejection reason dialog */}
+            {rejectDialogId !== null && (
+                <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => { setRejectDialogId(null); setRejectReason(""); }}
+                >
+                    <div
+                        className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-gray-200 p-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-[15px] font-semibold text-gray-900">Reject Detection</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Provide a reason for rejecting this refill detection.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { setRejectDialogId(null); setRejectReason(""); }}
+                                className="p-1 hover:bg-gray-100 rounded-full transition-colors ml-3"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Reason textarea */}
+                        <textarea
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#6b1176] focus:ring-1 focus:ring-[#6b1176] resize-none"
+                            rows={3}
+                            placeholder="e.g. False positive, sensor malfunction…"
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            autoFocus
+                        />
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button
+                                type="button"
+                                onClick={() => { setRejectDialogId(null); setRejectReason(""); }}
+                                className="px-4 h-9 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={submitReject}
+                                disabled={rejectSubmitting}
+                                className="px-4 h-9 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-60"
+                            >
+                                {rejectSubmitting ? "Rejecting…" : "Reject"}
+                            </button>
                         </div>
                     </div>
                 </div>

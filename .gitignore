@@ -2,3 +2,4 @@ FrontEnd/.env
 .cursor/
 .github/
 .cursor/mygrape_rule
+.DS_Store
