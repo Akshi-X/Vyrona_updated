@@ -869,7 +869,7 @@ export default function Dashboard({ }: DashboardProps) {
         branchName: (ivfAlert as IVFAlert & { branch_name?: string }).branch_name,
         dedupKey: (ivfAlert as IVFAlert & { dedup_key?: string }).dedup_key,
         message: ivfAlert.message,
-        timestamp: new Date(ivfAlert.occurred_at+"Z"),
+        timestamp: new Date(ivfAlert.occurred_at+"Z")+"",
         status: (ivfAlert.status === 'Active' ? 'Active' : 'Acknowledged') as 'Active' | 'Acknowledged' | 'Resolved' | 'Escalated'
       };
     } else {
