@@ -274,7 +274,7 @@ export default function OutboundQualityTrackingPage() {
                     branchName: (a as typeof a & { branch_name?: string }).branch_name,
                     dedupKey: (a as typeof a & { dedup_key?: string }).dedup_key,
                     message: a.message,
-                    timestamp: new Date(a.occurred_at+"Z"),
+                    timestamp: new Date(a.occurred_at+"Z")+"",
                     status: a.status === 'Active' ? 'Active' : 'Acknowledged',
                 }))}
                 loading={loadingAlerts}
