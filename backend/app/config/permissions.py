@@ -136,6 +136,12 @@ AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
     ("GET", "/api/quality/history"),
     ("GET", "/api/quality/connections"),
     # WebSocket endpoint: /api/quality/ws - authentication handled in endpoint
+    # Refill detection review endpoints
+    ("GET", "/api/quality-tracking/refill-detections/pending"),
+    ("PATCH", "/api/quality-tracking/refill-detections/{detection_id}/review"),
+    # Bulk tank refill summary and all logs
+    ("GET", "/api/quality-tracking/tanks/refill-summary"),
+    ("GET", "/api/quality-tracking/tanks/all-refill-logs"),
 }
 
 
