@@ -211,7 +211,7 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
         case "COMPLETE_LEVEL": {
             const level = state.levels[action.levelId];
             if (!level) return state;
-            const nextLevelId = onboardingLevels.find((item, index) => {
+            const nextLevelId = onboardingLevels.find((_item, index) => {
                 const currentIndex = onboardingLevels.findIndex((config) => config.id === action.levelId);
                 return index === currentIndex + 1;
             })?.id;

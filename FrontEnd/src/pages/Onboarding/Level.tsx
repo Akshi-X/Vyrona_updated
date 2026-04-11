@@ -87,7 +87,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             stepCount: steps.length,
             targets: steps.map((step) => step.target),
         });
-        setSteps(mappedSteps);
+        setSteps?.(mappedSteps);
         if (steps.length > 0 && typeof currentStep !== "number") {
             const safeIndex = Math.min(stepIndex, steps.length - 1);
             setCurrentStep(safeIndex);
