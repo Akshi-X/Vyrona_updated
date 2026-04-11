@@ -96,17 +96,36 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     }, [steps, stepIndex, currentStep, setSteps, setCurrentStep, setIsOpen]);
 
     useEffect(() => {
-        if (typeof currentStep === "number" && currentStep !== stepIndex) {
-            console.log("[onboarding] tour step -> state", {
+        if (typeof currentStep !== "number" || currentStep === stepIndex) {
+            return;
+        }
+        if (currentStep < stepIndex) {
+            console.log("[onboarding] ignore backward tour step", {
                 levelId,
                 currentStep,
                 stepIndex,
             });
-            syncingFromTourRef.current = true;
-            setStepIndex(levelId, currentStep);
-            logEvent({ type: "tour_step", levelId, payload: { stepIndex: currentStep } });
+            return;
         }
-    }, [currentStep, stepIndex, levelId, setStepIndex, logEvent]);
+        const nextStep = steps[currentStep];
+        if (nextStep?.requireClick && !confirmedSteps[nextStep.id]) {
+            console.log("[onboarding] block tour step until confirmed", {
+                levelId,
+                stepId: nextStep.id,
+                currentStep,
+                stepIndex,
+            });
+            return;
+        }
+        console.log("[onboarding] tour step -> state", {
+            levelId,
+            currentStep,
+            stepIndex,
+        });
+        syncingFromTourRef.current = true;
+        setStepIndex(levelId, currentStep);
+        logEvent({ type: "tour_step", levelId, payload: { stepIndex: currentStep } });
+    }, [currentStep, stepIndex, steps, confirmedSteps, levelId, setStepIndex, logEvent]);
 
     useEffect(() => {
         if (steps.length === 0) return;
@@ -132,6 +151,8 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         if (typeof currentStep !== "number") return;
         const activeStep = steps[currentStep];
         if (!activeStep?.requireClick) return;
+        const alreadyConfirmed = confirmedSteps[activeStep.id];
+        if (alreadyConfirmed) return;
 
         const target = document.querySelector(activeStep.target);
         if (!target) {
@@ -143,10 +164,15 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             });
             return;
         }
-        const alreadyConfirmed = confirmedSteps[activeStep.id];
-        if (alreadyConfirmed) return;
 
-        const handleClick = () => {
+        console.log("[onboarding] attach click guard", {
+            levelId,
+            stepId: activeStep.id,
+            target: activeStep.target,
+            currentStep,
+        });
+
+        const confirmStep = () => {
             console.log("[onboarding] target clicked", {
                 levelId,
                 stepId: activeStep.id,
@@ -163,9 +189,16 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             setStepIndex(levelId, nextStep);
         };
 
-        target.addEventListener("click", handleClick, { once: true });
+        const handlePointerDown = (event: Event) => {
+            const element = event.target as HTMLElement | null;
+            if (!element) return;
+            if (!element.closest(activeStep.target)) return;
+            confirmStep();
+        };
+
+        document.addEventListener("pointerdown", handlePointerDown, true);
         return () => {
-            target.removeEventListener("click", handleClick);
+            document.removeEventListener("pointerdown", handlePointerDown, true);
         };
     }, [currentStep, steps, confirmedSteps, levelId, logEvent, setCurrentStep, setStepIndex]);
 
