@@ -1117,6 +1117,7 @@ export class IvfService extends BaseApiService {
             refilled_by: string | null;
             description: string | null;
             status: string | null;
+            refill_weight: number | null;
         }>;
     }> {
         return await this.request(
