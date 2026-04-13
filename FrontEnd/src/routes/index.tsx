@@ -32,6 +32,7 @@ import {
     OnboardingShell,
 } from "../pages/Onboarding";
 import Dashboard from "../pages/Dashboard";
+import { OnboardingProvider } from "../contexts/OnboardingContext";
 
 /**
  * Dashboard with variant support
@@ -228,7 +229,9 @@ export const router = createBrowserRouter([
         path: "/onboarding",
         element: (
             <OnboardingGate>
-                <OnboardingShell />
+                <OnboardingProvider>
+                    <OnboardingShell />
+                </OnboardingProvider>
             </OnboardingGate>
         ),
         children: [
