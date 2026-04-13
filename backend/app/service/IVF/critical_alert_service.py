@@ -476,6 +476,7 @@ class CriticalAlertService:
                 self.db.query(KpiConfig)
                 .filter(
                     KpiConfig.id == deviation.kpi_config_id,
+                    KpiConfig.status == True,
                 )
                 .first()
             )
@@ -500,7 +501,7 @@ class CriticalAlertService:
             # Build precise LIKE patterns anchored to tank_id to avoid false matches
             # (e.g. kpi_config_id=5 must not match :15, :25, :55, etc.)
             # Pattern 1: exact dedup key ending with :{kpi_config_id}
-            # Pattern 2: race-condition fallback keys ending with :{kpi_config_id}:{HHMMSS}
+        # Pattern 2: race-condition fallback keys ending with :{kpi_config_id}:{HHMMSS}
             dedup_prefix = f"{tank_id}:{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
             last_alert = (
                 self.db.query(CriticalAlert)
