@@ -48,6 +48,7 @@ from app.service.redis_service import get_pubsub, get_redis, reset_redis_connect
 logger = logging.getLogger(__name__)
 
 
+
 class QualityService:
     """Service for quality monitoring operations"""
 
@@ -789,8 +790,7 @@ class QualityService:
             row.max = max_val
         if unit is not None:
             row.unit = unit.strip() if unit else None
-        if alert_type is not None:
-            row.alert_type = alert_type.strip() if alert_type else None
+        row.alert_type = alert_type.strip() if isinstance(alert_type, str) and alert_type else None
         if cooldown_minutes is not None:
             row.cooldown_minutes = cooldown_minutes
         if status is not None:
