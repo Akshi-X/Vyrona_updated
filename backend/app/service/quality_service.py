@@ -611,9 +611,6 @@ class QualityService:
         Only includes non-null, non-empty values (no unnecessary null data).
         """
 
-        def _omit_none(d: dict) -> dict:
-            return {k: v for k, v in d.items() if v is not None and v != ""}
-
         try:
             tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
             branch = None
@@ -648,28 +645,11 @@ class QualityService:
             kpi_limits = {}
             for r in rows:
                 name = r.kpi_name
-                if name not in kpi_limits:
-                    kpi_limits[name] = {}
-                if r.alert_name is None:
-                    # Value config: only include unit if non-empty; min/max only if set
-                    val = _omit_none(
-                        {
-                            "unit": (r.unit or "").strip() or None,
-                            "min": float(r.min) if r.min is not None else None,
-                            "max": float(r.max) if r.max is not None else None,
-                        }
-                    )
-                    kpi_limits[name].update(val)
-                else:
-                    # Bands: only include min, max, alert_type when set
-                    band = _omit_none(
-                        {
-                            "min": float(r.min) if r.min is not None else None,
-                            "max": float(r.max) if r.max is not None else None,
-                            "alert_type": (r.alert_type or "").strip() or None,
-                        }
-                    )
-                    kpi_limits[name][r.alert_name] = band
+                kpi_limits.setdefault(name, {})[r.alert_name] = {
+                    "min": float(r.min) if r.min is not None else None,
+                    "max": float(r.max) if r.max is not None else None,
+                    "alert_type": (r.alert_type or "").strip() or None,
+                }
             return {
                 "tank_id": tank_id,
                 "tank_code": tank_code,
