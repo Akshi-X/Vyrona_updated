@@ -606,7 +606,7 @@ const RefillLog = () => {
                 <div className="grid grid-cols-1 min-[1436px]:grid-cols-2 min-[1436px]:h-[400px] gap-6">
 
                     {/* Left: Active Tank Status */}
-                    <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
+                    <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Active Tank Status</h2>
                         </div>
