@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
 export default function OnboardingStatus() {
-    const { levels, state } = useOnboarding();
+    const { levels, state, getQuiz } = useOnboarding();
 
     return (
         <div className="mx-auto max-w-4xl space-y-6">
@@ -14,13 +14,24 @@ export default function OnboardingStatus() {
                 {levels.map((level) => {
                     const progress = state.levels[level.id];
                     const status = progress?.status ?? "locked";
+                    const quiz = getQuiz(level.id);
+                    const answers = state.quizAnswers[level.id] || {};
+                    const quizScore = quiz.reduce((sum, question) => {
+                        const picked = answers[question.id];
+                        return picked === question.correctIndex ? sum + question.points : sum;
+                    }, 0);
+                    const currentScore = Math.max(progress?.score ?? 0, quizScore);
+                    const pointsRequired = level.pointsRequired ?? 0;
+                    const remainingPoints = Math.max(pointsRequired - currentScore, 0);
                     return (
                         <div key={level.id} className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
                             <div className="flex flex-wrap items-center justify-between gap-4">
                                 <div>
                                     <p className="text-sm uppercase tracking-[0.2em] text-slate-400">{level.id}</p>
                                     <h3 className="text-lg font-semibold">{level.title}</h3>
-                                    <p className="text-sm text-slate-500">Score: {progress?.score ?? 0}</p>
+                                    <p className="text-sm text-slate-500">Current points: {currentScore} / {pointsRequired}</p>
+                                    <p className="text-sm text-slate-500">Quiz points scored: {quizScore}</p>
+                                    <p className="text-sm text-slate-500">Points remaining: {remainingPoints}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-semibold text-slate-900">{status.replace("_", " ")}</p>

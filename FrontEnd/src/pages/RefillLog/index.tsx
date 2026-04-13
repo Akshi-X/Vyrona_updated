@@ -88,6 +88,7 @@ const RefillLog = () => {
         operator: string;
         description: string;
         status: string;
+        refillWeight?: number | null;
     }[]>([]);
     const [activityLoading, setActivityLoading] = useState(true);
     const [reservoirs, setReservoirs] = useState<{ reservoir_id: number; reservoir_name: string; hospital_id: number | null; branch_id: number | null; branch_name: string | null; current_weight: number | null; max_weight: number | null }[]>([]);
@@ -234,6 +235,7 @@ const RefillLog = () => {
                             operator: log.refilled_by ?? "-",
                             description: log.description ?? "-",
                             status: log.status ?? "-",
+                            refillWeight: log.refill_weight ?? null,
                         }));
                         setAllActivityLogs(merged);
                     } finally {
@@ -620,7 +622,17 @@ const RefillLog = () => {
                         {/* Container list */}
                         <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100">
                             {containersLoading && (
-                                <div className="p-4 text-xs text-gray-500">Loading containers...</div>
+                                [0,1,2,3].map((i) => (
+                                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2.5 items-center gap-x-2">
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="relative overflow-hidden h-3 w-24 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                            <div className="relative overflow-hidden h-2.5 w-16 rounded bg-gray-100"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        </div>
+                                        <div className="px-2"><div className="relative overflow-hidden h-2.5 w-full rounded-full bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></div>
+                                        <div className="relative overflow-hidden h-3 w-10 rounded bg-gray-200 mx-auto"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                        <div className="relative overflow-hidden h-3 w-14 rounded bg-gray-200 mx-auto"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                    </div>
+                                ))
                             )}
                             {!containersLoading && filteredContainers.map((container) => (
                                 <div
@@ -820,7 +832,14 @@ const RefillLog = () => {
                                 </div>
                                 <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-gray-100">
                                     {reservoirLogsLoading && (
-                                        <div className="p-4 text-xs text-gray-500">Loading...</div>
+                                        [0,1,2,3].map((i) => (
+                                            <div key={i} className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2.5 items-center">
+                                                <div className="relative overflow-hidden h-3 w-28 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                                <div className="relative overflow-hidden h-3 w-16 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                                <div className="relative overflow-hidden h-3 w-16 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div>
+                                                <div />
+                                            </div>
+                                        ))
                                     )}
                                     {!reservoirLogsLoading && reservoirLogs.length === 0 && (
                                         <div className="p-4 text-xs text-gray-400">No reservoir logs found.</div>
@@ -944,13 +963,20 @@ const RefillLog = () => {
                     </div>
                     <div className="flex-1 overflow-auto min-h-0">
                         {activityLoading ? (
-                            <div className="flex items-center justify-center h-24 text-sm text-gray-400 gap-2">
-                                <svg className="animate-spin w-4 h-4 text-[#6b1176]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                </svg>
-                                Loading activity...
-                            </div>
+                            <table className="w-full text-sm">
+                                <tbody>
+                                    {[0,1,2,3,4].map((i) => (
+                                        <tr key={i} className="border-b border-gray-100">
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-32 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-12 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-20 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-24 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-36 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                            <td className="px-4 py-3"><div className="relative overflow-hidden h-3 w-16 rounded bg-gray-200"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer" /></div></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         ) : (
                         <table className="w-full text-sm">
                             <thead className="sticky top-0 bg-white z-10">
@@ -960,6 +986,7 @@ const RefillLog = () => {
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Branch</th>
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Operator</th>
                                     <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Description</th>
+                                    <th className="text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-3 whitespace-nowrap">Refill Weight</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -970,11 +997,12 @@ const RefillLog = () => {
                                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.branch}</td>
                                         <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.operator}</td>
                                         <td className="px-4 py-2.5 text-gray-500 max-w-[160px] truncate">{row.description}</td>
+                                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{row.refillWeight != null ? `${row.refillWeight} kg` : "-"}</td>
                                     </tr>
                                 ))}
                                 {allActivityLogs.filter((r) => activityBranch === "All" || r.branch === activityBranch).length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-5 py-6 text-center text-sm text-gray-400">No recent activity.</td>
+                                        <td colSpan={6} className="px-5 py-6 text-center text-sm text-gray-400">No recent activity.</td>
                                     </tr>
                                 )}
                             </tbody>

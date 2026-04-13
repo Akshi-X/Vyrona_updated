@@ -166,7 +166,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             return isApprover;
         }
         if (item.label === "Alert Configuration") {
-            return isIVF && (userRole === "Manager" || userRole === "Admin");
+            return isIVF && (userRole === "Manager" || userRole === "Admin" || userRole === "User");
         }
         if (!isIVF && item.label === "Reports") {
             return false;
