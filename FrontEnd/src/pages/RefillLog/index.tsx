@@ -715,7 +715,11 @@ const RefillLog = () => {
                         </div>
                         <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG + reservoir dropdown */}
-                            <div className="flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                            <div className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                                {/* Coming Soon overlay */}
+                                <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
+                                    <span className="px-3 py-1 text-xs font-semibold text-[#6b1176] bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
+                                </div>
                                 {(() => {
                                     const selected = reservoirs.find(r => r.reservoir_id === selectedReservoirId);
                                     const cur = selected?.current_weight ?? 0;
