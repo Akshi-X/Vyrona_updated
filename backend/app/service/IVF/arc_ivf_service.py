@@ -17,6 +17,7 @@ from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...utils.ivf_helpers import encrypt_sensitive_ivf_value
+from ...utils.reservoir_utils import ensure_branch_reservoir
 
 logger = logging.getLogger(__name__)
 
@@ -526,6 +527,12 @@ class ARCIVFService:
                 db.add(branch)
                 db.flush()
                 logger.info(f"Created new branch: {branch.branch_id} - {branch.branch_name} (from ARC API siteName: {site_name})")
+                ensure_branch_reservoir(
+                    db,
+                    branch_id=branch.branch_id,
+                    hospital_id=hospital.hospital_id,
+                    branch_name=branch.branch_name or f"Branch {branch.branch_id}",
+                )
             
             # Find or create Tank by tank_code + branch_id (unique per branch)
             # Each branch can have T1, T2, etc. (e.g., Branch 1 (Tambaram) has T1, T2; Branch 5 has T1, T2, T3)

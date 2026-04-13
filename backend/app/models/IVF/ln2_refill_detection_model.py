@@ -70,8 +70,8 @@ class Ln2RefillDetection(Base):
     # ------------------------------------------------------------------ #
     refill_weight = Column(
         Numeric(12, 4),
-        nullable=True,
-        comment="Estimated LN2 added = mass_after - mass_before (kg)",
+        nullable=False,
+        comment="LN2 added (kg) — required field",
     )
 
     # ------------------------------------------------------------------ #
@@ -83,15 +83,15 @@ class Ln2RefillDetection(Base):
         default=None,
         comment="True/False once staff confirms or rejects; NULL = not yet reviewed",
     )
-    confirmed_by = Column(
+    acknowledged_by = Column(
         String(255),
         nullable=True,
-        comment="Name / user identifier of the staff member who confirmed",
+        comment="Name / user identifier of the staff member who acknowledged",
     )
-    confirmed_at = Column(
+    acknowledged_at = Column(
         DateTime(timezone=True),
         nullable=True,
-        comment="Timestamp when the detection was manually confirmed",
+        comment="Timestamp when the detection was acknowledged",
     )
     notes = Column(
         Text,

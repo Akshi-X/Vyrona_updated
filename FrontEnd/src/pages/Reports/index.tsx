@@ -745,17 +745,7 @@ export default function ReportsPage() {
                             </div>
                         )}
 
-                        <div className="mt-4 overflow-x-auto relative">
-                            {loading && (
-                                <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#6b1176]"></div>
-                                        <span className="text-sm text-gray-600">
-                                            Loading report...
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
+                        <div className="mt-4 overflow-x-auto">
                             {filters.reportType === "monthly-summary" && (
                                 <table className="min-w-full text-sm">
                                     <thead className="bg-[#fdeeff]">
@@ -772,22 +762,37 @@ export default function ReportsPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {monthlySummaryRows.map((row) => (
-                                            <tr
-                                                key={row.kpi_name}
-                                                className="border-b border-[#F1E8F2]"
-                                            >
-                                                <td className="px-4 py-3 text-gray-700">
-                                                    {row.kpi_name}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-700">
-                                                    {row.alerts_sent}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-700">
-                                                    {row.deviations_found}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {loading
+                                            ? Array.from({ length: 6 }).map((_, i) => (
+                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                    {[140, 75, 90].map((w, col) => (
+                                                        <td key={col} className="px-4 py-3">
+                                                            <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                                                <div
+                                                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                                                    style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))
+                                            : monthlySummaryRows.map((row) => (
+                                                <tr
+                                                    key={row.kpi_name}
+                                                    className="border-b border-[#F1E8F2]"
+                                                >
+                                                    <td className="px-4 py-3 text-gray-700">
+                                                        {row.kpi_name}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-700">
+                                                        {row.alerts_sent}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-700">
+                                                        {row.deviations_found}
+                                                    </td>
+                                                </tr>
+                                            ))}
                                         {!loading && monthlySummaryRows.length === 0 && (
                                             <tr>
                                                 <td
@@ -828,7 +833,22 @@ export default function ReportsPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {sortedAlertRows.map((row) => (
+                                        {loading
+                                            ? Array.from({ length: 6 }).map((_, i) => (
+                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                    {[85, 85, 65, 80, 80, 160].map((w, col) => (
+                                                        <td key={col} className="px-4 py-3">
+                                                            <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                                                <div
+                                                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                                                    style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))
+                                            : sortedAlertRows.map((row) => (
                                             <tr
                                                 key={row.alert_id}
                                                 className="border-b border-[#F1E8F2]"
@@ -919,7 +939,22 @@ export default function ReportsPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {sortedRefillLogRows.map((row) => (
+                                        {loading
+                                            ? Array.from({ length: 6 }).map((_, i) => (
+                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                    {[85, 85, 80, 90, 90, 75, 120, 80, 85, 85].map((w, col) => (
+                                                        <td key={col} className="px-4 py-3">
+                                                            <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                                                <div
+                                                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                                                    style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))
+                                            : sortedRefillLogRows.map((row) => (
                                             <tr
                                                 key={row.log_id}
                                                 className="border-b border-[#F1E8F2]"

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 import TrackAndTrace from "../pages/TrackAndTrace";
@@ -10,7 +10,6 @@ import UserProfilePage from "../pages/UserProfilePage";
 import Support from "../pages/Support";
 import NotFound from "../pages/NotFound";
 import VerifyOtp from "../pages/Verify";
-import Dashboard from "../pages/Dashboard";
 import Database from "../pages/Database";
 import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
@@ -27,6 +26,13 @@ import SuccessAlert from "../pages/SuccessAlert";
 import { RoleBasedRoute } from "../components/RoleBasedRoute";
 import { AuthRedirect } from "../components/AuthRedirect";
 import { VariantRoute } from "../components/VariantRoute";
+import { OnboardingGate } from "../components/OnboardingGate";
+import {
+    OnboardingLevel,
+    OnboardingShell,
+} from "../pages/Onboarding";
+import Dashboard from "../pages/Dashboard";
+import { OnboardingProvider } from "../contexts/OnboardingContext";
 
 /**
  * Dashboard with variant support
@@ -215,6 +221,28 @@ export const router = createBrowserRouter([
     { path: "/forgot-password", element: <ForgotPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
     { path: "/success", element: <SuccessAlert /> },
+
+    // ============================================================
+    // ONBOARDING ROUTES
+    // ============================================================
+    {
+        path: "/onboarding",
+        element: (
+            <OnboardingGate>
+                <OnboardingProvider>
+                    <OnboardingShell />
+                </OnboardingProvider>
+            </OnboardingGate>
+        ),
+        children: [
+            { path: "/onboarding", element: <Navigate to="/onboarding/welcome" replace /> },
+            { path: "/onboarding/welcome", element: <Dashboard /> },
+            { path: "/onboarding/timeline", element: <Dashboard /> },
+            { path: "/onboarding/status", element: <Dashboard /> },
+            { path: "/onboarding/level-1", element: <OnboardingLevel levelId="level-1" /> },
+            { path: "/onboarding/level-2", element: <OnboardingLevel levelId="level-2" /> },
+        ],
+    },
 
     // ============================================================
     // PROTECTED ROUTES WITH SHARED APP LAYOUT
