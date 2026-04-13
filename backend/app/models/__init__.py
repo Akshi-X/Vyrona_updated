@@ -22,3 +22,5 @@ from .quality_log_model import QualityLog
 from .geolocation_model import Geolocation
 from .kpi_config_model import KpiConfig
 from .readings_model import Readings
+from .onboarding_state_model import OnboardingState
+from .onboarding_event_model import OnboardingEvent

@@ -5,13 +5,21 @@ Handles HTTP requests for quality tracking operations including LN2 refill logs
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Response
 from sqlalchemy.orm import Session
-from typing import Optional
+from sqlalchemy import func, distinct
+from typing import Optional, List
+
+from pydantic import BaseModel as PydanticBaseModel
 
 from app.config.database import get_db
 from app.dependencies.auth_dependencies import get_current_user
 from app.exceptions.custom_exceptions import AppException
 from app.models.user_model import User
+from app.models.IVF.canister_ln2_log_model import CanisterLn2Log
+from app.models.IVF.ln2_readings_model import Ln2Reading
+from app.models.IVF.ln2_iot_device_model import Ln2IotDevice
+from app.models.kpi_config_model import KpiConfig
 from app.service.IVF.quality_tracking_service import QualityTrackingService
+from app.service.IVF.refill_detection_service import RefillDetectionService
 from app.schemas.IVF.quality_tracking_schema import (
     RefillLogCreate,
     RefillLogStatusUpdate,
@@ -491,3 +499,239 @@ def export_readings_deviations_excel(
     except Exception as e:
         logger.error(f"Error in export_readings_deviations_excel endpoint: {str(e)}", exc_info=True)
         raise
+
+
+# ============================================================
+# Bulk Tank Refill Summary (single CTE — replaces N×4 per-tank calls)
+# ============================================================
+
+@router.get("/tanks/refill-summary")
+def get_tanks_refill_summary(
+    tank_ids: str = Query(..., description="Comma-separated tank IDs, e.g. 1,2,3"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return last refill log, latest LN2 reading, ln2_level KPI min,
+    and tank capacity for all requested tanks — in a single CTE query.
+    """
+    try:
+        id_list: List[int] = [int(x) for x in tank_ids.split(",") if x.strip().isdigit()]
+    except Exception:
+        raise HTTPException(status_code=422, detail="tank_ids must be comma-separated integers")
+
+    if not id_list:
+        return {"summary": {}}
+
+    from sqlalchemy import text as sa_text
+
+    rows = db.execute(
+        sa_text("""
+            WITH latest_log AS (
+                SELECT DISTINCT ON (tank_id)
+                    tank_id,
+                    refill_date,
+                    refill_time,
+                    refilled_by,
+                    description
+                FROM canister_ln2_logs
+                WHERE tank_id = ANY(:ids)
+                ORDER BY tank_id, refill_date DESC NULLS LAST, refill_time DESC NULLS LAST
+            ),
+            latest_ln2 AS (
+                SELECT DISTINCT ON (tank_id)
+                    tank_id,
+                    ln2_mass_kg
+                FROM ln2_readings
+                WHERE tank_id = ANY(:ids)
+                ORDER BY tank_id, reading_timestamp DESC
+            ),
+            kpi AS (
+                SELECT DISTINCT ON (tank_id)
+                    tank_id,
+                    min AS ln2_config_min
+                FROM kpi_config
+                WHERE tank_id = ANY(:ids)
+                  AND kpi_name = 'ln2_level'
+                  AND alert_name IS NULL
+                  AND status = true
+                ORDER BY tank_id, id DESC
+            ),
+            capacity AS (
+                SELECT DISTINCT ON (tank_id)
+                    tank_id,
+                    tank_max_capacity_reading,
+                    tank_min_capacity_reading
+                FROM ln2_iot_devices
+                WHERE tank_id = ANY(:ids)
+                ORDER BY tank_id, id DESC
+            )
+            SELECT
+                t.tank_id,
+                ll.refill_date,
+                ll.refill_time,
+                ll.refilled_by,
+                ll.description,
+                ln.ln2_mass_kg,
+                k.ln2_config_min,
+                c.tank_max_capacity_reading,
+                c.tank_min_capacity_reading
+            FROM unnest(:ids::int[]) AS t(tank_id)
+            LEFT JOIN latest_log ll ON ll.tank_id = t.tank_id
+            LEFT JOIN latest_ln2 ln ON ln.tank_id = t.tank_id
+            LEFT JOIN kpi k ON k.tank_id = t.tank_id
+            LEFT JOIN capacity c ON c.tank_id = t.tank_id
+        """),
+        {"ids": id_list},
+    ).fetchall()
+
+    summary: dict = {}
+    for r in rows:
+        summary[r.tank_id] = {
+            "last_refill_date": str(r.refill_date) if r.refill_date else None,
+            "last_refill_time": str(r.refill_time) if r.refill_time else None,
+            "last_refilled_by": r.refilled_by,
+            "last_description": r.description,
+            "ln2_mass_kg": float(r.ln2_mass_kg) if r.ln2_mass_kg is not None else None,
+            "ln2_config_min": float(r.ln2_config_min) if r.ln2_config_min is not None else None,
+            "tank_max_capacity": float(r.tank_max_capacity_reading) if r.tank_max_capacity_reading is not None else None,
+            "tank_min_capacity": float(r.tank_min_capacity_reading) if r.tank_min_capacity_reading is not None else None,
+        }
+
+    return {"summary": summary}
+
+
+@router.get("/tanks/all-refill-logs")
+def get_all_tanks_refill_logs(
+    tank_ids: str = Query(..., description="Comma-separated tank IDs"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all refill logs for the requested tanks in one query.
+    Used by the Activity Log section to avoid N per-tank requests.
+    """
+    from sqlalchemy import text as sa_text
+
+    try:
+        id_list: List[int] = [int(x) for x in tank_ids.split(",") if x.strip().isdigit()]
+    except Exception:
+        raise HTTPException(status_code=422, detail="tank_ids must be comma-separated integers")
+
+    if not id_list:
+        return {"logs": []}
+
+    rows = db.execute(
+        sa_text("""
+            SELECT
+                l.tank_id,
+                t.tank_code,
+                b.branch_name,
+                l.refill_date,
+                l.refill_time,
+                l.refilled_by,
+                l.description,
+                l.status
+            FROM canister_ln2_logs l
+            JOIN tanks t ON t.tank_id = l.tank_id
+            LEFT JOIN hospital_branches b ON b.branch_id = l.branch_id
+            WHERE l.tank_id = ANY(:ids)
+            ORDER BY l.refill_date DESC NULLS LAST, l.refill_time DESC NULLS LAST
+        """),
+        {"ids": id_list},
+    ).fetchall()
+
+    logs = [
+        {
+            "tank_id": r.tank_id,
+            "tank_code": r.tank_code,
+            "branch_name": r.branch_name,
+            "refill_date": str(r.refill_date) if r.refill_date else None,
+            "refill_time": str(r.refill_time) if r.refill_time else None,
+            "refilled_by": r.refilled_by,
+            "description": r.description,
+            "status": str(r.status) if r.status else None,
+        }
+        for r in rows
+    ]
+
+    return {"logs": logs}
+
+
+# ============================================================
+# Refill Detection Review Endpoints
+# ============================================================
+
+class ReviewDetectionRequest(PydanticBaseModel):
+    is_confirmed: bool
+    notes: Optional[str] = None
+
+
+@router.get("/refill-detections/pending")
+def get_pending_refill_detections(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all unconfirmed (pending) LN2 refill detections for the
+    current user's hospital. Used by the frontend to show the stacked
+    'Refill Detected' notification banner.
+    """
+    service = RefillDetectionService(db)
+    detections = service.get_pending_detections(current_user.hospital_id)
+
+    items = []
+    for d in detections:
+        tank_code = (d.tank.tank_code if d.tank else None) or str(d.tank_id)
+        branch_name = (
+            d.tank.branch.branch_name
+            if (d.tank and d.tank.branch)
+            else None
+        )
+        items.append(
+            {
+                "id": d.id,
+                "tank_id": d.tank_id,
+                "tank_code": tank_code,
+                "branch_name": branch_name,
+                "detected_at": d.detected_at.isoformat() if d.detected_at else None,
+                "refill_weight": (
+                    float(d.refill_weight) if d.refill_weight is not None else None
+                ),
+            }
+        )
+
+    return {"detections": items}
+
+
+@router.patch("/refill-detections/{detection_id}/review")
+def review_refill_detection(
+    detection_id: int,
+    body: ReviewDetectionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Confirm or reject a pending LN2 refill detection.
+
+    - is_confirmed=true  → staff confirmed the refill (usually after adding a log)
+    - is_confirmed=false → staff dismissed / rejected the detection
+    """
+    confirmed_by = getattr(current_user, "email", None) or getattr(
+        current_user, "first_name", "unknown"
+    )
+    service = RefillDetectionService(db)
+    try:
+        detection = service.review_detection(
+            detection_id=detection_id,
+            is_confirmed=body.is_confirmed,
+            confirmed_by=str(confirmed_by),
+            notes=body.notes,
+        )
+        return {
+            "success": True,
+            "detection_id": detection.id,
+            "is_confirmed": detection.is_confirmed,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

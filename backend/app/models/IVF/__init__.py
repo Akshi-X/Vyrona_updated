@@ -11,6 +11,7 @@ from .patient_crylock_info_model import PatientCrylockInfo
 from .critical_alert_model import CriticalAlert, AlertType, AlertSource, AlertTriggeredBy, AlertSeverity, AlertStatus
 from .reservoir_model import Reservoir
 from .reservoir_log_model import ReservoirLog
+from .ln2_refill_detection_model import Ln2RefillDetection
 
 # Register UIRouteVariant so Hospital.ui_variants relationship resolves (same Base registry).
 # Without this, any code that touches Hospital (e.g. CriticalAlert -> ... -> Hospital) fails with

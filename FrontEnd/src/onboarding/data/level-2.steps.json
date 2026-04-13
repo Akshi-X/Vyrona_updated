@@ -1,0 +1,26 @@
+[
+    {
+        "id": "ct-map",
+        "target": "#onboarding-control-map",
+        "title": "Global Map",
+        "content": "This map visualizes the active lanes and risk zones. Click the map to continue.",
+        "placement": "bottom",
+        "requireClick": true
+    },
+    {
+        "id": "ct-kpi",
+        "target": "#onboarding-control-kpis",
+        "title": "Lane KPIs",
+        "content": "These KPIs show lane stability and delay risk. Click a KPI to continue.",
+        "placement": "right",
+        "requireClick": true
+    },
+    {
+        "id": "ct-actions",
+        "target": "#onboarding-control-actions",
+        "title": "Mitigation Actions",
+        "content": "Use this queue to trigger mitigation playbooks. Click the queue to continue.",
+        "placement": "top",
+        "requireClick": true
+    }
+]

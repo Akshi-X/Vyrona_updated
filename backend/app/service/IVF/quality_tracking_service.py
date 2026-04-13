@@ -225,13 +225,49 @@ class QualityTrackingService:
                 cryoshipper=refill_log_data.cryoshipper,
                 disinfected_shipper_infected_tank_description=refill_log_data.disinfected_shipper_infected_tank_description,
                 reservoir_id=refill_log_data.reservoir_id,
+                refill_weight=refill_log_data.refill_weight,
                 created_by=created_by,
                 branch_id=tank_branch_id,  # Use tank's actual branch_id, not override
                 refilled_count=last_refilled_count + 1,
                 opened_count=last_opened_count + 1
             )
-            
+
             self.db.add(refill_log)
+
+            # Deduct refill_weight from the selected reservoir.
+            # Prefer the explicitly selected reservoir_id; fall back to first reservoir of branch.
+            if refill_log_data.refill_weight:
+                from app.models.IVF.reservoir_model import Reservoir
+                if refill_log_data.reservoir_id:
+                    reservoir = (
+                        self.db.query(Reservoir)
+                        .filter(Reservoir.reservoir_id == refill_log_data.reservoir_id)
+                        .first()
+                    )
+                elif tank_branch_id:
+                    reservoir = (
+                        self.db.query(Reservoir)
+                        .filter(Reservoir.branch_id == tank_branch_id)
+                        .order_by(Reservoir.reservoir_id.asc())
+                        .first()
+                    )
+                else:
+                    reservoir = None
+
+                if reservoir is None:
+                    logger.warning(
+                        f"No reservoir found (reservoir_id={refill_log_data.reservoir_id}, "
+                        f"branch_id={tank_branch_id}). "
+                        f"Skipping weight deduction for refill_weight={refill_log_data.refill_weight}."
+                    )
+                else:
+                    new_weight = max(0.0, (reservoir.current_weight or 0.0) - refill_log_data.refill_weight)
+                    reservoir.current_weight = new_weight
+                    logger.info(
+                        f"Deducted {refill_log_data.refill_weight} kg from reservoir "
+                        f"id={reservoir.reservoir_id}. New current_weight={new_weight}"
+                    )
+
             self.db.commit()
             self.db.refresh(refill_log)
             
