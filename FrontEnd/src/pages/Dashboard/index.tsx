@@ -1237,7 +1237,7 @@ export default function Dashboard({ }: DashboardProps) {
                           </div>
 
                           {/* Title - Left aligned */}
-                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                          <div className="font-semibold text-white text-[11px] md:text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                             Cryocan
                             <br />
                             Quality Tracking
@@ -1283,7 +1283,7 @@ export default function Dashboard({ }: DashboardProps) {
                           </div>
 
                           {/* Title - Left aligned */}
-                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                          <div className="font-semibold text-white text-[11px] md:text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                             Embryo <br /> Grading
                           </div>
 
@@ -1329,7 +1329,7 @@ export default function Dashboard({ }: DashboardProps) {
                           </div>
 
                           {/* Title - Left aligned */}
-                          <div className="font-semibold text-white text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
+                          <div className="font-semibold text-white text-[11px] md:text-[14px] text-left mt-8 mb-1 whitespace-nowrap">
                             Incubator <br /> Quality Tracking
                           </div>
 
