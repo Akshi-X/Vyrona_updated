@@ -445,7 +445,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         setL2(thresholds.l2);
         setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
         setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
-        setKpiLimits(res?.kpi_limits ?? {});
+        setKpiLimits((res?.kpi_limits ?? {}) as Record<string, Record<string, { alert_type?: string | null }>>);
       })
       .catch(() => {});
 
