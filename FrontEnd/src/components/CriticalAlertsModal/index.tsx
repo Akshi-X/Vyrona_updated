@@ -324,7 +324,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const getSeverityIcon = (severity: CriticalAlert["severity"]) => {
         if (isHighSeverity(severity)) {
             return (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600">
+                <div className="hidden md:flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600">
                     <svg
                         className="h-5 w-5"
                         fill="none"
@@ -343,7 +343,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         }
 
         return (
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-orange-600">
+            <div className="hidden md:flex h-10 w-10 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-orange-600">
                 <svg
                     className="h-5 w-5"
                     fill="none"
@@ -423,7 +423,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
 
                 {/* Filter dropdown panel */}
                 {isFilterPanelOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-[9999] bg-white border border-[#e7c6ec] rounded-xl shadow-xl p-4 min-w-[260px]">
+                    <div className="absolute right-0 top-full mt-2 z-[102] bg-white border border-[#e7c6ec] rounded-xl shadow-xl p-4 min-w-[260px]" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-semibold text-[#6b1176]">
                                 Filters
@@ -499,6 +499,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
             title="Critical Alerts"
             description="Review critical alerts that require immediate attention"
             containerClassName="w-full max-w-[750px]"
+            contentHeightClassName="md:h-[520px]"
             icon={
                 <img
                     src={CriticalAlertsIcon}
