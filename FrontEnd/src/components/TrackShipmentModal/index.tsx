@@ -45,7 +45,7 @@ const TrackShipmentModal: React.FC<TrackShipmentModalProps> = ({
           className="w-6 h-6"
         />
       }
-      containerClassName="w-[40%]"
+      containerClassName="md:w-[40%]"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
