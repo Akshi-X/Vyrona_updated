@@ -439,15 +439,21 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
           {}
         );
         setKpiThresholds(thresholdMap);
-        const keys = Object.keys(res.kpi_limits).sort(
-          (a, b) =>
-            (KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number]) >= 0
-              ? KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number])
-              : KPI_ORDER.length) -
-            (KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number]) >= 0
-              ? KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number])
-              : KPI_ORDER.length)
-        );
+        const keys = Object.keys(res.kpi_limits)
+          .filter((name) => {
+            const entry = (res.kpi_limits as Record<string, unknown>)[name];
+            if (!entry || typeof entry !== 'object') return true;
+            return Object.values(entry as Record<string, any>).some((band) => band?.alert_type != null);
+          })
+          .sort(
+            (a, b) =>
+              (KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number]) >= 0
+                ? KPI_ORDER.indexOf(a as (typeof KPI_ORDER)[number])
+                : KPI_ORDER.length) -
+              (KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number]) >= 0
+                ? KPI_ORDER.indexOf(b as (typeof KPI_ORDER)[number])
+                : KPI_ORDER.length)
+          );
         const tabs = keys.map((name) => ({
           id: name,
           label: getKpiLabelFromLimits((res.kpi_limits as Record<string, unknown>)[name], name) || 'null',

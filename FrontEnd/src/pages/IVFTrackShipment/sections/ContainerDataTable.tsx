@@ -165,9 +165,9 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
   return (
     <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-black text-[16px]">Container Data</h3>
+        <h3 className="font-semibold text-black text-[13px] md:text-[16px]">Container Data</h3>
         <div className="flex items-center gap-4">
-          <div className="text-black text-sm">
+          <div className="text-black text-xs md:text-sm">
             <span className="font-medium">Total Cryolock: </span>
             <span className="font-semibold">{totalContainers}</span>
           </div>
@@ -182,7 +182,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
         className="flex-1 overflow-auto bg-[#F8F8F8] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
       >
         <table className="min-w-max w-full text-xs bg-white">
-          <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[12px] font-medium h-[56px]">
+          <thead className="sticky top-0 z-10 bg-[#FDF4FF] text-[#6B1176] text-[10px] md:text-[12px] font-medium h-[56px]">
             <tr>
               <th className="px-3 py-2 text-left rounded-tl-[10px] whitespace-nowrap">HIS # (PK)</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Cryolock #</th>
@@ -197,7 +197,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
           <tbody>
             {loading ? (
               Array.from({ length: 6 }, (_, i) => (
-                <tr key={i} className="text-black text-[14px] h-[56px] bg-white">
+                <tr key={i} className="text-black text-xs md:text-[14px] h-[56px] bg-white">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((col) => (
                     <td key={col} className="px-3 py-2 whitespace-nowrap">
                       <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${col === 1 ? 60 : col === 3 ? 50 : col === 6 ? 70 : col === 7 ? 90 : 45}px` }}>
@@ -211,13 +211,13 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
                 </tr>
               ))
             ) : error ? (
-              <tr className="text-black text-[14px] h-[56px]">
+              <tr className="text-black text-xs md:text-[14px] h-[56px]">
                 <td className="px-3 py-2 whitespace-nowrap text-red-600" colSpan={8}>
                   {error}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
-              <tr className="text-black text-[14px]">
+              <tr className="text-black text-xs md:text-[14px]">
                 <td className="px-3 py-2" colSpan={8}>
                   <div className="relative">
                     <div className="space-y-2">
@@ -267,7 +267,7 @@ export default function ContainerDataTable({ canisterNumber }: ContainerDataTabl
               rows.map((row, index) => {
                 const isEditing = editingRowIndex === index;
                 return (
-                  <tr key={index} className="text-black text-[14px] h-[56px] hover:bg-gray-50">
+                  <tr key={index} className="text-black text-xs md:text-[14px] h-[56px] hover:bg-gray-50">
                     <td className="px-3 py-2 whitespace-nowrap">{row.hisNumber || '-'} </td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.cryolockNum?.split("/").pop() || '-'}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.canisterNum || '-'}</td>

@@ -658,16 +658,16 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </colgroup>
                     <thead className="bg-[#fdeeff]">
                         <tr className="border-b border-[#eeeeee]">
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 Tank Code
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 Task Name
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 Description
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                     <span>Assigned by</span>
                                     <div
@@ -750,7 +750,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                     <span>Assigned to</span>
                                     <div
@@ -833,10 +833,10 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 Due date
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                     <span>Priority</span>
                                     <div
@@ -916,7 +916,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                     <span>Status</span>
                                     <div
@@ -995,7 +995,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 </div>
                             </th>
                             {(variant === "track" || variant === "ivf") && (
-                                <th className="p-[15px] font-semibold text-[#4b0d52] text-sm text-left whitespace-nowrap sticky bg-[#ead8f4]">
+                                <th className="p-2 md:p-[15px] font-semibold text-[#4b0d52] text-sm text-left whitespace-nowrap sticky bg-[#ead8f4]">
                                     Actions
                                 </th>
                             )}
@@ -1005,7 +1005,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         {/* Input row for new task */}
                         {showInputRow && (
                             <tr className="border-b border-[#eeeeee]">
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <input
                                             type="text"
@@ -1050,7 +1050,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <input
                                             type="text"
@@ -1076,7 +1076,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <input
                                             type="text"
@@ -1102,7 +1102,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <input
                                         type="text"
                                         value={newTask.assigneeBy}
@@ -1110,7 +1110,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-700 cursor-not-allowed"
                                     />
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <select
                                             value={newTask.assigneeId || ""}
@@ -1161,7 +1161,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <input
                                             type="date"
@@ -1192,7 +1192,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     </div>
                                 </td>
                                 <td
-                                    className="bg-white p-[15px] font-normal text-[#333333] text-sm relative"
+                                    className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
                                     style={{ overflow: "visible" }}
                                 >
                                     <div
@@ -1259,7 +1259,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     </div>
                                 </td>
                                 <td
-                                    className="bg-white p-[15px] font-normal text-[#333333] text-sm relative"
+                                    className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
                                     style={{ overflow: "visible" }}
                                 >
                                     <div
@@ -1325,7 +1325,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         </select>
                                     </div>
                                 </td>
-                                <td className="bg-[#fbf8fd] p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-center sticky z-10">
+                                <td className="bg-[#fbf8fd] p-2 md:p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-center sticky z-10">
                                     <div className="flex items-center justify-center gap-2">
                                         <button
                                             onClick={handleSaveAdd}
@@ -1382,7 +1382,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             ? 9
                                             : 8
                                     }
-                                    className="bg-white p-[15px] text-center text-gray-500 text-sm"
+                                    className="bg-white p-2 md:p-[15px] text-center text-gray-500 text-sm"
                                 >
                                     No tasks match the current filters
                                 </td>
@@ -1401,7 +1401,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     key={task.id}
                                     className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? "bg-gray-50" : ""}`}
                                 >
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         <div className="font-mono truncate">
                                             {task.tankCode ||
                                                 (isIvfVariant
@@ -1410,7 +1410,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                                     : task.patientId)}
                                         </div>
                                     </td>
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         {isEditing &&
                                         editableFields.has("taskName") ? (
                                             <input
@@ -1436,7 +1436,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             </div>
                                         )}
                                     </td>
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         {isEditing &&
                                         editableFields.has("description") ? (
                                             <input
@@ -1463,7 +1463,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             </div>
                                         )}
                                     </td>
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         {/* Assigned by is always read-only, even when editing */}
                                         <div
                                             className="whitespace-nowrap"
@@ -1472,7 +1472,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             {task.assigneeBy}
                                         </div>
                                     </td>
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         {isEditing &&
                                         editableFields.has("assignedTo") ? (
                                             <select
@@ -1533,7 +1533,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             </div>
                                         )}
                                     </td>
-                                    <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                         {isEditing &&
                                         editableFields.has("dueDate") ? (
                                             <input
@@ -1564,7 +1564,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         )}
                                     </td>
                                     <td
-                                        className="bg-white p-[15px] font-normal text-[#333333] text-sm relative"
+                                        className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
                                         style={{ overflow: "visible" }}
                                     >
                                         {isEditing &&
@@ -1656,7 +1656,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                             statusCellRefs.current[task.id] =
                                                 el;
                                         }}
-                                        className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap relative"
+                                        className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm whitespace-nowrap relative"
                                         style={{ overflow: "visible" }}
                                     >
                                         {isEditing &&
@@ -1762,7 +1762,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                     {(variant === "track" ||
                                         variant === "ivf") && (
                                         <td
-                                            className="bg-[#fbf8fd] p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-right sticky"
+                                            className="bg-[#fbf8fd] p-2 md:p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-right sticky"
                                             style={{ zIndex: 1010 }}
                                         >
                                             {canEdit && (

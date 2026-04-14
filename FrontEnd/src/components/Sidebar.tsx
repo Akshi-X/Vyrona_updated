@@ -207,9 +207,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             </div>
 
             {/* Header */}
-            <header className="flex items-center gap-[7px] px-6 pt-0 pb-6 flex-shrink-0 relative z-10">
+            <header className="flex items-center gap-[7px] px-6 pt-0 pb-2 md:pb-6 flex-shrink-0 relative z-10">
                 <img
-                    className="w-[150px] h-[100px]"
+                    className="w-[110px] h-[75px] md:w-[150px] md:h-[100px]"
                     alt="myGrape logo icon"
                     src={MyGrapeLogo}
                 />
@@ -217,7 +217,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             </header>
 
             {/* Nav Buttons */}
-            <nav className="flex flex-col gap-[18px] px-6 flex-shrink-0 relative z-10">
+            <nav className="flex flex-col gap-[18px] px-6 pb-2 flex-1 overflow-y-auto relative z-10 scrollbar-none">
                 {navigationItems.map((item, index) => {
                     if (isDropdownItem(item)) {
                         const isDashboardActive = isDashboardRoute(location.pathname);
@@ -241,7 +241,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                             alt={`${item.label} icon`}
                                             src={DashboardIconWhite}
                                         />
-                                        <span className="font-semibold text-sm text-white">
+                                        <span className="font-semibold text-xs md:text-sm text-white">
                                             {item.label}
                                         </span>
                                     </div>
@@ -288,7 +288,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                                             : "text-white/85 hover:bg-white/10 hover:text-white"
                                                     }`}
                                                 >
-                                                    <span className="font-medium text-sm text-left">
+                                                    <span className="font-medium text-xs md:text-sm text-left">
                                                         {child.label}
                                                     </span>
                                                 </button>
@@ -355,7 +355,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                                 />
                             )}
                             <span
-                                className={`font-semibold text-sm ${
+                                className={`font-semibold text-xs md:text-sm ${
                                     isActive ? "text-[#6b1176]" : "text-white"
                                 }`}
                             >
@@ -366,14 +366,12 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                 })}
             </nav>
 
-            {/* Spacer to push profile + logout to bottom */}
-            <div className="flex-1 relative z-10" />
 
             {/* Profile (above Log Out) - alignment and spacing match Log Out */}
             <button
                 type="button"
                 onClick={() => navigate("/user-profile")}
-                className="group w-full flex items-center gap-4 px-9 py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
+                className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
             >
                 <img
                     className="w-5 h-5 flex-shrink-0"
@@ -381,10 +379,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                     src={UserIcon}
                 />
                 <div className="flex-1 min-w-0 flex flex-col items-start ">
-                    <span className="font-semibold text-sm text-white truncate w-full text-left">
+                    <span className="font-semibold text-xs md:text-sm text-white truncate w-full text-left">
                         {profileName || "\u00A0"}
                     </span>
-                    <span className="text-xs text-white/80 truncate w-full text-left">
+                    <span className="text-[10px] md:text-xs text-white/80 truncate w-full text-left">
                         {profileEmail || "\u00A0"}
                     </span>
                 </div>
@@ -397,10 +395,10 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
             {/* Logout Button */}
             <button
                 onClick={onLogout}
-                className="h-auto flex items-center gap-4 px-9 py-4 hover:bg-white/10 flex-shrink-0 relative z-10"
+                className="h-auto flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 hover:bg-white/10 flex-shrink-0 relative z-10"
             >
                 <img className="w-5 h-5" alt="Log out icon" src={LogoutIcon} />
-                <span className="font-bold text-white text-sm">Log Out</span>
+                <span className="font-bold text-white text-xs md:text-sm">Log Out</span>
             </button>
         </aside>
         </>

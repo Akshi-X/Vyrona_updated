@@ -182,6 +182,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
   const [lastUpdateAt, setLastUpdateAt] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState<number>(Date.now());
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [kpiLimits, setKpiLimits] = useState<Record<string, Record<string, { alert_type?: string | null }>>>({});
 
   const getWebSocketUrl = () => {
     const envBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -444,6 +445,7 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
         setL2(thresholds.l2);
         setTankMaxCapacity(res?.tank_max_capacity_reading ?? null);
         setTankMinCapacity(res?.tank_min_capacity_reading ?? null);
+        setKpiLimits((res?.kpi_limits ?? {}) as Record<string, Record<string, { alert_type?: string | null }>>);
       })
       .catch(() => {});
 
@@ -620,6 +622,14 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       ? tankBodyBottom - (tankBodyHeight * (100 - ((ln2_100per - l2) / ln2_100per) * 100)) / 100
       : null;
   
+  // Returns true if this KPI source has an alert_type configured (show tile), false = hide tile.
+  // If no config entry exists at all, default to showing the tile.
+  const hasAlert = (kpiKey: string): boolean => {
+    const entry = kpiLimits[kpiKey];
+    if (!entry || Object.keys(entry).length === 0) return true;
+    return Object.values(entry).some((band) => band?.alert_type != null);
+  };
+
   // Alert color based on level thresholds
   const alertColor = levelPercent == null
     ? '#6B1176'
@@ -675,24 +685,28 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       <div className="flex items-start justify-center gap-1 @max-[505px]:flex-col @max-[505px]:items-center @max-[505px]:gap-3 my-auto">
         {/* Left KPI Tiles */}
         <div className="flex flex-col gap-3 justify-start pt-6 @max-[505px]:order-2 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
-          <KpiTile
-            icon={<LockIcon className="text-[#6B1176]" />}
-            label="Lid State"
-            value={lidLabel}
-            danger={isLidMissing}
-            loading={isInitialLoading}
-            timestamp={lidTimestamp}
-          />
-          <KpiTile
-            icon={<ThermometerIcon className="text-[#6B1176]" />}
-            label="Internal Temperature"
-            value={internalTemperatureValue}
-            tooltip={deadBatteryTileTooltip}
-            muted={showBatteryDeadState}
-            danger={isInternalMissing}
-            loading={isInitialLoading}
-            timestamp={tempInternalTimestamp}
-          />
+          {(isInitialLoading || hasAlert('ln2_lid_state')) && (
+            <KpiTile
+              icon={<LockIcon className="text-[#6B1176]" />}
+              label="Lid State"
+              value={lidLabel}
+              danger={isLidMissing}
+              loading={isInitialLoading}
+              timestamp={lidTimestamp}
+            />
+          )}
+          {(isInitialLoading || hasAlert('temp_internal')) && (
+            <KpiTile
+              icon={<ThermometerIcon className="text-[#6B1176]" />}
+              label="Internal Temperature"
+              value={internalTemperatureValue}
+              tooltip={deadBatteryTileTooltip}
+              muted={showBatteryDeadState}
+              danger={isInternalMissing}
+              loading={isInitialLoading}
+              timestamp={tempInternalTimestamp}
+            />
+          )}
         </div>
 
         {/* Tank SVG */}
@@ -848,34 +862,40 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
 
         {/* Right KPI Tiles */}
         <div className="flex flex-col gap-3 pt-6 @max-[505px]:order-3 @max-[505px]:pt-0 @max-[505px]:w-full @max-[505px]:flex-row @max-[505px]:flex-wrap @max-[505px]:justify-center">
-          <KpiTile
-            icon={<SunIcon className="text-[#6B1176]" />}
-            label="External Temperature"
-            value={externalTemperatureValue}
-            tooltip={deadBatteryTileTooltip}
-            muted={showBatteryDeadState}
-            danger={isExternalMissing}
-            loading={isInitialLoading}
-            timestamp={tempExternalTimestamp}
-          />
-          <KpiTile
-            icon={<EvaporationIcon className="text-[#6B1176]" />}
-            label="Evaporation Rate"
-            value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
-            danger={isEvaporationMissing}
-            loading={isInitialLoading}
-            timestamp={evapTimestamp}
-          />
-          <KpiTile
-            icon={<ShockIcon className="text-[#6B1176]" />}
-            label="Shock Detection"
-            value={shockValue}
-            tooltip={deadBatteryTileTooltip}
-            muted={showBatteryDeadState}
-            danger={isShockMissing}
-            loading={isInitialLoading}
-            timestamp={shockTimestamp}
-          />
+          {(isInitialLoading || hasAlert('temp_external')) && (
+            <KpiTile
+              icon={<SunIcon className="text-[#6B1176]" />}
+              label="External Temperature"
+              value={externalTemperatureValue}
+              tooltip={deadBatteryTileTooltip}
+              muted={showBatteryDeadState}
+              danger={isExternalMissing}
+              loading={isInitialLoading}
+              timestamp={tempExternalTimestamp}
+            />
+          )}
+          {(isInitialLoading || hasAlert('ln2_evaporation_rate')) && (
+            <KpiTile
+              icon={<EvaporationIcon className="text-[#6B1176]" />}
+              label="Evaporation Rate"
+              value={evaporationRate != null ? `${evaporationRate.value.toFixed(2)} ${evaporationRate.unit}` : '—'}
+              danger={isEvaporationMissing}
+              loading={isInitialLoading}
+              timestamp={evapTimestamp}
+            />
+          )}
+          {(isInitialLoading || hasAlert('shock')) && (
+            <KpiTile
+              icon={<ShockIcon className="text-[#6B1176]" />}
+              label="Shock Detection"
+              value={shockValue}
+              tooltip={deadBatteryTileTooltip}
+              muted={showBatteryDeadState}
+              danger={isShockMissing}
+              loading={isInitialLoading}
+              timestamp={shockTimestamp}
+            />
+          )}
         </div>
       </div>
     </div>
