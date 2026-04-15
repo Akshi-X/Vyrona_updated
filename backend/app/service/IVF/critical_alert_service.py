@@ -541,10 +541,10 @@ class CriticalAlertService:
                     # and check if the absolute difference is within the cooldown period.
                     if abs(time_diff) < cooldown_seconds:
                         logger.info(
-                            "Skipping alert creation for kpi_config_id=%s as last alert was created/updated within cooldown period (%s minutes) time_diff=%s seconds TIMEDIFF=%s",
+                            "Skipping alert creation for kpi_config_id=%s as last alert was created/updated within cooldown period (%s minutes) time_diff=%s seconds",
                             kpi_config.id,
                             kpi_config.cooldown_minutes,
-                            time_diff
+                            time_diff,
                         )
                         deviation.checked = True
                         checked_kpi_configs.append(kpi_config.id)
