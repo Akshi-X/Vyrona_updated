@@ -6,9 +6,9 @@ export const enableOnboardingMocks = () => {
     BaseApiService.setMockEnabled(true);
     BaseApiService.setMockResolver((endpoint) => {
         // User profile for onboarding dashboard header and auth-derived UI.
-        if (endpoint.startsWith("/api/profile")) {
-            return dashboardData.profile;
-        }
+        // if (endpoint.startsWith("/api/profile")) {
+        //     return dashboardData.profile;
+        // }
 
         // CGT alerts feed (used when department is not IVF).
         if (endpoint.startsWith("/api/alerts")) {
