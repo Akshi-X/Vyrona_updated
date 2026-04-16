@@ -14,7 +14,7 @@
         "title": "Control Tower Quest",
         "route": "/onboarding/level-2",
         "pointsRequired": 70,
-        "unlockDelayHours": 48,
+        "unlockDelayHours": 0,
         "tourStepsFile": "level-2.steps.json",
         "quizFile": "level-2.quiz.json",
         "replica": "control-tower"
