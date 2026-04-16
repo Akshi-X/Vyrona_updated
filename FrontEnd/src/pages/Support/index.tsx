@@ -266,9 +266,21 @@ const Support: React.FC = () => {
                 isEmailNotificationsEnabled,
             );
 
+            setStatus(response.new_status);
+
             setStatusUpdateSuccess(
                 `Status updated from ${response.old_status} to ${response.new_status}`,
             );
+
+            const now = new Date();
+            const actor = currentUserName || "User";
+            const statusActivity: CommentItem = {
+                id: `status-${now.getTime()}`,
+                author: actor,
+                content: `User ${actor} has updated the status to ${response.new_status}`,
+                createdAt: formatCommentTimestamp(now),
+            };
+            setComments((prev) => [statusActivity, ...prev]);
 
             // Clear success message after 3 seconds
             setTimeout(() => {
