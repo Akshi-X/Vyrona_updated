@@ -421,9 +421,11 @@ class CriticalAlertService:
                     logger.warning(
                         f"Alert with dedup_key={dedup_key} exists but is not active, creating new alert"
                     )
-                    # Create new alert with timestamp in dedup_key to make it unique
-                    new_dedup_key = (
-                        f"{dedup_key}:{datetime.now(timezone.utc).strftime('%H%M%S')}"
+                    # Create new alert using current time to produce a distinct dedup_key
+                    new_dedup_key = self._generate_dedup_key(
+                        tank_id, source, alert_type,
+                        datetime.now(timezone.utc),
+                        extra_info=extra_info,
                     )
                     alert = CriticalAlert(
                         alert_id=str(uuid.uuid4()),
@@ -498,10 +500,10 @@ class CriticalAlertService:
             last_activity_col = func.coalesce(
                 CriticalAlert.updated_at, CriticalAlert.created_at
             )
-            # Build precise LIKE patterns anchored to tank_id to avoid false matches
+            # Build LIKE patterns anchored to tank_id to avoid false matches
             # (e.g. kpi_config_id=5 must not match :15, :25, :55, etc.)
-            # Pattern 1: exact dedup key ending with :{kpi_config_id}
-        # Pattern 2: race-condition fallback keys ending with :{kpi_config_id}:{HHMMSS}
+            # Pattern 1: new keys via _generate_dedup_key → {tank_id}:{source}:{alert_type}:{timestamp}:{kpi_config.id}
+            # Pattern 2: legacy keys from old race-condition path → same but with :{HHMMSS} appended
             dedup_prefix = f"{tank_id}:{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
             last_alert = (
                 self.db.query(CriticalAlert)
@@ -539,9 +541,10 @@ class CriticalAlertService:
                     # and check if the absolute difference is within the cooldown period.
                     if abs(time_diff) < cooldown_seconds:
                         logger.info(
-                            "Skipping alert creation for kpi_config_id=%s as last alert was created/updated within cooldown period (%s minutes)",
+                            "Skipping alert creation for kpi_config_id=%s as last alert was created/updated within cooldown period (%s minutes) time_diff=%s seconds",
                             kpi_config.id,
-                            kpi_config.cooldown_minutes or 60,
+                            kpi_config.cooldown_minutes,
+                            time_diff,
                         )
                         deviation.checked = True
                         checked_kpi_configs.append(kpi_config.id)
