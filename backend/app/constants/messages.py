@@ -49,7 +49,7 @@ class ErrorMessages:
     INVALID_ROLE = "Invalid role selected"
     INVALID_USER_OR_EMAIL = "Invalid user ID or email. OTP could not be sent"
     REGISTRATION_EMAIL_FAILED = "Registration failed: Unable to send approval email"
-    REGISTRATION_NOT_ALLOWED = "user cannot be registered. For further support, kindly reach out to ITAdmin@myGrape.org."
+    REGISTRATION_NOT_ALLOWED = "user cannot be registered. For further support, kindly reach out to support@mygrape.org."
     PHARMA_ADMIN_APPROVE_ONLY = "Only pharma admin from the same company can approve users"
     PHARMA_ADMIN_REJECT_ONLY = "Only pharma admin from the same company can reject users"
     
