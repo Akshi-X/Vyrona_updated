@@ -76,6 +76,20 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
+class ActivityActorType(str, Enum):
+    USER = "user"
+    SYSTEM = "system"
+    SCHEDULER = "scheduler"
+    WEBHOOK = "webhook"
+    INTEGRATION = "integration"
+
+
+class ActivityOutcome(str, Enum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    PARTIAL = "partial"
+
+
 # ============================================
 # FEEDBACK SYSTEM ENUMS
 # ============================================

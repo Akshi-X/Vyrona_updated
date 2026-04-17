@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from ..dependencies.auth_dependencies import validate_login_request
+from ..service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    is_audit_log_disabled_for_user,
+)
+from ..constants.enums import ActivityOutcome
 from .otp_service import send_otp_to_user
 from ..exceptions import OTPSendFailedException
 
@@ -41,6 +47,14 @@ def handle_login(email: str, password: str, remember_me: bool, db: Session) -> d
     # Business Logic: Generate and send OTP with remember_me preference
     try:
         otp = send_otp_to_user(db, str(user.user_id), user.email, remember_me)
+        audit_log_disabled = is_audit_log_disabled_for_user(user)
+        ActivityLogService(db).log_activity(
+            action="user.login_requested",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            metadata={"remember_me": remember_me},
+            audit_log_disabled=audit_log_disabled,
+        )
         
         return {
             "user_id": str(user.user_id),

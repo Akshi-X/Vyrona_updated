@@ -67,6 +67,11 @@ export interface RefillLogReportResponse {
     status: string;
 }
 
+export interface ReportDownloadPayload {
+    report_type: string;
+    filters?: Record<string, any>;
+}
+
 export class IvfReportsService extends BaseApiService {
     async getMonthlySummary(options: {
         month?: string;
@@ -173,6 +178,13 @@ export class IvfReportsService extends BaseApiService {
             : "/api/ivf/reports/refill-logs";
         return await this.request<RefillLogReportResponse>(endpoint, {
             method: "GET",
+        });
+    }
+
+    async logReportDownload(payload: ReportDownloadPayload): Promise<{ status: string }> {
+        return await this.request<{ status: string }>("/api/reports/download", {
+            method: "POST",
+            body: JSON.stringify(payload),
         });
     }
 }

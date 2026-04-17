@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import Login from "../pages/Login";
-import Signup from "../pages/Signup";
 import TrackAndTrace from "../pages/TrackAndTrace";
 import TrackPage from "../pages/Track";
 import IVFTrackShipmentPage from "../pages/IVFTrackShipment";
@@ -15,10 +14,11 @@ import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
 import RefillLog from "../pages/RefillLog";
 import ReportsPage from "../pages/Reports";
+import UsersPage from "../pages/Users";
+import InviteSignup from "../pages/InviteSignup";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
-import { ApprovalLayout } from "../components/ApprovalLayout";
 import SidebarLayout from "../components/SidebarLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
@@ -237,7 +237,8 @@ export const router = createBrowserRouter([
     // ============================================================
     { path: "/", element: <AuthRedirect /> },
     { path: "/login", element: <Login /> },
-    { path: "/signup", element: <Signup /> },
+    { path: "/invite", element: <InviteSignup /> },
+    // { path: "/signup", element: <Signup /> },
     { path: "/verify-otp", element: <VerifyOtp /> },
     { path: "/forgot-password", element: <ForgotPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
@@ -303,6 +304,14 @@ export const router = createBrowserRouter([
                     </RoleBasedRoute>
                 ),
             },
+            {
+                path: "/users",
+                element: (
+                    <RoleBasedRoute allowedRoles={["Admin", "Manager"]}>
+                        <UsersPage />
+                    </RoleBasedRoute>
+                ),
+            },
         ],
     },
 
@@ -312,8 +321,6 @@ export const router = createBrowserRouter([
     { path: "/track-and-trace", element: <TrackAndTrace /> },
     { path: "/user-profile", element: <UserProfilePage /> },
     { path: "/support", element: <Support /> },
-    { path: "/approval", element: <ApprovalLayout /> },
-    { path: "/approval-screen", element: <ApprovalLayout /> },
 
     // ============================================================
     // FALLBACK ROUTE
