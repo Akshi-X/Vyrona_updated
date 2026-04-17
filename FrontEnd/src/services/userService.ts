@@ -35,6 +35,24 @@ export interface UserListItem {
   company_name?: string;
 }
 
+export interface HospitalUserItem {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+  branch_name?: string | null;
+  department?: string | null;
+  status: boolean;
+  approved_status: string;
+  invite_pending: boolean;
+}
+
+export interface HospitalUserListResponse {
+  total_users: number;
+  users: HospitalUserItem[];
+}
+
 export interface UserListResponse {
   total_users: number;
   users: UserListItem[];
@@ -69,10 +87,6 @@ export interface ResetPasswordRequest {
   confirm_password: string;
 }
 
-export interface UserApproval {
-  user_id: string;
-  action: 'approve' | 'reject';
-}
 
 export class UserService extends BaseApiService {
   /**
@@ -171,35 +185,6 @@ export class UserService extends BaseApiService {
   }
 
   /**
-   * Approve user (manager/admin only)
-   */
-  async approveUser(data: UserApproval): Promise<{ message: string }> {
-    return await this.request<{ message: string }>('/api/user/approve', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
-   * Reject user (manager/admin only)
-   */
-  async rejectUser(data: UserApproval): Promise<{ message: string }> {
-    return await this.request<{ message: string }>('/api/user/reject', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
-   * Get all users (admin only)
-   */
-  async getAllUsers(): Promise<UserProfileDto[]> {
-    return await this.request<UserProfileDto[]>('/api/users', {
-      method: 'GET',
-    });
-  }
-
-  /**
    * Get all users in company (for mentions, dropdowns, etc.)
    */
   async getAllUsersInCompany(): Promise<UserListResponse> {
@@ -214,15 +199,36 @@ export class UserService extends BaseApiService {
     });
   }
 
-  /**
-   * Get list of users pending approval (Admin / Pharma_admin only).
-   * Used by Dashboard and ApprovalScreen to show pending approval list.
-   */
-  async getPendingApprovals(): Promise<UserListResponse> {
-    return await this.request<UserListResponse>('/api/users/pending-approvals', {
+  async getHospitalUsers(): Promise<HospitalUserListResponse> {
+    return await this.request<HospitalUserListResponse>('/api/hospital/users', {
       method: 'GET',
     });
   }
+
+  async resendInvite(userId: string): Promise<{ message: string }> {
+    return await this.request<{ message: string }>(`/api/hospital/users/${encodeURIComponent(userId)}/resend-invite`, {
+      method: 'POST',
+    });
+  }
+
+  async inviteHospitalUser(email: string, role: string, branch?: string): Promise<{ message: string }> {
+    return await this.request<{ message: string }>('/api/hospital/users/invite', {
+      method: 'POST',
+      body: JSON.stringify({ email, role, branch_name: branch ?? null }),
+    });
+  }
+
+  async getInviteToken(token: string): Promise<{ email: string; role: string; hospital_name: string | null; expires_at: string }> {
+    return await this.request(`/api/invite/${token}`, { method: 'GET' });
+  }
+
+  async registerFromInvite(data: { token: string; first_name: string; last_name: string; password: string; confirm_password: string }): Promise<{ message: string; user_id: string }> {
+    return await this.request('/api/register/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
 }
 
 // Export singleton instance

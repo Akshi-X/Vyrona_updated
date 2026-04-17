@@ -126,6 +126,7 @@ EMAIL_WELCOME_SUBJECT = "Welcome to myGrape"
 EMAIL_REJECTION_SUBJECT = "Registration Status Update"
 EMAIL_PASSWORD_RESET_SUBJECT = "Reset Your Password - myGrape"
 EMAIL_USER_APPROVED_SUBJECT = "Registration Approved - Welcome to myGrape!"
+EMAIL_INVITE_SUBJECT = "You're Invited to Join myGrape"
 
 # Feedback Email Subjects
 EMAIL_FEEDBACK_NEW_TICKET_SUBJECT = "New Support Ticket Created - myGrape"
