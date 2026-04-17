@@ -1,5 +1,6 @@
 import React from "react";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
+import { useTourNavContext } from "../../contexts/TourNavContext";
 
 interface ModalProps {
     isOpen: boolean;
@@ -27,13 +28,15 @@ const Modal: React.FC<ModalProps> = ({
     id,
 }) => {
     useBodyScrollLock(isOpen);
+    const tourNavCtx = useTourNavContext();
+    const isTourActive = tourNavCtx?.isTourActive ?? false;
 
     if (!isOpen) return null;
 
     return (
         <div
             className="fixed inset-0 bg-black/70 z-[100] md:flex md:items-center md:justify-center md:p-4"
-            onClick={onClose}
+            onClick={isTourActive ? undefined : onClose}
         >
             <div
                 id={id}

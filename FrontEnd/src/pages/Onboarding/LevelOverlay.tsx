@@ -5,9 +5,10 @@ import { useOnboarding } from "../../contexts/OnboardingContext";
 
 interface LevelOverlayProps {
     levelId: string;
+    onComplete?: () => void;
 }
 
-export default function LevelOverlay({ levelId }: LevelOverlayProps) {
+export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps) {
     const {
         levels,
         state,
@@ -62,6 +63,7 @@ export default function LevelOverlay({ levelId }: LevelOverlayProps) {
             completeLevel(levelId, score);
             logEvent({ type: "quiz_pass", levelId, payload: { score } });
             setQuizResult("pass");
+            onComplete?.();
         } else {
             logEvent({ type: "quiz_fail", levelId, payload: { score } });
             setQuizResult("fail");
