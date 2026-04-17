@@ -13,11 +13,16 @@ import {
     type MonthlySummaryRow,
     type RefillLogReportRow,
 } from "../../services/ivfReportsService";
+import {
+    activityLogService,
+    type ActivityLogRecord,
+} from "../../services/activityLogService";
 
 const REPORT_TYPES = [
     { value: "monthly-summary", label: "Monthly Summary Report" },
     { value: "critical-alerts", label: "Critical Alert Report" },
     { value: "refill-logs", label: "Refill Logs Report" },
+    { value: "activity-logs", label: "Activity Logs" },
 ] as const;
 
 type ReportType = (typeof REPORT_TYPES)[number]["value"];
@@ -31,11 +36,19 @@ type FilterState = {
     severity: string;
     refillStatus: string;
     tankCodes: string[];
+    actionPrefix: string;
+    action: string;
+    outcome: string;
+    actorType: string;
+    metadataKey: string;
+    metadataValue: string;
 };
 
 const ALERT_STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
 const REFILL_STATUS_OPTIONS = ["All", "Not started", "In progress", "Done"] as const;
 const SEVERITY_OPTIONS = ["All", "High", "Medium", "Low"] as const;
+const ACTIVITY_OUTCOME_OPTIONS = ["All", "success", "failure", "partial"] as const;
+const ACTOR_TYPE_OPTIONS = ["All", "user", "system", "scheduler", "webhook", "integration"] as const;
 
 const escapeCsvValue = (value: string | number | null | undefined) => {
     const text = value === null || value === undefined ? "" : String(value);
@@ -69,6 +82,33 @@ const formatLocaleTime = (value?: string | null) => {
     return time.toLocaleTimeString();
 };
 
+const truncateText = (value: string, maxLength: number = 120) => {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength)}...`;
+};
+
+const formatActorLabel = (row: ActivityLogRecord) => {
+    if (row.actor_label) return row.actor_label;
+    const details = row.actor_details || {};
+    const name = `${details.first_name || ""} ${details.last_name || ""}`.trim();
+    return name || details.email || row.actor_id || row.actor_type;
+};
+
+const formatTargetLabel = (row: ActivityLogRecord) => {
+    if (row.target_label) return row.target_label;
+    const details = row.target_details || {};
+    return details.tank_code || details.branch_name || details.hospital_name || row.target_id || "-";
+};
+
+const formatMetadataSummary = (metadata?: Record<string, any> | null) => {
+    if (!metadata) return "-";
+    try {
+        return truncateText(JSON.stringify(metadata));
+    } catch {
+        return "-";
+    }
+};
+
 const getRefillStatusStyles = (status?: string | null) => {
     if (status === "Done") return "bg-green-100 text-green-700";
     if (status === "In progress") return "bg-amber-100 text-amber-700";
@@ -76,7 +116,7 @@ const getRefillStatusStyles = (status?: string | null) => {
 };
 
 export default function ReportsPage() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, userRole } = useAuth();
     const today = new Date();
     const startOfMonth = new Date(
         today.getFullYear(),
@@ -106,6 +146,12 @@ export default function ReportsPage() {
         severity: "All",
         refillStatus: "All",
         tankCodes: [],
+        actionPrefix: "",
+        action: "",
+        outcome: "All",
+        actorType: "All",
+        metadataKey: "",
+        metadataValue: "",
     };
     const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
@@ -114,6 +160,7 @@ export default function ReportsPage() {
     >([]);
     const [alertRows, setAlertRows] = useState<CriticalAlertReportRow[]>([]);
     const [refillLogRows, setRefillLogRows] = useState<RefillLogReportRow[]>([]);
+    const [activityLogRows, setActivityLogRows] = useState<ActivityLogRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reportMonthLabel, setReportMonthLabel] = useState<string>("");
@@ -123,6 +170,9 @@ export default function ReportsPage() {
     const [tankOptions, setTankOptions] = useState<string[]>([]);
 
     const isIvfUser = (department || "").toUpperCase() === "IVF";
+    const canViewActivityLogs = ["admin", "manager"].includes(
+        (userRole || "").toLowerCase(),
+    );
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -175,12 +225,22 @@ export default function ReportsPage() {
 
     useEffect(() => {
         if (!isAuthenticated) return;
-        if (!isIvfUser) {
+        const isActivityLogReport = filters.reportType === "activity-logs";
+        const canViewReport = isActivityLogReport
+            ? canViewActivityLogs
+            : isIvfUser;
+
+        if (!canViewReport) {
             setMonthlySummaryRows([]);
             setAlertRows([]);
             setRefillLogRows([]);
+            setActivityLogRows([]);
             setLoading(false);
-            setError(null);
+            setError(
+                isActivityLogReport
+                    ? "Activity logs are available for Admin and Manager roles only."
+                    : "Reports are available for IVF users only.",
+            );
             return;
         }
 
@@ -223,6 +283,30 @@ export default function ReportsPage() {
                     return;
                 }
 
+                if (filters.reportType === "activity-logs") {
+                    const response = await activityLogService.getActivityLogs({
+                        action_prefix: filters.actionPrefix || undefined,
+                        action: filters.action || undefined,
+                        outcome:
+                            filters.outcome === "All"
+                                ? undefined
+                                : filters.outcome,
+                        actor_type:
+                            filters.actorType === "All"
+                                ? undefined
+                                : filters.actorType,
+                        metadata_key: filters.metadataKey || undefined,
+                        metadata_value: filters.metadataValue || undefined,
+                        date_from: filters.dateFrom || undefined,
+                        date_to: filters.dateTo || undefined,
+                        page,
+                        page_size: pageSize,
+                    });
+                    setActivityLogRows(response.logs || []);
+                    setTotalCount(response.total_count ?? 0);
+                    return;
+                }
+
                 if (filters.reportType === "refill-logs") {
                     const response = await ivfReportsService.getRefillLogsReport(
                         {
@@ -245,6 +329,7 @@ export default function ReportsPage() {
                 setAlertRows([]);
                 setMonthlySummaryRows([]);
                 setRefillLogRows([]);
+                setActivityLogRows([]);
                 setTotalCount(0);
             } catch (err) {
                 const message = (err as Error)?.message || "Failed to load report";
@@ -252,6 +337,7 @@ export default function ReportsPage() {
                 setAlertRows([]);
                 setMonthlySummaryRows([]);
                 setRefillLogRows([]);
+                setActivityLogRows([]);
                 setTotalCount(0);
             } finally {
                 setLoading(false);
@@ -259,7 +345,14 @@ export default function ReportsPage() {
         };
 
         loadReportData();
-    }, [filters, isAuthenticated, isIvfUser, page]);
+    }, [
+        filters,
+        isAuthenticated,
+        isIvfUser,
+        canViewActivityLogs,
+        page,
+        pageSize,
+    ]);
 
     useEffect(() => {
         setPage(1);
@@ -272,6 +365,12 @@ export default function ReportsPage() {
         filters.severity,
         filters.refillStatus,
         filters.tankCodes.join(","),
+        filters.actionPrefix,
+        filters.action,
+        filters.outcome,
+        filters.actorType,
+        filters.metadataKey,
+        filters.metadataValue,
     ]);
 
     useEffect(() => {
@@ -288,8 +387,11 @@ export default function ReportsPage() {
         if (filters.reportType === "refill-logs") {
             return refillLogRows.length;
         }
+        if (filters.reportType === "activity-logs") {
+            return activityLogRows.length;
+        }
         return 0;
-    }, [filters.reportType, monthlySummaryRows, alertRows, refillLogRows]);
+    }, [filters.reportType, monthlySummaryRows, alertRows, refillLogRows, activityLogRows]);
 
     const totalPages = useMemo(() => {
         if (totalCount <= 0) return 1;
@@ -325,6 +427,8 @@ export default function ReportsPage() {
         let headers: string[] = [];
         let rows: Array<Array<string | number | null | undefined>> = [];
         let filename = "report.csv";
+        let reportTypeForLog = "unknown";
+        const filtersForLog: Record<string, any> = {};
 
         if (filters.reportType === "monthly-summary") {
             headers = ["KPI Config", "Alerts Sent", "KPI Deviations"];
@@ -335,6 +439,8 @@ export default function ReportsPage() {
             ]);
             const monthLabel = reportMonthLabel || "summary";
             filename = `monthly-summary-${monthLabel}.csv`;
+            reportTypeForLog = "ivf.monthly_summary";
+            filtersForLog.month = filters.month;
         } else if (filters.reportType === "critical-alerts") {
             headers = [
                 "Occurred Date",
@@ -353,6 +459,18 @@ export default function ReportsPage() {
                 row.message,
             ]);
             filename = "critical-alerts.csv";
+            reportTypeForLog = "ivf.critical_alerts";
+            filtersForLog.start_date = filters.dateFrom;
+            filtersForLog.end_date = filters.dateTo;
+            if (filters.alertStatus !== "All") {
+                filtersForLog.status = filters.alertStatus;
+            }
+            if (filters.severity !== "All") {
+                filtersForLog.severity = filters.severity;
+            }
+            if (filters.tankCodes.length > 0) {
+                filtersForLog.tank_codes = filters.tankCodes;
+            }
         } else if (filters.reportType === "refill-logs") {
             headers = [
                 "Refill Date",
@@ -379,7 +497,54 @@ export default function ReportsPage() {
                 formatLocaleDate(row.ln2_received_date) || "-",
             ]);
             filename = "refill-logs.csv";
+            reportTypeForLog = "ivf.refill_logs";
+            filtersForLog.start_date = filters.dateFrom;
+            filtersForLog.end_date = filters.dateTo;
+            if (filters.refillStatus !== "All") {
+                filtersForLog.status = filters.refillStatus;
+            }
+            if (filters.tankCodes.length > 0) {
+                filtersForLog.tank_codes = filters.tankCodes;
+            }
+        } else if (filters.reportType === "activity-logs") {
+            headers = [
+                "Timestamp",
+                "Action",
+                "Actor",
+                "Actor Type",
+                "Target",
+                "Outcome",
+                "Metadata",
+            ];
+            rows = activityLogRows.map((row) => [
+                row.created_at,
+                row.action,
+                formatActorLabel(row),
+                row.actor_type,
+                formatTargetLabel(row),
+                row.outcome,
+                formatMetadataSummary(row.metadata),
+            ]);
+            filename = "activity-logs.csv";
+            reportTypeForLog = "activity_logs";
+            if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
+            if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
+            if (filters.actionPrefix) filtersForLog.action_prefix = filters.actionPrefix;
+            if (filters.action) filtersForLog.action = filters.action;
+            if (filters.outcome !== "All") filtersForLog.outcome = filters.outcome;
+            if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
+            if (filters.metadataKey) filtersForLog.metadata_key = filters.metadataKey;
+            if (filters.metadataValue) filtersForLog.metadata_value = filters.metadataValue;
         }
+
+        ivfReportsService
+            .logReportDownload({
+                report_type: reportTypeForLog,
+                filters: filtersForLog,
+            })
+            .catch(() => {
+                // Avoid blocking user download if audit logging fails.
+            });
 
         const csvLines = [
             headers.map(escapeCsvValue).join(","),
@@ -423,7 +588,13 @@ export default function ReportsPage() {
                                 <button
                                     type="button"
                                     onClick={handleResetFilters}
-                                    disabled={!isIvfUser}
+                                    disabled={
+                                        !isIvfUser &&
+                                        !(
+                                            filters.reportType === "activity-logs" &&
+                                            canViewActivityLogs
+                                        )
+                                    }
                                     className="px-3 py-2 border border-[#E7E1E1] rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                                 >
                                     Reset Filters
@@ -449,7 +620,7 @@ export default function ReportsPage() {
                                                 .value as ReportType,
                                         }))
                                     }
-                                    disabled={!isIvfUser}
+                                    disabled={!isIvfUser && !canViewActivityLogs}
                                 >
                                     {REPORT_TYPES.map((option) => (
                                         <option
@@ -655,6 +826,161 @@ export default function ReportsPage() {
                                     </div>
                                 </>
                             )}
+
+                            {filters.reportType === "activity-logs" && (
+                                <>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Date From
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.dateFrom}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateFrom: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Date To
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.dateTo}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    dateTo: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Action Prefix
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            placeholder="config."
+                                            value={filters.actionPrefix}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    actionPrefix: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Action
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            placeholder="user.login"
+                                            value={filters.action}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    action: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Outcome
+                                        </label>
+                                        <select
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.outcome}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    outcome: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        >
+                                            {ACTIVITY_OUTCOME_OPTIONS.map((option) => (
+                                                <option key={option} value={option}>
+                                                    {option === "All" ? "All" : option}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Actor Type
+                                        </label>
+                                        <select
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            value={filters.actorType}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    actorType: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        >
+                                            {ACTOR_TYPE_OPTIONS.map((option) => (
+                                                <option key={option} value={option}>
+                                                    {option}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Metadata Key
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            placeholder="template"
+                                            value={filters.metadataKey}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    metadataKey: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Metadata Value
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            placeholder="tank_alert"
+                                            value={filters.metadataValue}
+                                            onChange={(event) =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    metadataValue: event.target.value,
+                                                }))
+                                            }
+                                            disabled={!canViewActivityLogs}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </section>
 
@@ -675,7 +1001,9 @@ export default function ReportsPage() {
                                 onClick={downloadCsv}
                                 disabled={
                                     activeRowsCount === 0 ||
-                                    !isIvfUser
+                                    (filters.reportType === "activity-logs"
+                                        ? !canViewActivityLogs
+                                        : !isIvfUser)
                                 }
                                 className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -739,9 +1067,14 @@ export default function ReportsPage() {
                             </div>
                         </div>
 
-                        {!loading && !isIvfUser && (
+                        {!loading && filters.reportType !== "activity-logs" && !isIvfUser && (
                             <div className="mt-4 text-sm text-gray-500">
                                 Reports are available for IVF users only.
+                            </div>
+                        )}
+                        {!loading && filters.reportType === "activity-logs" && !canViewActivityLogs && (
+                            <div className="mt-4 text-sm text-gray-500">
+                                Activity logs are available for Admin and Manager roles only.
                             </div>
                         )}
 
@@ -1009,6 +1342,89 @@ export default function ReportsPage() {
                                                 >
                                                     No refill logs found for the
                                                     selected range.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+
+                            {filters.reportType === "activity-logs" && (
+                                <table className="min-w-full text-sm">
+                                    <thead className="bg-[#fdeeff]">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Timestamp
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Action
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Actor
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Target
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Outcome
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
+                                                Metadata
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {loading
+                                            ? Array.from({ length: 6 }).map((_, i) => (
+                                                <tr key={i} className="border-b border-[#F1E8F2] bg-white">
+                                                    {[140, 160, 120, 120, 80, 160].map((w, col) => (
+                                                        <td key={col} className="px-4 py-3">
+                                                            <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
+                                                                <div
+                                                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                                                    style={{ width: '50%', animationDelay: `${i * 0.08}s` }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))
+                                            : activityLogRows.map((row) => (
+                                            <tr
+                                                key={row.id}
+                                                className="border-b border-[#F1E8F2]"
+                                            >
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {getLocaleDateTimeParts(row.created_at).date} {getLocaleDateTimeParts(row.created_at).time}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {row.action}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatActorLabel(row)}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatTargetLabel(row)}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.outcome === "success" ? "bg-green-100 text-green-700" : row.outcome === "partial" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}
+                                                    >
+                                                        {row.outcome}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700">
+                                                    {formatMetadataSummary(row.metadata)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {!loading && activityLogRows.length === 0 && (
+                                            <tr>
+                                                <td
+                                                    colSpan={6}
+                                                    className="px-4 py-6 text-center text-gray-400"
+                                                >
+                                                    No activity logs found for the selected filters.
                                                 </td>
                                             </tr>
                                         )}
