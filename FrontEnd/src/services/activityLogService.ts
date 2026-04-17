@@ -26,6 +26,7 @@ export interface ActivityLogResponse {
 
 export class ActivityLogService extends BaseApiService {
     async getActivityLogs(options: {
+        actions?: string[];
         action_prefix?: string;
         action?: string;
         actor_type?: string;
@@ -35,12 +36,16 @@ export class ActivityLogService extends BaseApiService {
         outcome?: string;
         metadata_key?: string;
         metadata_value?: string;
+        search?: string;
         date_from?: string;
         date_to?: string;
         page?: number;
         page_size?: number;
     }): Promise<ActivityLogResponse> {
         const params = new URLSearchParams();
+        if (options.actions && options.actions.length > 0) {
+            params.append("actions", options.actions.join(","));
+        }
         if (options.action_prefix) params.append("action_prefix", options.action_prefix);
         if (options.action) params.append("action", options.action);
         if (options.actor_type) params.append("actor_type", options.actor_type);
@@ -50,6 +55,7 @@ export class ActivityLogService extends BaseApiService {
         if (options.outcome) params.append("outcome", options.outcome);
         if (options.metadata_key) params.append("metadata_key", options.metadata_key);
         if (options.metadata_value) params.append("metadata_value", options.metadata_value);
+        if (options.search) params.append("search", options.search);
         if (options.date_from) params.append("date_from", options.date_from);
         if (options.date_to) params.append("date_to", options.date_to);
         if (options.page) params.append("page", options.page.toString());

@@ -377,6 +377,17 @@ class CriticalAlertService:
             existing_alert.updated_at = datetime.now(timezone.utc)
             return existing_alert
 
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        tank_code = tank.tank_code if tank else None
+        branch_name = None
+        if branch_id is not None:
+            branch = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.branch_id == branch_id)
+                .first()
+            )
+            branch_name = branch.branch_name if branch else None
+
         # Create new alert with UUID
         try:
             alert = CriticalAlert(
@@ -397,6 +408,22 @@ class CriticalAlertService:
 
             self.db.add(alert)
             self.db.flush()
+            ActivityLogService(self.db).log_activity(
+                action="alert.created",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_system_actor("critical_alert"),
+                target=build_target("tank", str(tank_id), tank_code),
+                metadata={
+                    "alert_id": alert.alert_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "message": message,
+                    "tank_id": tank_id,
+                    "tank_code": tank_code,
+                    "branch_id": branch_id,
+                    "branch_name": branch_name,
+                },
+            )
             return alert
         except IntegrityError as e:
             # Handle race condition: if another process created the alert between our check and insert
@@ -450,6 +477,22 @@ class CriticalAlertService:
                     )
                     self.db.add(alert)
                     self.db.flush()
+                    ActivityLogService(self.db).log_activity(
+                        action="alert.created",
+                        outcome=ActivityOutcome.SUCCESS.value,
+                        actor=build_system_actor("critical_alert"),
+                        target=build_target("tank", str(tank_id), tank_code),
+                        metadata={
+                            "alert_id": alert.alert_id,
+                            "alert_type": alert.alert_type,
+                            "severity": alert.severity,
+                            "message": message,
+                            "tank_id": tank_id,
+                            "tank_code": tank_code,
+                            "branch_id": branch_id,
+                            "branch_name": branch_name,
+                        },
+                    )
                     return alert
             else:
                 # Re-raise if it's a different integrity error
@@ -501,10 +544,10 @@ class CriticalAlertService:
 
             ## Check if last alert created/updated for this config is not acknowledged and occurred within last 1 hour,
             # if yes skip creating new alert to avoid alert spam.
-            # Use COALESCE(updated_at, created_at) so that dedup-updates (which only set updated_at)
-            # correctly reset the 1-hour cooldown window.
+            # Use occurred_at for cooldown ordering to avoid reminder/ack updates
+            # unintentionally resetting the cooldown window.
             last_activity_col = func.coalesce(
-                CriticalAlert.updated_at, CriticalAlert.created_at
+                CriticalAlert.occurred_at, CriticalAlert.created_at
             )
             # Build LIKE patterns anchored to tank_id to avoid false matches
             # (e.g. kpi_config_id=5 must not match :15, :25, :55, etc.)
@@ -525,6 +568,18 @@ class CriticalAlertService:
                 .order_by(last_activity_col.desc())
                 .first()
             )
+            if last_alert:
+                logger.info(
+                    "Cooldown candidate for tank_id=%s kpi_config_id=%s: alert_id=%s status=%s dedup_key=%s occurred_at=%s created_at=%s updated_at=%s",
+                    tank_id,
+                    kpi_config.id,
+                    last_alert.alert_id,
+                    last_alert.status,
+                    last_alert.dedup_key,
+                    last_alert.occurred_at,
+                    last_alert.created_at,
+                    last_alert.updated_at,
+                )
 
             now = datetime.now(timezone.utc)
             # Use per-KPI configurable cooldown (default 60 minutes)
@@ -535,7 +590,7 @@ class CriticalAlertService:
             )
             # Ensure timezone-aware comparison using the most recent timestamp (updated_at or created_at)
             if last_alert:
-                last_alert_time = last_alert.updated_at or last_alert.created_at
+                last_alert_time = last_alert.occurred_at or last_alert.created_at
                 if last_alert_time:
                     last_alert_time = (
                         last_alert_time
@@ -1029,8 +1084,22 @@ class CriticalAlertService:
                     action="email.critical_alert_sent",
                     outcome=ActivityOutcome.SUCCESS.value,
                     actor=build_system_actor("critical_alert"),
-                    target=build_target("alert", alert.alert_id),
-                    metadata={"recipient_email": user.email},
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "email_subject": subject,
+                        "email_message": alert.message,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "occurred_at": timestamp_string,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id if branch else None,
+                        "branch_name": branch.branch_name if branch else None,
+                    },
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
