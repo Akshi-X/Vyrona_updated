@@ -1,3 +1,4 @@
+import React from "react";
 import { Lock } from "lucide-react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useLayoutEffect } from "react";
@@ -31,7 +32,7 @@ function TourContent({ content }: { content: unknown }) {
                 />
             )}
             <p className="text-sm leading-relaxed text-slate-700">
-                {nav?.content ?? content}
+                {(nav?.content ?? content) as React.ReactNode}
             </p>
         </div>
     );

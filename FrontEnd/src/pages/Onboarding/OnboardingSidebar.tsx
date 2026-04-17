@@ -137,7 +137,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                             );
                         }
 
-                        const path = item.path as string;
+                        const path = (item as { path: string }).path;
                         const isActive = location.pathname === path || location.pathname.startsWith(path + "/");
                         const iconSrc = item.label === "Control Tower"
                             ? (isActive ? ControlTowerIconDark : ControlTowerIconWhite)

@@ -40,7 +40,7 @@ const nowIso = () => new Date().toISOString();
 
 const createInitialProgress = (levels: OnboardingLevelConfig[]): Record<string, OnboardingLevelProgress> => {
     const progress: Record<string, OnboardingLevelProgress> = {};
-    levels.forEach((level, index) => {
+    levels.forEach((level, _index) => {
         progress[level.id] = {
             id: level.id,
             status: "available",
