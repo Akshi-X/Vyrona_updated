@@ -9,13 +9,12 @@ interface OnboardingLevelProps {
 }
 
 export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
-    const { levels, getSteps, getLevelProgress, startLevel, setStepIndex, logEvent } = useOnboarding();
+    const { getSteps, getLevelProgress, startLevel, setStepIndex, logEvent } = useOnboarding();
     const navigate = useNavigate();
     const location = useLocation();
     const { setIsOpen, setSteps, setCurrentStep } = useTour();
     const tourNavCtx = useTourNavContext();
 
-    const config = levels.find((level) => level.id === levelId);
     const steps = getSteps(levelId);
     const progress = getLevelProgress(levelId);
 
@@ -210,7 +209,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 setCurrentStep(nextIndex);
                 setStepIndex(levelId, nextIndex);
 
-                matchedEl?.click();
+                (matchedEl as HTMLElement | null)?.click();
             } else {
                 const isInsideTarget = target.contains(clickedEl) || hitsBox(target);
                 if (!isInsideTarget) return;
