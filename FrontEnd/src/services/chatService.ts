@@ -22,7 +22,8 @@ export interface UnreadMessageResponse {
   message_id: number;
   message_content: string;
   patient_id?: string | null; // For CGT flow
-  canister_number?: string | null; // For IVF flow
+  canister_number?: string | null; // For IVF flow (legacy)
+  tank_code?: string | null; // For IVF flow
   patient_name?: string | null; // Patient name for CGT
   sender_id: string;
   sender_name: string;

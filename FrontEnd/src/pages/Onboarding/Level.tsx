@@ -1,31 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
-import Dashboard from "../Dashboard";
-import ControlTower from "../ControlTower";
+import { useTourNavContext, type TourNavState } from "../../contexts/TourNavContext";
 
 interface OnboardingLevelProps {
     levelId: string;
 }
 
 export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
-    const {
-        levels,
-        getSteps,
-        getLevelProgress,
-        startLevel,
-        setStepIndex,
-        logEvent,
-    } = useOnboarding();
+    const { levels, getSteps, getLevelProgress, startLevel, setStepIndex, logEvent } = useOnboarding();
     const navigate = useNavigate();
-    const {
-        setIsOpen,
-        setSteps,
-        setCurrentStep,
-        currentStep,
-        isOpen,
-    } = useTour();
+    const location = useLocation();
+    const { setIsOpen, setSteps, setCurrentStep } = useTour();
+    const tourNavCtx = useTourNavContext();
 
     const config = levels.find((level) => level.id === levelId);
     const steps = getSteps(levelId);
@@ -33,231 +21,303 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     const [confirmedSteps, setConfirmedSteps] = useState<Record<string, boolean>>({});
     const completionLoggedRef = useRef(false);
-    const syncingFromTourRef = useRef(false);
-    const lastAppliedStepRef = useRef<number | null>(null);
     const lastStepsKeyRef = useRef<string | null>(null);
-    const wrapperRef = useRef<HTMLDivElement | null>(null);
-    const didDumpIdsRef = useRef(false);
+
+    const isTourActive = tourNavCtx?.isTourActive ?? false;
+    const setIsTourActive = (v: boolean) => tourNavCtx?.setIsTourActive(v);
 
     const stepIndex = progress?.lastStepIndex ?? 0;
     const stepCount = steps.length;
+    const activeStep = stepIndex < stepCount ? steps[stepIndex] : null;
+    const canNext = !activeStep?.requireClick || !!confirmedSteps[activeStep.id];
 
-    useEffect(() => {
-        completionLoggedRef.current = false;
-    }, [levelId]);
+    const prevTargetIndex = (() => {
+        let target = stepIndex - 1;
+        if (target >= 0 && steps[target]?.prevDisable) target -= 1;
+        return target;
+    })();
+    const prevLocked = !!activeStep?.prevDisable;
+    const canPrev = !prevLocked && prevTargetIndex >= 0;
 
+    // ── 1. Level init ──────────────────────────────────────────────
     useEffect(() => {
-        if (!progress || progress.status === "locked") {
+        if (progress?.status === "locked") {
             navigate("/onboarding/timeline");
-            return;
         }
-        if (progress.status === "available") {
-            startLevel(levelId);
-            logEvent({ type: "level_start", levelId });
-        }
-    }, [levelId, progress?.status, startLevel, logEvent, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [levelId, progress?.status]);
+
+    // ── 2. Completion log ──────────────────────────────────────────
+    useEffect(() => { completionLoggedRef.current = false; }, [levelId]);
 
     useEffect(() => {
         if (stepCount > 0 && stepIndex >= stepCount && !completionLoggedRef.current) {
             logEvent({ type: "tour_completed", levelId });
             completionLoggedRef.current = true;
+            setIsTourActive(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [stepCount, stepIndex, logEvent, levelId]);
 
+    // ── 3. Tour steps setup & initial position ─────────────────────
     useEffect(() => {
-        if (stepIndex < stepCount) {
-            completionLoggedRef.current = false;
-        }
-    }, [stepIndex, stepCount]);
-
-    useEffect(() => {
-        const stepsKey = steps
-            .map((step) => `${step.id}|${step.target}|${step.placement ?? ""}|${step.content}`)
-            .join("::");
+        if (steps.length === 0) return;
+        const stepsKey = steps.map((s) => s.id).join(",");
         if (stepsKey === lastStepsKeyRef.current) return;
         lastStepsKeyRef.current = stepsKey;
 
-        const mappedSteps = steps.map((step) => ({
+        const mapped = steps.map((step) => ({
             selector: step.target,
             content: step.content,
             position: step.placement || "bottom",
         }));
-        console.log("[onboarding] level steps", {
-            levelId,
-            stepCount: steps.length,
-            targets: steps.map((step) => step.target),
-        });
-        setSteps?.(mappedSteps);
-        if (steps.length > 0 && typeof currentStep !== "number") {
-            const safeIndex = Math.min(stepIndex, steps.length - 1);
-            setCurrentStep(safeIndex);
-            setIsOpen(stepIndex < steps.length);
-        }
-    }, [steps, stepIndex, currentStep, setSteps, setCurrentStep, setIsOpen]);
+        setSteps?.(mapped);
 
+        const safeIndex = Math.min(stepIndex, steps.length - 1);
+        setCurrentStep(safeIndex);
+        if (isTourActive) setIsOpen(stepIndex < steps.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [steps]);
+
+    // ── 4. Keep tour open & in sync with stepIndex ─────────────────
     useEffect(() => {
-        if (typeof currentStep !== "number" || currentStep === stepIndex) {
+        if (stepCount === 0) return;
+        if (stepIndex >= stepCount) {
+            setIsOpen(false);
             return;
         }
-        if (currentStep < stepIndex) {
-            console.log("[onboarding] ignore backward tour step", {
-                levelId,
-                currentStep,
-                stepIndex,
-            });
-            return;
-        }
-        const nextStep = steps[currentStep];
-        if (nextStep?.requireClick && !confirmedSteps[nextStep.id]) {
-            console.log("[onboarding] block tour step until confirmed", {
-                levelId,
-                stepId: nextStep.id,
-                currentStep,
-                stepIndex,
-            });
-            return;
-        }
-        console.log("[onboarding] tour step -> state", {
-            levelId,
-            currentStep,
-            stepIndex,
-        });
-        syncingFromTourRef.current = true;
-        setStepIndex(levelId, currentStep);
-        logEvent({ type: "tour_step", levelId, payload: { stepIndex: currentStep } });
-    }, [currentStep, stepIndex, steps, confirmedSteps, levelId, setStepIndex, logEvent]);
+        setCurrentStep(stepIndex);
+        if (isTourActive) setIsOpen(true);
+    }, [stepIndex, stepCount, isTourActive, setCurrentStep, setIsOpen]);
 
+    // ── 4b. Navigate to startPage if step requires a specific page ──
     useEffect(() => {
-        if (steps.length === 0) return;
-        if (lastAppliedStepRef.current === stepIndex) {
-            syncingFromTourRef.current = false;
-            return;
-        }
-        lastAppliedStepRef.current = stepIndex;
-        if (!syncingFromTourRef.current && typeof currentStep === "number" && currentStep !== stepIndex) {
-            console.log("[onboarding] state step -> tour", {
-                levelId,
-                stepIndex,
-                currentStep,
-            });
-            const safeIndex = Math.min(stepIndex, steps.length - 1);
-            setCurrentStep(safeIndex);
-        }
-        syncingFromTourRef.current = false;
-    }, [stepIndex, steps.length, currentStep, setCurrentStep]);
+        if (!isTourActive) return;
+        if (!activeStep?.startPage) return;
+        if (location.pathname === activeStep.startPage) return;
+        navigate(activeStep.startPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeStep?.startPage, isTourActive]);
 
+    // ── 5. Re-sync tour when target appears asynchronously ──────────
     useEffect(() => {
-        if (steps.length === 0) return;
-        if (typeof currentStep !== "number") return;
-        const activeStep = steps[currentStep];
-        if (!activeStep?.requireClick) return;
-        const alreadyConfirmed = confirmedSteps[activeStep.id];
-        if (alreadyConfirmed) return;
+        if (!activeStep || stepIndex >= stepCount) return;
+        if (document.querySelector(activeStep.target)) return;
 
-        const target = document.querySelector(activeStep.target);
-        if (!target) {
-            console.log("[onboarding] target not found", {
-                levelId,
-                stepId: activeStep.id,
-                target: activeStep.target,
-                currentStep,
+        const interval = setInterval(() => {
+            if (document.querySelector(activeStep.target)) {
+                clearInterval(interval);
+                setCurrentStep(stepIndex);
+            }
+        }, 50);
+
+        return () => clearInterval(interval);
+    }, [activeStep, stepIndex, stepCount, setCurrentStep]);
+
+    // ── 6. Disable pointer-events on non-interactive steps ──────────
+    useEffect(() => {
+        if (!isTourActive || !activeStep || activeStep.requireClick) return;
+        const el = document.querySelector(activeStep.target) as HTMLElement | null;
+        if (!el) return;
+        el.style.setProperty("pointer-events", "none");
+        return () => { el.style.removeProperty("pointer-events"); };
+    }, [activeStep, isTourActive]);
+
+    // ── 7. Trail-border animation on clickOnlyId targets ────────────
+    useEffect(() => {
+        const ids = activeStep?.clickOnlyId;
+        if (!ids?.length) return;
+
+        const applyClass = () => {
+            ids.forEach((sel) => {
+                document.querySelector(sel)?.classList.add("tour-click-target");
             });
-            return;
-        }
-
-        console.log("[onboarding] attach click guard", {
-            levelId,
-            stepId: activeStep.id,
-            target: activeStep.target,
-            currentStep,
-        });
-
-        const confirmStep = () => {
-            console.log("[onboarding] target clicked", {
-                levelId,
-                stepId: activeStep.id,
-                target: activeStep.target,
-                currentStep,
-            });
-            setConfirmedSteps((prev) => ({
-                ...prev,
-                [activeStep.id]: true,
-            }));
-            logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
-            const nextStep = currentStep + 1;
-            setCurrentStep(nextStep);
-            setStepIndex(levelId, nextStep);
         };
 
+        applyClass();
+
+        const interval = setInterval(() => {
+            const missing = ids.some((sel) => !document.querySelector(sel));
+            if (!missing) { clearInterval(interval); return; }
+            applyClass();
+        }, 50);
+
+        return () => {
+            clearInterval(interval);
+            ids.forEach((sel) => {
+                document.querySelector(sel)?.classList.remove("tour-click-target");
+            });
+        };
+    }, [activeStep]);
+
+    // ── 8. Click guard ───────────────────────────────────────────────
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.requireClick || confirmedSteps[activeStep.id]) return;
+
+        const applyDisabledStyles = () => {
+            activeStep.disableClickID?.forEach((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (el) el.style.setProperty("pointer-events", "none");
+            });
+        };
+        const restoreDisabledStyles = () => {
+            activeStep.disableClickID?.forEach((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (el) el.style.removeProperty("pointer-events");
+            });
+        };
+
+        applyDisabledStyles();
+
         const handlePointerDown = (event: Event) => {
-            const element = event.target as HTMLElement | null;
-            if (!element) return;
-            if (!element.closest(activeStep.target)) return;
-            confirmStep();
+            const { clientX, clientY } = event as PointerEvent;
+            const clickedEl = event.target as Element | null;
+
+            const target = document.querySelector(activeStep.target);
+            if (!target) return;
+
+            applyDisabledStyles();
+
+            const hitsBox = (el: Element) => {
+                const r = el.getBoundingClientRect();
+                return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+            };
+
+            if (activeStep.disableClickID?.some((sel) => {
+                const el = document.querySelector(sel);
+                return el ? hitsBox(el) : false;
+            })) return;
+
+            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
+
+            if (hasWhitelist) {
+                let matchedEl: HTMLElement | null = null;
+                const hitWhitelisted = activeStep.clickOnlyId!.some((sel) => {
+                    const el = document.querySelector(sel) as HTMLElement | null;
+                    if (el && hitsBox(el)) { matchedEl = el; return true; }
+                    return false;
+                });
+                if (!hitWhitelisted) return;
+
+                // Prevent the native click from also firing so elements like
+                // toggle buttons aren't triggered twice (once real, once synthetic).
+                event.preventDefault();
+                event.stopPropagation();
+
+                const nextIndex = stepIndex + 1;
+                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
+                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
+                setCurrentStep(nextIndex);
+                setStepIndex(levelId, nextIndex);
+
+                matchedEl?.click();
+            } else {
+                const isInsideTarget = target.contains(clickedEl) || hitsBox(target);
+                if (!isInsideTarget) return;
+
+                const nextIndex = stepIndex + 1;
+                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
+                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
+                setCurrentStep(nextIndex);
+                setStepIndex(levelId, nextIndex);
+
+                (target as HTMLElement).click();
+            }
         };
 
         document.addEventListener("pointerdown", handlePointerDown, true);
         return () => {
             document.removeEventListener("pointerdown", handlePointerDown, true);
+            restoreDisabledStyles();
         };
-    }, [currentStep, steps, confirmedSteps, levelId, logEvent, setCurrentStep, setStepIndex]);
+    }, [activeStep, confirmedSteps, stepIndex, levelId, logEvent, setCurrentStep, setStepIndex, isTourActive]);
 
-    useEffect(() => {
-        if (steps.length === 0) return;
-        if (typeof currentStep !== "number") return;
-        const activeStep = steps[currentStep];
-        if (!activeStep?.requireClick) return;
-        if (confirmedSteps[activeStep.id]) return;
-        if (currentStep !== stepIndex) {
-            setCurrentStep(stepIndex);
-        }
-    }, [currentStep, stepIndex, steps, confirmedSteps, setCurrentStep]);
+    // ── Navigation handlers ─────────────────────────────────────────
+    const goNext = useCallback(() => {
+        if (!canNext) return;
+        const nextIndex = stepIndex + 1;
+        setCurrentStep(nextIndex);
+        setStepIndex(levelId, nextIndex);
+        logEvent({ type: "tour_step", levelId, payload: { stepIndex: nextIndex } });
+    }, [canNext, stepIndex, levelId, setCurrentStep, setStepIndex, logEvent]);
 
-    useEffect(() => {
-        if (steps.length === 0) return;
-        if (!isOpen && stepIndex < steps.length) {
-            setIsOpen(true);
-        }
-    }, [isOpen, steps.length, stepIndex, setIsOpen]);
-
-    useEffect(() => {
-        if (didDumpIdsRef.current) return;
-        const root = wrapperRef.current;
-        if (!root) return;
-        const ids = Array.from(root.querySelectorAll("[id]"))
-            .map((node) => node.id)
-            .filter(Boolean)
-            .sort();
-        console.log("[onboarding] dashboard ids", {
-            levelId,
-            count: ids.length,
-            ids,
+    const goPrev = useCallback(() => {
+        if (!canPrev) return;
+        setConfirmedSteps((prev) => {
+            const next = { ...prev };
+            for (let i = prevTargetIndex; i < stepIndex; i++) {
+                const s = steps[i];
+                if (s?.requireClick) delete next[s.id];
+            }
+            return next;
         });
-        didDumpIdsRef.current = true;
-    }, [levelId]);
+        setCurrentStep(prevTargetIndex);
+        setStepIndex(levelId, prevTargetIndex);
+        logEvent({ type: "tour_step", levelId, payload: { stepIndex: prevTargetIndex } });
+    }, [canPrev, prevTargetIndex, stepIndex, steps, levelId, setCurrentStep, setStepIndex, logEvent]);
 
-    if (!config) {
-        return (
-            <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
-                <p className="text-sm text-red-600">Unknown level.</p>
-            </div>
-        );
-    }
+    // ── Publish nav state ───────────────────────────────────────────
+    const navState = useMemo<TourNavState>(() => ({
+        title: activeStep?.title ?? "",
+        icon: activeStep?.icon ?? "",
+        content: activeStep?.content ?? "",
+        genieImage: activeStep?.genieImage,
+        stepIndex,
+        totalSteps: stepCount,
+        canNext,
+        canPrev,
+        prevLocked,
+        requiresClick: !!activeStep?.requireClick && !confirmedSteps[activeStep?.id ?? ""],
+        goNext,
+        goPrev,
+    }), [activeStep, stepIndex, stepCount, canNext, canPrev, prevLocked, confirmedSteps, goNext, goPrev]);
 
-    const renderReplica = () => {
-        switch (config.replica) {
-            case "dashboard":
-                return <Dashboard />;
-            case "control-tower":
-                return <ControlTower />;
-            default:
-                return null;
+    useEffect(() => {
+        tourNavCtx?.setNav(navState);
+    }, [navState, tourNavCtx]);
+
+    useEffect(() => {
+        return () => { tourNavCtx?.setNav(null); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── Open tour when isTourActive flips to true ───────────────────
+    useEffect(() => {
+        if (!isTourActive || stepCount === 0 || stepIndex >= stepCount) return;
+        setCurrentStep(stepIndex);
+        setIsOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTourActive]);
+
+    // ── Auto-start if navigated here with a pending start request ───
+    useEffect(() => {
+        if (tourNavCtx?.pendingStartLevelId !== levelId) return;
+        tourNavCtx.setPendingStartLevelId(null);
+        if (progress?.status === "available") {
+            startLevel(levelId);
+            logEvent({ type: "level_start", levelId });
         }
-    };
+        setIsTourActive(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tourNavCtx?.pendingStartLevelId]);
 
-    return (
-        <div ref={wrapperRef} className="min-h-screen">
-            {renderReplica()}
-        </div>
-    );
+    // ── Register startTour ──────────────────────────────────────────
+    useEffect(() => {
+        const fn = () => {
+            if (progress?.status === "available") {
+                startLevel(levelId);
+                logEvent({ type: "level_start", levelId });
+            }
+            setIsTourActive(true);
+            if (stepCount > 0 && stepIndex < stepCount) {
+                setCurrentStep(stepIndex);
+                setIsOpen(true);
+            }
+        };
+        tourNavCtx?.setStartTour(fn);
+        return () => { tourNavCtx?.setStartTour(null); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [progress?.status, levelId, stepCount, stepIndex]);
+
+    return null;
 }

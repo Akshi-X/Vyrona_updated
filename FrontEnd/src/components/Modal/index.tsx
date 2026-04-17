@@ -1,5 +1,6 @@
 import React from "react";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
+import { useTourNavContext } from "../../contexts/TourNavContext";
 
 interface ModalProps {
     isOpen: boolean;
@@ -11,6 +12,7 @@ interface ModalProps {
     containerClassName?: string;
     headerAction?: React.ReactNode;
     scrollableContainerClassName?: string;
+    id?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -23,17 +25,21 @@ const Modal: React.FC<ModalProps> = ({
     containerClassName,
     headerAction,
     scrollableContainerClassName: _scrollableContainerClassName,
+    id,
 }) => {
     useBodyScrollLock(isOpen);
+    const tourNavCtx = useTourNavContext();
+    const isTourActive = tourNavCtx?.isTourActive ?? false;
 
     if (!isOpen) return null;
 
     return (
         <div
             className="fixed inset-0 bg-black/70 z-[100] md:flex md:items-center md:justify-center md:p-4"
-            onClick={onClose}
+            onClick={isTourActive ? undefined : onClose}
         >
             <div
+                id={id}
                 className={`
                     fixed inset-0 flex flex-col rounded-xl
                     md:static md:inset-auto md:rounded-md md:max-h-[90vh] md:mx-auto md:w-4/5
@@ -57,7 +63,7 @@ const Modal: React.FC<ModalProps> = ({
                     </div>
                     <div className="flex items-center gap-2 md:gap-3 ml-3 shrink-0">
                         {headerAction}
-                        <button onClick={onClose} className="p-1.5 md:p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <button id="onboarding-modal-close-btn" onClick={onClose} className="p-1.5 md:p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>

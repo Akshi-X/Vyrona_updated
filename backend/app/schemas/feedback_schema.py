@@ -73,6 +73,9 @@ class FeedbackSummaryResponse(BaseModel):
     type: str         # Feedback type
     status: str       # Current status
     submitted_on: datetime
+    submitted_by_name: Optional[str] = None
+    hospital_name: Optional[str] = None
+    branch_name: Optional[str] = None
     
     class Config:
         from_attributes = True

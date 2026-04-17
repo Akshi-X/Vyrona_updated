@@ -1,4 +1,5 @@
 import logging
+from typing import List, Optional
 from pathlib import Path
 from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
@@ -261,7 +262,8 @@ def send_feedback_new_ticket_email(
     submitted_by_email: str,
     feedback_id: str,
     mygrape_admin_email: str,
-    send_to_user: bool = True
+    send_to_user: bool = True,
+    extra_recipient_emails: Optional[List[str]] = None
 ):
     """
     Send new feedback ticket notification email
@@ -299,6 +301,14 @@ def send_feedback_new_ticket_email(
     # Send to MyGrape admin (notification)
     send_email(mygrape_admin_email, email_subject, html_body)
     logger.info(f"Feedback notification sent to MyGrape admin: {mygrape_admin_email}")
+
+    # Send to any extra recipients (e.g., support inbox)
+    if extra_recipient_emails:
+        for recipient in {email.strip() for email in extra_recipient_emails if email}:
+            if recipient.lower() == mygrape_admin_email.lower() or recipient.lower() == submitted_by_email.lower():
+                continue
+            send_email(recipient, email_subject, html_body)
+            logger.info(f"Feedback notification sent to extra recipient: {recipient}")
 
 
 def send_feedback_status_update_email(

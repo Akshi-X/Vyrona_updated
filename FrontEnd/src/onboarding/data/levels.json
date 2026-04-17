@@ -2,7 +2,7 @@
     {
         "id": "level-1",
         "title": "Dashboard Quest",
-        "route": "/onboarding/level-1",
+        "route": "/onboarding/dashboard",
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-1.steps.json",
@@ -12,11 +12,21 @@
     {
         "id": "level-2",
         "title": "Control Tower Quest",
-        "route": "/onboarding/level-2",
+        "route": "/onboarding/dashboard",
         "pointsRequired": 70,
-        "unlockDelayHours": 48,
+        "unlockDelayHours": 0,
         "tourStepsFile": "level-2.steps.json",
         "quizFile": "level-2.quiz.json",
+        "replica": "control-tower"
+    },
+    {
+        "id": "level-3",
+        "title": "Branch Deep Dive",
+        "route": "/onboarding/control-tower",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-3.steps.json",
+        "quizFile": "level-3.quiz.json",
         "replica": "control-tower"
     }
 ]
