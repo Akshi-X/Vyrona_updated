@@ -17,6 +17,7 @@ interface AlertCardProps {
   headerAction?: React.ReactNode;
   disableInnerScroll?: boolean; // allows disabling inner scroll for specific modals
   thinScrollbar?: boolean; // allows thin scrollbar styling for specific modals
+  id?: string;
 }
 
 const AlertCard: React.FC<AlertCardProps> = ({
@@ -34,7 +35,8 @@ const AlertCard: React.FC<AlertCardProps> = ({
   contentHeightClassName = 'md:h-[300px]',
   headerAction,
   disableInnerScroll = false,
-  thinScrollbar = false
+  thinScrollbar = false,
+  id,
 }) => {
   return (
     <>
@@ -57,6 +59,7 @@ const AlertCard: React.FC<AlertCardProps> = ({
         containerClassName={containerClassName}
         headerAction={headerAction}
         scrollableContainerClassName={thinScrollbar ? 'alert-card-thin-scrollbar' : ''}
+        id={id}
       >
       <div className="w-full">
         {loading ? (

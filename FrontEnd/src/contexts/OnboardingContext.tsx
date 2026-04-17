@@ -43,7 +43,7 @@ const createInitialProgress = (levels: OnboardingLevelConfig[]): Record<string, 
     levels.forEach((level, index) => {
         progress[level.id] = {
             id: level.id,
-            status: index === 0 ? "available" : "locked",
+            status: "available",
             score: 0,
             attempts: 0,
             lastStepIndex: 0,
