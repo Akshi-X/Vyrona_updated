@@ -84,6 +84,13 @@ export class UserService extends BaseApiService {
     });
   }
 
+  async getProfileForOnboarding(): Promise<UserProfileDto> {
+    return await this.request<UserProfileDto>('/api/profile', {
+      method: 'GET',
+      skipMock: true,
+    });
+  }
+
   /**
    * Update user profile (first name and last name)
    */

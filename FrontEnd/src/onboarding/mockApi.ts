@@ -1,13 +1,19 @@
 import { BaseApiService } from "../services/baseApiService";
+import { userService } from "../services/userService";
 import dashboardData from "./mocks/dashboard-data.json";
 import controlTowerData from "./mocks/control-tower-data.json";
 
 export const enableOnboardingMocks = () => {
     BaseApiService.setMockEnabled(true);
-    BaseApiService.setMockResolver((endpoint) => {
-        // User profile for onboarding dashboard header and auth-derived UI.
+    BaseApiService.setMockResolver(async (endpoint) => {
+        // User profile — hit real API only for onboarding, preserve real role as real_role, override role to Admin.
         if (endpoint.startsWith("/api/profile")) {
-            return dashboardData.profile;
+            try {
+                const profile = await userService.getProfileForOnboarding();
+                return { ...profile, real_role: profile.role, role: "Admin" };
+            } catch {
+                return undefined;
+            }
         }
 
         // CGT alerts feed (used when department is not IVF).
@@ -98,6 +104,10 @@ export const enableOnboardingMocks = () => {
             return dashboardData.ivfMetricsTotalDeviations;
         }
 
+        if (endpoint.startsWith("/api/ivf/incubator/metrics/deviations")) {
+            return dashboardData.ivfMetricsIncubatorDeviations;
+        }
+
         if (endpoint.startsWith("/api/ivf/dashboard/metrics/top-deviation-driver")) {
             return dashboardData.ivfMetricsTopDeviationDriver;
         }
@@ -129,7 +139,12 @@ export const enableOnboardingMocks = () => {
         }
 
         if (endpoint.startsWith("/api/ivf/control_tower")) {
-            return controlTowerData.ivfControlTower;
+            try {
+                const profile = await userService.getProfileForOnboarding();
+                return { ...controlTowerData.ivfControlTower, hospitalName: profile.company_name ?? controlTowerData.ivfControlTower.hospitalName };
+            } catch {
+                return controlTowerData.ivfControlTower;
+            }
         }
 
         // IVF storage panel placeholder data.

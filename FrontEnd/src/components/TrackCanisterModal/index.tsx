@@ -569,6 +569,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
 
             <div className="flex justify-end gap-3">
                 <button
+                    id="onboarding-modal-cancel-btn"
                     type="button"
                     onClick={onClose}
                     className="px-5 py-2.5 rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200"
@@ -576,6 +577,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
                     Cancel
                 </button>
                 <button
+                    id="onboarding-modal-track-btn"
                     type="submit"
                     className="px-5 py-2.5 rounded-md bg-[#650458] text-white hover:opacity-95 disabled:opacity-50"
                     disabled={
@@ -623,6 +625,7 @@ const TrackCanisterModal: React.FC<TrackCanisterModalProps> = ({
             description={descriptionText}
             icon={<img src={icon} alt="Track Canister" className="w-6 h-6 mt-5" />}
             containerClassName="md:w-[40%]"
+            id="onboarding-dashboard-cryocan-modal"
         >
             {formContent}
         </Modal>
