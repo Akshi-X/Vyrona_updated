@@ -67,7 +67,7 @@ export default function OnboardingWelcome({ onStart }: OnboardingWelcomeProps) {
                     </div>
                     <div className="flex items-center justify-center">
                         <img
-                            src="/genie/hi.jpeg"
+                            src="/genie/welcoming_with_waving_hand.webp"
                             alt="Genie"
                             className="h-56 w-56 object-cover"
                         />

@@ -7,7 +7,7 @@
         "content": "This is your embryologist's command centre. Every KPI shown here is tailored to what you need to act on — storage volumes, container health, and deviations — all in one view the moment you log in.",
         "placement": "bottom",
         "requireClick": false,
-        "genieImage": "/genie/on_left.jpeg"
+        "genieImage": "/genie/explaining.webp"
     },
     {
         "id": "dash-kpis-volume",
@@ -17,7 +17,7 @@
         "content": "These numbers are pulled directly from your hospital's data systems — so what you see here always reflects actual inventory, not a manual entry. Any mismatch between this count and your lab records is worth investigating immediately.",
         "placement": "bottom",
         "requireClick": false,
-        "genieImage": "/genie/explaing.png"
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "dash-kpi-cryolocks",
@@ -27,7 +27,7 @@
         "content": "Shows the total number of Cryolocks currently stored across all sites. A Cryolock holds vitrified embryos — this count reflects your active inventory and should match your lab records.",
         "placement": "bottom",
         "requireClick": false,
-        "genieImage": "/genie/open.jpeg"
+        "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
     {
         "id": "dash-kpi-containers",
@@ -37,7 +37,7 @@
         "content": "The total number of cryogenic containers (tanks) actively monitored. Each container holds multiple Cryolocks — tracking this number helps you manage storage capacity and flag any unregistered units.",
         "placement": "bottom",
         "requireClick": false,
-        "genieImage": "/genie/tank.jpeg"
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "dash-kpis-impact",
@@ -47,7 +47,7 @@
         "content": "A single overlooked deviation or an unmonitored container can compromise a patient's only viable embryos. These KPIs exist so that never happens on your watch — they turn complex lab data into a clear signal you can act on in seconds.",
         "placement": "bottom",
         "requireClick": false,
-        "genieImage": "/genie/watching.jpeg"
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "dash-performance",
@@ -57,7 +57,7 @@
         "content": "See which cryogenic containers have triggered quality deviations and what's driving them most. Use this to prioritise which tanks need a closer look today.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/tank.jpeg"
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "dash-performance-detail",
@@ -67,7 +67,7 @@
         "content": "Each card shows the deviation count alongside the top driver — so you know not just how many issues exist, but exactly what is causing them. Repeated drivers across containers signal a systemic problem worth escalating.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/explaing_2.png"
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "dash-performance-deviations",
@@ -77,7 +77,7 @@
         "content": "The total number of quality deviations currently flagged across all monitored containers. Any non-zero value here means active issues that need to be reviewed, documented, and resolved before they affect sample viability.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/where.jpeg"
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "dash-performance-driver",
@@ -87,7 +87,7 @@
         "content": "The single biggest cause of container deviations right now — whether it's a temperature excursion, low LN2, or a lid state issue. Focus your immediate attention here to address the root cause before it cascades.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/explaing.png"
+        "genieImage": "/genie/lid_state.webp"
     },
     {
         "id": "dash-performance-impact",
@@ -97,7 +97,7 @@
         "content": "Unresolved container deviations don't just affect equipment — they put stored embryos and genetic material at direct risk. Catching a temperature breach or low LN2 level here, before it becomes a critical alert, is the difference between a recoverable incident and an irreversible loss.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/watching.jpeg"
+        "genieImage": "/genie/idea_with_thermometer.webp"
     },
     {
         "id": "dash-incubator",
@@ -107,7 +107,7 @@
         "content": "Incubator stability is critical for embryo development. This panel surfaces deviations and their top causes so your lab team can act before culture conditions are compromised.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/lid_open.jpeg"
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "dash-incubator-detail",
@@ -117,7 +117,7 @@
         "content": "Even a brief temperature fluctuation inside an incubator can impair embryo development at a cellular level. The deviation count and top driver here give your lab team the earliest possible signal — so corrective action happens in minutes, not hours.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/explaing_2.png"
+        "genieImage": "/genie/explaining.webp"
     },
     {
         "id": "dash-incubator-deviations",
@@ -127,7 +127,7 @@
         "content": "The number of quality deviations flagged inside your incubators. Unlike container deviations, incubator issues directly affect live culture — each flagged deviation here should be traced to a specific chamber and resolved before the next culture check.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/where.jpeg"
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "dash-incubator-driver",
@@ -137,7 +137,7 @@
         "content": "The leading cause of incubator deviations right now. CO₂ fluctuations, humidity drops, and door seal failures are common culprits — knowing the driver lets you go straight to the right corrective protocol instead of running a full diagnostic.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/settings.jpeg"
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "dash-incubator-impact",
@@ -147,7 +147,7 @@
         "content": "Every embryo in culture right now is depending on these conditions staying stable. A deviation that goes unnoticed for even a few hours can reduce blastocyst development rates, lower implantation success, and in the worst case, mean a patient has no viable embryos left for transfer.",
         "placement": "right",
         "requireClick": false,
-        "genieImage": "/genie/watching.jpeg"
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "dash-quality-tracking",
@@ -157,7 +157,7 @@
         "content": "Jump directly into Cryocan Quality Tracking, Embryo Grading, or Incubator Quality Tracking from here. These are your day-to-day tools for logging and verifying sample integrity.",
         "placement": "left",
         "requireClick": false,
-        "genieImage": "/genie/tickets.jpeg"
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "dash-cryocan-card",
@@ -167,7 +167,7 @@
         "content": "Click this card to open the Cryocan Quality Tracking tool and check the storage health of your liquid nitrogen tanks.",
         "placement": "bottom",
         "requireClick": true,
-        "genieImage": "/genie/on_right.jpeg"
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "dash-cryocan-modal",
@@ -180,7 +180,7 @@
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn", "#onboarding-modal-cancel-btn"],
         "disableClickID": ["#onboarding-modal-track-btn"],
-        "genieImage": "/genie/tank.jpeg"
+        "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
     {
         "id": "dash-deviation-chart",
@@ -190,7 +190,7 @@
         "content": "This chart breaks down every deviation type across your sites — Battery Level, Lid State, LN2, Evaporation Rate, Temperature, and Shock Detection. Spot patterns across sites at a glance.",
         "placement": "left",
         "requireClick": false,
-        "genieImage": "/genie/explaing_2.png"
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "dash-alerts",
@@ -200,7 +200,7 @@
         "content": "Real-time alerts that need your attention — from sensor thresholds crossed to scheduled checks overdue. Staying on top of this list keeps your samples and patients safe.",
         "placement": "left",
         "requireClick": false,
-        "genieImage": "/genie/watching.jpeg"
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "dash-critical-alerts-icon",
@@ -210,7 +210,7 @@
         "content": "The red badge here means something needs immediate action — a tank temperature breach, a missing check, or an escalated deviation. Click the icon to review what's critical right now.",
         "placement": "bottom",
         "requireClick": true,
-        "genieImage": "/genie/where.jpeg"
+        "genieImage": "/genie/shock.webp"
     },
     {
         "id": "dash-critical-alerts-modal",
@@ -222,7 +222,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "genieImage": "/genie/tickets.jpeg"
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "dash-stakeholder-icon",
@@ -232,7 +232,7 @@
         "content": "Coordinate with clinicians, embryologists, and operations teams without leaving the platform. Click the chat icon to see pending conversations.",
         "placement": "bottom",
         "requireClick": true,
-        "genieImage": "/genie/peace.jpeg"
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "dash-stakeholder-modal",
@@ -244,7 +244,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "genieImage": "/genie/on_left.jpeg"
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
         "id": "dash-mytasks-icon",
@@ -254,7 +254,7 @@
         "content": "Your personal task queue — scheduled QC checks, follow-ups, and action items assigned to you. Click the icon to see what's pending.",
         "placement": "bottom",
         "requireClick": true,
-        "genieImage": "/genie/tickets.jpeg"
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "dash-mytasks-modal",
@@ -266,7 +266,7 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "genieImage": "/genie/open_2.jpeg"
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
         "id": "dash-shipments",
@@ -276,6 +276,6 @@
         "content": "A live view of shipments and site-level metrics across your network. Track which sites have active transfers, pending collections, or flagged conditions — all in one table.",
         "placement": "top",
         "requireClick": false,
-        "genieImage": "/genie/refill.jpeg"
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     }
 ]
