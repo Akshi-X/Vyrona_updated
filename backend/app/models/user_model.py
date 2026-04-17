@@ -53,6 +53,10 @@ class User(Base):
     session_timeout = sqlalchemy.Column(sqlalchemy.Integer, default=30)  # Minutes (custom per user)
     last_login = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # Last successful login
     
+    # Invite token (used when an admin invites a user via email link)
+    invite_token = sqlalchemy.Column(sqlalchemy.String, nullable=True, unique=True, index=True)
+    invite_token_expires_at = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True), nullable=True)
+
     # Audit Trail
     created_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who created this user
     updated_by = sqlalchemy.Column(sqlalchemy.String, nullable=True)  # Who last updated
