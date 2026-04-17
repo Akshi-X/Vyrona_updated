@@ -20,6 +20,7 @@ class ActivityActor:
     actor_type: str
     actor_id: Optional[str]
     actor_label: Optional[str]
+    hospital_id: Optional[int] = None
 
 
 @dataclass
@@ -27,6 +28,7 @@ class ActivityTarget:
     target_type: Optional[str]
     target_id: Optional[str]
     target_label: Optional[str]
+    hospital_id: Optional[int] = None
 
 
 class ActivityLogService:
@@ -45,12 +47,19 @@ class ActivityLogService:
         if not settings.AUDIT_LOG_ENABLED or audit_log_disabled:
             return None
 
+        hospital_id = actor.hospital_id
+        if hospital_id is None and target is not None:
+            hospital_id = target.hospital_id
+        if hospital_id is None and target is not None:
+            hospital_id = self._resolve_target_hospital_id(target)
+
         record = ActivityLog(
             action=action,
             outcome=outcome,
             actor_type=actor.actor_type,
             actor_id=actor.actor_id,
             actor_label=actor.actor_label,
+            hospital_id=hospital_id,
             target_type=target.target_type if target else None,
             target_id=target.target_id if target else None,
             target_label=target.target_label if target else None,
@@ -128,6 +137,7 @@ class ActivityLogService:
                     "actor_type": row.actor_type,
                     "actor_id": row.actor_id,
                     "actor_label": row.actor_label,
+                    "hospital_id": row.hospital_id,
                     "target_type": row.target_type,
                     "target_id": row.target_id,
                     "target_label": row.target_label,
@@ -222,6 +232,43 @@ class ActivityLogService:
 
         return hydrated
 
+    def _resolve_target_hospital_id(self, target: ActivityTarget) -> Optional[int]:
+        if not target.target_type or not target.target_id:
+            return None
+
+        if target.target_type == "hospital":
+            return int(target.target_id) if target.target_id.isdigit() else None
+
+        if target.target_type == "branch":
+            if not target.target_id.isdigit():
+                return None
+            branch = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.branch_id == int(target.target_id))
+                .first()
+            )
+            return branch.hospital_id if branch else None
+
+        if target.target_type == "tank":
+            if not target.target_id.isdigit():
+                return None
+            tank = (
+                self.db.query(Tank)
+                .filter(Tank.tank_id == int(target.target_id))
+                .first()
+            )
+            return tank.hospital_id if tank else None
+
+        if target.target_type == "user":
+            user = (
+                self.db.query(User)
+                .filter(User.user_id == target.target_id)
+                .first()
+            )
+            return user.hospital_id if user else None
+
+        return None
+
 
 def build_actor_from_user(user: Optional[User]) -> ActivityActor:
     if not user:
@@ -232,6 +279,7 @@ def build_actor_from_user(user: Optional[User]) -> ActivityActor:
         actor_type=ActivityActorType.USER.value,
         actor_id=user.user_id,
         actor_label=label or user.email,
+        hospital_id=user.hospital_id,
     )
 
 
@@ -243,8 +291,18 @@ def build_scheduler_actor(job_name: str) -> ActivityActor:
     return ActivityActor(actor_type=ActivityActorType.SCHEDULER.value, actor_id=job_name, actor_label=job_name)
 
 
-def build_target(target_type: Optional[str], target_id: Optional[str], target_label: Optional[str] = None) -> ActivityTarget:
-    return ActivityTarget(target_type=target_type, target_id=target_id, target_label=target_label)
+def build_target(
+    target_type: Optional[str],
+    target_id: Optional[str],
+    target_label: Optional[str] = None,
+    hospital_id: Optional[int] = None,
+) -> ActivityTarget:
+    return ActivityTarget(
+        target_type=target_type,
+        target_id=target_id,
+        target_label=target_label,
+        hospital_id=hospital_id,
+    )
 
 
 def is_audit_log_disabled_for_user(user: Optional[User]) -> bool:

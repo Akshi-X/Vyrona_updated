@@ -16,6 +16,7 @@ class ActivityLog(Base):
     actor_type = Column(String, nullable=False)
     actor_id = Column(String, nullable=True)
     actor_label = Column(String, nullable=True)
+    hospital_id = Column(Integer, nullable=True)
     target_type = Column(String, nullable=True)
     target_id = Column(String, nullable=True)
     target_label = Column(String, nullable=True)
@@ -26,6 +27,7 @@ class ActivityLog(Base):
         Index("idx_activity_log_action", "action"),
         Index("idx_activity_log_outcome", "outcome"),
         Index("idx_activity_log_actor", "actor_type", "actor_id"),
+        Index("idx_activity_log_hospital", "hospital_id"),
         Index("idx_activity_log_target", "target_type", "target_id"),
         Index("idx_activity_log_created_at", "created_at"),
         Index("idx_activity_log_metadata", "metadata", postgresql_using="gin"),

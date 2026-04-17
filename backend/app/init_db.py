@@ -129,6 +129,7 @@ def sync_ivf_schema():
                     actor_type VARCHAR NOT NULL,
                     actor_id VARCHAR,
                     actor_label VARCHAR,
+                    hospital_id INTEGER,
                     target_type VARCHAR,
                     target_id VARCHAR,
                     target_label VARCHAR,
@@ -138,9 +139,11 @@ def sync_ivf_schema():
                 """
             )
         )
+        db.execute(text("ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS hospital_id INTEGER"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log (action)"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_outcome ON activity_log (outcome)"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_actor ON activity_log (actor_type, actor_id)"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_hospital ON activity_log (hospital_id)"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_target ON activity_log (target_type, target_id)"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log (created_at)"))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_log_metadata ON activity_log USING GIN (metadata)"))
