@@ -92,6 +92,7 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             
             # Verify token and get payload
             payload = verify_token(token)
+            request.state.audit_log_disabled = bool(payload.get("audit_log_disabled"))
             
             # Get user from database
             user_id = payload.get("sub")

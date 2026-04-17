@@ -33,6 +33,8 @@ from app.schemas.response_schema import (
 from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
+from app.service.activity_log_service import ActivityLogService, build_actor_from_user
+from app.constants.enums import ActivityOutcome
 
 router = APIRouter(tags=["Users"])
 
@@ -149,7 +151,11 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
     try:
         # Call service (all business logic there)
         logger.debug("Controller: Calling verify_otp_and_create_token service...")
-        result = verify_otp_and_create_token(request.user_id, request.otp, db)
+        result = verify_otp_and_create_token(
+            request.user_id,
+            request.otp,
+            db,
+        )
         logger.debug(f"Controller: Service returned result: {result}")
 
         # Return DTO - supports both pharma and hospital responses
@@ -183,7 +189,11 @@ def verify_otp_endpoint(request: VerifyOTPRequest, db: Session = Depends(databas
 # Logout endpoint
 # ---------------------------
 @router.post("/logout", response_model=LogoutResponse)
-def logout_user(current_user: user_model.User = Depends(get_current_user)):
+def logout_user(
+    request: Request,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
     """
     User logout endpoint.
     
@@ -193,6 +203,12 @@ def logout_user(current_user: user_model.User = Depends(get_current_user)):
     happens on the client side by removing the token from storage.
     This endpoint serves to acknowledge the logout action.
     """
+    ActivityLogService(db).log_activity(
+        action="user.logout",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        audit_log_disabled=getattr(request.state, "audit_log_disabled", False),
+    )
     return LogoutResponse(
         status="success",
         message=SuccessMessages.LOGOUT_SUCCESS
