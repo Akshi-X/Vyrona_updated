@@ -33,7 +33,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("*", "/api/forgot-password"),
     ("*", "/api/reset-password"),
     ("*", "/api/approval-screen"),
-    ("*", "/api/hospital-info-by-email"),  
+    ("*", "/api/hospital-info-by-email"),
+    ("*", "/api/register/invite"),
     ("*", "/api/dashboard/performance"),
     ("*", "/api/dashboard/risk"),
     ("*", "/api/dashboard/compliance"),
@@ -224,5 +225,10 @@ class EndpointPermissions:
         # Check for wildcard method match
         if ("*", path) in PUBLIC_ENDPOINTS:
             return True
-        
+
+        # Check public path prefixes (for dynamic segments like /api/invite/{token})
+        PUBLIC_PREFIXES = ("/api/invite/",)
+        if any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+            return True
+
         return False

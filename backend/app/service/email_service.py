@@ -13,12 +13,13 @@ from email.mime.text import MIMEText
 from ..config.config import settings
 from ..constants.app_constants import (
     EMAIL_APPROVAL_SUBJECT, EMAIL_OTP_SUBJECT, OTP_EXPIRY_MINUTES,
-    EMAIL_FEEDBACK_NEW_TICKET_SUBJECT, EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT, 
+    EMAIL_FEEDBACK_NEW_TICKET_SUBJECT, EMAIL_FEEDBACK_STATUS_UPDATE_SUBJECT,
     EMAIL_FEEDBACK_NEW_COMMENT_SUBJECT,
     EMAIL_APPROVAL_SUBJECT,
     EMAIL_OTP_SUBJECT,
     EMAIL_PASSWORD_RESET_SUBJECT,
     EMAIL_USER_APPROVED_SUBJECT,
+    EMAIL_INVITE_SUBJECT,
     OTP_EXPIRY_MINUTES,
     PASSWORD_RESET_TOKEN_EXPIRY_MINUTES
 )
@@ -481,6 +482,28 @@ def send_user_approved_notification(
         )
     except TemplateError as e:
         raise TemplateRenderException(template_name="user_approved_notification.html", reason=str(e))
-    
-    # Send email using SendGrid
+
     send_email(user_email, subject, html_body)
+
+
+def send_invite_email(recipient_email: str, invited_by: str, role: str, company: str, signup_url: str):
+    """Send an invite email to a prospective user with a signup link."""
+    subject = EMAIL_INVITE_SUBJECT
+
+    try:
+        template = jinja_env.get_template("invite_email.html")
+    except TemplateNotFound:
+        raise TemplateNotFoundException(template_name="invite_email.html")
+
+    try:
+        html_body = template.render(
+            subject=subject,
+            invited_by=invited_by,
+            role=role,
+            company=company,
+            signup_url=signup_url,
+        )
+    except TemplateError as e:
+        raise TemplateRenderException(template_name="invite_email.html", reason=str(e))
+
+    send_email(recipient_email, subject, html_body)
