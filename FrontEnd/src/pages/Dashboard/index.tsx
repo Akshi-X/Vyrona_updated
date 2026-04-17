@@ -166,16 +166,6 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTopDeviationDriver, setLoadingIvfTopDeviationDriver] = useState(false);
   const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
 
-  // IVF outbound shipments metric (live API data)
-  const [ivfOutboundShipments, setIvfOutboundShipments] = useState<number | null>(null);
-  const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
-  const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
-
-
-  // IVF total deviations metric (live API data)
-  const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
-  const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
-  const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
   // IVF incubator deviations metric
   const [ivfIncubatorDeviations, setIvfIncubatorDeviations] = useState<number | null>(null);
@@ -660,62 +650,6 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
-  // Fetch IVF outbound shipments from API
-  useEffect(() => {
-    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
-    if (!shouldFetch) return;
-
-    let cancelled = false;
-    const fetchOutboundShipments = async () => {
-      setLoadingIvfOutboundShipments(true);
-      setIvfOutboundShipmentsError(null);
-      try {
-        const response = await ivfService.getOutboundShipments();
-        if (!cancelled) setIvfOutboundShipments(response?.total_outbound_shipments ?? 0);
-      } catch (e: any) {
-        if (!cancelled) {
-          setIvfOutboundShipments(null);
-          setIvfOutboundShipmentsError(e?.message || 'Failed to load outbound shipments');
-        }
-      } finally {
-        if (!cancelled) setLoadingIvfOutboundShipments(false);
-      }
-    };
-
-    fetchOutboundShipments();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
-
-
-  // Fetch IVF total deviations from API
-  useEffect(() => {
-    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
-    if (!shouldFetch) return;
-
-    let cancelled = false;
-    const fetchTotalDeviations = async () => {
-      setLoadingIvfTotalDeviations(true);
-      setIvfTotalDeviationsError(null);
-      try {
-        const response = await ivfService.getTotalDeviations();
-        if (!cancelled) setIvfTotalDeviations(response?.total_deviations ?? 0);
-      } catch (e: any) {
-        if (!cancelled) {
-          setIvfTotalDeviations(null);
-          setIvfTotalDeviationsError(e?.message || 'Failed to load total deviations');
-        }
-      } finally {
-        if (!cancelled) setLoadingIvfTotalDeviations(false);
-      }
-    };
-
-    fetchTotalDeviations();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
 
   // Fetch IVF incubator deviations from API
   useEffect(() => {
