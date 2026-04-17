@@ -11,6 +11,7 @@ class ActivityLogRecord(BaseModel):
     actor_type: str
     actor_id: Optional[str] = None
     actor_label: Optional[str] = None
+    hospital_id: Optional[int] = None
     target_type: Optional[str] = None
     target_id: Optional[str] = None
     target_label: Optional[str] = None
