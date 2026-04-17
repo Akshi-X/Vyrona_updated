@@ -76,6 +76,12 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         setQuizResult(null);
     };
 
+    const handleRetryQuiz = () => {
+        setQuizIndex(levelId, 0);
+        logEvent({ type: "quiz_retry", levelId });
+        setQuizResult(null);
+    };
+
     if (quizResult === "fail") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
         const needed = levelConfig?.pointsRequired ?? 0;
@@ -111,13 +117,22 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={handleRetry}
-                    className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-                >
-                    Retry tour
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                        Retry tour
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleRetryQuiz}
+                        className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                        Retry quiz
+                    </button>
+                </div>
             </div>
         );
     }
