@@ -1,0 +1,62 @@
+[
+    {
+        "id": "ct3-q1",
+        "prompt": "What does the colour of a branch marker on the map indicate?",
+        "choices": [
+            "The branch's geographic region",
+            "The number of containers at that branch",
+            "The branch's health status — safe, risk, or critical",
+            "The last time the branch was updated"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "ct3-q2",
+        "prompt": "What happens when you click a branch marker on the map?",
+        "choices": [
+            "The branch is deleted",
+            "The map zooms in and the container list filters to that branch",
+            "A new container is created",
+            "The page refreshes"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "ct3-q3",
+        "prompt": "What information can you find by clicking a container row?",
+        "choices": [
+            "User login history",
+            "Branch billing records",
+            "Sensor readings and full container history",
+            "Map configuration settings"
+        ],
+        "correctIndex": 2,
+        "points": 15
+    },
+    {
+        "id": "ct3-q4",
+        "prompt": "After clicking a branch marker, what updates on the screen?",
+        "choices": [
+            "Only the map zoom changes, nothing else",
+            "The active containers list filters to show only that branch's containers",
+            "All filters are reset to default",
+            "The page navigates away from Control Tower"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    },
+    {
+        "id": "ct3-q5",
+        "prompt": "What is the best way to investigate a specific container's sensor health?",
+        "choices": [
+            "Check the branch name in the filter panel",
+            "Click the container row to open its detail view",
+            "Export the map as an image",
+            "Reset all filters and scroll the list"
+        ],
+        "correctIndex": 1,
+        "points": 15
+    }
+]

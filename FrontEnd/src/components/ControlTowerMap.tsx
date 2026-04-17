@@ -18,13 +18,14 @@ interface AdvancedMarkerProps {
     iconUrl?: string;
     dotColor?: string;
     title?: string;
+    id?: string;
     onClick?: () => void;
     onMouseEnter?: () => void;
     onMouseLeave?: () => void;
 }
 
 const AdvancedMarker: React.FC<AdvancedMarkerProps> = ({
-    position, iconUrl, dotColor, title, onClick, onMouseEnter, onMouseLeave,
+    position, iconUrl, dotColor, title, id, onClick, onMouseEnter, onMouseLeave,
 }) => {
     const map = useGoogleMap();
 
@@ -49,6 +50,7 @@ const AdvancedMarker: React.FC<AdvancedMarkerProps> = ({
         }
 
         const marker = new AdvancedMarkerElement({ map, position, content, title });
+        if (id && marker.element) marker.element.id = id;
         if (onClick) marker.addListener("gmp-click", onClick);
         if (onMouseEnter) marker.element?.addEventListener("mouseenter", onMouseEnter);
         if (onMouseLeave) marker.element?.addEventListener("mouseleave", onMouseLeave);
@@ -970,6 +972,7 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
                                                 position={branchPosition}
                                                 iconUrl={getBranchMarkerIcon(branch.branch_status)}
                                                 title={branch.branch_name}
+                                                id={`map-marker-${branch.branch_name}`}
                                                 onClick={() => {
                                                     setPendingBranchZoomName(branch.branch_name);
                                                     onBranchSelect?.(branch.branch_name);

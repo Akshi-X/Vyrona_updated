@@ -1,0 +1,41 @@
+[
+    {
+        "id": "ct3-map-intro",
+        "target": "#onboarding-control-map",
+        "title": "The Live Map",
+        "icon": "Map",
+        "content": "Every pin on this map is a live branch. Colour tells you its health — green is safe, yellow is at risk, red is critical. Let's interact with one.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/control-tower"
+    },
+    {
+        "id": "ct3-map-bangalore-click",
+        "target": "#map-marker-Bangalore",
+        "title": "Click Bangalore",
+        "icon": "Map",
+        "content": "Click the Bangalore marker to zoom in and filter the view to that branch.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#map-marker-Bangalore"]
+    },
+    {
+        "id": "ct3-containers-after-marker",
+        "target": "#onboarding-control-active-containers",
+        "title": "Branch Containers",
+        "icon": "Package",
+        "content": "The list has updated to show only Bangalore containers. Find Container T-161 and click it to inspect its details.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
+        "id": "ct3-container-t161-click",
+        "target": "#tank-Bangalore-T-161",
+        "title": "Open Container T-161",
+        "icon": "Package",
+        "content": "Click this container row to drill into its sensor readings and full history.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#tank-Bangalore-T-161"]
+    }
+]

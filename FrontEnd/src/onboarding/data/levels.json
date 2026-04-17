@@ -18,5 +18,15 @@
         "tourStepsFile": "level-2.steps.json",
         "quizFile": "level-2.quiz.json",
         "replica": "control-tower"
+    },
+    {
+        "id": "level-3",
+        "title": "Branch Deep Dive",
+        "route": "/onboarding/control-tower",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-3.steps.json",
+        "quizFile": "level-3.quiz.json",
+        "replica": "control-tower"
     }
 ]

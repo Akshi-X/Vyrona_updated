@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
@@ -37,6 +37,8 @@ const formatSensorLabel = (countValue: unknown): string => {
 const ControlTower = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isOnboarding = location.pathname.startsWith("/onboarding");
 
     const [selectedRegion, setSelectedRegion] = useState<string>("All");
     const [selectedStatusInbound, setSelectedStatusInbound] =
@@ -927,9 +929,8 @@ const ControlTower = () => {
                                                                     : "border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]";
                                                             return (
                                                                 <div
-                                                                    key={
-                                                                        canister.id
-                                                                    }
+                                                                    key={canister.id}
+                                                                    id={canister.id}
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
@@ -945,15 +946,14 @@ const ControlTower = () => {
                                                                                     ),
                                                                                 );
                                                                             }
-                                                                            navigate(
-                                                                                `/ivf-track-shipment/${encodeURIComponent(
-                                                                                    canister.tankId &&
-                                                                                        canister.tankId !==
-                                                                                            "N/A"
-                                                                                        ? canister.tankId
-                                                                                        : canister.canisterId,
-                                                                                )}`,
+                                                                            const tankParam = encodeURIComponent(
+                                                                                canister.tankId &&
+                                                                                    canister.tankId !== "N/A"
+                                                                                    ? canister.tankId
+                                                                                    : canister.canisterId,
                                                                             );
+                                                                            const prefix = isOnboarding ? "/onboarding" : "";
+                                                                            navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
                                                                         } catch {}
                                                                     }}
                                                                 >
