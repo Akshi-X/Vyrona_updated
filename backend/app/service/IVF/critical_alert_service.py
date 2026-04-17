@@ -45,6 +45,12 @@ from ...schemas.IVF.critical_alert_schema import (
     TankAlertsResponse,
 )
 from ...service.email_service import send_email
+from ...service.activity_log_service import (
+    ActivityLogService,
+    build_system_actor,
+    build_target,
+)
+from ...constants.enums import ActivityOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -1018,6 +1024,13 @@ class CriticalAlertService:
                 send_email(user.email, subject, html_body)
                 logger.info(
                     f"Sent alert email to {user.email} for alert_id={alert.alert_id}"
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("alert", alert.alert_id),
+                    metadata={"recipient_email": user.email},
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")

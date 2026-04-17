@@ -41,6 +41,13 @@ from app.schemas.task_schema import (
 )
 from app.utils.utils import get_user_by_id, normalize_role_to_title_case
 from app.utils.user_helpers import is_hospital_department
+from app.service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from app.constants.enums import ActivityOutcome
 
 
 def _resolve_tank_code_to_id(
@@ -278,6 +285,21 @@ def create_task(
         db.add(task)
         db.commit()
         db.refresh(task)
+
+        ActivityLogService(db).log_activity(
+            action="task.created",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("task", str(task.id), task.task_name),
+            metadata={
+                "assignee_id": task.assignee_id,
+                "patient_id": task.patient_id,
+                "tank_id": task.tank_id,
+                "priority": str(task.priority),
+                "status": str(task.status),
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         # Build response
         task_response = _build_task_response(task, current_user, db)
@@ -585,6 +607,15 @@ def update_task(
                 task.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(task)
+
+                ActivityLogService(db).log_activity(
+                    action="task.status_updated",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_actor_from_user(current_user),
+                    target=build_target("task", str(task.id), task.task_name),
+                    metadata={"status": str(task.status)},
+                    audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+                )
             
             # Build response
             task_response = _build_task_response(task, current_user, db)
@@ -662,6 +693,21 @@ def update_task(
         
         db.commit()
         db.refresh(task)
+
+        ActivityLogService(db).log_activity(
+            action="task.updated",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("task", str(task.id), task.task_name),
+            metadata={
+                "assignee_id": task.assignee_id,
+                "patient_id": task.patient_id,
+                "tank_id": task.tank_id,
+                "priority": str(task.priority),
+                "status": str(task.status),
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         # Build response
         task_response = _build_task_response(task, current_user, db)
@@ -720,6 +766,15 @@ def update_task_status(
         
         db.commit()
         db.refresh(task)
+
+        ActivityLogService(db).log_activity(
+            action="task.status_updated",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("task", str(task.id), task.task_name),
+            metadata={"status": str(task.status)},
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         # Build response
         task_response = _build_task_response(task, current_user, db)
@@ -768,6 +823,15 @@ def delete_task(task_id: int, current_user: User, db: Session) -> DeleteTaskResp
         # Delete task
         db.delete(task)
         db.commit()
+
+        ActivityLogService(db).log_activity(
+            action="task.deleted",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("task", str(task.id), task.task_name),
+            metadata={"assignee_id": task.assignee_id},
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         return DeleteTaskResponse(
             message=SuccessMessages.TASK_DELETED,

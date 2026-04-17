@@ -17,6 +17,13 @@ from app.schemas.response_schema import (
 )
 from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse
 from app.service.email_service import send_approval_email, send_user_approved_notification
+from app.service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from app.constants.enums import ActivityOutcome
 from app.utils import utils
 from app.exceptions import (
     EmailAlreadyExistsException,
@@ -399,6 +406,27 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         db.commit()
         db.refresh(user)
         logger.info(f"User and pharma created successfully: {user.user_id}")
+
+        ActivityLogService(db).log_activity(
+            action="user.registered",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+            metadata={
+                "role": role,
+                "department": department,
+                "approval_sent_to": recipient_email,
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
+
+        ActivityLogService(db).log_activity(
+            action="email.user_approval_requested",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            metadata={"recipient_email": recipient_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
         
     except IntegrityError as e:
         db.rollback()
@@ -537,6 +565,15 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     db.commit()
     db.refresh(user)
+
+    ActivityLogService(db).log_activity(
+        action="user.approved",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(approver),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={"role": normalize_role_to_title_case(user.role)},
+        audit_log_disabled=is_audit_log_disabled_for_user(approver),
+    )
     
     # Get company name for email
     is_hospital_user = is_hospital_department(user.department) if user.department else False
@@ -578,6 +615,14 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
             approved_date=approved_date
         )
         logger.info(f"Approval notification email sent to {user.email}")
+        ActivityLogService(db).log_activity(
+            action="email.user_approved_sent",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(approver),
+            target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+            metadata={"recipient_email": user.email},
+            audit_log_disabled=is_audit_log_disabled_for_user(approver),
+        )
     except Exception as e:
         # Log email failure but don't fail the approval process
         logger.error(f"Failed to send approval notification email to {user.email}: {str(e)}")
@@ -643,6 +688,15 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     user.updated_at = datetime.now(timezone.utc)
     
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="user.rejected",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(rejector),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={"role": normalize_role_to_title_case(user.role)},
+        audit_log_disabled=is_audit_log_disabled_for_user(rejector),
+    )
     
     # Build response object
     response = UserRejectionResponse(
@@ -967,6 +1021,20 @@ def update_user_name(
         
         db.commit()
         db.refresh(target_user)
+
+        fields = ["first_name", "last_name"]
+        if update_request.phone_number is not None:
+            fields.append("phone_number")
+        ActivityLogService(db).log_activity(
+            action="user.profile_updated",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("user", target_user.user_id, f"{target_user.first_name} {target_user.last_name}".strip()),
+            metadata={
+                "fields": fields,
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         # Build response object
         response = user_schema.UserUpdateResponse(

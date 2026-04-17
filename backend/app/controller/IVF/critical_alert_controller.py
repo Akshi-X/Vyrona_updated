@@ -20,6 +20,8 @@ from app.schemas.IVF.critical_alert_schema import (
 )
 from app.utils.ivf_helpers import get_branch_filter_info
 from app.constants.enums import AlertStatus
+from app.service.activity_log_service import ActivityLogService, build_actor_from_user, build_target
+from app.constants.enums import ActivityOutcome
 
 router = APIRouter(prefix="/ivf/alerts", tags=["IVF Critical Alerts"])
 
@@ -106,6 +108,14 @@ def acknowledge_alert(
         
         service = CriticalAlertService(db)
         result = service.acknowledge_alert(request_data.alert_id, user_id)
+        ActivityLogService(db).log_activity(
+            action="alert.acknowledged",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("alert", request_data.alert_id),
+            metadata={"status": AlertStatus.ACKNOWLEDGED.value},
+            audit_log_disabled=getattr(request.state, "audit_log_disabled", False),
+        )
         return result
     except HTTPException:
         raise

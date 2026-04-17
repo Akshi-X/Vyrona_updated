@@ -37,6 +37,13 @@ from ..constants.app_constants import (
 )
 from ..constants.enums import FeedbackStatus
 from .email_service import send_feedback_new_ticket_email, send_feedback_status_update_email, send_feedback_new_comment_email
+from .activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from ..constants.enums import ActivityOutcome
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -237,6 +244,19 @@ def create_feedback(
     user = db.query(User).filter(User.user_id == submitted_by).first()
     if not user:
         raise FeedbackUserNotFoundException(user_id=submitted_by)
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.created",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={
+            "priority": feedback.priority.value,
+            "department": feedback.department.value,
+            "feedback_type": feedback.feedback_type.value,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications - always send to admin, conditionally to user
     try:
@@ -257,6 +277,14 @@ def create_feedback(
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email,
             extra_recipient_emails=["support@mygrape.org"]
+        )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_created",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -312,6 +340,15 @@ def add_comment(
     except Exception as e:
         db.rollback()
         raise FeedbackCommentCreateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.comment_added",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={"comment_id": comment.id},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
@@ -335,6 +372,14 @@ def add_comment(
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_comment_queued",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
@@ -350,6 +395,14 @@ def add_comment(
                 feedback_id=feedback.ticket_id,
                 mygrape_admin_email=mygrape_admin_email,
                 send_to_user=request.send_email
+            )
+            ActivityLogService(db).log_activity(
+                action="email.support_ticket_comment_sent",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_actor_from_user(user),
+                target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+                metadata={"recipient_email": mygrape_admin_email},
+                audit_log_disabled=is_audit_log_disabled_for_user(user),
             )
         except Exception as e:
             # Log error but don't fail the request
@@ -408,6 +461,15 @@ def update_feedback_status(
     except Exception as e:
         db.rollback()
         raise FeedbackStatusUpdateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.status_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={"old_status": old_status, "new_status": request.status.value},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
@@ -432,6 +494,14 @@ def update_feedback_status(
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_status_queued",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
@@ -448,6 +518,14 @@ def update_feedback_status(
                 feedback_id=feedback.ticket_id,
                 mygrape_admin_email=mygrape_admin_email,
                 send_to_user=request.send_email
+            )
+            ActivityLogService(db).log_activity(
+                action="email.support_ticket_status_sent",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_actor_from_user(user),
+                target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+                metadata={"recipient_email": mygrape_admin_email},
+                audit_log_disabled=is_audit_log_disabled_for_user(user),
             )
         except Exception as e:
             # Log error but don't fail the request
