@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.config.config import settings
@@ -74,6 +75,7 @@ class ActivityLogService:
     def query_logs(
         self,
         hospital_id: Optional[int] = None,
+        actions: Optional[List[str]] = None,
         action_prefix: Optional[str] = None,
         action: Optional[str] = None,
         actor_type: Optional[str] = None,
@@ -83,6 +85,7 @@ class ActivityLogService:
         outcome: Optional[str] = None,
         metadata_key: Optional[str] = None,
         metadata_value: Optional[str] = None,
+        search: Optional[str] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
         page: int = 1,
@@ -93,7 +96,9 @@ class ActivityLogService:
         if hospital_id is not None:
             query = query.filter(ActivityLog.hospital_id == hospital_id)
 
-        if action:
+        if actions:
+            query = query.filter(ActivityLog.action.in_(actions))
+        elif action:
             query = query.filter(ActivityLog.action == action)
         elif action_prefix:
             query = query.filter(ActivityLog.action.like(f"{action_prefix}%"))
@@ -110,6 +115,18 @@ class ActivityLogService:
             query = query.filter(ActivityLog.outcome == outcome)
         if metadata_key and metadata_value is not None:
             query = query.filter(ActivityLog.metadata_json[metadata_key].astext == str(metadata_value))
+        if search:
+            term = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    ActivityLog.action.ilike(term),
+                    ActivityLog.actor_label.ilike(term),
+                    ActivityLog.actor_id.ilike(term),
+                    ActivityLog.target_label.ilike(term),
+                    ActivityLog.target_id.ilike(term),
+                    cast(ActivityLog.metadata_json, String).ilike(term),
+                )
+            )
         if date_from:
             query = query.filter(ActivityLog.created_at >= date_from)
         if date_to:

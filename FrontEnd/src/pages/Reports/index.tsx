@@ -37,12 +37,10 @@ type FilterState = {
     severity: string;
     refillStatus: string;
     tankCodes: string[];
-    actionPrefix: string;
-    action: string;
+    actions: string[];
     outcome: string;
     actorType: string;
-    metadataKey: string;
-    metadataValue: string;
+    search: string;
 };
 
 const ALERT_STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
@@ -106,9 +104,15 @@ const formatTargetLabel = (row: ActivityLogRecord) => {
     return details.tank_code || details.branch_name || details.hospital_name || row.target_id || "-";
 };
 
+const formatTargetName = (row: ActivityLogRecord) => {
+    const details = row.target_details || {};
+    const name = `${details.first_name || ""} ${details.last_name || ""}`.trim();
+    return name || row.target_label || details.email || row.target_id || "-";
+};
+
 const formatTargetSubLabel = (row: ActivityLogRecord) => {
     const details = row.target_details || {};
-    return details.branch_name || "";
+    return details.branch_name || row.metadata?.branch_name || "";
 };
 
 const formatMetadataSummary = (metadata?: Record<string, any> | null) => {
@@ -146,6 +150,7 @@ const ACTION_LABELS: Record<string, string> = {
     "task.status_updated": "Task Status Updated",
     "task.deleted": "Task Deleted",
     "alert.acknowledged": "Alert Acknowledged",
+    "alert.created": "Critical Alert Created",
     "email.critical_alert_sent": "Critical Alert Email Sent",
     "refill_detection.created": "Refill Detection Created",
     "refill_detection.reviewed": "Refill Detection Reviewed",
@@ -159,6 +164,10 @@ const ACTION_LABELS: Record<string, string> = {
     "report.ivf.refill_logs.downloaded": "Refill Logs Downloaded",
     "report.activity_logs.downloaded": "Activity Logs Downloaded",
 };
+
+const ACTIVITY_ACTION_OPTIONS = Object.keys(ACTION_LABELS)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({ label: ACTION_LABELS[key], value: key }));
 
 const formatActionLabel = (action: string) => {
     if (ACTION_LABELS[action]) return ACTION_LABELS[action];
@@ -207,6 +216,10 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
 
     if (action.startsWith("email.")) {
         if (metadata.recipient_email) lines.push(`To: ${metadata.recipient_email}`);
+        if (action === "email.critical_alert_sent") {
+            if (metadata.email_message) lines.push(`Email: ${truncateText(String(metadata.email_message), 80)}`);
+            if (metadata.occurred_at) lines.push(`Occurred: ${metadata.occurred_at}`);
+        }
         return lines;
     }
 
@@ -293,6 +306,25 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         return lines;
     }
 
+    if (action.startsWith("alert.")) {
+        if (action === "alert.created") {
+            if (metadata.message) lines.push(`Message: ${truncateText(String(metadata.message), 80)}`);
+            return lines;
+        }
+        if (metadata.alert_id) lines.push(`Alert ID: ${metadata.alert_id}`);
+        if (metadata.tank_code || metadata.tank_id) {
+            lines.push(`Tank: ${metadata.tank_code || metadata.tank_id}`);
+        }
+        if (metadata.branch_name || metadata.branch_id) {
+            lines.push(`Branch: ${metadata.branch_name || metadata.branch_id}`);
+        }
+        if (metadata.alert_type) lines.push(`Alert Type: ${metadata.alert_type}`);
+        if (metadata.severity) lines.push(`Severity: ${metadata.severity}`);
+        if (metadata.message) lines.push(`Message: ${truncateText(String(metadata.message), 80)}`);
+        if (metadata.status) lines.push(`Status: ${metadata.status}`);
+        return lines;
+    }
+
     if (action.startsWith("report.")) {
         if (metadata.month) lines.push(`Month: ${metadata.month}`);
         if (metadata.start_date || metadata.end_date) {
@@ -301,6 +333,15 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         if (metadata.status) lines.push(`Status: ${metadata.status}`);
         if (metadata.severity) lines.push(`Severity: ${metadata.severity}`);
         if (metadata.tank_codes?.length) lines.push(`Tanks: ${metadata.tank_codes.join(", ")}`);
+        if (action === "report.activity_logs.downloaded") {
+            if (metadata.search) lines.push(`Search: ${metadata.search}`);
+            if (metadata.actions?.length) lines.push(`Actions: ${metadata.actions.join(", ")}`);
+            if (metadata.outcome) lines.push(`Outcome: ${metadata.outcome}`);
+            if (metadata.actor_type) lines.push(`Actor: ${metadata.actor_type}`);
+            if (metadata.date_from || metadata.date_to) {
+                lines.push(`Range: ${metadata.date_from || ""} → ${metadata.date_to || ""}`.trim());
+            }
+        }
         return lines;
     }
 
@@ -344,14 +385,13 @@ export default function ReportsPage() {
         severity: "All",
         refillStatus: "All",
         tankCodes: [],
-        actionPrefix: "",
-        action: "",
+        actions: [],
         outcome: "All",
         actorType: "All",
-        metadataKey: "",
-        metadataValue: "",
+        search: "",
     };
     const [filters, setFilters] = useState<FilterState>(defaultFilters);
+    const [activitySearchInput, setActivitySearchInput] = useState("");
 
     const [monthlySummaryRows, setMonthlySummaryRows] = useState<
         MonthlySummaryRow[]
@@ -483,8 +523,7 @@ export default function ReportsPage() {
 
                 if (filters.reportType === "activity-logs") {
                     const response = await activityLogService.getActivityLogs({
-                        action_prefix: filters.actionPrefix || undefined,
-                        action: filters.action || undefined,
+                        actions: filters.actions.length > 0 ? filters.actions : undefined,
                         outcome:
                             filters.outcome === "All"
                                 ? undefined
@@ -493,8 +532,7 @@ export default function ReportsPage() {
                             filters.actorType === "All"
                                 ? undefined
                                 : filters.actorType,
-                        metadata_key: filters.metadataKey || undefined,
-                        metadata_value: filters.metadataValue || undefined,
+                        search: filters.search || undefined,
                         date_from: filters.dateFrom || undefined,
                         date_to: filters.dateTo || undefined,
                         page,
@@ -563,17 +601,19 @@ export default function ReportsPage() {
         filters.severity,
         filters.refillStatus,
         filters.tankCodes.join(","),
-        filters.actionPrefix,
-        filters.action,
+        filters.actions.join(","),
         filters.outcome,
         filters.actorType,
-        filters.metadataKey,
-        filters.metadataValue,
+        filters.search,
     ]);
 
     useEffect(() => {
         setPage(1);
     }, [pageSize]);
+
+    useEffect(() => {
+        setActivitySearchInput(filters.search);
+    }, [filters.search]);
 
     const activeRowsCount = useMemo(() => {
         if (filters.reportType === "monthly-summary") {
@@ -617,6 +657,7 @@ export default function ReportsPage() {
             ...defaultFilters,
             reportType: prev.reportType,
         }));
+        setActivitySearchInput("");
     };
 
     const downloadCsv = () => {
@@ -727,12 +768,10 @@ export default function ReportsPage() {
             reportTypeForLog = "activity_logs";
             if (filters.dateFrom) filtersForLog.date_from = filters.dateFrom;
             if (filters.dateTo) filtersForLog.date_to = filters.dateTo;
-            if (filters.actionPrefix) filtersForLog.action_prefix = filters.actionPrefix;
-            if (filters.action) filtersForLog.action = filters.action;
+            if (filters.actions.length > 0) filtersForLog.actions = filters.actions;
             if (filters.outcome !== "All") filtersForLog.outcome = filters.outcome;
             if (filters.actorType !== "All") filtersForLog.actor_type = filters.actorType;
-            if (filters.metadataKey) filtersForLog.metadata_key = filters.metadataKey;
-            if (filters.metadataValue) filtersForLog.metadata_value = filters.metadataValue;
+            if (filters.search) filtersForLog.search = filters.search;
         }
 
         ivfReportsService
@@ -1062,39 +1101,18 @@ export default function ReportsPage() {
                                         />
                                     </div>
                                     <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Action Prefix
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                            placeholder="config."
-                                            value={filters.actionPrefix}
-                                            onChange={(event) =>
+                                        <MultiSelectDropdown
+                                            label="Actions"
+                                            options={ACTIVITY_ACTION_OPTIONS}
+                                            selected={filters.actions}
+                                            placeholder="All actions"
+                                            disabled={!canViewActivityLogs}
+                                            onChange={(selected) =>
                                                 setFilters((prev) => ({
                                                     ...prev,
-                                                    actionPrefix: event.target.value,
+                                                    actions: selected,
                                                 }))
                                             }
-                                            disabled={!canViewActivityLogs}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Action
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                            placeholder="user.login"
-                                            value={filters.action}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    action: event.target.value,
-                                                }))
-                                            }
-                                            disabled={!canViewActivityLogs}
                                         />
                                     </div>
                                     <div className="flex flex-col gap-2">
@@ -1143,37 +1161,25 @@ export default function ReportsPage() {
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         <label className="text-xs font-semibold text-gray-600">
-                                            Metadata Key
+                                            Search
                                         </label>
                                         <input
                                             type="text"
                                             className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                            placeholder="template"
-                                            value={filters.metadataKey}
+                                            placeholder="Press Enter to apply"
+                                            value={activitySearchInput}
                                             onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    metadataKey: event.target.value,
-                                                }))
+                                                setActivitySearchInput(event.target.value)
                                             }
-                                            disabled={!canViewActivityLogs}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Metadata Value
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
-                                            placeholder="tank_alert"
-                                            value={filters.metadataValue}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    metadataValue: event.target.value,
-                                                }))
-                                            }
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    setFilters((prev) => ({
+                                                        ...prev,
+                                                        search: activitySearchInput.trim(),
+                                                    }));
+                                                }
+                                            }}
                                             disabled={!canViewActivityLogs}
                                         />
                                     </div>
@@ -1608,7 +1614,27 @@ export default function ReportsPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {row.target_type === "tank" && row.target_id ? (
+                                                    {row.action === "alert.acknowledged" ? (
+                                                        <div className="flex flex-col">
+                                                            {row.metadata?.tank_id ? (
+                                                                <Link
+                                                                    to={`/ivf-track-shipment/${row.metadata.tank_id}`}
+                                                                    className="text-[#6b1176] hover:underline"
+                                                                >
+                                                                    {row.metadata?.tank_code || row.metadata?.tank_id}
+                                                                </Link>
+                                                            ) : (
+                                                                <span>
+                                                                    {row.metadata?.tank_code || row.metadata?.tank_id || "-"}
+                                                                </span>
+                                                            )}
+                                                            {row.metadata?.branch_name ? (
+                                                                <span className="text-xs text-gray-400">
+                                                                    {row.metadata?.branch_name}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : row.target_type === "tank" && row.target_id ? (
                                                         <div className="flex flex-col">
                                                             <Link
                                                                 to={`/ivf-track-shipment/${row.target_id}`}
@@ -1619,6 +1645,15 @@ export default function ReportsPage() {
                                                             {formatTargetSubLabel(row) ? (
                                                                 <span className="text-xs text-gray-400">
                                                                     {formatTargetSubLabel(row)}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : row.action === "email.critical_alert_sent" ? (
+                                                        <div className="flex flex-col">
+                                                            <span>{formatTargetName(row)}</span>
+                                                            {(row.target_details?.email || row.metadata?.recipient_email) ? (
+                                                                <span className="text-xs text-gray-400">
+                                                                    {row.target_details?.email || row.metadata?.recipient_email}
                                                                 </span>
                                                             ) : null}
                                                         </div>

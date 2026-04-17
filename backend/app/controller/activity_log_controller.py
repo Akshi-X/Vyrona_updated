@@ -18,6 +18,7 @@ router = APIRouter(prefix="/activity-logs", tags=["Activity Logs"])
 @router.get("", response_model=ActivityLogQueryResponse)
 def get_activity_logs(
     request: Request,
+    actions: Optional[str] = Query(None, description="Comma-separated action list"),
     action_prefix: Optional[str] = Query(None, description="Filter by action prefix (e.g., config.)"),
     action: Optional[str] = Query(None, description="Exact action match"),
     actor_type: Optional[str] = Query(None, description="Actor type"),
@@ -27,6 +28,7 @@ def get_activity_logs(
     outcome: Optional[str] = Query(None, description="Outcome: success/failure/partial"),
     metadata_key: Optional[str] = Query(None, description="Metadata key to filter"),
     metadata_value: Optional[str] = Query(None, description="Metadata value to filter"),
+    search: Optional[str] = Query(None, description="Search term for action/labels/metadata"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     page: int = Query(1, ge=1, le=10000),
@@ -61,8 +63,10 @@ def get_activity_logs(
         )
 
     service = ActivityLogService(db)
+    action_list = [item for item in (actions or "").split(",") if item]
     rows, total_count = service.query_logs(
         hospital_id=hospital_id,
+        actions=action_list or None,
         action_prefix=action_prefix,
         action=action,
         actor_type=actor_type,
@@ -72,6 +76,7 @@ def get_activity_logs(
         outcome=outcome,
         metadata_key=metadata_key,
         metadata_value=metadata_value,
+        search=search,
         date_from=start_dt,
         date_to=end_dt,
         page=page,

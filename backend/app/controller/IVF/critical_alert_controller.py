@@ -8,6 +8,8 @@ from typing import Optional
 from pydantic import BaseModel
 from app.config.database import get_db
 from app.models.IVF.tank_model import Tank
+from app.models.IVF.critical_alert_model import CriticalAlert
+from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.service.IVF.critical_alert_service import CriticalAlertService
 from app.exceptions.custom_exceptions import AppException
 from app.schemas.IVF.critical_alert_schema import (
@@ -108,12 +110,37 @@ def acknowledge_alert(
         
         service = CriticalAlertService(db)
         result = service.acknowledge_alert(request_data.alert_id, user_id)
+        alert = (
+            db.query(CriticalAlert)
+            .filter(CriticalAlert.alert_id == request_data.alert_id)
+            .first()
+        )
+        tank = None
+        branch = None
+        if alert and alert.tank_id:
+            tank = (
+                db.query(Tank)
+                .filter(Tank.tank_id == alert.tank_id)
+                .first()
+            )
+            if tank and tank.branch_id is not None:
+                branch = (
+                    db.query(HospitalBranch)
+                    .filter(HospitalBranch.branch_id == tank.branch_id)
+                    .first()
+                )
         ActivityLogService(db).log_activity(
             action="alert.acknowledged",
             outcome=ActivityOutcome.SUCCESS.value,
             actor=build_actor_from_user(user),
             target=build_target("alert", request_data.alert_id),
-            metadata={"status": AlertStatus.ACKNOWLEDGED.value},
+            metadata={
+                "status": AlertStatus.ACKNOWLEDGED.value,
+                "tank_id": alert.tank_id if alert else None,
+                "tank_code": tank.tank_code if tank else None,
+                "branch_id": tank.branch_id if tank else None,
+                "branch_name": branch.branch_name if branch else None,
+            },
             audit_log_disabled=getattr(request.state, "audit_log_disabled", False),
         )
         return result
