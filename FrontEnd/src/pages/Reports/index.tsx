@@ -129,6 +129,8 @@ const ACTION_LABELS: Record<string, string> = {
     "user.login": "Login Successful",
     "user.logout": "Logged Out",
     "user.registered": "User Registered",
+    "user.invited": "User Invited",
+    "user.invite_registered": "User Registered via Invite",
     "user.approved": "User Approved",
     "user.rejected": "User Rejected",
     "user.profile_updated": "Profile Updated",
@@ -228,6 +230,8 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
         if (metadata.department) lines.push(`Department: ${metadata.department}`);
         if (metadata.approval_sent_to) lines.push(`Approval Sent To: ${metadata.approval_sent_to}`);
         if (metadata.remember_me !== undefined) lines.push(`Remember Me: ${metadata.remember_me ? "Yes" : "No"}`);
+        if (metadata.recipient_email) lines.push(`Email: ${metadata.recipient_email}`);
+        if (metadata.branch_name) lines.push(`Branch: ${metadata.branch_name}`);
         return lines;
     }
 

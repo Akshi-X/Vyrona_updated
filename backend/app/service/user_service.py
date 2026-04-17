@@ -979,6 +979,18 @@ def invite_user(db: Session, current_user: User, email: str, role: str, base_url
         company=hospital.hospital_name,
         signup_url=invite_url,
     )
+    ActivityLogService(db).log_activity(
+        action="user.invited",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("email", email.lower().strip(), email.lower().strip()),
+        metadata={
+            "recipient_email": email.lower().strip(),
+            "role": role_norm,
+            "branch_name": branch_name,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
     return {"message": f"Invite sent to {email}"}
 
 
@@ -1076,6 +1088,24 @@ def register_from_invite(db: Session, data: RegisterFromInviteRequest) -> dict:
     user.invite_token_expires_at = None
     user.updated_at = now
     db.commit()
+
+    branch_name = None
+    if user.branch_id is not None:
+        branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user.branch_id).first()
+        branch_name = branch.branch_name if branch else None
+
+    ActivityLogService(db).log_activity(
+        action="user.invite_registered",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={
+            "recipient_email": user.email,
+            "role": normalize_role_to_title_case(user.role),
+            "branch_name": branch_name,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
 
     return {"message": "Account created successfully.", "user_id": user.user_id}
 
