@@ -601,7 +601,22 @@ const ControlTowerMap: React.FC<ControlTowerMapProps> = ({
         if (direction !== "inbound" || !mapRef) return;
 
         const selectedBranch = filters?.selectedBranch;
-        if (!selectedBranch || selectedBranch === "All") return;
+
+        // Reset to full view when "All Branches" is selected
+        if (!selectedBranch || selectedBranch === "All") {
+            if (ivfBranches.length === 0) return;
+            const bounds = new google.maps.LatLngBounds();
+            let hasValid = false;
+            ivfBranches.forEach((b) => {
+                const pos = toValidLatLng(b.geoLocation.latitude, b.geoLocation.longitude);
+                if (!pos) return;
+                hasValid = true;
+                bounds.extend(pos);
+            });
+            if (!hasValid) return;
+            mapRef.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+            return;
+        }
 
         // When branch selection comes from map click, skip this effect to
         // avoid a second delayed zoom animation from parent filter update.
