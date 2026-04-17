@@ -21,6 +21,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     const [confirmedSteps, setConfirmedSteps] = useState<Record<string, boolean>>({});
     const completionLoggedRef = useRef(false);
     const lastStepsKeyRef = useRef<string | null>(null);
+    const prevStepIndexRef = useRef(0);
 
     const isTourActive = tourNavCtx?.isTourActive ?? false;
     const setIsTourActive = (v: boolean) => tourNavCtx?.setIsTourActive(v);
@@ -29,6 +30,15 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     const stepCount = steps.length;
     const activeStep = stepIndex < stepCount ? steps[stepIndex] : null;
     const canNext = !activeStep?.requireClick || !!confirmedSteps[activeStep.id];
+
+    // Clear confirmed steps when level is reset (stepIndex goes back to 0 from a higher value)
+    useEffect(() => {
+        if (prevStepIndexRef.current > 0 && stepIndex === 0) {
+            setConfirmedSteps({});
+            completionLoggedRef.current = false;
+        }
+        prevStepIndexRef.current = stepIndex;
+    }, [stepIndex]);
 
     const prevTargetIndex = (() => {
         let target = stepIndex - 1;
