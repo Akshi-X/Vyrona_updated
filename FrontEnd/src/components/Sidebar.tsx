@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronRight, Download } from "lucide-react";
+import { ChevronRight, Download, Users } from "lucide-react";
 
 import { useSidebar } from "../contexts/SidebarContext";
 import { useOnboardingMode } from "../contexts/OnboardingModeContext";
@@ -77,8 +77,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
     { icon: ControlTowerIconWhite, label: "Control Tower",      path: "/control-tower" },
-    { icon: MyTasksIcon,          label: "Pending approvals",   path: "/approval"      },
-    { icon: CriticalAlertsIcon,   label: "Alert Configuration", path: "/alert-setting" },
+    { icon: "", lucideIcon: Users,    label: "Users",            path: "/users"         },
+{ icon: CriticalAlertsIcon,   label: "Alert Configuration", path: "/alert-setting" },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
     { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
 ];
@@ -138,6 +138,8 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     const navigationItems = ALL_NAV_ITEMS.filter((item) => {
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
+        if (item.label === "Users")
+            return userRole === "Admin" || userRole === "Manager";
         if (item.label === "Alert Configuration")
             return isIVF ;
         if (item.label === "Reports")

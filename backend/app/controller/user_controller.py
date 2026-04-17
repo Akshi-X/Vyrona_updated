@@ -1,6 +1,7 @@
 import os
 import logging
 import traceback
+from app.config.config import settings
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
@@ -25,12 +26,10 @@ from app.schemas.auth_schema import (
     LogoutResponse
 )
 from app.schemas.response_schema import (
-    UserApprovalResponse,
-    UserRejectionResponse,
     UserDetailsResponse,
     UserProfileResponse
 )
-from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse
+from app.schemas.user_schema import UserListResponse, UserNameUpdateRequest, UserUpdateResponse, HospitalUserListResponse, HospitalUserItem, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest
 from app.constants.messages import SuccessMessages
 from app.dependencies.auth_dependencies import get_current_user, validate_registration_request
 from app.service.activity_log_service import ActivityLogService, build_actor_from_user
@@ -326,55 +325,6 @@ def approval_screen():
     return FileResponse(html_path)
 
 
-# ---------------------------
-# Approve user
-# ---------------------------
-@router.post("/user/approve", response_model=UserApprovalResponse)
-def approve_user(
-    action: RegistrationAction,
-    current_user: user_model.User = Depends(get_current_user),
-    db: Session = Depends(database.get_db)
-):
-    """
-    Approve user registration.
-    
-    Protected endpoint. Manager or Admin role required (enforced by middleware).
-    Uses Depends(get_current_user) to get authenticated user.
-    """
-    # Call service (business logic in service layer)
-    result = user_service.approve_user(
-        registration_id=action.registration_id,
-        approved_by_user_id=current_user.user_id,
-        db=db
-    )
-    
-    # Return DTO (result is already UserApprovalResponse)
-    return result
-
-# ---------------------------
-# Reject user
-# ---------------------------
-@router.post("/user/reject", response_model=UserRejectionResponse)
-def reject_user(
-    action: RegistrationAction,
-    current_user: user_model.User = Depends(get_current_user),
-    db: Session = Depends(database.get_db)
-):
-    """
-    Reject user registration.
-    
-    Protected endpoint. Manager or Admin role required (enforced by middleware).
-    Uses Depends(get_current_user) to get authenticated user.
-    """
-    # Call service (business logic in service layer)
-    result = user_service.reject_user(
-        registration_id=action.registration_id,
-        rejected_by_user_id=current_user.user_id,
-        db=db
-    )
-    
-    # Return DTO (result is already UserRejectionResponse)
-    return result
 
 
 # ---------------------------
@@ -406,20 +356,71 @@ def get_all_users(
 
 
 # ---------------------------
-# Get pending approvals (Admin / Pharma_admin only)
+# Get all users of the current user's hospital
 # ---------------------------
-@router.get("/users/pending-approvals", response_model=UserListResponse)
-def get_pending_approvals(
+@router.get("/hospital/users", response_model=HospitalUserListResponse)
+def get_hospital_users(
     current_user: user_model.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
     """
-    Get list of users with pending approval status (same company/hospital as current user).
-
-    Protected endpoint. Admin or Pharma_admin role required (same as approve/reject).
-    Used by Dashboard and ApprovalScreen to show pending approval list.
+    Get all approved, active users belonging to the same hospital as the current user.
+    Returns hospital-specific fields: user_id, name, email, role, branch_id, department.
     """
-    return user_service.get_pending_approvals(db=db, current_user=current_user)
+    return user_service.get_hospital_users(db=db, current_user=current_user)
+
+
+@router.post("/hospital/users/invite")
+def invite_hospital_user(
+    body: InviteUserRequest,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Generate a one-time invite token and send invite email."""
+    try:
+        return user_service.invite_user(
+            db=db,
+            current_user=current_user,
+            email=body.email,
+            role=body.role,
+            base_url=settings.FRONTEND_URL,
+            branch_name=body.branch_name,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/hospital/users/{user_id}/resend-invite")
+def resend_invite(
+    user_id: str,
+    current_user: user_model.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Resend invite email to a pending user with a fresh token."""
+    try:
+        return user_service.resend_invite(db=db, current_user=current_user, user_id=user_id, base_url=settings.FRONTEND_URL)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/invite/{token}", response_model=InviteTokenResponse)
+def get_invite(token: str, db: Session = Depends(database.get_db)):
+    """Validate an invite token and return invite metadata."""
+    try:
+        return user_service.get_invite_token(db=db, token=token)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/register/invite")
+def register_from_invite(body: RegisterFromInviteRequest, db: Session = Depends(database.get_db)):
+    """Create an account from a valid invite link."""
+    try:
+        return user_service.register_from_invite(db=db, data=body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 
 
 # ---------------------------

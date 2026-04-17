@@ -109,10 +109,10 @@ export class AuthService extends BaseApiService {
   /**
    * Resend OTP
    */
-  async resendOTP(userId: string): Promise<{ message: string }> {
-    return await this.request<{ message: string }>('/api/resend-otp', {
+  async resendOTP(userId: string, email: string): Promise<{ message: string; otp_expiry?: number | string | Date; email?: string }> {
+    return await this.request<{ message: string; otp_expiry?: number | string | Date; email?: string }>('/api/resend-otp', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({ user_id: userId, email }),
     });
   }
 
