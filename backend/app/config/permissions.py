@@ -142,6 +142,7 @@ AUTHENTICATED_ENDPOINTS: Set[EndpointPermission] = {
     # Bulk tank refill summary and all logs
     ("GET", "/api/quality-tracking/tanks/refill-summary"),
     ("GET", "/api/quality-tracking/tanks/all-refill-logs"),
+    ("POST", "/api/reports/download"),
 }
 
 

@@ -24,3 +24,4 @@ from .kpi_config_model import KpiConfig
 from .readings_model import Readings
 from .onboarding_state_model import OnboardingState
 from .onboarding_event_model import OnboardingEvent
+from .activity_log_model import ActivityLog
