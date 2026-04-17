@@ -542,6 +542,71 @@ class CriticalAlertService:
                 deviation.checked = True
                 continue
 
+            now = datetime.now(timezone.utc)
+            # Use per-KPI configurable cooldown (default 60 minutes)
+            cooldown_seconds = (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+            if kpi_config.kpi_name == "ln2_lid_state":
+                last_clear = (
+                    self.db.query(Readings)
+                    .filter(
+                        Readings.tank_id == tank_id,
+                        Readings.kpi_config_id == kpi_config.id,
+                        Readings.deviation == False,
+                    )
+                    .order_by(Readings.timestamp.desc())
+                    .first()
+                )
+                if last_clear:
+                    first_deviation = (
+                        self.db.query(Readings)
+                        .filter(
+                            Readings.tank_id == tank_id,
+                            Readings.kpi_config_id == kpi_config.id,
+                            Readings.deviation == True,
+                            Readings.timestamp >= last_clear.timestamp,
+                        )
+                        .order_by(Readings.timestamp.asc())
+                        .first()
+                    )
+                else:
+                    first_deviation = (
+                        self.db.query(Readings)
+                        .filter(
+                            Readings.tank_id == tank_id,
+                            Readings.kpi_config_id == kpi_config.id,
+                            Readings.deviation == True,
+                        )
+                        .order_by(Readings.timestamp.asc())
+                        .first()
+                    )
+                if first_deviation and first_deviation.timestamp:
+                    start_time = first_deviation.timestamp
+                    if not start_time.tzinfo:
+                        start_time = start_time.replace(tzinfo=timezone.utc)
+                    continuity_seconds = (now - start_time).total_seconds()
+                    logger.info(
+                        "ln2_lid_state continuity for kpi_config_id=%s: start_time=%s now=%s duration=%.0fs cooldown=%.0fs",
+                        kpi_config.id,
+                        start_time,
+                        now,
+                        continuity_seconds,
+                        cooldown_seconds,
+                    )
+                    if continuity_seconds < cooldown_seconds:
+                        logger.info(
+                            "Skipping ln2_lid_state alert for kpi_config_id=%s; continuous deviation %.0fs below cooldown %.0fs",
+                            kpi_config.id,
+                            continuity_seconds,
+                            cooldown_seconds,
+                        )
+                        deviation.checked = True
+                        checked_kpi_configs.append(kpi_config.id)
+                        continue
+
             ## Check if last alert created/updated for this config is not acknowledged and occurred within last 1 hour,
             # if yes skip creating new alert to avoid alert spam.
             # Use occurred_at for cooldown ordering to avoid reminder/ack updates
@@ -581,13 +646,6 @@ class CriticalAlertService:
                     last_alert.updated_at,
                 )
 
-            now = datetime.now(timezone.utc)
-            # Use per-KPI configurable cooldown (default 60 minutes)
-            cooldown_seconds = (
-                int(kpi_config.cooldown_minutes) * 60
-                if kpi_config.cooldown_minutes is not None
-                else 3600
-            )
             # Ensure timezone-aware comparison using the most recent timestamp (updated_at or created_at)
             if last_alert:
                 last_alert_time = last_alert.occurred_at or last_alert.created_at
