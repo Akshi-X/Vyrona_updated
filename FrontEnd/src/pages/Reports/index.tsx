@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Download } from "lucide-react";
 import PageLayout from "../../components/PageLayout";
 
@@ -94,10 +95,20 @@ const formatActorLabel = (row: ActivityLogRecord) => {
     return name || details.email || row.actor_id || row.actor_type;
 };
 
+const formatActorSubLabel = (row: ActivityLogRecord) => {
+    const details = row.actor_details || {};
+    return details.branch_name || "";
+};
+
 const formatTargetLabel = (row: ActivityLogRecord) => {
     if (row.target_label) return row.target_label;
     const details = row.target_details || {};
     return details.tank_code || details.branch_name || details.hospital_name || row.target_id || "-";
+};
+
+const formatTargetSubLabel = (row: ActivityLogRecord) => {
+    const details = row.target_details || {};
+    return details.branch_name || "";
 };
 
 const formatMetadataSummary = (metadata?: Record<string, any> | null) => {
@@ -107,6 +118,193 @@ const formatMetadataSummary = (metadata?: Record<string, any> | null) => {
     } catch {
         return "-";
     }
+};
+
+const ACTION_LABELS: Record<string, string> = {
+    "user.login_requested": "Login Requested",
+    "user.login": "Login Successful",
+    "user.logout": "Logged Out",
+    "user.registered": "User Registered",
+    "user.approved": "User Approved",
+    "user.rejected": "User Rejected",
+    "user.profile_updated": "Profile Updated",
+    "user.password_reset_completed": "Password Reset Completed",
+    "email.otp_sent": "OTP Email Sent",
+    "email.password_reset_sent": "Password Reset Email Sent",
+    "email.user_approval_requested": "Approval Email Sent",
+    "email.user_approved_sent": "Approval Confirmation Sent",
+    "support_ticket.created": "Support Ticket Created",
+    "support_ticket.comment_added": "Support Ticket Commented",
+    "support_ticket.status_updated": "Support Ticket Status Updated",
+    "email.support_ticket_created": "Support Ticket Email Sent",
+    "email.support_ticket_comment_queued": "Support Ticket Comment Queued",
+    "email.support_ticket_comment_sent": "Support Ticket Comment Sent",
+    "email.support_ticket_status_queued": "Support Ticket Status Queued",
+    "email.support_ticket_status_sent": "Support Ticket Status Email Sent",
+    "task.created": "Task Created",
+    "task.updated": "Task Updated",
+    "task.status_updated": "Task Status Updated",
+    "task.deleted": "Task Deleted",
+    "alert.acknowledged": "Alert Acknowledged",
+    "email.critical_alert_sent": "Critical Alert Email Sent",
+    "refill_detection.created": "Refill Detection Created",
+    "refill_detection.reviewed": "Refill Detection Reviewed",
+    "alert_configuration.notification_settings_updated": "Alert Notification Settings Updated",
+    "alert_configuration.kpi_config_created": "Alert Configuration Created",
+    "alert_configuration.kpi_config_updated": "Alert Configuration Updated",
+    "alert_configuration.kpi_config_deleted": "Alert Configuration Deleted",
+    "alert_configuration.kpi_config_bulk_upserted": "Alert Configuration Bulk Updated",
+    "report.ivf.monthly_summary.downloaded": "Monthly Summary Downloaded",
+    "report.ivf.critical_alerts.downloaded": "Critical Alerts Downloaded",
+    "report.ivf.refill_logs.downloaded": "Refill Logs Downloaded",
+    "report.activity_logs.downloaded": "Activity Logs Downloaded",
+};
+
+const formatActionLabel = (action: string) => {
+    if (ACTION_LABELS[action]) return ACTION_LABELS[action];
+    const cleaned = action.replace(/_/g, " ").replace(/\./g, " ");
+    return cleaned
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+};
+
+const formatMetadataLines = (action: string, metadata?: Record<string, any> | null) => {
+    if (!metadata) return [] as string[];
+    const lines: string[] = [];
+    const formatValue = (value: any) => {
+        if (value === null || value === undefined || value === "") return "-";
+        return String(value);
+    };
+    const pushDelta = (label: string, beforeValue: any, afterValue: any) => {
+        if (beforeValue === undefined && afterValue === undefined) return;
+        const beforeText = formatValue(beforeValue);
+        const afterText = formatValue(afterValue);
+        if (beforeText === afterText) return;
+        lines.push(`${label}: ${beforeText} → ${afterText}`);
+    };
+
+    if (action.startsWith("task.")) {
+        if (metadata.status) lines.push(`Status: ${metadata.status}`);
+        if (metadata.priority) lines.push(`Priority: ${metadata.priority}`);
+        if (metadata.assignee_id) lines.push(`Assignee: ${metadata.assignee_id}`);
+        if (metadata.patient_id) lines.push(`Patient: ${metadata.patient_id}`);
+        if (metadata.tank_id) lines.push(`Tank: ${metadata.tank_id}`);
+        return lines;
+    }
+
+    if (action.startsWith("support_ticket.")) {
+        if (metadata.new_status || metadata.old_status) {
+            lines.push(`Status: ${metadata.old_status || ""} → ${metadata.new_status || ""}`.trim());
+        }
+        if (metadata.priority) lines.push(`Priority: ${metadata.priority}`);
+        if (metadata.department) lines.push(`Department: ${metadata.department}`);
+        if (metadata.feedback_type) lines.push(`Type: ${metadata.feedback_type}`);
+        if (metadata.comment_id) lines.push(`Comment: ${metadata.comment_id}`);
+        return lines;
+    }
+
+    if (action.startsWith("email.")) {
+        if (metadata.recipient_email) lines.push(`To: ${metadata.recipient_email}`);
+        return lines;
+    }
+
+    if (action.startsWith("user.")) {
+        if (metadata.role) lines.push(`Role: ${metadata.role}`);
+        if (metadata.department) lines.push(`Department: ${metadata.department}`);
+        if (metadata.approval_sent_to) lines.push(`Approval Sent To: ${metadata.approval_sent_to}`);
+        if (metadata.remember_me !== undefined) lines.push(`Remember Me: ${metadata.remember_me ? "Yes" : "No"}`);
+        return lines;
+    }
+
+    if (action.startsWith("refill_detection.")) {
+        if (metadata.is_confirmed !== undefined) lines.push(`Confirmed: ${metadata.is_confirmed ? "Yes" : "No"}`);
+        if (metadata.tank_id) lines.push(`Tank: ${metadata.tank_id}`);
+        if (metadata.refill_weight !== undefined && metadata.refill_weight !== null) {
+            lines.push(`Refill Weight: ${metadata.refill_weight}`);
+        }
+        if (metadata.notes) lines.push(`Notes: ${truncateText(String(metadata.notes), 80)}`);
+        return lines;
+    }
+
+    if (action.startsWith("alert_configuration.")) {
+        if (metadata.hospital_id) lines.push(`Hospital: ${metadata.hospital_id}`);
+        if (metadata.branch_id) lines.push(`Branch: ${metadata.branch_id}`);
+        if (metadata.tank_id) lines.push(`Tank: ${metadata.tank_id}`);
+
+        if (action === "alert_configuration.notification_settings_updated") {
+            const before = metadata.before || {};
+            const after = metadata.after || {};
+            pushDelta(
+                "Email Alerts",
+                before.is_email_notifify !== undefined ? (before.is_email_notifify ? "On" : "Off") : undefined,
+                after.is_email_notifify !== undefined ? (after.is_email_notifify ? "On" : "Off") : undefined,
+            );
+            pushDelta(
+                "WhatsApp Alerts",
+                before.is_whatsapp_notify !== undefined ? (before.is_whatsapp_notify ? "On" : "Off") : undefined,
+                after.is_whatsapp_notify !== undefined ? (after.is_whatsapp_notify ? "On" : "Off") : undefined,
+            );
+            return lines;
+        }
+
+        if (metadata.before || metadata.after) {
+            const before = metadata.before || {};
+            const after = metadata.after || {};
+            pushDelta("KPI", before.kpi_name, after.kpi_name);
+            pushDelta("Alert Name", before.alert_name, after.alert_name);
+            pushDelta("Min", before.min, after.min);
+            pushDelta("Max", before.max, after.max);
+            pushDelta("Unit", before.unit, after.unit);
+            pushDelta("Alert Type", before.alert_type, after.alert_type);
+            pushDelta("Cooldown", before.cooldown_minutes, after.cooldown_minutes);
+            pushDelta("Status", before.status, after.status);
+            if (!lines.some((line) => line.startsWith("Alert Name:"))) {
+                const value = after.alert_name ?? before.alert_name;
+                if (value) lines.push(`Alert Name: ${value}`);
+            }
+            if (!lines.some((line) => line.startsWith("Unit:"))) {
+                const value = after.unit ?? before.unit;
+                if (value) lines.push(`Unit: ${value}`);
+            }
+            return lines;
+        }
+
+        if (metadata.kpi_name) lines.push(`KPI: ${metadata.kpi_name}`);
+        if (metadata.alert_name) lines.push(`Alert Name: ${metadata.alert_name}`);
+        if (metadata.min !== undefined && metadata.min !== null) lines.push(`Min: ${metadata.min}`);
+        if (metadata.max !== undefined && metadata.max !== null) lines.push(`Max: ${metadata.max}`);
+        if (metadata.unit) lines.push(`Unit: ${metadata.unit}`);
+        if (metadata.alert_type) lines.push(`Alert Type: ${metadata.alert_type}`);
+        if (metadata.cooldown_minutes !== undefined && metadata.cooldown_minutes !== null) {
+            lines.push(`Cooldown: ${metadata.cooldown_minutes}`);
+        }
+        if (metadata.status !== undefined) lines.push(`Status: ${metadata.status ? "Active" : "Inactive"}`);
+        if (metadata.updated !== undefined) lines.push(`Updated: ${metadata.updated}`);
+        if (metadata.created !== undefined) lines.push(`Created: ${metadata.created}`);
+        if (metadata.config_count !== undefined) lines.push(`Configs: ${metadata.config_count}`);
+        if (Array.isArray(metadata.kpi_names) && metadata.kpi_names.length) {
+            lines.push(`KPIs: ${metadata.kpi_names.join(", ")}`);
+        }
+        if (Array.isArray(metadata.tank_ids) && metadata.tank_ids.length) {
+            lines.push(`Tanks: ${metadata.tank_ids.join(", ")}`);
+        }
+        return lines;
+    }
+
+    if (action.startsWith("report.")) {
+        if (metadata.month) lines.push(`Month: ${metadata.month}`);
+        if (metadata.start_date || metadata.end_date) {
+            lines.push(`Range: ${metadata.start_date || ""} → ${metadata.end_date || ""}`.trim());
+        }
+        if (metadata.status) lines.push(`Status: ${metadata.status}`);
+        if (metadata.severity) lines.push(`Severity: ${metadata.severity}`);
+        if (metadata.tank_codes?.length) lines.push(`Tanks: ${metadata.tank_codes.join(", ")}`);
+        return lines;
+    }
+
+    return [formatMetadataSummary(metadata)];
 };
 
 const getRefillStatusStyles = (status?: string | null) => {
@@ -1354,9 +1552,6 @@ export default function ReportsPage() {
                                     <thead className="bg-[#fdeeff]">
                                         <tr>
                                             <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
-                                                Timestamp
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
                                                 Action
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
@@ -1369,7 +1564,7 @@ export default function ReportsPage() {
                                                 Outcome
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
-                                                Metadata
+                                                Details
                                             </th>
                                         </tr>
                                     </thead>
@@ -1377,7 +1572,7 @@ export default function ReportsPage() {
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
                                                 <tr key={i} className="border-b border-[#F1E8F2] bg-white">
-                                                    {[140, 160, 120, 120, 80, 160].map((w, col) => (
+                                                    {[200, 140, 140, 90, 200].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
                                                                 <div
@@ -1395,16 +1590,48 @@ export default function ReportsPage() {
                                                 className="border-b border-[#F1E8F2]"
                                             >
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {getLocaleDateTimeParts(row.created_at).date} {getLocaleDateTimeParts(row.created_at).time}
+                                                    <div className="font-semibold text-[#1f2937]">
+                                                        {formatActionLabel(row.action)}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {getLocaleDateTimeParts(row.created_at).date} {getLocaleDateTimeParts(row.created_at).time}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {row.action}
+                                                    <div className="flex flex-col">
+                                                        <span>{formatActorLabel(row)}</span>
+                                                        {formatActorSubLabel(row) ? (
+                                                            <span className="text-xs text-gray-400">
+                                                                {formatActorSubLabel(row)}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {formatActorLabel(row)}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-700">
-                                                    {formatTargetLabel(row)}
+                                                    {row.target_type === "tank" && row.target_id ? (
+                                                        <div className="flex flex-col">
+                                                            <Link
+                                                                to={`/ivf-track-shipment/${row.target_id}`}
+                                                                className="text-[#6b1176] hover:underline"
+                                                            >
+                                                                {formatTargetLabel(row)}
+                                                            </Link>
+                                                            {formatTargetSubLabel(row) ? (
+                                                                <span className="text-xs text-gray-400">
+                                                                    {formatTargetSubLabel(row)}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col">
+                                                            <span>{formatTargetLabel(row)}</span>
+                                                            {formatTargetSubLabel(row) ? (
+                                                                <span className="text-xs text-gray-400">
+                                                                    {formatTargetSubLabel(row)}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
                                                     <span
@@ -1414,16 +1641,23 @@ export default function ReportsPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
-                                                    {formatMetadataSummary(row.metadata)}
+                                                    {formatMetadataLines(row.action, row.metadata).length > 0 ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            {formatMetadataLines(row.action, row.metadata).map((line, index) => (
+                                                                <div key={index} className="text-xs text-gray-600">
+                                                                    {line}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">-</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
                                         {!loading && activityLogRows.length === 0 && (
                                             <tr>
-                                                <td
-                                                    colSpan={6}
-                                                    className="px-4 py-6 text-center text-gray-400"
-                                                >
+                                                <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
                                                     No activity logs found for the selected filters.
                                                 </td>
                                             </tr>

@@ -2,7 +2,7 @@
 Activity Log Controller
 Endpoints for querying activity logs with role-based access.
 """
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -34,6 +34,8 @@ def get_activity_logs(
     db: Session = Depends(get_db),
 ):
     current_user = getattr(request.state, "current_user", None)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     role_value = getattr(current_user, "role", None)
     role_name = role_value.value if hasattr(role_value, "value") else str(role_value or "")
     if role_name.lower() not in {"admin", "manager"}:
@@ -41,12 +43,26 @@ def get_activity_logs(
 
     try:
         start_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-        end_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
+        end_dt = None
+        if date_to:
+            end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+            end_dt = datetime.combine(end_date, time.max)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.") from exc
 
+    hospital_id = getattr(current_user, "hospital_id", None)
+    if hospital_id is None:
+        return ActivityLogQueryResponse(
+            logs=[],
+            total_count=0,
+            page=page,
+            page_size=page_size,
+            status="success",
+        )
+
     service = ActivityLogService(db)
     rows, total_count = service.query_logs(
+        hospital_id=hospital_id,
         action_prefix=action_prefix,
         action=action,
         actor_type=actor_type,

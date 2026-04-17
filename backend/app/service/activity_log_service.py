@@ -73,6 +73,7 @@ class ActivityLogService:
 
     def query_logs(
         self,
+        hospital_id: Optional[int] = None,
         action_prefix: Optional[str] = None,
         action: Optional[str] = None,
         actor_type: Optional[str] = None,
@@ -88,6 +89,9 @@ class ActivityLogService:
         page_size: int = 20,
     ) -> Tuple[List[ActivityLog], int]:
         query = self.db.query(ActivityLog)
+
+        if hospital_id is not None:
+            query = query.filter(ActivityLog.hospital_id == hospital_id)
 
         if action:
             query = query.filter(ActivityLog.action == action)
@@ -160,13 +164,26 @@ class ActivityLogService:
 
         for actor_type, ids in actor_ids_by_type.items():
             if actor_type == ActivityActorType.USER.value:
-                for user in self.db.query(User).filter(User.user_id.in_(ids)).all():
+                users = self.db.query(User).filter(User.user_id.in_(ids)).all()
+                branch_ids = {user.branch_id for user in users if user.branch_id is not None}
+                branch_map: Dict[int, str] = {}
+                if branch_ids:
+                    for branch in (
+                        self.db.query(HospitalBranch)
+                        .filter(HospitalBranch.branch_id.in_(branch_ids))
+                        .all()
+                    ):
+                        branch_map[branch.branch_id] = branch.branch_name
+
+                for user in users:
                     hydrated[(actor_type, user.user_id)] = {
                         "user_id": user.user_id,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
                         "email": user.email,
                         "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                        "branch_id": user.branch_id,
+                        "branch_name": branch_map.get(user.branch_id),
                     }
             elif actor_type == ActivityActorType.SYSTEM.value:
                 for actor_id in ids:
@@ -194,23 +211,49 @@ class ActivityLogService:
 
         for target_type, ids in target_ids_by_type.items():
             if target_type == "user":
-                for user in self.db.query(User).filter(User.user_id.in_(ids)).all():
+                users = self.db.query(User).filter(User.user_id.in_(ids)).all()
+                branch_ids = {user.branch_id for user in users if user.branch_id is not None}
+                branch_map: Dict[int, str] = {}
+                if branch_ids:
+                    for branch in (
+                        self.db.query(HospitalBranch)
+                        .filter(HospitalBranch.branch_id.in_(branch_ids))
+                        .all()
+                    ):
+                        branch_map[branch.branch_id] = branch.branch_name
+
+                for user in users:
                     hydrated[(target_type, user.user_id)] = {
                         "user_id": user.user_id,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
                         "email": user.email,
                         "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                        "branch_id": user.branch_id,
+                        "branch_name": branch_map.get(user.branch_id),
                     }
             elif target_type == "tank":
                 tank_ids = [int(value) for value in ids if value.isdigit()]
                 if tank_ids:
-                    for tank in self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all():
+                    tanks = self.db.query(Tank).filter(Tank.tank_id.in_(tank_ids)).all()
+                    branch_ids = {tank.branch_id for tank in tanks if tank.branch_id is not None}
+                    branch_map: Dict[int, HospitalBranch] = {}
+                    if branch_ids:
+                        for branch in (
+                            self.db.query(HospitalBranch)
+                            .filter(HospitalBranch.branch_id.in_(branch_ids))
+                            .all()
+                        ):
+                            branch_map[branch.branch_id] = branch
+
+                    for tank in tanks:
+                        branch = branch_map.get(tank.branch_id)
                         hydrated[(target_type, str(tank.tank_id))] = {
                             "tank_id": tank.tank_id,
                             "tank_code": tank.tank_code,
                             "branch_id": tank.branch_id,
-                            "hospital_id": tank.hospital_id,
+                            "branch_name": branch.branch_name if branch else None,
+                            "hospital_id": branch.hospital_id if branch else None,
                         }
             elif target_type == "branch":
                 branch_ids = [int(value) for value in ids if value.isdigit()]
@@ -257,7 +300,14 @@ class ActivityLogService:
                 .filter(Tank.tank_id == int(target.target_id))
                 .first()
             )
-            return tank.hospital_id if tank else None
+            if not tank or tank.branch_id is None:
+                return None
+            branch = (
+                self.db.query(HospitalBranch)
+                .filter(HospitalBranch.branch_id == int(tank.branch_id))
+                .first()
+            )
+            return branch.hospital_id if branch else None
 
         if target.target_type == "user":
             user = (
