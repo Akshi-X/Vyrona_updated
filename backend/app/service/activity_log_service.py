@@ -54,7 +54,7 @@ class ActivityLogService:
             target_type=target.target_type if target else None,
             target_id=target.target_id if target else None,
             target_label=target.target_label if target else None,
-            metadata=metadata or None,
+            metadata_json=metadata or None,
             created_at=datetime.now(timezone.utc),
         )
         self.db.add(record)
@@ -96,7 +96,7 @@ class ActivityLogService:
         if outcome:
             query = query.filter(ActivityLog.outcome == outcome)
         if metadata_key and metadata_value is not None:
-            query = query.filter(ActivityLog.metadata[metadata_key].astext == str(metadata_value))
+            query = query.filter(ActivityLog.metadata_json[metadata_key].astext == str(metadata_value))
         if date_from:
             query = query.filter(ActivityLog.created_at >= date_from)
         if date_to:
@@ -131,7 +131,7 @@ class ActivityLogService:
                     "target_type": row.target_type,
                     "target_id": row.target_id,
                     "target_label": row.target_label,
-                    "metadata": row.metadata,
+                    "metadata": row.metadata_json,
                     "created_at": row.created_at,
                     "actor_details": actor_map.get((row.actor_type, row.actor_id)),
                     "target_details": target_map.get((row.target_type, row.target_id)),

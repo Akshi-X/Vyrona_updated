@@ -19,7 +19,7 @@ class ActivityLog(Base):
     target_type = Column(String, nullable=True)
     target_id = Column(String, nullable=True)
     target_label = Column(String, nullable=True)
-    metadata = Column(JSONB, nullable=True)
+    metadata_json = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
