@@ -14,7 +14,6 @@ import DatabaseIconWhite from "../assets/DashBoardIcons/DataBaseWhite.svg";
 import DatabaseIconDark from "../assets/DashBoardIcons/DatabaseDark.svg";
 import ControlTowerIconWhite from "../assets/DashBoardIcons/ControlTowerWhite.svg";
 import ControlTowerIconDark from "../assets/DashBoardIcons/ControlTowerDark.svg";
-import MyTasksIcon from "../assets/DashBoardIcons/My_Tasks.svg";
 import CriticalAlertsIcon from "../assets/DashBoardIcons/Critical_Alerts.svg";
 import ContainersIcon from "../assets/DashBoardIcons/Containers.svg";
 import LogoutIcon from "../assets/DashBoardIcons/Logout.svg";

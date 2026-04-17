@@ -203,11 +203,11 @@ describe('AuthService', () => {
 
       mockRequest.mockResolvedValueOnce(response)
 
-      const result = await service.resendOTP(userId)
+      const result = await service.resendOTP(userId,"dummy@email.com")
 
       expect(mockRequest).toHaveBeenCalledWith('/api/resend-otp', {
         method: 'POST',
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({ user_id: userId, email: "dummy@email.com" }),
       })
       expect(result).toEqual(response)
     })

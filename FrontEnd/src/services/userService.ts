@@ -218,7 +218,7 @@ export class UserService extends BaseApiService {
     });
   }
 
-  async getInviteToken(token: string): Promise<{ email: string; role: string; hospital_name: string | null; expires_at: string }> {
+  async getInviteToken(token: string): Promise<{ email: string; role: string; hospital_name: string | null; expires_at: string; branch_name: string | null } | null> {
     return await this.request(`/api/invite/${token}`, { method: 'GET' });
   }
 

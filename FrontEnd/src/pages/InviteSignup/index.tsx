@@ -15,6 +15,7 @@ const InviteSignup: React.FC = () => {
         role: string;
         hospital_name: string | null;
         expires_at: string;
+        branch_name: string | null;
     } | null>(null);
     const [tokenError, setTokenError] = useState("");
     const [tokenLoading, setTokenLoading] = useState(true);
