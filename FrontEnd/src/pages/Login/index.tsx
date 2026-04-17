@@ -159,6 +159,33 @@ const Login: React.FC = () => {
                 }
 
                 // Navigate to OTP page with preserved redirect path
+                try {
+                    const otpExpiryTimestamp = response.otp_expiry;
+                    if (otpExpiryTimestamp) {
+                        const normalizedExpiry = typeof otpExpiryTimestamp === "number"
+                            ? (otpExpiryTimestamp > 1_000_000_000_000 ? otpExpiryTimestamp : otpExpiryTimestamp * 1000)
+                            : Number.isFinite(Number(otpExpiryTimestamp))
+                                ? (Number(otpExpiryTimestamp) > 1_000_000_000_000 ? Number(otpExpiryTimestamp) : Number(otpExpiryTimestamp) * 1000)
+                                : Date.parse(String(otpExpiryTimestamp));
+
+                        if (Number.isFinite(normalizedExpiry)) {
+                            sessionStorage.setItem("verify_otp_expiry_timestamp", String(normalizedExpiry));
+                        } else {
+                            sessionStorage.removeItem("verify_otp_expiry_timestamp");
+                        }
+                    } else {
+                        sessionStorage.removeItem("verify_otp_expiry_timestamp");
+                    }
+
+                    if (response.email) {
+                        sessionStorage.setItem("verify_otp_email", response.email);
+                    } else {
+                        sessionStorage.removeItem("verify_otp_email");
+                    }
+                } catch (e) {
+                    // Silently handle sessionStorage errors
+                }
+
                 navigate("/verify-otp", {
                     state: {
                         userId: response.user_id,
@@ -281,12 +308,12 @@ const Login: React.FC = () => {
                     </form>
 
                     {/* Footer */}
-                    <p className="text-center text-sm text-gray-500 mt-2">
+                    {/* <p className="text-center text-sm text-gray-500 mt-2">
                         New to myGrape?{" "}
                         <Link to="/signup" className="text-[#8b2a96] font-semibold underline">
                             Create an account
                         </Link>
-                    </p>
+                    </p> */}
 
                 </div>
                 <p className="mt-2 text-center text-[#9a9a9a] text-sm">

@@ -22,6 +22,12 @@ from ..exceptions import (
 from ..utils.utils import get_user_by_email, get_user_by_id, normalize_role_to_title_case
 from ..utils.user_helpers import is_hospital_department
 from .email_service import send_otp_email
+from .activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    is_audit_log_disabled_for_user,
+)
+from ..constants.enums import ActivityOutcome
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -79,6 +85,15 @@ def send_otp_to_user(db: Session, user_id: str, email: str, remember_me: bool = 
         # Email sent successfully, NOW commit the transaction
         db.commit()
         db.refresh(otp)
+
+        user = db.query(User).filter(User.user_id == user_id).first()
+        ActivityLogService(db).log_activity(
+            action="email.otp_sent",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            metadata={"recipient_email": email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
         
         return otp
         
@@ -227,11 +242,13 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
 
         # Determine if hospital user based on department
         is_hospital_user = is_hospital_department(user.department) if user.department else False
+        audit_log_disabled = is_audit_log_disabled_for_user(user)
 
         # Build token payload
         token_data = {
             "sub": str(user.user_id),
             "remember_me": remember_me,
+            "audit_log_disabled": audit_log_disabled,
         }
 
         # Add type-specific fields to token
@@ -290,6 +307,13 @@ def verify_otp_and_create_token(user_id: str, otp: str, db: Session) -> dict:
             result["department"] = user.department  # Include department (CGT) for pharma users
         
         logger.debug(f"Returning result: {result}")
+        ActivityLogService(db).log_activity(
+            action="user.login",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            metadata={"remember_me": remember_me},
+            audit_log_disabled=audit_log_disabled,
+        )
         return result
 
     except Exception as e:

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8F9FA;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 600; margin-bottom: 5px; }
+        .header .subtitle { font-size: 14px; opacity: 0.9; margin: 0; }
+        .content { padding: 30px; color: #374151; }
+        .content h2 { color: #6B1176; font-size: 18px; margin-top: 0; }
+        .details-card {
+            background-color: #F2E4FF;
+            border-left: 4px solid #6B1176;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .details-card p { margin: 8px 0; font-size: 14px; color: #374151; }
+        .details-card strong { color: #6B1176; display: inline-block; min-width: 100px; }
+        .action-buttons { text-align: center; margin: 30px 0; }
+        .button {
+            display: inline-block;
+            padding: 18px 45px;
+            background: linear-gradient(135deg, #6B1176 0%, #703F99 100%);
+            color: #FFFFFF !important;
+            text-decoration: none !important;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 12px rgba(107, 17, 118, 0.4);
+            border: 2px solid #6B1176;
+            min-width: 200px;
+            text-align: center;
+        }
+        .divider { height: 1px; background-color: #E5E7EB; margin: 20px 0; }
+        .icon { font-size: 32px; margin-bottom: 10px; }
+        .footer {
+            background-color: #F8F9FA;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6B7280;
+            border-top: 1px solid #E5E7EB;
+        }
+        .footer p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">✉️</div>
+            <h1>{{ subject }}</h1>
+            <p class="subtitle">myGrape</p>
+        </div>
+
+        <div class="content">
+            <h2>You're Invited!</h2>
+            <p>
+                <strong>{{ invited_by }}</strong> has invited you to join <strong>{{ company }}</strong> on myGrape as a <strong>{{ role }}</strong>.
+            </p>
+
+            <div class="details-card">
+                <p><strong>🏢 Organisation:</strong> {{ company }}</p>
+                <p><strong>👤 Role:</strong> {{ role }}</p>
+            </div>
+
+            <p>Click the button below to create your account and get started:</p>
+
+            <div class="action-buttons">
+                <a href="{{ signup_url }}" class="button" style="color: #FFFFFF !important; text-decoration: none !important;">
+                    ACCEPT INVITE
+                </a>
+            </div>
+
+            <div class="divider"></div>
+
+            <p style="font-size: 14px; color: #6B7280;">
+                <strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="{{ signup_url }}" style="color: #2563EB; word-break: break-all;">{{ signup_url }}</a>
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>myGrape</strong></p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p style="margin-top: 10px;">© 2025 myGrape. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

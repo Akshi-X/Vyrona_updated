@@ -20,6 +20,12 @@ from ..models.user_model import User
 from ..auth.auth import get_password_hash
 from ..config.config import settings
 from ..service.email_service import send_password_reset_email
+from ..service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    is_audit_log_disabled_for_user,
+)
+from ..constants.enums import ActivityOutcome
 from ..utils.utils import get_user_by_email as utils_get_user_by_email
 from ..utils.utils import get_user_by_id as utils_get_user_by_id
 from ..constants.app_constants import (
@@ -240,6 +246,15 @@ def request_password_reset(email: str, db: Session) -> Dict[str, str]:
     except Exception as e:
         # Email failed, but audit already saved
         raise PasswordResetFailedException(reason=str(e))
+
+
+    ActivityLogService(db).log_activity(
+        action="email.password_reset_sent",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        metadata={"recipient_email": user.email},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     return {
         "email": user.email,
@@ -289,6 +304,13 @@ def reset_password(token: str, new_password: str, confirm_password: str, db: Ses
         
         # Commit changes
         db.commit()
+
+        ActivityLogService(db).log_activity(
+            action="user.password_reset_completed",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
         
         return {
             "message": "Password reset successful. Please login with your new password"

@@ -19,6 +19,7 @@ from app.constants.app_constants import (
 )
 from app.constants.status_constants import HEALTH_HEALTHY
 from app.controller import (
+    activity_log_controller,
     chat_controller,
     dashboard_controller,
     feedback_controller,
@@ -28,6 +29,7 @@ from app.controller import (
     onboarding_controller,
     patient_controller,
     quality_controller,
+    report_actions_controller,
     shipment_controller,
     task_controller,
     ui_variant_controller,
@@ -224,6 +226,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include API routes
 app.include_router(user_controller.router, prefix=API_PREFIX)
+app.include_router(activity_log_controller.router, prefix=API_PREFIX)
+app.include_router(report_actions_controller.router, prefix=API_PREFIX)
 app.include_router(onboarding_controller.router, prefix=API_PREFIX)
 app.include_router(patient_controller.router, prefix=API_PREFIX)
 app.include_router(feedback_controller.router, prefix=API_PREFIX)

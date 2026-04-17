@@ -75,6 +75,7 @@ def init_db():
         telemetry_model,
         quality_log_model,
         geolocation_model,
+        activity_log_model,
     )
     # Import IVF models
     from ..models.IVF import (

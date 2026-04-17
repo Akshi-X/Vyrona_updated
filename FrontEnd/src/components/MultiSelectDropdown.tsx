@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+type MultiSelectOption = string | { label: string; value: string };
+
 interface MultiSelectDropdownProps {
     label: string;
-    options: string[];
+    options: MultiSelectOption[];
     selected: string[];
     placeholder?: string;
     disabled?: boolean;
@@ -23,19 +25,34 @@ export default function MultiSelectDropdown({
 
     const normalizedSelected = useMemo(() => new Set(selected), [selected]);
 
+    const normalizedOptions = useMemo(
+        () =>
+            options.map((option) =>
+                typeof option === "string"
+                    ? { label: option, value: option }
+                    : option,
+            ),
+        [options],
+    );
+
     const filteredOptions = useMemo(() => {
         const term = search.trim().toLowerCase();
-        if (!term) return options;
-        return options.filter((option) =>
-            option.toLowerCase().includes(term),
+        if (!term) return normalizedOptions;
+        return normalizedOptions.filter((option) =>
+            option.label.toLowerCase().includes(term),
         );
-    }, [options, search]);
+    }, [normalizedOptions, search]);
 
     const selectedLabel = useMemo(() => {
         if (selected.length === 0) return placeholder;
-        if (selected.length === 1) return selected[0];
+        if (selected.length === 1) {
+            const selectedOption = normalizedOptions.find(
+                (option) => option.value === selected[0],
+            );
+            return selectedOption?.label || selected[0];
+        }
         return `${selected.length} selected`;
-    }, [placeholder, selected]);
+    }, [placeholder, selected, normalizedOptions]);
 
     const toggleOption = (value: string) => {
         if (normalizedSelected.has(value)) {
@@ -46,10 +63,10 @@ export default function MultiSelectDropdown({
     };
 
     const toggleAll = () => {
-        if (selected.length === options.length) {
+        if (selected.length === normalizedOptions.length) {
             onChange([]);
         } else {
-            onChange([...options]);
+            onChange(normalizedOptions.map((option) => option.value));
         }
     };
 
@@ -132,7 +149,7 @@ export default function MultiSelectDropdown({
                                 onClick={toggleAll}
                                 className="text-[#6b1176] font-semibold hover:underline"
                             >
-                                {selected.length === options.length
+                                {selected.length === normalizedOptions.length
                                     ? "Clear all"
                                     : "Select all"}
                             </button>
@@ -154,12 +171,12 @@ export default function MultiSelectDropdown({
                             </div>
                         )}
                         {filteredOptions.map((option) => {
-                            const isSelected = normalizedSelected.has(option);
+                            const isSelected = normalizedSelected.has(option.value);
                             return (
                                 <button
-                                    key={option}
+                                    key={option.value}
                                     type="button"
-                                    onClick={() => toggleOption(option)}
+                                    onClick={() => toggleOption(option.value)}
                                     className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
                                         isSelected
                                             ? "bg-[#f7ecfb] text-[#6b1176]"
@@ -189,7 +206,7 @@ export default function MultiSelectDropdown({
                                             </svg>
                                         )}
                                     </span>
-                                    <span className="truncate">{option}</span>
+                                    <span className="truncate">{option.label}</span>
                                 </button>
                             );
                         })}
