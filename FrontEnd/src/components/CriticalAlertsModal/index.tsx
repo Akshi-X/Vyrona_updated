@@ -21,6 +21,7 @@ interface CriticalAlertsModalProps {
     loading?: boolean;
     onAcknowledge?: (alertId: string) => Promise<void>;
     patientIdLabel?: string;
+    id?: string;
 }
 
 const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
@@ -30,6 +31,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     loading = false,
     onAcknowledge,
     patientIdLabel = "Tank Code",
+    id,
 }) => {
     const showPatientId = Boolean(patientIdLabel?.trim());
     const [acknowledgingIds, setAcknowledgingIds] = useState<Set<string>>(
@@ -508,6 +510,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 />
             }
             loading={loading}
+            id={id}
             loadingText="Loading alerts..."
             emptyText="No critical alerts found"
             dataLength={Math.max(visibleAlerts.length, 1)}
