@@ -22,6 +22,8 @@ export interface OnboardingStep {
     prevDisable?: boolean;
     clickOnlyId?: string[];
     disableClickID?: string[];
+    genieImage?: string;
+    startPage?: string;
 }
 
 export interface OnboardingQuizQuestion {

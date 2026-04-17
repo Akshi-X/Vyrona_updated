@@ -144,11 +144,22 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
         case "START_LEVEL": {
             const level = state.levels[action.levelId];
             if (!level) return state;
+
+            // Demote any other in_progress level back to available — only one can be active.
+            const updatedLevels: Record<string, OnboardingLevelProgress> = {};
+            Object.entries(state.levels).forEach(([id, l]) => {
+                if (id !== action.levelId && l.status === "in_progress") {
+                    updatedLevels[id] = { ...l, status: "available" };
+                } else {
+                    updatedLevels[id] = l;
+                }
+            });
+
             return {
                 ...state,
                 activeLevelId: action.levelId,
                 levels: {
-                    ...state.levels,
+                    ...updatedLevels,
                     [action.levelId]: {
                         ...level,
                         status: level.status === "completed" ? "completed" : "in_progress",

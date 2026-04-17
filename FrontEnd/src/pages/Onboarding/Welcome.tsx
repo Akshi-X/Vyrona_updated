@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
 const SECTIONS = [
@@ -17,9 +16,12 @@ const SECTIONS = [
     },
 ];
 
-export default function OnboardingWelcome() {
-    const { state, advanceWelcome, startLevel, logEvent } = useOnboarding();
-    const navigate = useNavigate();
+interface OnboardingWelcomeProps {
+    onStart?: () => void;
+}
+
+export default function OnboardingWelcome({ onStart }: OnboardingWelcomeProps) {
+    const { state, advanceWelcome, logEvent } = useOnboarding();
 
     const visibleSections = useMemo(() => SECTIONS.slice(0, state.welcomeStage + 1), [state.welcomeStage]);
 
@@ -29,14 +31,13 @@ export default function OnboardingWelcome() {
     };
 
     const handleStart = () => {
-        startLevel("level-1");
         logEvent({ type: "welcome_start", levelId: "level-1" });
-        navigate("/onboarding/level-1");
+        onStart?.();
     };
 
     return (
         <div className="mx-auto max-w-4xl">
-            <div className="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl backdrop-blur">
+            <div className="rounded-3xl border border-white/60 bg-white/80 p-8 ">
                 <div className="grid gap-8 md:grid-cols-[1.1fr_0.9fr]">
                     <div className="space-y-6">
                         {visibleSections.map((section) => (
@@ -60,12 +61,16 @@ export default function OnboardingWelcome() {
                                 onClick={handleStart}
                                 className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm"
                             >
-                                Start Level 1
+                                Start Tour →
                             </button>
                         </div>
                     </div>
                     <div className="flex items-center justify-center">
-                        <div className="h-56 w-56 rounded-full bg-gradient-to-br from-[#FFB347] via-[#FF6B6B] to-[#845EC2] opacity-90 shadow-xl" />
+                        <img
+                            src="/genie/hi.jpeg"
+                            alt="Genie"
+                            className="h-56 w-56 object-cover"
+                        />
                     </div>
                 </div>
             </div>

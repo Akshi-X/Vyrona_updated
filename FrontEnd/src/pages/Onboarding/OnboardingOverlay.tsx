@@ -1,95 +1,111 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
+import { useTourNavContext } from "../../contexts/TourNavContext";
 import OnboardingWelcome from "./Welcome";
 import OnboardingTimeline from "./Timeline";
-import OnboardingStatus from "./Status";
 import LevelOverlay from "./LevelOverlay";
-
-type Tab = "welcome" | "timeline" | "status";
-
-const TABS: { id: Tab; label: string }[] = [
-    { id: "welcome",  label: "Welcome"  },
-    { id: "timeline", label: "Timeline" },
-    { id: "status",   label: "Status"   },
-];
-
-const isLevelRoute = (pathname: string) => pathname.includes("/onboarding/level-");
-
-const pathnameToTab = (pathname: string): Tab => {
-    if (pathname === "/onboarding/timeline") return "timeline";
-    if (pathname === "/onboarding/status")   return "status";
-    return "welcome";
-};
 
 export default function OnboardingOverlay() {
     const location  = useLocation();
-    const navigate  = useNavigate();
     const { levels, getSteps, state } = useOnboarding();
     const { isOpen: isTourOpen } = useTour();
+    const tourNavCtx = useTourNavContext();
 
-    const [isOpen, setIsOpen]   = useState(false);
-    const [activeTab, setActiveTab] = useState<Tab>(pathnameToTab(location.pathname));
+    const [isOpen, setIsOpen] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(false);
 
-    const currentLevelId = useMemo(() => {
-        const match = levels.find((level) => location.pathname.includes(level.id));
-        return match?.id;
-    }, [levels, location.pathname]);
+    // Register openOverlay so the tour close button can open this panel
+    useEffect(() => {
+        tourNavCtx?.setOpenOverlay(() => {
+            setShowWelcome(false);
+            setIsOpen(true);
+        });
+        return () => { tourNavCtx?.setOpenOverlay(null); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    const currentLevelProgress = currentLevelId ? state.levels[currentLevelId] : undefined;
-    const currentLevelSteps    = currentLevelId ? getSteps(currentLevelId) : [];
-    const tourComplete = currentLevelId
-        ? currentLevelSteps.length > 0 && (currentLevelProgress?.lastStepIndex ?? 0) >= currentLevelSteps.length
+    // Active level = the one that is in_progress (or available as fallback)
+    const activeLevelId = useMemo(() => {
+        const inProgress = levels.find((l) => state.levels[l.id]?.status === "in_progress");
+        if (inProgress) return inProgress.id;
+        const available = levels.find((l) => state.levels[l.id]?.status === "available");
+        return available?.id ?? null;
+    }, [levels, state.levels]);
+
+    const activeLevelProgress = activeLevelId ? state.levels[activeLevelId] : undefined;
+    const activeLevelSteps    = activeLevelId ? getSteps(activeLevelId) : [];
+    const tourComplete = activeLevelId
+        ? activeLevelSteps.length > 0 && (activeLevelProgress?.lastStepIndex ?? 0) >= activeLevelSteps.length
         : false;
 
-    // Auto-open overlay on welcome route or when a level tour finishes
+    const level1Status = state.levels["level-1"]?.status;
+
+    // Auto-open welcome on first dashboard landing
     useEffect(() => {
-        if (location.pathname === "/onboarding/welcome") {
+        if (location.pathname === "/onboarding/dashboard" && level1Status === "available") {
+            setShowWelcome(true);
             setIsOpen(true);
         }
-        if (isLevelRoute(location.pathname) && tourComplete && currentLevelProgress?.status !== "completed") {
+    }, [location.pathname, level1Status]);
+
+    const [showTimeline, setShowTimeline] = useState(false);
+
+    // Only open quiz overlay when tourComplete transitions false → true (not on mount/navigation)
+    const prevTourCompleteRef = useRef(tourComplete);
+    useEffect(() => {
+        const justCompleted = tourComplete && !prevTourCompleteRef.current;
+        prevTourCompleteRef.current = tourComplete;
+        if (justCompleted && activeLevelProgress?.status !== "completed") {
+            setShowWelcome(false);
+            setShowTimeline(false);
             setIsOpen(true);
         }
-    }, [location.pathname, tourComplete, currentLevelProgress?.status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tourComplete, activeLevelProgress?.status]);
 
-    // Sync active tab when route changes from outside the overlay
+    // Once tour starts, drop welcome view
     useEffect(() => {
-        if (!isLevelRoute(location.pathname)) {
-            setActiveTab(pathnameToTab(location.pathname));
+        if (level1Status !== "available" && level1Status !== undefined) {
+            setShowWelcome(false);
         }
-    }, [location.pathname]);
+    }, [level1Status]);
 
-    const handleTabClick = (tab: Tab) => {
-        setActiveTab(tab);
-        navigate(`/onboarding/${tab}`);
+    const handleStartTour = () => {
+        tourNavCtx?.startTour?.();
+        setIsOpen(false);
     };
 
     const renderContent = () => {
-        if (currentLevelId && isLevelRoute(location.pathname)) {
-            return <LevelOverlay levelId={currentLevelId} />;
+        if (showTimeline) {
+            return <OnboardingTimeline onStart={() => { setShowTimeline(false); setIsOpen(false); }} />;
         }
-        switch (activeTab) {
-            case "timeline": return <OnboardingTimeline />;
-            case "status":   return <OnboardingStatus />;
-            default:         return <OnboardingWelcome />;
+        if (activeLevelId && tourComplete) {
+            return <LevelOverlay levelId={activeLevelId} onComplete={() => { setShowTimeline(true); }} />;
         }
+        if (showWelcome) {
+            return <OnboardingWelcome onStart={handleStartTour} />;
+        }
+        return <OnboardingTimeline onStart={() => setIsOpen(false)} />;
     };
 
-    // Hide while the tour popover is actively open and not yet complete
-    if (isLevelRoute(location.pathname) && !tourComplete && isTourOpen) {
+    // Hide the floating button and panel while tour is actively running
+    if (!tourComplete && isTourOpen) {
         return null;
     }
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setIsOpen(true)}
-                className="fixed right-6 top-6 z-40 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg"
-            >
-                Onboarding
-            </button>
+            {!isTourOpen && (
+                <button
+                    type="button"
+                    onClick={() => { setShowWelcome(false); setIsOpen(true); }}
+                    className="fixed right-6 top-6 z-40 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg"
+                >
+                    Onboarding
+                </button>
+            )}
 
             {isOpen && (
                 <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30 p-6">
@@ -108,24 +124,6 @@ export default function OnboardingOverlay() {
                             >
                                 Close
                             </button>
-                        </div>
-
-                        {/* Tab selector */}
-                        <div className="mt-4 flex items-center gap-1 rounded-xl bg-slate-100 p-1">
-                            {TABS.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    onClick={() => handleTabClick(tab.id)}
-                                    className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                                        activeTab === tab.id && !isLevelRoute(location.pathname)
-                                            ? "bg-white text-slate-900 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700"
-                                    }`}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
                         </div>
 
                         {/* Content */}

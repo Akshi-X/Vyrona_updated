@@ -21,8 +21,15 @@ function TourContent({ content }: { content: unknown }) {
             <TourStepHeading
                 title={nav?.title ?? ""}
                 icon={nav?.icon}
-                onClose={() => setIsOpen(false)}
+                onClose={() => { setIsOpen(false); ctx?.setIsTourActive(false); ctx?.openOverlay?.(); }}
             />
+            {nav?.genieImage && (
+                <img
+                    src={nav.genieImage}
+                    alt=""
+                    className="w-full h-72 object-contain object-center"
+                />
+            )}
             <p className="text-sm leading-relaxed text-slate-700">
                 {nav?.content ?? content}
             </p>
@@ -114,9 +121,9 @@ export default function OnboardingShell() {
 
     return (
         <div className="bg-[#FDFAFF] flex w-full min-h-screen overflow-x-hidden">
+            <OnboardingModeProvider value={true}>
             <Sidebar onLogout={handleLogout} />
             <div className="flex-1 ml-0 md:ml-60 min-w-0">
-                <OnboardingModeProvider value={true}>
                     <TourNavStoreProvider>
                         <TourProvider
                             steps={[]}
@@ -143,8 +150,8 @@ export default function OnboardingShell() {
                             <OnboardingOverlay />
                         </TourProvider>
                     </TourNavStoreProvider>
-                </OnboardingModeProvider>
             </div>
+            </OnboardingModeProvider>
         </div>
     );
 }

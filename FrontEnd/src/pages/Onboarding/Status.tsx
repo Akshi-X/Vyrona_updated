@@ -8,9 +8,9 @@ export default function OnboardingStatus() {
 
     return (
         <div className="mx-auto max-w-4xl space-y-6">
-            <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-lg">
-                <h2 className="text-xl font-semibold">Onboarding Status</h2>
-                <p className="text-sm text-slate-600">Track your milestones and locked levels.</p>
+            <div className="px-1">
+                <h2 className="text-base font-semibold">Onboarding Status</h2>
+                <p className="text-xs text-slate-500">Track your milestones and locked levels.</p>
             </div>
             <div className="space-y-4">
                 {levels.map((level) => {

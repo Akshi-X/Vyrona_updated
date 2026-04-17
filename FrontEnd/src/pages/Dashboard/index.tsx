@@ -177,14 +177,10 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
   const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
 
-  console.log(
-      ivfOutboundShipments,
-  loadingIvfOutboundShipments,
-  ivfOutboundShipmentsError,
-  ivfTotalDeviations,
-  loadingIvfTotalDeviations,
-  ivfTotalDeviationsError,
-  )
+  // IVF incubator deviations metric
+  const [ivfIncubatorDeviations, setIvfIncubatorDeviations] = useState<number | null>(null);
+  const [ivfIncubatorTopDriver, setIvfIncubatorTopDriver] = useState<string | null>(null);
+  const [loadingIvfIncubatorDeviations, setLoadingIvfIncubatorDeviations] = useState(false);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -721,6 +717,36 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
+  // Fetch IVF incubator deviations from API
+  useEffect(() => {
+    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    const fetchIncubatorDeviations = async () => {
+      setLoadingIvfIncubatorDeviations(true);
+      try {
+        const response = await ivfService.getIncubatorDeviations();
+        if (!cancelled) {
+          setIvfIncubatorDeviations(response?.total_deviations ?? 0);
+          const sorted = Object.entries(response.deviations_by_kpi ?? {})
+            .sort(([, a], [, b]) => b - a);
+          setIvfIncubatorTopDriver(sorted[0]?.[0] ?? 'N/A');
+        }
+      } catch {
+        if (!cancelled) {
+          setIvfIncubatorDeviations(0);
+          setIvfIncubatorTopDriver('N/A');
+        }
+      } finally {
+        if (!cancelled) setLoadingIvfIncubatorDeviations(false);
+      }
+    };
+
+    fetchIncubatorDeviations();
+    return () => { cancelled = true; };
+  }, [userDepartment, isAuthenticated]);
+
   // Fetch IVF quality deviation chart from API
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
@@ -1197,32 +1223,26 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            <AnimatedNumber value={0} />
-                            {/* {loadingIvfOutboundShipments
+                            {loadingIvfIncubatorDeviations
                               ? '--'
-                              : ivfOutboundShipmentsError
-                                ? '0'
-                                : `${ivfOutboundShipments ?? 0}`} */}
+                              : <AnimatedNumber value={ivfIncubatorDeviations ?? 0} />}
                           </div>
                         </div>
                       </div>
 
-                      {/* Deviations */}
+                      {/* Incubator Top Deviation Driver */}
                       <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Top Deviation<br className="sm:hidden" /> Driver
+                            Top Deviation<br className="sm:hidden" /> Driver
                           </div>
-                          <div className="font-semibold text-black text-[28px] mt-1">
-                            <AnimatedNumber value={0} />
-                            {/* {loadingIvfTotalDeviations
+                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfIncubatorTopDriver || undefined}>
+                            {loadingIvfIncubatorDeviations
                               ? '--'
-                              : ivfTotalDeviationsError
-                                ? '0'
-                                : `${ivfTotalDeviations ?? 0}`} */}
+                              : ivfIncubatorTopDriver ?? 'N/A'}
                           </div>
                         </div>
                       </div>
