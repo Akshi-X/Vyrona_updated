@@ -50,6 +50,21 @@ export default function OnboardingTimeline({ onStart }: OnboardingTimelineProps)
                                     {progress?.unlockedAt && status === "locked" && (
                                         <p className="text-xs text-slate-500">Unlocks at {new Date(progress.unlockedAt).toLocaleString()}</p>
                                     )}
+                                    {status === "completed" && !levels.some((l) => state.levels[l.id]?.status === "in_progress") && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                resetLevel(level.id);
+                                                setCurrentStep(0);
+                                                tourNavCtx?.setPendingStartLevelId(level.id);
+                                                navigate(level.route);
+                                                onStart?.();
+                                            }}
+                                            className="mt-2 inline-flex rounded-full border border-slate-300 px-4 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                        >
+                                            Play Again
+                                        </button>
+                                    )}
                                     {(status === "available" || status === "in_progress") && (() => {
                                         const anyInProgress = levels.some(
                                             (l) => l.id !== level.id && (state.levels[l.id]?.status === "in_progress"),
