@@ -200,10 +200,10 @@ const IncubatorDetailWithAuth = () => (
 
 /**
  * Alert Setting with role-based access
- * Only Managers and Admins can access this
+ * IVF Admins, Managers, and Users can access this
  */
 const AlertSettingWithAuth = () => (
-    <RoleBasedRoute allowedRoles={["Manager", "Admin"]}>
+    <RoleBasedRoute allowedRoles={["Manager", "Admin", "User"]}>
         <VariantRoute
             routePath="/alert-setting"
             defaultComponent={<AlertSetting />}
