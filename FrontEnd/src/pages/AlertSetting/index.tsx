@@ -56,6 +56,9 @@ const KPI_NAMES = {
     IVF_LN2_LID_STATE: "ln2_lid_state",
 } as const;
 
+const isActiveAlertType = (alertType?: string | null) =>
+    alertType === "critical" || alertType === "soft";
+
 // KPI metadata configuration with icons, labels, and descriptions
 interface KpiMetadata {
     label: string;
@@ -449,6 +452,25 @@ export default function AlertSetting() {
         return inputRefsMap.current.get(key)!;
     }, []);
 
+    const refetchKpiConfig = useCallback(
+        async (tankId: number, options?: { showLoading?: boolean }) => {
+            if (options?.showLoading) setConfigLoading(true);
+            try {
+                const res = await ivfService.getKpiConfigList(tankId);
+                setConfigList(res?.config ?? []);
+                setTankContext({
+                    hospital_id: res?.hospital_id ?? null,
+                    branch_id: res?.branch_id ?? null,
+                });
+                setConfigLoadedTankId(tankId);
+                return res;
+            } finally {
+                if (options?.showLoading) setConfigLoading(false);
+            }
+        },
+        [],
+    );
+
     // Handle Enter key to move focus to next input
     const handleKeyDown = useCallback(
         (
@@ -590,22 +612,13 @@ export default function AlertSetting() {
         setConfigLoading(true);
         setConfigError(null);
         setConfigLoadedTankId(null);
-        ivfService
-            .getKpiConfigList(primaryContainer.tank_id)
-            .then((res) => {
-                setConfigList(res?.config ?? []);
-                setTankContext({
-                    hospital_id: res?.hospital_id ?? null,
-                    branch_id: res?.branch_id ?? null,
-                });
-                setConfigLoadedTankId(primaryContainer.tank_id);
-            })
+        refetchKpiConfig(primaryContainer.tank_id)
             .catch((e: any) => {
                 setConfigError(e?.message || "Failed to fetch KPI config");
                 setConfigList([]);
             })
             .finally(() => setConfigLoading(false));
-    }, [primaryContainer?.tank_id]);
+    }, [primaryContainer?.tank_id, refetchKpiConfig]);
 
     useEffect(() => {
         setDraftConfig({});
@@ -876,14 +889,13 @@ export default function AlertSetting() {
                 unit: formPayload.unit ?? null,
                 alert_type: formPayload.alert_type ?? null,
                 cooldown_minutes: formPayload.cooldown_minutes ?? 60,
-                status: formPayload.status ?? true,
+                status: isActiveAlertType(formPayload.alert_type ?? null),
             };
             await ivfService.createKpiConfig(payload);
             closeForm();
-            const res = await ivfService.getKpiConfigList(
-                primaryContainer.tank_id,
-            );
-            setConfigList(res?.config ?? []);
+            await refetchKpiConfig(primaryContainer.tank_id, {
+                showLoading: true,
+            });
         } catch (e: any) {
             setFormError(e?.message || "Create failed");
         } finally {
@@ -903,14 +915,13 @@ export default function AlertSetting() {
                 unit: formPayload.unit ?? null,
                 alert_type: formPayload.alert_type ?? null,
                 cooldown_minutes: formPayload.cooldown_minutes ?? undefined,
-                status: formPayload.status ?? undefined,
+                status: isActiveAlertType(formPayload.alert_type ?? null),
             });
             closeForm();
             if (primaryContainer) {
-                const res = await ivfService.getKpiConfigList(
-                    primaryContainer.tank_id,
-                );
-                setConfigList(res?.config ?? []);
+                await refetchKpiConfig(primaryContainer.tank_id, {
+                    showLoading: true,
+                });
             }
         } catch (e: any) {
             setFormError(e?.message || "Update failed");
@@ -1018,6 +1029,7 @@ export default function AlertSetting() {
                 unit: string | null;
                 alert_type: string | null;
                 cooldown_minutes?: number;
+                status?: boolean;
             }> = [];
             for (const kpiName of ALL_KPI_NAMES) {
                 const d = getMultiDraft(kpiName);
@@ -1042,7 +1054,7 @@ export default function AlertSetting() {
                 if (
                     minVal !== null ||
                     maxVal !== null ||
-                    (d.alert_type !== undefined && d.alert_type !== null)
+                    d.alert_type !== undefined
                 ) {
                     configsToApply.push({
                         kpi_name: kpiName,
@@ -1055,6 +1067,7 @@ export default function AlertSetting() {
                         unit: metadata.unit ?? null,
                         alert_type: d.alert_type ?? null,
                         cooldown_minutes: d.cooldown_minutes,
+                        status: isActiveAlertType(d.alert_type ?? null),
                     });
                 }
             }
@@ -1068,12 +1081,14 @@ export default function AlertSetting() {
                 setMultiDraftConfig({});
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
+                    await refetchKpiConfig(selectedContainers[0].tank_id, {
+                        showLoading: true,
+                    });
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
-                    const res = await ivfService.getKpiConfigList(
-                        primaryContainer.tank_id,
-                    );
-                    setConfigList(res?.config ?? []);
+                    await refetchKpiConfig(primaryContainer.tank_id, {
+                        showLoading: true,
+                    });
                 }
             } catch (e: any) {
                 setConfigError(e?.message || "Save failed");
@@ -1118,15 +1133,20 @@ export default function AlertSetting() {
                     maxVal = values.max;
                 }
 
+                const nextAlertType =
+                    d.alert_type !== undefined
+                        ? d.alert_type
+                        : config?.alert_type ?? null;
+
                 await ivfService.updateKpiConfig(id, {
                     min: minVal,
                     max: maxVal,
-                    alert_type:
-                        d.alert_type !== undefined ? d.alert_type : undefined,
+                    alert_type: nextAlertType,
                     cooldown_minutes:
                         d.cooldown_minutes !== undefined
                             ? d.cooldown_minutes
                             : undefined,
+                    status: isActiveAlertType(nextAlertType),
                 });
             }
             if (primaryContainer && hasTemplateDrafts) {
@@ -1138,6 +1158,7 @@ export default function AlertSetting() {
                     unit: string | null;
                     alert_type: string | null;
                     cooldown_minutes?: number;
+                    status?: boolean;
                 }> = [];
 
                 for (const kpiName of missingKpiNames) {
@@ -1163,7 +1184,7 @@ export default function AlertSetting() {
                     if (
                         minVal !== null ||
                         maxVal !== null ||
-                        (d.alert_type !== undefined && d.alert_type !== null)
+                        d.alert_type !== undefined
                     ) {
                         configsToApply.push({
                             kpi_name: kpiName,
@@ -1176,6 +1197,7 @@ export default function AlertSetting() {
                             unit: metadata.unit ?? null,
                             alert_type: d.alert_type ?? null,
                             cooldown_minutes: d.cooldown_minutes,
+                            status: isActiveAlertType(d.alert_type ?? null),
                         });
                     }
                 }
@@ -1190,10 +1212,9 @@ export default function AlertSetting() {
             setDraftConfig({});
             setMultiDraftConfig({});
             if (primaryContainer) {
-                const res = await ivfService.getKpiConfigList(
-                    primaryContainer.tank_id,
-                );
-                setConfigList(res?.config ?? []);
+                await refetchKpiConfig(primaryContainer.tank_id, {
+                    showLoading: true,
+                });
             }
         } catch (e: any) {
             setConfigError(e?.message || "Save failed");
@@ -1209,10 +1230,9 @@ export default function AlertSetting() {
             await ivfService.deleteKpiConfig(configToDeleteId);
             closeDeleteConfirm();
             if (primaryContainer) {
-                const res = await ivfService.getKpiConfigList(
-                    primaryContainer.tank_id,
-                );
-                setConfigList(res?.config ?? []);
+                await refetchKpiConfig(primaryContainer.tank_id, {
+                    showLoading: true,
+                });
             }
         } catch (e: any) {
             setConfigError(e?.message || "Delete failed");
@@ -1260,11 +1280,13 @@ export default function AlertSetting() {
         setNotifySettingsSaving(true);
         setNotifySettingsError(null);
         try {
-            const res = await ivfService.updateHospitalNotificationSettings({
+            await ivfService.updateHospitalNotificationSettings({
                 is_email_notifify: notifySettings.is_email_notifify,
                 is_whatsapp_notify: notifySettings.is_whatsapp_notify,
             });
-            setNotifySettings(res);
+            const updatedSettings =
+                await ivfService.getHospitalNotificationSettings();
+            setNotifySettings(updatedSettings);
             setShowNotifySettings(false);
         } catch (e: any) {
             setNotifySettingsError(
@@ -3550,8 +3572,14 @@ export default function AlertSetting() {
                                                                                         unit: cfg.unit ?? null,
                                                                                         alert_type: cfg.alert_type ?? null,
                                                                                         cooldown_minutes: cfg.cooldown_minutes,
+                                                                                        status: isActiveAlertType(cfg.alert_type ?? null),
                                                                                     }));
                                                                                     await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
+                                                                                    if (primaryContainer) {
+                                                                                        await refetchKpiConfig(primaryContainer.tank_id, {
+                                                                                            showLoading: true,
+                                                                                        });
+                                                                                    }
                                                                                 } finally {
                                                                                     setSavingToBranches(false);
                                                                                     setShowBranchDropdown(false);
@@ -3725,10 +3753,17 @@ export default function AlertSetting() {
                                 <input
                                     value={formPayload.alert_type ?? ""}
                                     onChange={(e) =>
-                                        setFormPayload((p) => ({
-                                            ...p,
-                                            alert_type: e.target.value || null,
-                                        }))
+                                        setFormPayload((p) => {
+                                            const alertType =
+                                                e.target.value || null;
+                                            return {
+                                                ...p,
+                                                alert_type: alertType,
+                                                status: isActiveAlertType(
+                                                    alertType,
+                                                ),
+                                            };
+                                        })
                                     }
                                     className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                                     placeholder="e.g. soft, critical"
@@ -3780,15 +3815,15 @@ export default function AlertSetting() {
                                     <input
                                         type="checkbox"
                                         id="form-status"
-                                        checked={formPayload.status ?? true}
-                                        onChange={(e) =>
-                                            setFormPayload((p) => ({
-                                                ...p,
-                                                status: e.target.checked,
-                                            }))
-                                        }
+                                        checked={isActiveAlertType(
+                                            formPayload.alert_type ?? null,
+                                        )}
+                                        disabled
                                     />
-                                    <label htmlFor="form-status">Active</label>
+                                    <label htmlFor="form-status">
+                                        Active when alert type is soft or
+                                        critical
+                                    </label>
                                 </div>
                             )}
                         </div>
@@ -3937,11 +3972,16 @@ export default function AlertSetting() {
                                         type="button"
                                         onClick={handleSaveNotifySettings}
                                         disabled={notifySettingsSaving}
-                                        className="px-4 py-2 bg-[#6b1176] text-white rounded text-sm hover:bg-[#8a2a95] disabled:opacity-50"
+                                        className="px-4 py-2 bg-[#6b1176] text-white rounded text-sm hover:bg-[#8a2a95] disabled:opacity-50 flex items-center gap-2"
                                     >
-                                        {notifySettingsSaving
-                                            ? "Saving..."
-                                            : "Save"}
+                                        {notifySettingsSaving ? (
+                                            <>
+                                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            "Save"
+                                        )}
                                     </button>
                                 </div>
                             </div>

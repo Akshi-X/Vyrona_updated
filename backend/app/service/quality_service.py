@@ -800,7 +800,7 @@ class QualityService:
         """
         For each tank and each config: if a row exists for (tank_id, kpi_name, alert_name), update it
         with min, max, alert_type (and unit); otherwise create a new row with the same shape.
-        Config items must have kpi_name; optional: alert_name, min, max, unit, alert_type.
+        Config items must have kpi_name; optional: alert_name, min, max, unit, alert_type, status.
         Validates each tank belongs to branch when branch_id is provided.
         Returns {"updated": count, "created": count}.
         """
@@ -846,6 +846,9 @@ class QualityService:
                 alert_type_val = cfg.get("alert_type")
                 if alert_type_val is not None and isinstance(alert_type_val, str):
                     alert_type_val = alert_type_val.strip() or None
+                status_val = cfg.get("status")
+                if status_val is None:
+                    status_val = alert_type_val in ("critical", "soft")
                 cooldown_val = cfg.get("cooldown_minutes")
                 if cooldown_val is not None:
                     try:
@@ -865,6 +868,7 @@ class QualityService:
                     existing.min = min_val
                     existing.max = max_val
                     existing.alert_type = alert_type_val
+                    existing.status = bool(status_val)
                     if unit is not None:
                         existing.unit = unit
                     if cooldown_val is not None:
@@ -885,7 +889,7 @@ class QualityService:
                         cooldown_minutes=cooldown_val
                         if cooldown_val is not None
                         else 60,
-                        status=True,
+                        status=bool(status_val),
                     )
                     self.db.add(row)
                     self.db.flush()
