@@ -882,7 +882,7 @@ def bulk_upsert_kpi_config(
 ):
     """
     Bulk upsert KPI config to multiple tanks (Alert Setting).
-    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type? }).
+    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type?, status? }).
     For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
     IVF Admin, Manager, and User only.
     """
