@@ -31,6 +31,8 @@ export default function IVFTrackShipmentPage() {
     const navigate = useNavigate();
     const [headerTankCode, setHeaderTankCode] = useState<string>("-");
     const [headerBranchName, setHeaderBranchName] = useState<string>("-");
+    const [accessDenied, setAccessDenied] = useState(false);
+    const [countdown, setCountdown] = useState(3);
 
     // Header interactions state
     const [showCriticalAlerts, setShowCriticalAlerts] = useState(false);
@@ -162,9 +164,15 @@ export default function IVFTrackShipmentPage() {
 
             setHeaderTankCode(kpiConfigResponse?.tank_code || "-");
             setHeaderBranchName(kpiConfigResponse?.branch_name || "-");
-        } catch {
-            setHeaderTankCode("-");
-            setHeaderBranchName("-");
+        } catch (e: unknown) {
+            const msg = (e as Error)?.message || "";
+            if (msg.includes("403") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("does not belong")) {
+                setAccessDenied(true);
+                setCountdown(3);
+            } else {
+                setHeaderTankCode("-");
+                setHeaderBranchName("-");
+            }
         }
     };
 
@@ -198,6 +206,16 @@ export default function IVFTrackShipmentPage() {
     useEffect(() => {
         fetchHeaderMetadata();
     }, [tankId]);
+
+    useEffect(() => {
+        if (!accessDenied) return;
+        if (countdown <= 0) {
+            navigate("/ivf-track-shipment");
+            return;
+        }
+        const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [accessDenied, countdown, navigate]);
 
     // Update stakeholder chats from WebSocket data
     useEffect(() => {
@@ -311,6 +329,26 @@ export default function IVFTrackShipmentPage() {
             </div>
         </div>
     );
+
+    if (accessDenied) {
+        return (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-xl p-8 max-w-sm w-full mx-4 text-center">
+                    <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-800 mb-2">Access Denied</h2>
+                    <p className="text-sm text-gray-500 mb-6">You don't have access to this page.</p>
+                    <div className="w-12 h-12 rounded-full border-4 border-[#6b1176] flex items-center justify-center mx-auto">
+                        <span className="text-xl font-bold text-[#6b1176]">{countdown}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}…</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>

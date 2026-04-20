@@ -5,6 +5,7 @@ import React, {
     useRef,
     useCallback,
 } from "react";
+import { toast } from "react-toastify";
 import { useAuth } from "../../contexts/AuthContext";
 import {
     ivfService,
@@ -106,7 +107,7 @@ const KPI_METADATA: Record<string, KpiMetadata> = {
     },
     [KPI_NAMES.IVF_LN2_LID_STATE]: {
         label: "Lid State",
-        description: "Monitor Cryocan lid open/close status for security",
+        description: "Alert triggers after lid change persists for the configured duration; repeats at the same interval if it continues.",
         icon: <DoorOpen size={20} />,
     },
 };
@@ -1090,6 +1091,7 @@ export default function AlertSetting() {
                         showLoading: true,
                     });
                 }
+                toast.success("Changes saved successfully");
             } catch (e: any) {
                 setConfigError(e?.message || "Save failed");
             } finally {
@@ -1216,6 +1218,7 @@ export default function AlertSetting() {
                     showLoading: true,
                 });
             }
+            toast.success("Changes saved successfully");
         } catch (e: any) {
             setConfigError(e?.message || "Save failed");
         } finally {
@@ -2287,7 +2290,7 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                         />
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
@@ -2918,7 +2921,7 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                         />
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
@@ -3476,7 +3479,7 @@ export default function AlertSetting() {
                                                                                                 );
                                                                                             }}
                                                                                             title="Alert cooldown period in minutes"
-                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center"
+                                                                                            className="flex-1 min-w-0 text-sm text-gray-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                         />
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
@@ -3503,7 +3506,7 @@ export default function AlertSetting() {
                                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                                                         </svg>
-                                                        Save to Additional Tanks
+                                                        Copy to Additional Tanks
                                                         <svg className={`w-3 h-3 transition-transform ${showBranchDropdown ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
                                                     </button>
                                                     {showBranchDropdown && (() => {
@@ -3580,6 +3583,7 @@ export default function AlertSetting() {
                                                                                             showLoading: true,
                                                                                         });
                                                                                     }
+                                                                                    toast.success(`Copied to ${selectedTankIds.length} tank(s) successfully`);
                                                                                 } finally {
                                                                                     setSavingToBranches(false);
                                                                                     setShowBranchDropdown(false);
@@ -3798,7 +3802,7 @@ export default function AlertSetting() {
                                                 cooldown_minutes: v,
                                             }));
                                         }}
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         placeholder="60"
                                     />
                                     <span className="text-xs text-gray-400 whitespace-nowrap">

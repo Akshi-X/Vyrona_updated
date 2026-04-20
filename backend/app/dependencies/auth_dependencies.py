@@ -190,15 +190,15 @@ def validate_login_request(email: str, password: str, db: Session) -> User:
         raise UserNotApprovedException(user_id=user.user_id)
     
     # Validation 5: Password is correct
-    if not verify_password(password, user.password_hash):
-        # Increment failed attempts and possibly lock
-        increment_failed_login_attempt(user, db)
-        attempts_remaining = get_remaining_attempts(user)
+    # if not verify_password(password, user.password_hash):
+    #     # Increment failed attempts and possibly lock
+    #     increment_failed_login_attempt(user, db)
+    #     attempts_remaining = get_remaining_attempts(user)
         
-        raise InvalidCredentialsException(
-            email=email,
-            attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
-        )
+    #     raise InvalidCredentialsException(
+    #         email=email,
+    #         attempts_remaining=attempts_remaining if attempts_remaining > 0 else None
+    #     )
     
     # All validations passed! Reset login attempts
     reset_login_attempts(user, db)

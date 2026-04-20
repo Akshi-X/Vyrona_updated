@@ -352,11 +352,7 @@ const formatMetadataLines = (action: string, metadata?: Record<string, any> | nu
     return [formatMetadataSummary(metadata)];
 };
 
-const getRefillStatusStyles = (status?: string | null) => {
-    if (status === "Done") return "bg-green-100 text-green-700";
-    if (status === "In progress") return "bg-amber-100 text-amber-700";
-    return "bg-gray-200 text-gray-700";
-};
+
 
 export default function ReportsPage() {
     const { isAuthenticated, userRole } = useAuth();
@@ -721,7 +717,6 @@ export default function ReportsPage() {
                 "Tank Code",
                 "Branch",
                 "Refilled By",
-                "Status",
                 "Description",
                 "Reservoir",
                 "LN2 Ordered Date",
@@ -733,7 +728,6 @@ export default function ReportsPage() {
                 row.tank_code || "-",
                 row.branch_name || "-",
                 row.refilled_by || "-",
-                row.status || "-",
                 row.description || "-",
                 row.reservoir || "-",
                 formatLocaleDate(row.ln2_ordered_date) || "-",
@@ -1463,9 +1457,6 @@ export default function ReportsPage() {
                                                 Refilled By
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
-                                                Status
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
                                                 Description
                                             </th>
                                             <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">
@@ -1483,7 +1474,7 @@ export default function ReportsPage() {
                                         {loading
                                             ? Array.from({ length: 6 }).map((_, i) => (
                                                 <tr key={i} className="border-b border-[#F1E8F2] bg-white">
-                                                    {[85, 85, 80, 90, 90, 75, 120, 80, 85, 85].map((w, col) => (
+                                                    {[85, 85, 80, 90, 90, 120, 80, 85, 85].map((w, col) => (
                                                         <td key={col} className="px-4 py-3">
                                                             <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
                                                                 <div
@@ -1514,15 +1505,6 @@ export default function ReportsPage() {
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
                                                     {row.refilled_by || "-"}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-700">
-                                                    <span
-                                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getRefillStatusStyles(
-                                                            row.status,
-                                                        )}`}
-                                                    >
-                                                        {row.status || "-"}
-                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-700">
                                                     {row.description || "-"}

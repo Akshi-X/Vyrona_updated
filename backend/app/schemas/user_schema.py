@@ -139,6 +139,7 @@ class HospitalUserItem(BaseModel):
     status: bool = False
     approved_status: str = "pending"
     invite_pending: bool = False
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
