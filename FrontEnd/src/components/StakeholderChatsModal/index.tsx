@@ -15,6 +15,7 @@ interface StakeholderChatsModalProps {
   onClose: () => void;
   chats: StakeholderChat[];
   loading?: boolean;
+  id?: string;
 }
 
 // Utility function to format timestamp in UTC
@@ -46,12 +47,14 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
   isOpen,
   onClose,
   chats,
-  loading = false
+  loading = false,
+  id,
 }) => {
   return (
     <AlertCard
       isOpen={isOpen}
       onClose={onClose}
+      id={id}
       title="Stakeholder Chats"
       description="Communicate with stakeholders and track conversations"
       icon={

@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import Login from "../pages/Login";
-import Signup from "../pages/Signup";
 import TrackAndTrace from "../pages/TrackAndTrace";
 import TrackPage from "../pages/Track";
 import IVFTrackShipmentPage from "../pages/IVFTrackShipment";
@@ -15,10 +14,11 @@ import ControlTower from "../pages/ControlTower/index";
 import AlertSetting from "../pages/AlertSetting";
 import RefillLog from "../pages/RefillLog";
 import ReportsPage from "../pages/Reports";
+import UsersPage from "../pages/Users";
+import InviteSignup from "../pages/InviteSignup";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
-import { ApprovalLayout } from "../components/ApprovalLayout";
 import SidebarLayout from "../components/SidebarLayout";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
@@ -32,7 +32,28 @@ import {
     OnboardingShell,
 } from "../pages/Onboarding";
 import Dashboard from "../pages/Dashboard";
-import { OnboardingProvider } from "../contexts/OnboardingContext";
+import { OnboardingProvider, useOnboarding } from "../contexts/OnboardingContext";
+import { useTourNavContext } from "../contexts/TourNavContext";
+
+// Renders whichever level is currently active — works on any page.
+// Prevents two OnboardingLevel instances from fighting over the shared tour instance.
+// Prioritises pendingStartLevelId so clicking Start/Resume on any level mounts the right one.
+function ActiveOnboardingLevel() {
+    const { levels, state } = useOnboarding();
+    const tourNavCtx = useTourNavContext();
+    const pendingId = tourNavCtx?.pendingStartLevelId;
+
+    const active = pendingId
+        ? (levels.find((l) => l.id === pendingId) ?? null)
+        : (
+            levels.find((l) => state.levels[l.id]?.status === "in_progress") ??
+            levels.find((l) => state.levels[l.id]?.status === "available") ??
+            null
+        );
+
+    if (!active) return null;
+    return <OnboardingLevel levelId={active.id} />;
+}
 
 /**
  * Dashboard with variant support
@@ -179,10 +200,10 @@ const IncubatorDetailWithAuth = () => (
 
 /**
  * Alert Setting with role-based access
- * Only Managers and Admins can access this
+ * IVF Admins, Managers, and Users can access this
  */
 const AlertSettingWithAuth = () => (
-    <RoleBasedRoute allowedRoles={["Manager", "Admin"]}>
+    <RoleBasedRoute allowedRoles={["Manager", "Admin", "User"]}>
         <VariantRoute
             routePath="/alert-setting"
             defaultComponent={<AlertSetting />}
@@ -216,7 +237,8 @@ export const router = createBrowserRouter([
     // ============================================================
     { path: "/", element: <AuthRedirect /> },
     { path: "/login", element: <Login /> },
-    { path: "/signup", element: <Signup /> },
+    { path: "/invite", element: <InviteSignup /> },
+    // { path: "/signup", element: <Signup /> },
     { path: "/verify-otp", element: <VerifyOtp /> },
     { path: "/forgot-password", element: <ForgotPassword /> },
     { path: "/reset-password", element: <ResetPassword /> },
@@ -235,12 +257,22 @@ export const router = createBrowserRouter([
             </OnboardingGate>
         ),
         children: [
-            { path: "/onboarding", element: <Navigate to="/onboarding/welcome" replace /> },
-            { path: "/onboarding/welcome", element: <Dashboard /> },
-            { path: "/onboarding/timeline", element: <Dashboard /> },
-            { path: "/onboarding/status", element: <Dashboard /> },
-            { path: "/onboarding/level-1", element: <OnboardingLevel levelId="level-1" /> },
-            { path: "/onboarding/level-2", element: <OnboardingLevel levelId="level-2" /> },
+            { path: "/onboarding",               element: <Navigate to="/onboarding/dashboard" replace /> },
+            // Playground routes — level tours run on top of these as invisible overlays
+            { path: "/onboarding/dashboard",     element: <><Dashboard /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/control-tower", element: <><ControlTower /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/cryocan-tracking",                      element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/cryocan-tracking/:tankCode",            element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/ivf-track-shipment",                    element: <><IVFTrackShipmentSearchPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/ivf-track-shipment/:tankId",            element: <><IVFTrackShipmentPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
+            // Catch-all: any unknown /onboarding/* path → dashboard
+            { path: "/onboarding/*",             element: <Navigate to="/onboarding/dashboard" replace /> },
         ],
     },
 
@@ -272,6 +304,14 @@ export const router = createBrowserRouter([
                     </RoleBasedRoute>
                 ),
             },
+            {
+                path: "/users",
+                element: (
+                    <RoleBasedRoute allowedRoles={["Admin", "Manager"]}>
+                        <UsersPage />
+                    </RoleBasedRoute>
+                ),
+            },
         ],
     },
 
@@ -281,8 +321,6 @@ export const router = createBrowserRouter([
     { path: "/track-and-trace", element: <TrackAndTrace /> },
     { path: "/user-profile", element: <UserProfilePage /> },
     { path: "/support", element: <Support /> },
-    { path: "/approval", element: <ApprovalLayout /> },
-    { path: "/approval-screen", element: <ApprovalLayout /> },
 
     // ============================================================
     // FALLBACK ROUTE

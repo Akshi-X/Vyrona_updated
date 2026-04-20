@@ -40,6 +40,7 @@ interface MyTasksModalProps {
     defaultPatientId?: string; // Default patient ID to pre-fill when adding a new task
     defaultCanisterNumber?: string; // Default canister number to pre-fill when adding a new IVF task
     defaultTankId?: number; // Default tank ID for exact IVF task mapping
+    id?: string;
 }
 
 const MyTasksModal: React.FC<MyTasksModalProps> = ({
@@ -57,6 +58,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     defaultPatientId = "",
     defaultCanisterNumber = "",
     defaultTankId,
+    id,
 }) => {
     const isUserRole = userRole?.toLowerCase() === "user";
     const isIvfVariant = variant === "ivf";
@@ -499,6 +501,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         <AlertCard
             isOpen={isOpen}
             onClose={onClose}
+            id={id}
             title={
                 variant === "track"
                     ? "My Tasks (Track & Trace)"

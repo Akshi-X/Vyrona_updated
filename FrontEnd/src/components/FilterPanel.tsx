@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
+import { useTourNavContext } from "../contexts/TourNavContext";
 
 // --- FilterSelect ---
 type FilterSelectProps = {
@@ -8,6 +9,8 @@ type FilterSelectProps = {
     onChange: (val: string) => void;
     options: string[];
     allLabel?: string;
+    buttonId?: string;
+    listId?: string;
 };
 
 export const FilterSelect = ({
@@ -16,19 +19,23 @@ export const FilterSelect = ({
     onChange,
     options,
     allLabel = "All",
+    buttonId,
+    listId,
 }: FilterSelectProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const tourNavCtx = useTourNavContext();
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
+            if (tourNavCtx?.isTourActive) return;
             if (ref.current && !ref.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [tourNavCtx?.isTourActive]);
 
     return (
         <div>
@@ -37,6 +44,7 @@ export const FilterSelect = ({
             </label>
             <div className="relative" ref={ref}>
                 <button
+                    id={buttonId}
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -62,10 +70,11 @@ export const FilterSelect = ({
                     </svg>
                 </button>
                 {isOpen && (
-                    <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                    <div id={listId} className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                         {options.map((option) => (
                             <button
                                 key={option}
+                                id={listId ? `${listId}-${option}` : undefined}
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();

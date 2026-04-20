@@ -31,6 +31,7 @@ from app.constants.kpi_constants import (
     AGG_BUCKET_MINUTES_7D,
     AGG_BUCKET_MINUTES_24H,
 )
+from app.constants.enums import ActivityOutcome
 from app.dependencies.auth_dependencies import get_current_user
 from app.exceptions import InvalidTokenException
 from app.models.IVF.device_model import Device
@@ -41,7 +42,14 @@ from app.models.IVF.ln2_iot_raw_data_model import Ln2IotRawData
 from app.models.IVF.ln2_readings_model import Ln2Reading
 from app.models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from app.models.IVF.tank_model import Tank
+from app.models.kpi_config_model import KpiConfig
 from app.models.user_model import User
+from app.service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
 from app.service.IVF.quality_tracking_service import QualityTrackingService
 from app.service.quality_service import (
     QualityService,
@@ -94,7 +102,7 @@ def get_quality_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -161,7 +169,7 @@ def get_ln2_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -189,7 +197,7 @@ def get_ln2_history_by_id(
         raise HTTPException(status_code=404, detail=f"Tank with id '{tank_id}' not found")
 
     try:
-        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id)
+        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -214,7 +222,7 @@ def get_tank_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
@@ -386,7 +394,7 @@ def get_tank_kpi_history(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -507,7 +515,7 @@ def get_tank_kpi_history_by_date(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -588,7 +596,7 @@ def append_tank_kpi_reading(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     if not body or "kpis" not in body:
@@ -617,7 +625,7 @@ def append_tank_kpi_reading(
 
 
 def _require_alert_setting_role(current_user: User) -> None:
-    """Raise 403 if user is not IVF Manager or Admin (for Alert Setting CRUD)."""
+    """Raise 403 if user is not IVF Admin, Manager, or User (for Alert Setting CRUD)."""
     if not is_specific_department(
         getattr(current_user, "department", None) or "", "IVF"
     ):
@@ -628,10 +636,10 @@ def _require_alert_setting_role(current_user: User) -> None:
     if hasattr(role, "value"):
         role = role.value
     role = (role or "").lower()
-    if role not in ("manager", "admin"):
+    if role not in ("manager", "admin", "user"):
         raise HTTPException(
             status_code=403,
-            detail="Access denied: Alert Setting requires Manager or Admin role",
+            detail="Access denied: Alert Setting requires Admin, Manager, or User role",
         )
 
 
@@ -655,6 +663,25 @@ def _resolve_current_hospital_id(request: Request, db: Session) -> int:
         status_code=400,
         detail="Unable to resolve hospital for current user",
     )
+
+
+def _kpi_config_metadata(row: KpiConfig) -> dict:
+    return {
+        "config_id": row.id,
+        "hospital_id": row.hospital_id,
+        "branch_id": row.branch_id,
+        "tank_id": row.tank_id,
+        "kpi_name": row.kpi_name,
+        "alert_name": row.alert_name,
+        "min": float(row.min) if row.min is not None else None,
+        "max": float(row.max) if row.max is not None else None,
+        "unit": row.unit,
+        "alert_type": row.alert_type,
+        "cooldown_minutes": int(row.cooldown_minutes)
+        if row.cooldown_minutes is not None
+        else None,
+        "status": bool(row.status),
+    }
 
 
 @router.get("/hospital-notification-settings")
@@ -707,9 +734,30 @@ def update_hospital_notification_settings(
     if not hospital:
         raise HTTPException(status_code=404, detail="Hospital not found")
 
+    before_state = {
+        "is_email_notifify": bool(hospital.is_email_notifify),
+        "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+    }
+
     hospital.is_email_notifify = email_enabled
     hospital.is_whatsapp_notify = whatsapp_enabled
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.notification_settings_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("hospital", str(hospital.hospital_id), hospital.hospital_name),
+        metadata={
+            "hospital_id": hospital.hospital_id,
+            "before": before_state,
+            "after": {
+                "is_email_notifify": bool(hospital.is_email_notifify),
+                "is_whatsapp_notify": bool(hospital.is_whatsapp_notify),
+            },
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
 
     return {
         "hospital_id": hospital.hospital_id,
@@ -725,7 +773,7 @@ def list_kpi_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all KPI config rows for a tank (Alert Setting). Manager and Admin only."""
+    """List all KPI config rows for a tank (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
@@ -733,7 +781,7 @@ def list_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
@@ -759,7 +807,7 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row (Alert Setting). Manager and Admin only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    """Create a KPI config row (Alert Setting). IVF Admin, Manager, and User only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
@@ -795,6 +843,18 @@ def create_kpi_config(
         status=body.get("status", True),
     )
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_created",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("tank", str(row.tank_id)),
+        metadata={
+            **_kpi_config_metadata(row),
+            "kpi_names": [row.kpi_name] if row.kpi_name else [],
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
     return {
         "id": row.id,
         "hospital_id": row.hospital_id,
@@ -824,7 +884,7 @@ def bulk_upsert_kpi_config(
     Bulk upsert KPI config to multiple tanks (Alert Setting).
     Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type?, status? }).
     For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
-    Manager and Admin only.
+    IVF Admin, Manager, and User only.
     """
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
@@ -843,6 +903,24 @@ def bulk_upsert_kpi_config(
         tank_ids=tank_ids, configs=configs, branch_id=branch_id
     )
     db.commit()
+
+    unique_kpis = sorted(
+        {str(cfg.get("kpi_name")).strip() for cfg in configs if cfg.get("kpi_name")}
+    )
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_bulk_upserted",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("branch", str(branch_id)) if branch_id is not None else None,
+        metadata={
+            "tank_ids": tank_ids,
+            "updated": result.get("updated"),
+            "created": result.get("created"),
+            "config_count": len(configs),
+            "kpi_names": unique_kpis,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
     return result
 
 
@@ -854,10 +932,14 @@ def update_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Update a KPI config row (Alert Setting). Manager and Admin only."""
+    """Update a KPI config row (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     quality_service = QualityService(db)
+    existing = db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    before_state = _kpi_config_metadata(existing)
     row = quality_service.update_kpi_config(
         config_id=config_id,
         branch_id=branch_id,
@@ -875,6 +957,25 @@ def update_kpi_config(
     if not row:
         raise HTTPException(status_code=404, detail="KPI config not found")
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("tank", str(row.tank_id)),
+        metadata={
+            "before": before_state,
+            "after": _kpi_config_metadata(row),
+            "kpi_names": sorted(
+                {
+                    value
+                    for value in [before_state.get("kpi_name"), row.kpi_name]
+                    if value
+                }
+            ),
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
     return {
         "id": row.id,
         "hospital_id": row.hospital_id,
@@ -900,14 +1001,30 @@ def delete_kpi_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a KPI config row (Alert Setting). Manager and Admin only."""
+    """Delete a KPI config row (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     quality_service = QualityService(db)
+    existing = db.query(KpiConfig).filter(KpiConfig.id == config_id).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="KPI config not found")
+    before_state = _kpi_config_metadata(existing)
     ok = quality_service.delete_kpi_config(config_id, branch_id=branch_id)
     if not ok:
         raise HTTPException(status_code=404, detail="KPI config not found")
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_deleted",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("tank", str(before_state.get("tank_id")) if before_state.get("tank_id") else None),
+        metadata={
+            **before_state,
+            "kpi_names": [before_state.get("kpi_name")] if before_state.get("kpi_name") else [],
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
     return {"deleted": True, "id": config_id}
 
 

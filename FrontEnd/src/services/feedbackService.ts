@@ -28,6 +28,9 @@ export interface UserTicketSummary {
   type: string;
   status: string;
   submitted_on: string;
+  submitted_by_name?: string;
+  hospital_name?: string;
+  branch_name?: string;
 }
 
 export interface CommentItemDto {

@@ -9,6 +9,15 @@ from sqlalchemy.orm import Session
 
 from app.models.IVF.ln2_refill_detection_model import Ln2RefillDetection
 from app.models.IVF.tank_model import Tank
+from app.models.user_model import User
+from app.service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_system_actor,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from app.constants.enums import ActivityOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -78,25 +87,35 @@ class RefillDetectionService:
         self.db.commit()
         self.db.refresh(detection)
 
+        ActivityLogService(self.db).log_activity(
+            action="refill_detection.created",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_system_actor("refill_detection"),
+            target=build_target("refill_detection", str(detection.id)),
+            metadata={
+                "tank_id": tank_id,
+                "branch_id": branch_id,
+                "hospital_id": hospital_id,
+                "refill_weight": refill_weight,
+            },
+        )
+
         return detection
 
     def get_pending_detections(
-        self, hospital_id: Optional[int]
+        self, hospital_id: Optional[int], branch_id: Optional[int] = None
     ) -> List[Ln2RefillDetection]:
         """
         Return unconfirmed (is_confirmed IS NULL) detections for a hospital.
-
-        Args:
-            hospital_id: Filter by this hospital, or None to return all.
-
-        Returns:
-            List of Ln2RefillDetection rows ordered by detected_at descending.
+        Optionally scoped to a specific branch for regular users.
         """
         query = self.db.query(Ln2RefillDetection).filter(
             Ln2RefillDetection.is_confirmed == None  # noqa: E711
         )
         if hospital_id is not None:
             query = query.filter(Ln2RefillDetection.hospital_id == hospital_id)
+        if branch_id is not None:
+            query = query.filter(Ln2RefillDetection.branch_id == branch_id)
         return query.order_by(Ln2RefillDetection.detected_at.asc()).all()
 
     def review_detection(
@@ -137,6 +156,20 @@ class RefillDetectionService:
 
         self.db.commit()
         self.db.refresh(detection)
+
+        reviewer = (
+            self.db.query(User)
+            .filter(User.user_id == confirmed_by)
+            .first()
+        )
+        ActivityLogService(self.db).log_activity(
+            action="refill_detection.reviewed",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(reviewer),
+            target=build_target("refill_detection", str(detection.id)),
+            metadata={"is_confirmed": is_confirmed, "notes": notes},
+            audit_log_disabled=is_audit_log_disabled_for_user(reviewer),
+        )
 
         logger.info(
             f"Refill detection id={detection_id} reviewed: "

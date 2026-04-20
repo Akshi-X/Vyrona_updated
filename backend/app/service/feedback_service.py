@@ -22,6 +22,8 @@ from ..models.feedback_model import Feedback
 from ..models.feedback_comments import Comment
 from ..models.feedback_attachment import FeedbackAttachment
 from ..models.user_model import User
+from ..models.IVF.hospital_model import Hospital
+from ..models.IVF.hospital_branch_model import HospitalBranch
 from .user_service import get_mygrape_admin_email
 from ..schemas.feedback_schema import (
     FeedbackCreateRequest, CommentCreateRequest, FeedbackStatusUpdateRequest,
@@ -35,6 +37,13 @@ from ..constants.app_constants import (
 )
 from ..constants.enums import FeedbackStatus
 from .email_service import send_feedback_new_ticket_email, send_feedback_status_update_email, send_feedback_new_comment_email
+from .activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from ..constants.enums import ActivityOutcome
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -235,6 +244,19 @@ def create_feedback(
     user = db.query(User).filter(User.user_id == submitted_by).first()
     if not user:
         raise FeedbackUserNotFoundException(user_id=submitted_by)
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.created",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={
+            "priority": feedback.priority.value,
+            "department": feedback.department.value,
+            "feedback_type": feedback.feedback_type.value,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications - always send to admin, conditionally to user
     try:
@@ -253,7 +275,16 @@ def create_feedback(
             submitted_by_email=user.email,
             feedback_id=feedback.ticket_id,
             mygrape_admin_email=mygrape_admin_email,
-            send_to_user=request.send_email
+            send_to_user=request.send_email,
+            extra_recipient_emails=["support@mygrape.org"]
+        )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_created",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
         )
     except Exception as e:
         # Log error but don't fail the request
@@ -309,6 +340,15 @@ def add_comment(
     except Exception as e:
         db.rollback()
         raise FeedbackCommentCreateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.comment_added",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={"comment_id": comment.id},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
@@ -332,6 +372,14 @@ def add_comment(
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_comment_queued",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
@@ -347,6 +395,14 @@ def add_comment(
                 feedback_id=feedback.ticket_id,
                 mygrape_admin_email=mygrape_admin_email,
                 send_to_user=request.send_email
+            )
+            ActivityLogService(db).log_activity(
+                action="email.support_ticket_comment_sent",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_actor_from_user(user),
+                target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+                metadata={"recipient_email": mygrape_admin_email},
+                audit_log_disabled=is_audit_log_disabled_for_user(user),
             )
         except Exception as e:
             # Log error but don't fail the request
@@ -387,6 +443,15 @@ def update_feedback_status(
     feedback.status = request.status
     feedback.updated_by = updated_by
     feedback.updated_at = datetime.now(timezone.utc)
+
+    updated_by_name = f"{user.first_name} {user.last_name}".strip() or user.user_id
+    status_comment = Comment(
+        ticket_id=feedback_id,
+        comment=f"User {updated_by_name} has updated the status to {request.status.value}",
+        commented_by=updated_by,
+        created_by=updated_by
+    )
+    db.add(status_comment)
     
     try:
         db.commit()
@@ -396,6 +461,15 @@ def update_feedback_status(
     except Exception as e:
         db.rollback()
         raise FeedbackStatusUpdateFailedException(feedback_id=feedback_id, reason=f"Database error: {str(e)}")
+
+    ActivityLogService(db).log_activity(
+        action="support_ticket.status_updated",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+        metadata={"old_status": old_status, "new_status": request.status.value},
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
     
     # Send email notifications in background - always send to admin, conditionally to user
     if background_tasks:
@@ -420,6 +494,14 @@ def update_feedback_status(
             mygrape_admin_email=mygrape_admin_email,
             send_to_user=request.send_email
         )
+        ActivityLogService(db).log_activity(
+            action="email.support_ticket_status_queued",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+            metadata={"recipient_email": mygrape_admin_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
     else:
         # Fallback: send synchronously if background_tasks not available (shouldn't happen in normal flow)
         try:
@@ -436,6 +518,14 @@ def update_feedback_status(
                 feedback_id=feedback.ticket_id,
                 mygrape_admin_email=mygrape_admin_email,
                 send_to_user=request.send_email
+            )
+            ActivityLogService(db).log_activity(
+                action="email.support_ticket_status_sent",
+                outcome=ActivityOutcome.SUCCESS.value,
+                actor=build_actor_from_user(user),
+                target=build_target("support_ticket", feedback.ticket_id, feedback.subject),
+                metadata={"recipient_email": mygrape_admin_email},
+                audit_log_disabled=is_audit_log_disabled_for_user(user),
             )
         except Exception as e:
             # Log error but don't fail the request
@@ -455,7 +545,13 @@ def get_all_feedback(
 ) -> List[FeedbackSummaryResponse]:
     """Get all feedback tickets with optional filtering"""
     
-    query = db.query(Feedback)
+    query = db.query(Feedback, User, Hospital, HospitalBranch).join(
+        User, Feedback.submitted_by == User.user_id
+    ).outerjoin(
+        Hospital, Hospital.hospital_id == User.hospital_id
+    ).outerjoin(
+        HospitalBranch, HospitalBranch.branch_id == User.branch_id
+    )
     
     # Apply filters - only feedback_type, status, and submitted_on
     if filters:
@@ -475,9 +571,12 @@ def get_all_feedback(
             feedback=feedback.subject,
             type=feedback.feedback_type.value,
             status=feedback.status.value,
-            submitted_on=feedback.submitted_on
+            submitted_on=feedback.submitted_on,
+            submitted_by_name=f"{user.first_name} {user.last_name}".strip() if user else None,
+            hospital_name=hospital.hospital_name if hospital else None,
+            branch_name=branch.branch_name if branch else None
         )
-        for feedback in feedback_list
+        for feedback, user, hospital, branch in feedback_list
     ]
 
 

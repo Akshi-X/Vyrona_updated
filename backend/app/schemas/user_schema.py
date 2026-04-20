@@ -105,6 +105,52 @@ class UserListResponse(BaseModel):
     users: List[UserListItem]
 
 
+class InviteUserRequest(BaseModel):
+    email: str
+    role: str
+    branch_name: Optional[str] = None
+
+
+class InviteTokenResponse(BaseModel):
+    email: str
+    role: str
+    branch_name: Optional[str] = None
+    hospital_name: Optional[str] = None
+    expires_at: datetime
+
+
+class RegisterFromInviteRequest(BaseModel):
+    token: str
+    first_name: str
+    last_name: str
+    password: str
+    confirm_password: str
+
+
+class HospitalUserItem(BaseModel):
+    """Schema for a hospital user in the users list"""
+    user_id: str
+    first_name: str
+    last_name: str
+    email: str
+    role: str
+    branch_name: Optional[str] = None
+    department: Optional[str] = None
+    status: bool = False
+    approved_status: str = "pending"
+    invite_pending: bool = False
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class HospitalUserListResponse(BaseModel):
+    """Response schema for listing hospital users"""
+    total_users: int
+    users: list[HospitalUserItem]
+
+
 class UserNameUpdateRequest(BaseModel):
     """Schema for updating user first and last name (and optional phone number)"""
     first_name: str

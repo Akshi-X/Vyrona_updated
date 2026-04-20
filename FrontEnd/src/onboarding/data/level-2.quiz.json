@@ -1,36 +1,116 @@
 [
     {
         "id": "ct-q1",
-        "prompt": "What does the Control Tower map show?",
-        "choices": ["Active lanes and risk zones", "User passwords", "Billing history", "Archived shipments"],
-        "correctIndex": 0,
-        "points": 15
+        "prompt": "What is the purpose of the Control Tower?",
+        "choices": [
+            "Manage user passwords",
+            "Centralize live oversight of containers, branches, and routes",
+            "Generate monthly billing reports",
+            "Archive old shipment records"
+        ],
+        "correctIndex": 1,
+        "points": 10
     },
     {
         "id": "ct-q2",
-        "prompt": "Which KPI indicates potential delay risk?",
-        "choices": ["Delay Risk Index", "User Activity", "Shipment Owner", "Cost per Mile"],
-        "correctIndex": 0,
-        "points": 15
+        "prompt": "What does the Direction toggle in the filter panel switch between?",
+        "choices": [
+            "Inbound and Outbound",
+            "Map view and List view",
+            "Cryotanks and Incubators",
+            "Admin and Staff roles"
+        ],
+        "correctIndex": 2,
+        "points": 10
     },
     {
         "id": "ct-q3",
-        "prompt": "Where do you trigger mitigation playbooks?",
-        "choices": ["Mitigation Actions queue", "Dashboard KPIs", "Settings", "User Profile"],
-        "correctIndex": 0,
+        "prompt": "What happens when you leave the Branch filter set to 'All Branches'?",
+        "choices": [
+            "Only the home branch is shown",
+            "The map is hidden",
+            "All branches and their assets are visible at once",
+            "Filters are reset to default"
+        ],
+        "correctIndex": 2,
         "points": 10
     },
     {
         "id": "ct-q4",
-        "prompt": "Why is the Control Tower useful?",
-        "choices": ["It replaces sensors", "It centralizes lane oversight", "It hides alerts", "It manages approvals"],
+        "prompt": "What does selecting a specific branch in the filter do?",
+        "choices": [
+            "Deletes data for other branches",
+            "Narrows the view to assets and routes at that location",
+            "Logs you into that branch",
+            "Sends an alert to that branch"
+        ],
         "correctIndex": 1,
         "points": 10
     },
     {
         "id": "ct-q5",
-        "prompt": "What should you check after a risk spike?",
-        "choices": ["Only the user profile", "Lane history and mitigation options", "Logout", "Delete the lane"],
+        "prompt": "Which status filter should you use to see only the highest-priority containers?",
+        "choices": ["Safe", "Risk", "All Status", "Critical"],
+        "correctIndex": 3,
+        "points": 10
+    },
+    {
+        "id": "ct-q6",
+        "prompt": "What three statuses can you filter containers by in the Control Tower?",
+        "choices": [
+            "Active, Inactive, Pending",
+            "Safe, Risk, Critical",
+            "Open, Closed, Archived",
+            "Low, Medium, High"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct-q7",
+        "prompt": "What does the Active Containers panel display for each container?",
+        "choices": [
+            "Container ID, status, branch, and date",
+            "User name, role, and login time",
+            "Invoice number and payment status",
+            "Sensor firmware version only"
+        ],
+        "correctIndex": 0,
+        "points": 10
+    },
+    {
+        "id": "ct-q8",
+        "prompt": "What can you do by clicking a container row in the list?",
+        "choices": [
+            "Delete the container",
+            "Assign it to a different branch",
+            "Drill into its sensor readings and history",
+            "Export it as a PDF"
+        ],
+        "correctIndex": 2,
+        "points": 10
+    },
+    {
+        "id": "ct-q9",
+        "prompt": "What does the Control Tower map visualize?",
+        "choices": [
+            "Employee attendance records",
+            "Every branch, route, and container status in real time",
+            "Monthly deviation trends only",
+            "Network connection speeds"
+        ],
+        "correctIndex": 1,
+        "points": 10
+    },
+    {
+        "id": "ct-q10",
+        "prompt": "After applying the Branch and Status filters together, what is the most effective next step?",
+        "choices": [
+            "Log out and check back later",
+            "Click a critical container to review its sensor readings",
+            "Reset all filters immediately",
+            "Switch to the dashboard home"
+        ],
         "correctIndex": 1,
         "points": 10
     }

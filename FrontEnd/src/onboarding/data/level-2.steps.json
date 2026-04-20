@@ -1,26 +1,179 @@
 [
     {
+        "id": "ct-sidebar-nav",
+        "target": "#onboarding-sidebar-control-tower",
+        "title": "Control Tower",
+        "icon": "Map",
+        "content": "Click the Control Tower in the sidebar to navigate there and see your live operational overview.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-control-tower"],
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "ct-filter-panel",
+        "target": "#onboarding-control-filter-panel",
+        "title": "Filter Panel",
+        "icon": "SlidersHorizontal",
+        "content": "Use these filters to narrow your view by direction, branch, or status — so you can focus on exactly the containers or routes that matter right now.",
+        "placement": "left",
+        "requireClick": false,
+        "startPage": "/onboarding/control-tower"
+    },
+    {
+        "id": "ct-overview-containers",
+        "target": "#onboarding-control-active-containers",
+        "title": "Active Containers",
+        "icon": "Package",
+        "content": "This panel lists every active container being monitored — container ID, status, and branch at a glance.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
+        "id": "ct-overview-map",
+        "target": "#onboarding-control-map",
+        "title": "Live Map",
+        "icon": "Map",
+        "content": "And here's the map tying it all together — every branch, route, and status visualised in real time. Now let's walk through the filters to see how you control this view.",
+        "placement": "bottom",
+        "requireClick": false
+    },
+    {
+        "id": "ct-filter-direction",
+        "target": "#onboarding-control-filter-direction",
+        "title": "Direction",
+        "icon": "SlidersHorizontal",
+        "content": "Toggle between Cryotanks and Incubators to switch the type of assets you're monitoring. Cryotanks tracks inbound cryo shipments; Incubators covers IVF incubation units.",
+        "placement": "left",
+        "requireClick": false
+    },
+    {
+        "id": "ct-filter-branch",
+        "target": "#onboarding-control-filter-branch",
+        "title": "Branch",
+        "icon": "SlidersHorizontal",
+        "content": "Select a specific branch to narrow your view to assets and routes associated with that location. Leave it as All Branches to see everything at once.",
+        "placement": "left",
+        "requireClick": false
+    },
+    {
+        "id": "ct-filter-branch-open",
+        "target": "#onboarding-control-branch-btn",
+        "title": "Open the Branch List",
+        "icon": "SlidersHorizontal",
+        "content": "Click this button to open the branch dropdown and see all available locations.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-control-branch-btn"]
+
+    },
+    {
+        "id": "ct-filter-branch-select",
+        "target": "#onboarding-control-branch-list",
+        "title": "Select a Branch",
+        "icon": "SlidersHorizontal",
+        "content": "Pick a branch from the list to narrow your view. Go ahead and select Egmore.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-control-branch-list-Egmore"],
+        "disableClickID": [
+            "#onboarding-control-branch-list-All",
+            "#onboarding-control-branch-list-Bangalore",
+            "#onboarding-control-branch-list-Coimbatore",
+            "#onboarding-control-branch-list-Delhi",
+            "#onboarding-control-branch-list-Hyderabad",
+            "#onboarding-control-branch-list-Jaipur",
+            "#onboarding-control-branch-list-Kochin",
+            "#onboarding-control-branch-list-Kolkata",
+            "#onboarding-control-branch-list-Lucknow",
+            "#onboarding-control-branch-list-Mumbai",
+            "#onboarding-control-branch-list-Nellore",
+            "#onboarding-control-branch-list-Pune",
+            "#onboarding-control-branch-list-Raipur",
+            "#onboarding-control-branch-list-Srinagar",
+            "#onboarding-control-branch-list-Tambaram",
+            "#onboarding-control-branch-list-Tirunelveli",
+            "#onboarding-control-branch-list-Varanasi"
+        ]
+    },
+    {
+        "id": "ct-filter-branch-selected",
+        "target": "#onboarding-control-active-containers",
+        "title": "Branch Selected",
+        "icon": "Package",
+        "content": "The branch filter is now set to Egmore. This panel updates instantly — you can see only the containers and routes associated with that location.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
+        "id": "ct-filter-status",
+        "target": "#onboarding-control-filter-status",
+        "title": "Status",
+        "icon": "SlidersHorizontal",
+        "content": "Filter by asset status — Safe, Risk, or Critical — to quickly zero in on what needs your attention right now.",
+        "placement": "left",
+        "requireClick": false
+    },
+    {
+        "id": "ct-filter-status-open",
+        "target": "#onboarding-control-status-btn",
+        "title": "Open the Status Filter",
+        "icon": "SlidersHorizontal",
+        "content": "Click here to open the status dropdown and see the available filter options.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-control-status-btn"]
+    },
+    {
+        "id": "ct-filter-status-select",
+        "target": "#onboarding-control-status-list",
+        "title": "Filter by Critical",
+        "icon": "SlidersHorizontal",
+        "content": "Select Critical to instantly surface only the containers that need immediate attention.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-control-status-list-Critical"],
+        "disableClickID": [
+            "#onboarding-control-status-list-All",
+            "#onboarding-control-status-list-Safe"
+        ]
+    },
+    {
+        "id": "ct-filter-status-selected",
+        "target": "#onboarding-control-active-containers",
+        "title": "Critical Containers",
+        "icon": "Package",
+        "content": "Status is now filtered to Critical. This list shows only containers flagged as critical — your highest priority items at a glance.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
+        "id": "ct-active-containers",
+        "target": "#onboarding-control-active-containers",
+        "title": "Active Containers",
+        "icon": "Package",
+        "content": "This panel lists every active container currently being monitored. Each row shows the container ID, status, and branch — giving you a live snapshot of your entire cryogenic network at a glance.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
         "id": "ct-map",
         "target": "#onboarding-control-map",
         "title": "Global Map",
-        "content": "This map visualizes the active lanes and risk zones. Click the map to continue.",
+        "icon": "Map",
+        "content": "This map visualizes the active lanes and risk zones across all your monitored sites.",
         "placement": "bottom",
-        "requireClick": true
+        "requireClick": false
     },
     {
         "id": "ct-kpi",
-        "target": "#onboarding-control-kpis",
-        "title": "Lane KPIs",
-        "content": "These KPIs show lane stability and delay risk. Click a KPI to continue.",
+        "target": "#onboarding-control-container-list",
+        "title": "Explore a Container",
+        "icon": "Activity",
+        "content": "Each row here is a live container. Click any tank to drill into its sensor readings and history — we'll dive deeper into this in the next level.",
         "placement": "right",
-        "requireClick": true
-    },
-    {
-        "id": "ct-actions",
-        "target": "#onboarding-control-actions",
-        "title": "Mitigation Actions",
-        "content": "Use this queue to trigger mitigation playbooks. Click the queue to continue.",
-        "placement": "top",
-        "requireClick": true
+        "requireClick": false
     }
 ]

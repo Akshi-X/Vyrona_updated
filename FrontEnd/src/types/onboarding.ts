@@ -16,8 +16,14 @@ export interface OnboardingStep {
     target: string;
     title: string;
     content: string;
+    icon?: string;
     placement?: "top" | "bottom" | "left" | "right" | "center";
     requireClick?: boolean;
+    prevDisable?: boolean;
+    clickOnlyId?: string[];
+    disableClickID?: string[];
+    genieImage?: string;
+    startPage?: string;
 }
 
 export interface OnboardingQuizQuestion {

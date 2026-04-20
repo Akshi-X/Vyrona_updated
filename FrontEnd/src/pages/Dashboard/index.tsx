@@ -166,25 +166,11 @@ export default function Dashboard({ }: DashboardProps) {
   const [loadingIvfTopDeviationDriver, setLoadingIvfTopDeviationDriver] = useState(false);
   const [ivfTopDeviationDriverError, setIvfTopDeviationDriverError] = useState<string | null>(null);
 
-  // IVF outbound shipments metric (live API data)
-  const [ivfOutboundShipments, setIvfOutboundShipments] = useState<number | null>(null);
-  const [loadingIvfOutboundShipments, setLoadingIvfOutboundShipments] = useState(false);
-  const [ivfOutboundShipmentsError, setIvfOutboundShipmentsError] = useState<string | null>(null);
 
-
-  // IVF total deviations metric (live API data)
-  const [ivfTotalDeviations, setIvfTotalDeviations] = useState<number | null>(null);
-  const [loadingIvfTotalDeviations, setLoadingIvfTotalDeviations] = useState(false);
-  const [ivfTotalDeviationsError, setIvfTotalDeviationsError] = useState<string | null>(null);
-
-  console.log(
-      ivfOutboundShipments,
-  loadingIvfOutboundShipments,
-  ivfOutboundShipmentsError,
-  ivfTotalDeviations,
-  loadingIvfTotalDeviations,
-  ivfTotalDeviationsError,
-  )
+  // IVF incubator deviations metric
+  const [ivfIncubatorDeviations, setIvfIncubatorDeviations] = useState<number | null>(null);
+  const [ivfIncubatorTopDriver, setIvfIncubatorTopDriver] = useState<string | null>(null);
+  const [loadingIvfIncubatorDeviations, setLoadingIvfIncubatorDeviations] = useState(false);
 
   // IVF quality deviation chart data (live API data)
   const [ivfQualityDeviationChart, setIvfQualityDeviationChart] = useState<{
@@ -209,9 +195,11 @@ export default function Dashboard({ }: DashboardProps) {
         const transformedChats: StakeholderChat[] = response.unread_messages.map((msg: UnreadMessageResponse) => ({
           id: msg.message_id.toString(),
           sender: msg.sender_name,
-          patientId: msg.canister_number
-            ? `Canister ID: ${msg.canister_number}`
-            : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'Unknown'),
+          patientId: msg.tank_code
+            ? `Tank: ${msg.tank_code}`
+            : msg.canister_number
+              ? `Canister ID: ${msg.canister_number}`
+              : (msg.patient_id ? `Patient ID: ${msg.patient_id}` : 'N/A'),
           message: msg.message_content,
           timestamp: new Date(msg.created_at).toLocaleString(),
           isRead: false // These are unread messages
@@ -662,61 +650,35 @@ export default function Dashboard({ }: DashboardProps) {
     };
   }, [userDepartment, isAuthenticated]);
 
-  // Fetch IVF outbound shipments from API
+
+  // Fetch IVF incubator deviations from API
   useEffect(() => {
     const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
     if (!shouldFetch) return;
 
     let cancelled = false;
-    const fetchOutboundShipments = async () => {
-      setLoadingIvfOutboundShipments(true);
-      setIvfOutboundShipmentsError(null);
+    const fetchIncubatorDeviations = async () => {
+      setLoadingIvfIncubatorDeviations(true);
       try {
-        const response = await ivfService.getOutboundShipments();
-        if (!cancelled) setIvfOutboundShipments(response?.total_outbound_shipments ?? 0);
-      } catch (e: any) {
+        const response = await ivfService.getIncubatorDeviations();
         if (!cancelled) {
-          setIvfOutboundShipments(null);
-          setIvfOutboundShipmentsError(e?.message || 'Failed to load outbound shipments');
+          setIvfIncubatorDeviations(response?.total_deviations ?? 0);
+          const sorted = Object.entries(response.deviations_by_kpi ?? {})
+            .sort(([, a], [, b]) => b - a);
+          setIvfIncubatorTopDriver(sorted[0]?.[0] ?? 'N/A');
+        }
+      } catch {
+        if (!cancelled) {
+          setIvfIncubatorDeviations(0);
+          setIvfIncubatorTopDriver('N/A');
         }
       } finally {
-        if (!cancelled) setLoadingIvfOutboundShipments(false);
+        if (!cancelled) setLoadingIvfIncubatorDeviations(false);
       }
     };
 
-    fetchOutboundShipments();
-    return () => {
-      cancelled = true;
-    };
-  }, [userDepartment, isAuthenticated]);
-
-
-  // Fetch IVF total deviations from API
-  useEffect(() => {
-    const shouldFetch = (userDepartment || '').toUpperCase() === 'IVF' && isAuthenticated;
-    if (!shouldFetch) return;
-
-    let cancelled = false;
-    const fetchTotalDeviations = async () => {
-      setLoadingIvfTotalDeviations(true);
-      setIvfTotalDeviationsError(null);
-      try {
-        const response = await ivfService.getTotalDeviations();
-        if (!cancelled) setIvfTotalDeviations(response?.total_deviations ?? 0);
-      } catch (e: any) {
-        if (!cancelled) {
-          setIvfTotalDeviations(null);
-          setIvfTotalDeviationsError(e?.message || 'Failed to load total deviations');
-        }
-      } finally {
-        if (!cancelled) setLoadingIvfTotalDeviations(false);
-      }
-    };
-
-    fetchTotalDeviations();
-    return () => {
-      cancelled = true;
-    };
+    fetchIncubatorDeviations();
+    return () => { cancelled = true; };
   }, [userDepartment, isAuthenticated]);
 
   // Fetch IVF quality deviation chart from API
@@ -1027,7 +989,33 @@ export default function Dashboard({ }: DashboardProps) {
 
   const dashboardActionIconsWithId = (
     <div id="onboarding-dashboard-alerts" className="flex items-center gap-4">
-      {dashboardActionIcons}
+      <div id="onboarding-dashboard-critical-alerts-icon" className="relative cursor-pointer"
+        onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
+        <img className="w-[22px] h-[22px]" alt="Critical Alerts" src={CriticalAlertsIcon} />
+        {criticalAlertsCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{criticalAlertsCount}</span>
+          </div>
+        )}
+      </div>
+      <div id="onboarding-dashboard-stakeholder-icon" className="relative cursor-pointer"
+        onClick={() => { refreshUnread(); fetchStakeholderChats(); setShowStakeholderChats(true); }}>
+        <img className="w-[22px] h-[22px]" alt="Stakeholder Chats" src={StakeholderChatsIcon} />
+        {stakeholderChatCount > 0 && (
+          <div className={`absolute -top-1 -right-1 bg-[#ff0000] rounded-full border border-white flex items-center justify-center ${stakeholderChatCount > 9 ? 'px-1 min-w-4' : 'w-4 h-4'}`}>
+            <span className="font-semibold text-white text-[10px]">{formatCount(stakeholderChatCount)}</span>
+          </div>
+        )}
+      </div>
+      <div id="onboarding-dashboard-mytasks-icon" className="relative cursor-pointer"
+        onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
+        <img className="w-[22px] h-[22px]" alt="My Tasks" src={MyTasksIcon} />
+        {myTasksCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-full border border-white flex items-center justify-center">
+            <span className="font-semibold text-white text-[10px]">{myTasksCount}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1068,11 +1056,11 @@ export default function Dashboard({ }: DashboardProps) {
                 {/* Left Column - Volume, Performance, Shipment sections */}
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   {/* Volume Section */}
-                  <section>
+                  <section id="onboarding-dashboard-kpis">
                     <h2 className="font-semibold text-black text-base mb-4">Volume</h2>
-                    <div id="onboarding-dashboard-kpis" className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-6">
                       {/* Total Embryos/Cryolocks */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-kpi-cryolocks" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Embryos" src={EmbryosIcon} />
@@ -1091,7 +1079,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Total number of Containers */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-kpi-containers" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Containers" src={ContainersIcon} />
@@ -1112,11 +1100,11 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Performance Section */}
-                  <section>
+                  <section id="onboarding-dashboard-performance">
                     <h2 className="font-semibold text-black text-base mb-4">Container Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Quality Deviations Flagged */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-performance-deviations" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
@@ -1135,7 +1123,7 @@ export default function Dashboard({ }: DashboardProps) {
                       </div>
 
                       {/* Top Deviation Driver */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-performance-driver" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-2 md:p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start md:mb-2 ml-2 md:ml-3 w-full min-w-0">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
@@ -1156,11 +1144,11 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Outbound Shipments Section */}
-                  <section>
+                  <section id="onboarding-dashboard-incubator">
                     <h2 className="font-semibold text-black text-base mb-4">Incubator Performance</h2>
                     <div className="grid grid-cols-2 gap-6">
                       {/* Outbound Shipments */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      <div id="onboarding-dashboard-incubator-deviations" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Quality Deviations" src={CriticalAlertsIcon} />
@@ -1169,32 +1157,26 @@ export default function Dashboard({ }: DashboardProps) {
                             Quality Deviations<br className="sm:hidden" /> Flagged
                           </div>
                           <div className="font-semibold text-black text-[28px] mt-1">
-                            <AnimatedNumber value={0} />
-                            {/* {loadingIvfOutboundShipments
+                            {loadingIvfIncubatorDeviations
                               ? '--'
-                              : ivfOutboundShipmentsError
-                                ? '0'
-                                : `${ivfOutboundShipments ?? 0}`} */}
+                              : <AnimatedNumber value={ivfIncubatorDeviations ?? 0} />}
                           </div>
                         </div>
                       </div>
 
-                      {/* Deviations */}
-                      <div className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
+                      {/* Incubator Top Deviation Driver */}
+                      <div id="onboarding-dashboard-incubator-driver" className="flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-3 sm:h-[123px]">
                         <div className="flex flex-col items-start mb-2 ml-3">
                           <div className="w-8 h-8 bg-[#fdf1ff] rounded-2xl flex items-center justify-center">
                             <img className="w-[18px] h-[18px]" alt="Deviation Driver" src={DeviationDriverIcon} />
                           </div>
                           <div className="font-normal text-[#656565] text-[11px] mt-2">
-                          Top Deviation<br className="sm:hidden" /> Driver
+                            Top Deviation<br className="sm:hidden" /> Driver
                           </div>
-                          <div className="font-semibold text-black text-[28px] mt-1">
-                            <AnimatedNumber value={0} />
-                            {/* {loadingIvfTotalDeviations
+                          <div className="font-semibold text-black text-[23px] mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={ivfIncubatorTopDriver || undefined}>
+                            {loadingIvfIncubatorDeviations
                               ? '--'
-                              : ivfTotalDeviationsError
-                                ? '0'
-                                : `${ivfTotalDeviations ?? 0}`} */}
+                              : ivfIncubatorTopDriver ?? 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -1206,10 +1188,11 @@ export default function Dashboard({ }: DashboardProps) {
                 <div className="flex-1 flex flex-col gap-6 min-w-0">
                   {/* <h1 className="font-semibold text-black text-lg">Monthly Summary</h1> */}
                   {/* Quality Tracking Links - Above the chart */}
-                  <section>
+                  <section id="onboarding-dashboard-quality-tracking">
                     <div className="flex gap-6 mt-10">
                       {/* Container Quality Tracking */}
                           <div
+                            id="onboarding-dashboard-cryocan-card"
                             className="flex-1 bg-[#6B1176] rounded-lg cursor-pointer transition-all drop-shadow-[0_3px_3px_rgba(0,0,0,0.10)] h-[123px] hover:drop-shadow-[0_3px_3px_rgba(0,0,0,0.18)] relative overflow-hidden hover:bg-[#7a1a88] hover:shadow-lg hover:-translate-y-0.5"
                         onClick={() => {
                           setShowTrackCanister(true);
@@ -1354,7 +1337,7 @@ export default function Dashboard({ }: DashboardProps) {
                   </section>
 
                   {/* Quality Deviation Chart - Below Quality Tracking */}
-                  <section className="flex-1 h-[347px]">
+                  <section id="onboarding-dashboard-deviation-chart" className="flex-1 h-[347px]">
                     {loadingIvfQualityDeviationChart ? (
                       <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[347px] flex items-center justify-center">
                         <p className="text-gray-500">Loading quality deviation data...</p>
@@ -1970,6 +1953,7 @@ export default function Dashboard({ }: DashboardProps) {
       <CriticalAlertsModal
         isOpen={showCriticalAlerts}
         onClose={() => setShowCriticalAlerts(false)}
+        id="onboarding-dashboard-critical-alerts-modal"
         alerts={transformedAlerts}
         loading={loadingAlerts}
         patientIdLabel={isIVF ? 'Tank Code' : 'Patient ID'}
@@ -1979,6 +1963,7 @@ export default function Dashboard({ }: DashboardProps) {
       <MyTasksModal
         isOpen={showMyTasks}
         onClose={() => setShowMyTasks(false)}
+        id="onboarding-dashboard-mytasks-modal"
         tasks={transformedTasks}
         loading={loadingTasks}
         variant="dashboard"
@@ -1988,6 +1973,7 @@ export default function Dashboard({ }: DashboardProps) {
       <StakeholderChatsModal
         isOpen={showStakeholderChats}
         onClose={() => setShowStakeholderChats(false)}
+        id="onboarding-dashboard-stakeholder-modal"
         chats={stakeholderChats}
         loading={loadingChats}
       />

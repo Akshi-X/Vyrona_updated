@@ -18,6 +18,10 @@ export interface ApiError {
   code?: string;
 }
 
+export interface ApiRequestOptions extends RequestInit {
+  skipMock?: boolean;
+}
+
 export class BaseApiService {
   protected baseUrl: string;
   protected useMock: boolean;
@@ -59,9 +63,10 @@ export class BaseApiService {
    */
   protected async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: ApiRequestOptions = {}
   ): Promise<T> {
-    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+    const { skipMock = false, ...requestOptions } = options;
+    if (!skipMock && BaseApiService.mockEnabled && BaseApiService.mockResolver) {
       const mocked = await BaseApiService.mockResolver(endpoint, options);
       if (mocked !== undefined) {
         return mocked as T;
@@ -84,7 +89,7 @@ export class BaseApiService {
     const requestPromise = (async () => {
       try {
         const response = await fetch(url, {
-          ...options,
+          ...requestOptions,
           headers,
           // credentials: 'include', // Removed to fix CORS issue
         });
@@ -147,9 +152,10 @@ export class BaseApiService {
   protected async requestFormData<T>(
     endpoint: string,
     formData: FormData,
-    options: RequestInit = {}
+    options: ApiRequestOptions = {}
   ): Promise<T> {
-    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+    const { skipMock = false, ...requestOptions } = options;
+    if (!skipMock && BaseApiService.mockEnabled && BaseApiService.mockResolver) {
       const mocked = await BaseApiService.mockResolver(endpoint, options);
       if (mocked !== undefined) {
         return mocked as T;
@@ -162,7 +168,7 @@ export class BaseApiService {
     };
 
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
       // credentials: 'include', // Removed to fix CORS issue
       body: formData,
@@ -197,9 +203,10 @@ export class BaseApiService {
    */
   protected async unauthenticatedRequest<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: ApiRequestOptions = {}
   ): Promise<T> {
-    if (BaseApiService.mockEnabled && BaseApiService.mockResolver) {
+    const { skipMock = false, ...requestOptions } = options;
+    if (!skipMock && BaseApiService.mockEnabled && BaseApiService.mockResolver) {
       const mocked = await BaseApiService.mockResolver(endpoint, options);
       if (mocked !== undefined) {
         return mocked as T;
@@ -212,7 +219,7 @@ export class BaseApiService {
     };
 
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
       // credentials: 'include', // Removed to fix CORS issue
     });
