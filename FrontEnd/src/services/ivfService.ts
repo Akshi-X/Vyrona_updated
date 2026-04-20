@@ -799,6 +799,13 @@ export class IvfService extends BaseApiService {
         );
     }
 
+    async getIncubatorDeviations(): Promise<TotalDeviationsResponse> {
+        return await this.request<TotalDeviationsResponse>(
+            "/api/ivf/incubator/metrics/deviations",
+            { method: "GET" },
+        );
+    }
+
     async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
         const raw = await this.request<DeviationsGraphResponse>(
             "/api/ivf/dashboard/metrics/deviations-graph",

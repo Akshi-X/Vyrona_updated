@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Header';
+import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
  
  
 interface Ticket {
@@ -13,6 +14,9 @@ interface Ticket {
   type: string;
   status: string; // Allow any status value from API
   submittedOn: string;
+  submittedByName?: string;
+  hospitalName?: string;
+  branchName?: string;
 }
  
 const NAME_MAX = 80;
@@ -41,6 +45,12 @@ const UserProfilePage: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState<boolean>(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedType, setSelectedType] = useState('All');
+  const [selectedHospital, setSelectedHospital] = useState('All');
+  const [selectedBranch, setSelectedBranch] = useState('All');
+  const [selectedSubmitter, setSelectedSubmitter] = useState('All');
  
   // Initialize name fields - removed hardcoded values, will be set by API call
  
@@ -142,6 +152,95 @@ const UserProfilePage: React.FC = () => {
     return () => { isMounted = false; };
   }, [isAuthChecked, isAuthenticated]);
  
+  const isMygrapeAdmin = role?.toLowerCase() === 'mygrape_admin';
+
+  const statusOptions = useMemo(() => {
+    const values = Array.from(new Set(tickets.map((t) => t.status).filter(Boolean)));
+    return ['All', ...values.sort()];
+  }, [tickets]);
+
+  const typeOptions = useMemo(() => {
+    const values = Array.from(new Set(tickets.map((t) => t.type).filter(Boolean)));
+    return ['All', ...values.sort()];
+  }, [tickets]);
+
+  const hospitalOptions = useMemo(() => {
+    const values = Array.from(new Set(tickets.map((t) => t.hospitalName).filter(Boolean))) as string[];
+    return ['All', ...values.sort()];
+  }, [tickets]);
+
+  const branchOptions = useMemo(() => {
+    const values = Array.from(new Set(tickets.map((t) => t.branchName).filter(Boolean))) as string[];
+    return ['All', ...values.sort()];
+  }, [tickets]);
+
+  const submitterOptions = useMemo(() => {
+    const values = Array.from(new Set(tickets.map((t) => t.submittedByName).filter(Boolean))) as string[];
+    return ['All', ...values.sort()];
+  }, [tickets]);
+
+  const filteredTickets = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return tickets.filter((ticket) => {
+      if (normalizedQuery) {
+        const haystack = [
+          ticket.id,
+          ticket.title,
+          ticket.type,
+          ticket.status,
+          ticket.submittedByName,
+          ticket.hospitalName,
+          ticket.branchName,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(normalizedQuery)) return false;
+      }
+
+      if (selectedStatus !== 'All' && ticket.status !== selectedStatus) return false;
+      if (selectedType !== 'All' && ticket.type !== selectedType) return false;
+      if (isMygrapeAdmin) {
+        if (selectedHospital !== 'All' && ticket.hospitalName !== selectedHospital) return false;
+        if (selectedBranch !== 'All' && ticket.branchName !== selectedBranch) return false;
+        if (selectedSubmitter !== 'All' && ticket.submittedByName !== selectedSubmitter) return false;
+      }
+
+      return true;
+    });
+  }, [
+    tickets,
+    searchQuery,
+    selectedStatus,
+    selectedType,
+    selectedHospital,
+    selectedBranch,
+    selectedSubmitter,
+    isMygrapeAdmin,
+  ]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery.trim()) count += 1;
+    if (selectedStatus !== 'All') count += 1;
+    if (selectedType !== 'All') count += 1;
+    if (isMygrapeAdmin) {
+      if (selectedHospital !== 'All') count += 1;
+      if (selectedBranch !== 'All') count += 1;
+      if (selectedSubmitter !== 'All') count += 1;
+    }
+    return count;
+  }, [
+    searchQuery,
+    selectedStatus,
+    selectedType,
+    selectedHospital,
+    selectedBranch,
+    selectedSubmitter,
+    isMygrapeAdmin,
+  ]);
+
   // Load tickets when role is known
   useEffect(() => {
     if (!role) return; // wait until role is resolved
@@ -156,7 +255,6 @@ const UserProfilePage: React.FC = () => {
       setTicketsError(null);
       setLoadingTickets(true);
  
-      const isMygrapeAdmin = role?.toLowerCase() === 'mygrape_admin';
       const ticketPromise = isMygrapeAdmin
         ? feedbackApi.getAllFeedbackTickets()
         : feedbackApi.getUserTickets(uid);
@@ -169,6 +267,9 @@ const UserProfilePage: React.FC = () => {
             type: t.type,
             status: t.status,
             submittedOn: new Date(t.submitted_on).toISOString().slice(0,10).replace(/-/g, '.'),
+            submittedByName: t.submitted_by_name || undefined,
+            hospitalName: t.hospital_name || undefined,
+            branchName: t.branch_name || undefined,
           }));
           if (!isMounted) return;
           setTickets(mapped);
@@ -183,7 +284,7 @@ const UserProfilePage: React.FC = () => {
         });
     })();
     return () => { isMounted = false; };
-  }, [role]);
+  }, [role, isMygrapeAdmin]);
  
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -534,7 +635,7 @@ const UserProfilePage: React.FC = () => {
           {saveError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
@@ -558,25 +659,169 @@ const UserProfilePage: React.FC = () => {
               >
                 Submit New Request
               </button>
+              <div className="md:hidden">
+                <FilterPanel activeCount={activeFilterCount}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search
+                    </label>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search tickets"
+                      className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                    />
+                  </div>
+                  <FilterSelect
+                    label="Status"
+                    value={selectedStatus}
+                    onChange={setSelectedStatus}
+                    options={statusOptions}
+                    allLabel="All Status"
+                  />
+                  <FilterSelect
+                    label="Type"
+                    value={selectedType}
+                    onChange={setSelectedType}
+                    options={typeOptions}
+                    allLabel="All Types"
+                  />
+                  {isMygrapeAdmin && (
+                    <FilterSelect
+                      label="Submitted By"
+                      value={selectedSubmitter}
+                      onChange={setSelectedSubmitter}
+                      options={submitterOptions}
+                      allLabel="All Submitters"
+                    />
+                  )}
+                  {isMygrapeAdmin && (
+                    <FilterSelect
+                      label="Hospital"
+                      value={selectedHospital}
+                      onChange={setSelectedHospital}
+                      options={hospitalOptions}
+                      allLabel="All Hospitals"
+                    />
+                  )}
+                  {isMygrapeAdmin && (
+                    <FilterSelect
+                      label="Branch"
+                      value={selectedBranch}
+                      onChange={setSelectedBranch}
+                      options={branchOptions}
+                      allLabel="All Branches"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedStatus('All');
+                      setSelectedType('All');
+                      setSelectedHospital('All');
+                      setSelectedBranch('All');
+                      setSelectedSubmitter('All');
+                    }}
+                    className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-[#6b1176] border border-[#6b1176] hover:bg-[#6b1176]/10"
+                  >
+                    Clear filters
+                  </button>
+                </FilterPanel>
+              </div>
             </div>
           </div>
  
           <div>
             <div className="flex items-center justify-between mb-4 pl-2">
               <h3 className="text-lg font-bold text-gray-700">
-                {role?.toLowerCase() === 'mygrape_admin'
+                {isMygrapeAdmin
                   ? 'All Tickets & Feedback'
                   : 'My Tickets & Feedback'
                 }
               </h3>
-              {role?.toLowerCase() === 'mygrape_admin' && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clipRule="evenodd" />
-                  </svg>
-                  Admin View
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {isMygrapeAdmin && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clipRule="evenodd" />
+                    </svg>
+                    Admin View
+                  </span>
+                )}
+                <div className="hidden md:flex">
+                  <FilterPanel activeCount={activeFilterCount}>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Search
+                      </label>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search tickets"
+                        className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
+                      />
+                    </div>
+                    <FilterSelect
+                      label="Status"
+                      value={selectedStatus}
+                      onChange={setSelectedStatus}
+                      options={statusOptions}
+                      allLabel="All Status"
+                    />
+                    <FilterSelect
+                      label="Type"
+                      value={selectedType}
+                      onChange={setSelectedType}
+                      options={typeOptions}
+                      allLabel="All Types"
+                    />
+                    {isMygrapeAdmin && (
+                      <FilterSelect
+                        label="Submitted By"
+                        value={selectedSubmitter}
+                        onChange={setSelectedSubmitter}
+                        options={submitterOptions}
+                        allLabel="All Submitters"
+                      />
+                    )}
+                    {isMygrapeAdmin && (
+                      <FilterSelect
+                        label="Hospital"
+                        value={selectedHospital}
+                        onChange={setSelectedHospital}
+                        options={hospitalOptions}
+                        allLabel="All Hospitals"
+                      />
+                    )}
+                    {isMygrapeAdmin && (
+                      <FilterSelect
+                        label="Branch"
+                        value={selectedBranch}
+                        onChange={setSelectedBranch}
+                        options={branchOptions}
+                        allLabel="All Branches"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSelectedStatus('All');
+                        setSelectedType('All');
+                        setSelectedHospital('All');
+                        setSelectedBranch('All');
+                        setSelectedSubmitter('All');
+                      }}
+                      className="mt-1 w-full px-3 h-11 rounded-lg text-sm font-medium text-[#6b1176] border border-[#6b1176] hover:bg-[#6b1176]/10"
+                    >
+                      Clear filters
+                    </button>
+                  </FilterPanel>
+                </div>
+              </div>
             </div>
             <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
               <div
@@ -594,14 +839,16 @@ const UserProfilePage: React.FC = () => {
                       <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
                         Title
                       </th>
+                      {isMygrapeAdmin && (
+                        <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
+                          Submitted By / Hospital / Branch
+                        </th>
+                      )}
                       <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
                         Type
                       </th>
                       <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
                         Status
-                      </th>
-                      <th className="p-[15px] font-semibold text-[#6b1176] text-sm text-left whitespace-nowrap">
-                        Submitted On
                       </th>
                     </tr>
                   </thead>
@@ -609,7 +856,7 @@ const UserProfilePage: React.FC = () => {
                     {loadingTickets ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={isMygrapeAdmin ? 5 : 4}
                           className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center"
                         >
                           Loading tickets...
@@ -618,42 +865,59 @@ const UserProfilePage: React.FC = () => {
                     ) : ticketsError ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={isMygrapeAdmin ? 5 : 4}
                           className="bg-white p-[15px] font-normal text-red-600 text-sm text-center"
                         >
                           {ticketsError}
                         </td>
                       </tr>
-                    ) : tickets.length === 0 ? (
+                    ) : filteredTickets.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={isMygrapeAdmin ? 5 : 4}
                           className="bg-white p-[15px] font-normal text-[#333333] text-sm text-center"
                         >
                           No tickets found.
                         </td>
                       </tr>
                     ) : (
-                      tickets.map((ticket) => (
-                        <tr key={ticket.id} className="border-b border-[#eeeeee] hover:bg-white/50">
+                      filteredTickets.map((ticket) => (
+                        <tr
+                          key={ticket.id}
+                          className="border-b border-[#eeeeee] hover:bg-white/50 cursor-pointer"
+                          onClick={() => navigateToTicketPrefilled(ticket)}
+                        >
                           <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
-                            <a
-                              href="#"
-                              className="font-medium hover:opacity-80"
+                            <span
+                              className="font-medium"
                               style={{ color: COLORS.primary.purpleDark }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                navigateToTicketPrefilled(ticket);
-                              }}
                             >
                               {ticket.id}
-                            </a>
+                            </span>
                           </td>
                           <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
-                            <div className="truncate break-words max-w-[220px]" title={ticket.title}>
-                              {ticket.title}
+                            <div className="flex flex-col gap-1">
+                              <div className="truncate wrap-break-word max-w-60" title={ticket.title}>
+                                {ticket.title}
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {ticket.submittedOn.replace(/\./g, '-')}
+                              </span>
                             </div>
                           </td>
+                          {isMygrapeAdmin && (
+                            <td className="bg-white p-[15px] font-normal text-[#333333] text-sm">
+                              <div className="flex flex-col gap-1">
+                                <span className="font-medium">
+                                  {ticket.submittedByName || '—'}
+                                </span>
+                                <span className="text-xs text-gray-600">
+                                  {ticket.hospitalName || '—'}
+                                  {ticket.branchName ? ` • ${ticket.branchName}` : ''}
+                                </span>
+                              </div>
+                            </td>
+                          )}
                           <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
                             {ticket.type}
                           </td>
@@ -661,9 +925,6 @@ const UserProfilePage: React.FC = () => {
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(ticket.status)}`}>
                               {ticket.status}
                             </span>
-                          </td>
-                          <td className="bg-white p-[15px] font-normal text-[#333333] text-sm whitespace-nowrap">
-                            {ticket.submittedOn.replace(/\./g, '-')}
                           </td>
                         </tr>
                       ))

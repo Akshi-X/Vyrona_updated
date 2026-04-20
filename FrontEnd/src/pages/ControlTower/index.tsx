@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
@@ -37,6 +37,8 @@ const formatSensorLabel = (countValue: unknown): string => {
 const ControlTower = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isOnboarding = location.pathname.startsWith("/onboarding");
 
     const [selectedRegion, setSelectedRegion] = useState<string>("All");
     const [selectedStatusInbound, setSelectedStatusInbound] =
@@ -601,33 +603,39 @@ const ControlTower = () => {
                         <div className="order-2 lg:order-1 flex flex-col gap-6 min-w-0 lg:h-full lg:min-h-0 lg:row-span-2">
 
                             {/* Inline Filter Panel — desktop only */}
-                            <div className="hidden lg:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 shrink-0">
+                            <div id="onboarding-control-filter-panel" className="hidden lg:flex flex-col gap-3 bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 shrink-0">
                                 {isIvfUser && (
-                                    <FilterToggle
-                                        label="Direction"
-                                        value={direction}
-                                        onChange={(v) => setDirection(v as "inbound" | "outbound")}
-                                        options={[
-                                            { label: "Cryotanks", value: "inbound" },
-                                            { label: "Incubators", value: "outbound", disabled: isIvfUser },
-                                        ]}
-                                    />
+                                    <div id="onboarding-control-filter-direction">
+                                        <FilterToggle
+                                            label="Direction"
+                                            value={direction}
+                                            onChange={(v) => setDirection(v as "inbound" | "outbound")}
+                                            options={[
+                                                { label: "Cryotanks", value: "inbound" },
+                                                { label: "Incubators", value: "outbound", disabled: isIvfUser },
+                                            ]}
+                                        />
+                                    </div>
                                 )}
                                 {direction === "inbound" && (
-                                    <FilterSelect
-                                        label="Branch"
-                                        value={selectedBranch}
-                                        onChange={(v) => {
-                                            setSelectedBranch(v);
-                                            setIsBranchFilterFromMap(false);
-                                            if (v === "All") {
-                                                setZoomToLocation(null);
-                                                setZoomToBranchName(null);
-                                            }
-                                        }}
-                                        options={branchOptions}
-                                        allLabel="All Branches"
-                                    />
+                                    <div id="onboarding-control-filter-branch">
+                                        <FilterSelect
+                                            label="Branch"
+                                            value={selectedBranch}
+                                            onChange={(v) => {
+                                                setSelectedBranch(v);
+                                                setIsBranchFilterFromMap(false);
+                                                if (v === "All") {
+                                                    setZoomToLocation(null);
+                                                    setZoomToBranchName(null);
+                                                }
+                                            }}
+                                            options={branchOptions}
+                                            allLabel="All Branches"
+                                            buttonId="onboarding-control-branch-btn"
+                                            listId="onboarding-control-branch-list"
+                                        />
+                                    </div>
                                 )}
                                 {direction === "outbound" && (
                                     <FilterSelect
@@ -638,13 +646,17 @@ const ControlTower = () => {
                                         allLabel="All Regions"
                                     />
                                 )}
-                                <FilterSelect
-                                    label="Status"
-                                    value={direction === "inbound" ? selectedStatusInbound : selectedStatusOutbound}
-                                    onChange={(v) => direction === "inbound" ? setSelectedStatusInbound(v) : setSelectedStatusOutbound(v)}
-                                    options={statusOptions}
-                                    allLabel="All Status"
-                                />
+                                <div id="onboarding-control-filter-status">
+                                    <FilterSelect
+                                        label="Status"
+                                        value={direction === "inbound" ? selectedStatusInbound : selectedStatusOutbound}
+                                        onChange={(v) => direction === "inbound" ? setSelectedStatusInbound(v) : setSelectedStatusOutbound(v)}
+                                        options={statusOptions}
+                                        allLabel="All Status"
+                                        buttonId="onboarding-control-status-btn"
+                                        listId="onboarding-control-status-list"
+                                    />
+                                </div>
                                 {direction === "outbound" && (
                                     <FilterSelect
                                         label="Carrier"
@@ -657,7 +669,7 @@ const ControlTower = () => {
                             </div>
 
                             {/* Active Routes/Canisters List */}
-                            <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
+                            <div id="onboarding-control-active-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 w-full flex-1 flex flex-col overflow-hidden min-h-80">
                                 <h2 className="font-bold text-black text-base mb-2">
                                     {isIvfUser
                                         ? "Active Containers"
@@ -677,6 +689,7 @@ const ControlTower = () => {
                                     </div>
                                 </div>
                                 <div
+                                    id="onboarding-control-container-list"
                                     className="flex-1 overflow-y-auto overflow-x-hidden mt-1 divide-y divide-gray-100"
                                     style={{
                                         scrollbarWidth: "thin",
@@ -916,9 +929,8 @@ const ControlTower = () => {
                                                                     : "border-[#A6F4C5] bg-[#ECFDF3] text-[#027A48]";
                                                             return (
                                                                 <div
-                                                                    key={
-                                                                        canister.id
-                                                                    }
+                                                                    key={canister.id}
+                                                                    id={canister.id}
                                                                     className="grid grid-cols-3 pl-2 pr-2 py-2 hover:bg-gray-50 items-center overflow-hidden gap-3 cursor-pointer"
                                                                     onClick={() => {
                                                                         try {
@@ -934,15 +946,14 @@ const ControlTower = () => {
                                                                                     ),
                                                                                 );
                                                                             }
-                                                                            navigate(
-                                                                                `/ivf-track-shipment/${encodeURIComponent(
-                                                                                    canister.tankId &&
-                                                                                        canister.tankId !==
-                                                                                            "N/A"
-                                                                                        ? canister.tankId
-                                                                                        : canister.canisterId,
-                                                                                )}`,
+                                                                            const tankParam = encodeURIComponent(
+                                                                                canister.tankId &&
+                                                                                    canister.tankId !== "N/A"
+                                                                                    ? canister.tankId
+                                                                                    : canister.canisterId,
                                                                             );
+                                                                            const prefix = isOnboarding ? "/onboarding" : "";
+                                                                            navigate(`${prefix}/ivf-track-shipment/${tankParam}`);
                                                                         } catch {}
                                                                     }}
                                                                 >
@@ -1018,7 +1029,7 @@ const ControlTower = () => {
                         </div>
 
                         {/* Right Panel - Map Visualization */}
-                        <div className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full h-[45vh] lg:row-span-2 lg:h-full lg:min-h-0">
+                        <div id="onboarding-control-map" className="order-1 lg:order-2 flex flex-col gap-6 min-w-0 w-full h-[45vh] lg:row-span-2 lg:h-full lg:min-h-0">
                             <ControlTowerMap
                                 filters={{
                                     selectedRegion,

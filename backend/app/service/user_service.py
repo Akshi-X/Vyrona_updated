@@ -15,8 +15,15 @@ from app.schemas.response_schema import (
     UserRejectionResponse,
     UserDetailsResponse
 )
-from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse
-from app.service.email_service import send_approval_email, send_user_approved_notification
+from app.schemas.user_schema import UserListResponse, UserListItem, UserNameUpdateRequest, UserUpdateResponse, HospitalUserItem, HospitalUserListResponse, InviteUserRequest, InviteTokenResponse, RegisterFromInviteRequest
+from app.service.email_service import send_approval_email, send_user_approved_notification, send_invite_email
+from app.service.activity_log_service import (
+    ActivityLogService,
+    build_actor_from_user,
+    build_target,
+    is_audit_log_disabled_for_user,
+)
+from app.constants.enums import ActivityOutcome
 from app.utils import utils
 from app.exceptions import (
     EmailAlreadyExistsException,
@@ -399,6 +406,27 @@ def register_user(db: Session, request: user_schema.UserRegister) -> UserRegistr
         db.commit()
         db.refresh(user)
         logger.info(f"User and pharma created successfully: {user.user_id}")
+
+        ActivityLogService(db).log_activity(
+            action="user.registered",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+            metadata={
+                "role": role,
+                "department": department,
+                "approval_sent_to": recipient_email,
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
+
+        ActivityLogService(db).log_activity(
+            action="email.user_approval_requested",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            metadata={"recipient_email": recipient_email},
+            audit_log_disabled=is_audit_log_disabled_for_user(user),
+        )
         
     except IntegrityError as e:
         db.rollback()
@@ -537,6 +565,15 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
     
     db.commit()
     db.refresh(user)
+
+    ActivityLogService(db).log_activity(
+        action="user.approved",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(approver),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={"role": normalize_role_to_title_case(user.role)},
+        audit_log_disabled=is_audit_log_disabled_for_user(approver),
+    )
     
     # Get company name for email
     is_hospital_user = is_hospital_department(user.department) if user.department else False
@@ -578,6 +615,14 @@ def approve_user(registration_id: str, approved_by_user_id: str, db: Session) ->
             approved_date=approved_date
         )
         logger.info(f"Approval notification email sent to {user.email}")
+        ActivityLogService(db).log_activity(
+            action="email.user_approved_sent",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(approver),
+            target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+            metadata={"recipient_email": user.email},
+            audit_log_disabled=is_audit_log_disabled_for_user(approver),
+        )
     except Exception as e:
         # Log email failure but don't fail the approval process
         logger.error(f"Failed to send approval notification email to {user.email}: {str(e)}")
@@ -643,6 +688,15 @@ def reject_user(registration_id: str, rejected_by_user_id: str, db: Session) -> 
     user.updated_at = datetime.now(timezone.utc)
     
     db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="user.rejected",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(rejector),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={"role": normalize_role_to_title_case(user.role)},
+        audit_log_disabled=is_audit_log_disabled_for_user(rejector),
+    )
     
     # Build response object
     response = UserRejectionResponse(
@@ -826,6 +880,237 @@ def get_all_users(db: Session, current_user: User) -> UserListResponse:
         raise DatabaseQueryException(operation="list users", reason=str(e))
 
 
+def get_hospital_users(db: Session, current_user: User) -> HospitalUserListResponse:
+    """
+    Get all users belonging to the same hospital as the current user.
+    Returns hospital-specific fields only (no pharma data).
+    """
+    try:
+        if current_user.hospital_id is None:
+            return HospitalUserListResponse(total_users=0, users=[])
+
+        users = db.query(User).filter(
+            User.hospital_id == current_user.hospital_id,
+        ).all()
+
+        user_items = [
+            HospitalUserItem(
+                user_id=user.user_id,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                email=user.email,
+                role=normalize_role_to_title_case(user.role),
+                branch_name=user.branch.branch_name if user.branch else None,
+                department=user.department,
+                status=bool(user.status),
+                approved_status=user.approved_status if isinstance(user.approved_status, str) else user.approved_status.value,
+                invite_pending=user.invite_token is not None,
+                last_login=user.last_login,
+            )
+            for user in users
+        ]
+
+        return HospitalUserListResponse(total_users=len(user_items), users=user_items)
+    except Exception as e:
+        raise DatabaseQueryException(operation="list hospital users", reason=str(e))
+
+
+def invite_user(db: Session, current_user: User, email: str, role: str, base_url: str, branch_name: str = None) -> dict:
+    """Create a pending user row with an invite token and send the invite email."""
+    import uuid
+    from datetime import timedelta
+
+    if current_user.hospital_id is None:
+        raise ValueError("Current user is not associated with a hospital.")
+
+    # Duplicate check
+    existing = db.query(User).filter(User.email == email.lower().strip()).first()
+    if existing:
+        raise ValueError("A user with this email already exists.")
+
+    role_norm = normalize_role_to_title_case(role)
+    if role_norm not in ("User", "Manager", "Admin"):
+        raise ValueError("Role must be User, Manager, or Admin.")
+
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == current_user.hospital_id).first()
+    if not hospital:
+        raise ValueError("Hospital not found.")
+
+    branch_id = None
+    if role_norm == "User":
+        if not branch_name:
+            raise ValueError("branch_name is required for User role.")
+        branch = db.query(HospitalBranch).filter(
+            HospitalBranch.branch_name == branch_name,
+            HospitalBranch.hospital_id == hospital.hospital_id,
+        ).first()
+        if not branch:
+            raise ValueError(f"Branch '{branch_name}' not found.")
+        branch_id = branch.branch_id
+
+    token = uuid.uuid4().hex
+    expires_at = datetime.now(timezone.utc) + timedelta(weeks=1)
+    department = hospital.hospital_type or "IVF"
+
+    invited_user = User(
+        user_id=utils.generate_user_id(),
+        first_name="",
+        last_name="",
+        email=email.lower().strip(),
+        password_hash="INVITE_PENDING",
+        role=role_norm,
+        hospital_id=hospital.hospital_id,
+        branch_id=branch_id,
+        department=department,
+        approved_status="pending",
+        status=False,
+        created_by=current_user.user_id,
+        invite_token=token,
+        invite_token_expires_at=expires_at,
+    )
+    db.add(invited_user)
+    db.commit()
+
+    invite_url = f"{base_url}/invite?token={token}"
+    invited_by = f"{current_user.first_name} {current_user.last_name}".strip() or current_user.email
+    send_invite_email(
+        recipient_email=email,
+        invited_by=invited_by,
+        role=role_norm,
+        company=hospital.hospital_name,
+        signup_url=invite_url,
+    )
+    ActivityLogService(db).log_activity(
+        action="user.invited",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("email", email.lower().strip(), email.lower().strip()),
+        metadata={
+            "recipient_email": email.lower().strip(),
+            "role": role_norm,
+            "branch_name": branch_name,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+    return {"message": f"Invite sent to {email}"}
+
+
+def resend_invite(db: Session, current_user: User, user_id: str, base_url: str) -> dict:
+    """Generate a fresh invite token for a pending user and resend the email."""
+    import uuid
+    from datetime import timedelta
+
+    target = db.query(User).filter(User.user_id == user_id).first()
+    if not target:
+        raise ValueError("User not found.")
+    if target.hospital_id != current_user.hospital_id:
+        raise ValueError("Access denied.")
+    if target.status:
+        raise ValueError("User has already accepted the invite.")
+    if not target.invite_token:
+        raise ValueError("No pending invite for this user.")
+
+    hospital = db.query(Hospital).filter(Hospital.hospital_id == current_user.hospital_id).first()
+
+    token = uuid.uuid4().hex
+    target.invite_token = token
+    target.invite_token_expires_at = datetime.now(timezone.utc) + timedelta(weeks=1)
+    db.commit()
+
+    invite_url = f"{base_url}/invite?token={token}"
+    invited_by = f"{current_user.first_name} {current_user.last_name}".strip() or current_user.email
+    send_invite_email(
+        recipient_email=target.email,
+        invited_by=invited_by,
+        role=normalize_role_to_title_case(target.role),
+        company=hospital.hospital_name if hospital else "myGrape",
+        signup_url=invite_url,
+    )
+    return {"message": f"Invite resent to {target.email}"}
+
+
+def get_invite_token(db: Session, token: str) -> InviteTokenResponse:
+    """Validate an invite token and return its metadata (stored in users table)."""
+    user = db.query(User).filter(User.invite_token == token).first()
+    if not user:
+        raise ValueError("Invalid invite link.")
+    if user.status:
+        raise ValueError("This invite link has already been used.")
+    now = datetime.now(timezone.utc)
+    expires = user.invite_token_expires_at
+    if expires and expires.tzinfo is None:
+        from datetime import timezone as tz
+        expires = expires.replace(tzinfo=tz.utc)
+    if expires and now > expires:
+        raise ValueError("This invite link has expired.")
+
+    hospital_name = None
+    if user.hospital_id:
+        hospital = db.query(Hospital).filter(Hospital.hospital_id == user.hospital_id).first()
+        hospital_name = hospital.hospital_name if hospital else None
+
+    branch_name = user.branch.branch_name if user.branch else None
+
+    return InviteTokenResponse(
+        email=user.email,
+        role=normalize_role_to_title_case(user.role),
+        branch_name=branch_name,
+        hospital_name=hospital_name,
+        expires_at=user.invite_token_expires_at,
+    )
+
+
+def register_from_invite(db: Session, data: RegisterFromInviteRequest) -> dict:
+    """Complete registration from an invite link by updating the pending user row."""
+    if data.password != data.confirm_password:
+        raise ValueError("Passwords do not match.")
+
+    user = db.query(User).filter(User.invite_token == data.token).first()
+    if not user:
+        raise ValueError("Invalid invite link.")
+    if user.status:
+        raise ValueError("This invite link has already been used.")
+    now = datetime.now(timezone.utc)
+    expires = user.invite_token_expires_at
+    if expires and expires.tzinfo is None:
+        from datetime import timezone as tz
+        expires = expires.replace(tzinfo=tz.utc)
+    if expires and now > expires:
+        raise ValueError("This invite link has expired.")
+
+    user.first_name = data.first_name.strip()
+    user.last_name = data.last_name.strip()
+    user.password_hash = utils.hash_password(data.password)
+    user.approved_status = "approved"
+    user.approved_by = user.created_by
+    user.approved_on = now
+    user.status = True
+    user.invite_token = None
+    user.invite_token_expires_at = None
+    user.updated_at = now
+    db.commit()
+
+    branch_name = None
+    if user.branch_id is not None:
+        branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == user.branch_id).first()
+        branch_name = branch.branch_name if branch else None
+
+    ActivityLogService(db).log_activity(
+        action="user.invite_registered",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(user),
+        target=build_target("user", user.user_id, f"{user.first_name} {user.last_name}".strip()),
+        metadata={
+            "recipient_email": user.email,
+            "role": normalize_role_to_title_case(user.role),
+            "branch_name": branch_name,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(user),
+    )
+
+    return {"message": "Account created successfully.", "user_id": user.user_id}
+
+
 def _resolve_hospital_id_from_branch(db: Session, user: User) -> Optional[int]:
     """
     Resolve hospital_id from user.branch_id when user.hospital_id is null.
@@ -967,6 +1252,20 @@ def update_user_name(
         
         db.commit()
         db.refresh(target_user)
+
+        fields = ["first_name", "last_name"]
+        if update_request.phone_number is not None:
+            fields.append("phone_number")
+        ActivityLogService(db).log_activity(
+            action="user.profile_updated",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(current_user),
+            target=build_target("user", target_user.user_id, f"{target_user.first_name} {target_user.last_name}".strip()),
+            metadata={
+                "fields": fields,
+            },
+            audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+        )
         
         # Build response object
         response = user_schema.UserUpdateResponse(
