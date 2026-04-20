@@ -102,7 +102,7 @@ def get_quality_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -169,7 +169,7 @@ def get_ln2_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -197,7 +197,7 @@ def get_ln2_history_by_id(
         raise HTTPException(status_code=404, detail=f"Tank with id '{tank_id}' not found")
 
     try:
-        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id)
+        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -222,7 +222,7 @@ def get_tank_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
@@ -394,7 +394,7 @@ def get_tank_kpi_history(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -515,7 +515,7 @@ def get_tank_kpi_history_by_date(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -596,7 +596,7 @@ def append_tank_kpi_reading(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     if not body or "kpis" not in body:
@@ -781,7 +781,7 @@ def list_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
