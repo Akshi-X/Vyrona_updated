@@ -78,4 +78,3 @@ jobs:
         with:
           app-name: mgscale-frontnd-dev
           package: dist
-
