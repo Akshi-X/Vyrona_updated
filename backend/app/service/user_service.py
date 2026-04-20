@@ -905,6 +905,7 @@ def get_hospital_users(db: Session, current_user: User) -> HospitalUserListRespo
                 status=bool(user.status),
                 approved_status=user.approved_status if isinstance(user.approved_status, str) else user.approved_status.value,
                 invite_pending=user.invite_token is not None,
+                last_login=user.last_login,
             )
             for user in users
         ]

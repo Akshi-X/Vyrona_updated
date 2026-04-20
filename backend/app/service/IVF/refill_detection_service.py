@@ -103,22 +103,19 @@ class RefillDetectionService:
         return detection
 
     def get_pending_detections(
-        self, hospital_id: Optional[int]
+        self, hospital_id: Optional[int], branch_id: Optional[int] = None
     ) -> List[Ln2RefillDetection]:
         """
         Return unconfirmed (is_confirmed IS NULL) detections for a hospital.
-
-        Args:
-            hospital_id: Filter by this hospital, or None to return all.
-
-        Returns:
-            List of Ln2RefillDetection rows ordered by detected_at descending.
+        Optionally scoped to a specific branch for regular users.
         """
         query = self.db.query(Ln2RefillDetection).filter(
             Ln2RefillDetection.is_confirmed == None  # noqa: E711
         )
         if hospital_id is not None:
             query = query.filter(Ln2RefillDetection.hospital_id == hospital_id)
+        if branch_id is not None:
+            query = query.filter(Ln2RefillDetection.branch_id == branch_id)
         return query.order_by(Ln2RefillDetection.detected_at.asc()).all()
 
     def review_detection(

@@ -46,6 +46,21 @@ router = APIRouter(
 )
 
 
+def _assert_tank_hospital(tank_id: int, current_user: User, db: Session) -> None:
+    """Raise 403 if the tank does not belong to the current user's hospital."""
+    if not current_user.hospital_id:
+        return
+    from sqlalchemy import text as _text
+    from app.models.IVF.hospital_branch_model import HospitalBranch
+    from app.models.IVF.tank_model import Tank
+    tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
+    if not tank:
+        raise HTTPException(status_code=404, detail=f"Tank {tank_id} not found")
+    branch = db.query(HospitalBranch).filter(HospitalBranch.branch_id == tank.branch_id).first()
+    if not branch or branch.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied: tank does not belong to your hospital")
+
+
 @router.post("/tanks/{tank_id}/refill-logs", response_model=RefillLogResponse, status_code=201)
 def create_refill_log(
     tank_id: int = Path(..., description="Tank ID from URL (e.g., 91)"),
@@ -70,6 +85,7 @@ def create_refill_log(
     - Status: Status of the refill log (default: Not started)
     """
     try:
+        _assert_tank_hospital(tank_id, current_user, db)
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
         return quality_tracking_service.create_refill_log_for_tank(
@@ -79,6 +95,8 @@ def create_refill_log(
             created_by=current_user.email if current_user else None,
             branch_id=branch_id
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in create_refill_log endpoint: {str(e)}", exc_info=True)
         raise
@@ -119,6 +137,7 @@ def get_refill_logs_by_container(
                     detail=f"Invalid status value. Must be one of: {', '.join([s.value for s in TaskStatus])}"
                 )
         
+        _assert_tank_hospital(tank_id, current_user, db)
         branch_id, _ = get_branch_filter_info(request, branch_id_override=branch_id_override, is_quality_tracking=True) if request else (None, None)
         quality_tracking_service = QualityTrackingService(db)
         return quality_tracking_service.get_refill_logs_for_tank(
@@ -525,6 +544,30 @@ def get_tanks_refill_summary(
 
     from sqlalchemy import text as sa_text
 
+    # Restrict tank_ids to current user's hospital (and branch for regular users)
+    if current_user.hospital_id:
+        allowed = db.execute(
+            sa_text("""
+                SELECT t.tank_id FROM tanks t
+                JOIN hospital_branches b ON b.branch_id = t.branch_id
+                WHERE t.tank_id = ANY(:ids) AND b.hospital_id = :hid
+            """),
+            {"ids": id_list, "hid": current_user.hospital_id},
+        ).fetchall()
+        id_list = [r.tank_id for r in allowed]
+
+    if current_user.branch_id and current_user.role not in ("Admin", "Manager", "Mygrape_admin"):
+        id_list = [
+            r.tank_id
+            for r in db.execute(
+                sa_text("SELECT tank_id FROM tanks WHERE tank_id = ANY(:ids) AND branch_id = :bid"),
+                {"ids": id_list, "bid": current_user.branch_id},
+            ).fetchall()
+        ]
+
+    if not id_list:
+        return {"summary": {}}
+
     rows = db.execute(
         sa_text("""
             WITH latest_log AS (
@@ -621,8 +664,22 @@ def get_all_tanks_refill_logs(
     if not id_list:
         return {"logs": []}
 
+    params: dict = {"ids": id_list}
+    hospital_clause = ""
+    branch_clause = ""
+
+    # Always restrict to the current user's hospital
+    if current_user.hospital_id:
+        hospital_clause = "AND b.hospital_id = :hospital_id"
+        params["hospital_id"] = current_user.hospital_id
+
+    # Users (non-admin, non-manager) only see their own branch
+    if current_user.branch_id and current_user.role not in ("Admin", "Manager", "Mygrape_admin"):
+        branch_clause = "AND t.branch_id = :branch_id"
+        params["branch_id"] = current_user.branch_id
+
     rows = db.execute(
-        sa_text("""
+        sa_text(f"""
             SELECT
                 l.tank_id,
                 t.tank_code,
@@ -634,11 +691,13 @@ def get_all_tanks_refill_logs(
                 l.status
             FROM canister_ln2_logs l
             JOIN tanks t ON t.tank_id = l.tank_id
-            LEFT JOIN hospital_branches b ON b.branch_id = l.branch_id
+            JOIN hospital_branches b ON b.branch_id = t.branch_id
             WHERE l.tank_id = ANY(:ids)
+            {hospital_clause}
+            {branch_clause}
             ORDER BY l.refill_date DESC NULLS LAST, l.refill_time DESC NULLS LAST
         """),
-        {"ids": id_list},
+        params,
     ).fetchall()
 
     logs = [
@@ -678,7 +737,8 @@ def get_pending_refill_detections(
     'Refill Detected' notification banner.
     """
     service = RefillDetectionService(db)
-    detections = service.get_pending_detections(current_user.hospital_id)
+    branch_filter = current_user.branch_id if current_user.role not in ("Admin", "Manager", "Mygrape_admin") else None
+    detections = service.get_pending_detections(current_user.hospital_id, branch_filter)
 
     items = []
     for d in detections:
@@ -722,6 +782,15 @@ def review_refill_detection(
     )
     service = RefillDetectionService(db)
     try:
+        from app.models.IVF.ln2_refill_detection_model import Ln2RefillDetection
+        detection_record = db.query(Ln2RefillDetection).filter(
+            Ln2RefillDetection.id == detection_id
+        ).first()
+        if not detection_record:
+            raise HTTPException(status_code=404, detail="Detection not found")
+        if current_user.hospital_id and detection_record.hospital_id != current_user.hospital_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
         detection = service.review_detection(
             detection_id=detection_id,
             is_confirmed=body.is_confirmed,

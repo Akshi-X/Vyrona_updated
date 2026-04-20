@@ -46,6 +46,7 @@ export interface HospitalUserItem {
   status: boolean;
   approved_status: string;
   invite_pending: boolean;
+  last_login?: string | null;
 }
 
 export interface HospitalUserListResponse {

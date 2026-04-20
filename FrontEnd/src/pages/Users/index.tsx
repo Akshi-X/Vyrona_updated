@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { Users, UserPlus } from "lucide-react";
 import PageLayout from "../../components/PageLayout";
 import { useAuth } from "../../contexts/AuthContext";
@@ -37,6 +38,9 @@ export default function UsersPage() {
     const [inviteBranch, setInviteBranch] = useState("");
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteStatus, setInviteStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
+
+    const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -84,17 +88,18 @@ export default function UsersPage() {
     const handleReset = () => setFilters({ role: "All", branch: "All" });
 
     const handleInvite = async () => {
-        if (!inviteEmail.trim()) return;
+        if (!inviteEmail.trim() || !validateEmail(inviteEmail)) {
+            setInviteEmailError("Enter a valid email address.");
+            return;
+        }
         if (inviteRole === "User" && !inviteBranch) return;
         setInviteLoading(true);
         setInviteStatus(null);
         try {
             const branch = inviteBranch || undefined;
-            const res = await userService.inviteHospitalUser(inviteEmail.trim(), inviteRole, branch);
-            setInviteStatus({ type: "success", message: res.message });
-            setInviteEmail("");
-            setInviteRole("User");
-            setInviteBranch("");
+            await userService.inviteHospitalUser(inviteEmail.trim(), inviteRole, branch);
+            toast.success("Invite sent successfully");
+            closeInviteModal();
         } catch (err) {
             setInviteStatus({ type: "error", message: (err as Error)?.message || "Failed to send invite" });
         } finally {
@@ -108,6 +113,7 @@ export default function UsersPage() {
         setInviteRole("User");
         setInviteBranch("");
         setInviteStatus(null);
+        setInviteEmailError(null);
     };
 
     if (!isAuthenticated) {
@@ -133,11 +139,12 @@ export default function UsersPage() {
                             <input
                                 type="email"
                                 placeholder="user@example.com"
-                                className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30"
+                                className={`border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6b1176]/30 ${inviteEmailError ? "border-red-400" : "border-[#E7E1E1]"}`}
                                 value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
+                                onChange={(e) => { setInviteEmail(e.target.value); setInviteEmailError(null); }}
                                 disabled={inviteLoading}
                             />
+                            {inviteEmailError && <p className="text-xs text-red-500">{inviteEmailError}</p>}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -193,6 +200,7 @@ export default function UsersPage() {
                             disabled={
                                 inviteLoading ||
                                 !inviteEmail.trim() ||
+                                !validateEmail(inviteEmail) ||
                                 (inviteRole === "User" && !inviteBranch)
                             }
                             className="px-4 py-2 bg-[#6b1176] text-white rounded-md text-sm font-semibold hover:bg-[#5a0f66] transition-colors disabled:opacity-50"
@@ -287,6 +295,7 @@ export default function UsersPage() {
                                 <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Branch</th>
                                 <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Status</th>
                                 <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Approved</th>
+                                <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Last Login</th>
                                 <th className="px-4 py-3 text-left font-semibold text-[#6b1176]">Invite</th>
                             </tr>
                         </thead>
@@ -294,7 +303,7 @@ export default function UsersPage() {
                             {loading
                                 ? Array.from({ length: 6 }).map((_, i) => (
                                     <tr key={i} className="border-b border-[#F1E8F2] bg-white">
-                                        {[120, 160, 80, 100, 70, 80, 100].map((w, col) => (
+                                        {[120, 160, 80, 100, 70, 80, 110, 100].map((w, col) => (
                                             <td key={col} className="px-4 py-3">
                                                 <div className="relative overflow-hidden h-4 rounded-md bg-gray-200" style={{ width: `${w}px` }}>
                                                     <div
@@ -332,6 +341,11 @@ export default function UsersPage() {
                                                 {user.approved_status.charAt(0).toUpperCase() + user.approved_status.slice(1)}
                                             </span>
                                         </td>
+                                        <td className="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">
+                                            {user.last_login
+                                                ? new Date(user.last_login).toLocaleString("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                                : <span className="text-gray-400">Never</span>}
+                                        </td>
                                         <td className="px-4 py-3">
                                             {user.invite_pending ? (
                                                 <button
@@ -350,7 +364,7 @@ export default function UsersPage() {
                                 ))}
                             {!loading && filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
+                                    <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
                                         No users found.
                                     </td>
                                 </tr>
