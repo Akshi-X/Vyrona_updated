@@ -102,7 +102,7 @@ def get_quality_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -169,7 +169,7 @@ def get_ln2_history(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -197,7 +197,7 @@ def get_ln2_history_by_id(
         raise HTTPException(status_code=404, detail=f"Tank with id '{tank_id}' not found")
 
     try:
-        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id)
+        QualityService(db).validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -222,7 +222,7 @@ def get_tank_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     return quality_service.get_tank_kpi_config(tank_id, tank.tank_code or f"T{tank_id}")
@@ -394,7 +394,7 @@ def get_tank_kpi_history(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -515,7 +515,7 @@ def get_tank_kpi_history_by_date(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -596,7 +596,7 @@ def append_tank_kpi_reading(
     tank_id = tank.tank_id
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     if not body or "kpis" not in body:
@@ -625,7 +625,7 @@ def append_tank_kpi_reading(
 
 
 def _require_alert_setting_role(current_user: User) -> None:
-    """Raise 403 if user is not IVF Manager or Admin (for Alert Setting CRUD)."""
+    """Raise 403 if user is not IVF Admin, Manager, or User (for Alert Setting CRUD)."""
     if not is_specific_department(
         getattr(current_user, "department", None) or "", "IVF"
     ):
@@ -636,10 +636,10 @@ def _require_alert_setting_role(current_user: User) -> None:
     if hasattr(role, "value"):
         role = role.value
     role = (role or "").lower()
-    if role not in ("manager", "admin"):
+    if role not in ("manager", "admin", "user"):
         raise HTTPException(
             status_code=403,
-            detail="Access denied: Alert Setting requires Manager or Admin role",
+            detail="Access denied: Alert Setting requires Admin, Manager, or User role",
         )
 
 
@@ -773,7 +773,7 @@ def list_kpi_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all KPI config rows for a tank (Alert Setting). Manager and Admin only."""
+    """List all KPI config rows for a tank (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     tank = db.query(Tank).filter(Tank.tank_id == tank_id).first()
@@ -781,7 +781,7 @@ def list_kpi_config(
         raise HTTPException(status_code=404, detail=f"Tank id '{tank_id}' not found")
     quality_service = QualityService(db)
     try:
-        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id)
+        quality_service.validate_tank_belongs_to_branch(tank_id, branch_id, current_user.hospital_id)
     except Exception as e:
         raise HTTPException(status_code=403, detail=str(e))
     rows = quality_service.list_kpi_config_by_tank(tank_id)
@@ -807,7 +807,7 @@ def create_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Create a KPI config row (Alert Setting). Manager and Admin only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
+    """Create a KPI config row (Alert Setting). IVF Admin, Manager, and User only. Body: hospital_id, branch_id, tank_id, kpi_name, alert_name?, min?, max?, unit?, alert_type?, status?."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     required = ("hospital_id", "branch_id", "tank_id", "kpi_name")
@@ -882,9 +882,9 @@ def bulk_upsert_kpi_config(
 ):
     """
     Bulk upsert KPI config to multiple tanks (Alert Setting).
-    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type? }).
+    Body: tank_ids (list of int), configs (list of { kpi_name, alert_name?, min?, max?, unit?, alert_type?, status? }).
     For each tank and each config: if row exists for (tank_id, kpi_name, alert_name) update it; else create.
-    Manager and Admin only.
+    IVF Admin, Manager, and User only.
     """
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
@@ -932,7 +932,7 @@ def update_kpi_config(
     current_user: User = Depends(get_current_user),
     body: dict = Body(...),
 ):
-    """Update a KPI config row (Alert Setting). Manager and Admin only."""
+    """Update a KPI config row (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     quality_service = QualityService(db)
@@ -1001,7 +1001,7 @@ def delete_kpi_config(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a KPI config row (Alert Setting). Manager and Admin only."""
+    """Delete a KPI config row (Alert Setting). IVF Admin, Manager, and User only."""
     _require_alert_setting_role(current_user)
     branch_id, _ = get_branch_filter_info(request) if request else (None, None)
     quality_service = QualityService(db)

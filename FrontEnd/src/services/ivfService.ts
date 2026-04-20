@@ -620,6 +620,7 @@ export class IvfService extends BaseApiService {
             unit?: string | null;
             alert_type?: string | null;
             cooldown_minutes?: number;
+            status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {
         return await this.request("/api/ivf/quality/kpi-config/bulk", {

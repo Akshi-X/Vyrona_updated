@@ -838,6 +838,8 @@ def get_reservoir_logs(
     from app.models.IVF.reservoir_log_model import ReservoirLog
 
     branch_id, role = get_branch_filter_info(request)
+    user = request.state.current_user
+    hospital_id = user.hospital_id if hasattr(user, "hospital_id") else None
 
     query = (
         db.query(
@@ -853,6 +855,10 @@ def get_reservoir_logs(
         .join(Reservoir, Reservoir.reservoir_id == ReservoirLog.reservoir_id)
         .outerjoin(HospitalBranch, HospitalBranch.branch_id == Reservoir.branch_id)
     )
+
+    # Always scope by hospital
+    if hospital_id is not None:
+        query = query.filter(Reservoir.hospital_id == hospital_id)
 
     # User sees only their branch; Admin and Manager see all
     if role == "User" and branch_id is not None:
@@ -885,11 +891,19 @@ def update_reservoir_log(
 ):
     """Update an existing reservoir log entry."""
     from app.models.IVF.reservoir_log_model import ReservoirLog
+    from app.models.IVF.reservoir_model import Reservoir as ReservoirModel
     from datetime import date as date_type
 
     log = db.query(ReservoirLog).filter(ReservoirLog.log_id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Reservoir log not found")
+
+    user = request.state.current_user
+    hospital_id = user.hospital_id if hasattr(user, "hospital_id") else None
+    if hospital_id:
+        reservoir = db.query(ReservoirModel).filter(ReservoirModel.reservoir_id == log.reservoir_id).first()
+        if not reservoir or reservoir.hospital_id != hospital_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     def parse_date(val):
         if not val:
@@ -917,11 +931,19 @@ def create_reservoir_log(
 ):
     """Create a new reservoir log entry."""
     from app.models.IVF.reservoir_log_model import ReservoirLog
+    from app.models.IVF.reservoir_model import Reservoir as ReservoirModel
     from datetime import date as date_type
 
     reservoir_id = payload.get("reservoir_id")
     if not reservoir_id:
         raise HTTPException(status_code=422, detail="reservoir_id is required")
+
+    user = request.state.current_user
+    hospital_id = user.hospital_id if hasattr(user, "hospital_id") else None
+    if hospital_id:
+        reservoir = db.query(ReservoirModel).filter(ReservoirModel.reservoir_id == int(reservoir_id)).first()
+        if not reservoir or reservoir.hospital_id != hospital_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     def parse_date(val):
         if not val:
