@@ -1,0 +1,42 @@
+[
+    {
+        "id": "us8-sidebar-intro",
+        "target": "#onboarding-sidebar-users",
+        "title": "Users",
+        "icon": "Users",
+        "content": "The Users page lets you view, filter, and manage everyone who has access to your clinic's mGrape account — from Admins and Managers down to individual Users.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "us8-sidebar-click",
+        "target": "#onboarding-sidebar-users",
+        "title": "Open Users",
+        "icon": "Users",
+        "content": "Click here to open the Users page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-users"],
+        "prevDisable": true
+    },
+    {
+        "id": "us8-filters",
+        "target": "#onboarding-users-filters",
+        "title": "User Filters",
+        "icon": "Filter",
+        "content": "Filter the user list by role or branch to quickly find the person you're looking for. Use Reset Filters to return to the full list.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/users"
+    },
+    {
+        "id": "us8-results",
+        "target": "#onboarding-users-results",
+        "title": "User List",
+        "icon": "Users",
+        "content": "All registered users for your hospital appear here with their role, branch, and account status. Admins can invite new users, resend invites, and manage access directly from this panel.",
+        "placement": "top",
+        "requireClick": false
+    }
+]

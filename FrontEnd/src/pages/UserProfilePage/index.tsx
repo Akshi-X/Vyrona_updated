@@ -479,7 +479,7 @@ const UserProfilePage: React.FC = () => {
           <div className="space-y-8">
  
         {/* Basic Information Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-basic-info" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Basic Information</h2>
             {!isEditingProfile ? (
@@ -649,7 +649,7 @@ const UserProfilePage: React.FC = () => {
         </div>
  
         {/* Support Activity Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-support-activity" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -937,7 +937,7 @@ const UserProfilePage: React.FC = () => {
         </div>
  
         {/* Notifications Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-notifications" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Notifications</h2>
          
           <div className="space-y-6">

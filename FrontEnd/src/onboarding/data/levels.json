@@ -38,5 +38,45 @@
         "tourStepsFile": "level-4.steps.json",
         "quizFile": "level-4.quiz.json",
         "replica": "alert-setting"
+    },
+    {
+        "id": "level-5",
+        "title": "Refill Log",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-5.steps.json",
+        "quizFile": "level-5.quiz.json",
+        "replica": "refill-log"
+    },
+    {
+        "id": "level-6",
+        "title": "Reports",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-6.steps.json",
+        "quizFile": "level-6.quiz.json",
+        "replica": "reports"
+    },
+    {
+        "id": "level-7",
+        "title": "Profile",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-7.steps.json",
+        "quizFile": "level-7.quiz.json",
+        "replica": "user-profile"
+    },
+    {
+        "id": "level-8",
+        "title": "Users",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-8.steps.json",
+        "quizFile": "level-8.quiz.json",
+        "replica": "users"
     }
 ]

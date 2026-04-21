@@ -1,6 +1,6 @@
 import React from "react";
 import { Lock } from "lucide-react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useLayoutEffect } from "react";
 import { Sidebar } from "../../components/Sidebar";
 import { useAuth } from "../../contexts/AuthContext";
@@ -81,8 +81,15 @@ function TourNavigation(_props: Record<string, unknown>) {
     );
 }
 
+// Pages that have their own full-width layout — sidebar should be hidden for these.
+const NO_SIDEBAR_PATHS = ["/onboarding/user-profile"];
+
 export default function OnboardingShell() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const hideSidebar = NO_SIDEBAR_PATHS.some(
+        (p) => location.pathname === p || location.pathname.startsWith(p + "/"),
+    );
     const { logout } = useAuth();
 
     useLayoutEffect(() => {
@@ -91,8 +98,19 @@ export default function OnboardingShell() {
         const previousCompany = localStorage.getItem("company_name");
 
         localStorage.setItem("department", "IVF");
-        localStorage.setItem("user_role", "User");
+        localStorage.setItem("user_role", "Admin");
         localStorage.setItem("company_name", "Iris Fertility");
+        // Manually dispatch a storage event so AuthContext (which listens to the
+        // "storage" event but only fires cross-tab by default) re-syncs userRole
+        // to "Admin" immediately for the current window.
+        window.dispatchEvent(
+            new StorageEvent("storage", {
+                key: "user_role",
+                newValue: "Admin",
+                oldValue: previousRole,
+                storageArea: localStorage,
+            }),
+        );
         enableOnboardingMocks();
 
         return () => {
@@ -106,6 +124,14 @@ export default function OnboardingShell() {
             } else {
                 localStorage.removeItem("user_role");
             }
+            window.dispatchEvent(
+                new StorageEvent("storage", {
+                    key: "user_role",
+                    newValue: previousRole ?? null,
+                    oldValue: "Admin",
+                    storageArea: localStorage,
+                }),
+            );
             if (previousCompany) {
                 localStorage.setItem("company_name", previousCompany);
             } else {
@@ -120,39 +146,49 @@ export default function OnboardingShell() {
         navigate("/login");
     };
 
+    // Providers are always at the same tree position so React never remounts them
+    // when navigating between sidebar and no-sidebar pages — tour state is preserved.
     return (
-        <div className="bg-[#FDFAFF] flex w-full min-h-screen overflow-x-hidden">
-            <OnboardingModeProvider value={true}>
-            <Sidebar onLogout={handleLogout} />
-            <div className="flex-1 ml-0 md:ml-60 min-w-0">
-                    <TourNavStoreProvider>
-                        <TourProvider
-                            steps={[]}
-                            disableInteraction={false}
-                            disableDotsNavigation={true}
-                            disableKeyboardNavigation={true}
-                            onClickMask={() => {}}
-                            onClickClose={() => {}}
-                            components={{
-                                Content: TourContent,
-                                Navigation: TourNavigation,
-                                Close: () => null,
-                            }}
-                            styles={{
-                                popover: (base) => ({
-                                    ...base,
-                                    borderRadius: 16,
-                                    padding: 20,
-                                    maxWidth: 360,
-                                }),
-                            }}
-                        >
+        <OnboardingModeProvider value={true}>
+            <TourNavStoreProvider>
+                <TourProvider
+                    steps={[]}
+                    disableInteraction={false}
+                    disableDotsNavigation={true}
+                    disableKeyboardNavigation={true}
+                    onClickMask={() => {}}
+                    onClickClose={() => {}}
+                    components={{
+                        Content: TourContent,
+                        Navigation: TourNavigation,
+                        Close: () => null,
+                    }}
+                    styles={{
+                        popover: (base) => ({
+                            ...base,
+                            borderRadius: 16,
+                            padding: 20,
+                            maxWidth: 360,
+                        }),
+                    }}
+                >
+                    {hideSidebar ? (
+                        // Pages with their own full-width layout — no sidebar, no offset wrapper.
+                        <>
                             <Outlet />
                             <OnboardingOverlay />
-                        </TourProvider>
-                    </TourNavStoreProvider>
-            </div>
-            </OnboardingModeProvider>
-        </div>
+                        </>
+                    ) : (
+                        <div className="bg-[#FDFAFF] flex w-full min-h-screen overflow-x-hidden">
+                            <Sidebar onLogout={handleLogout} />
+                            <div className="flex-1 ml-0 md:ml-60 min-w-0">
+                                <Outlet />
+                                <OnboardingOverlay />
+                            </div>
+                        </div>
+                    )}
+                </TourProvider>
+            </TourNavStoreProvider>
+        </OnboardingModeProvider>
     );
 }

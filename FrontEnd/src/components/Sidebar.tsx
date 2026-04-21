@@ -138,7 +138,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
         if (item.label === "Users")
-            return userRole === "Admin" || userRole === "Manager";
+            return isOnboarding || userRole === "Admin" || userRole === "Manager";
         if (item.label === "Alert Configuration")
             return isIVF ;
         if (item.label === "Reports")
@@ -287,7 +287,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                         return (
                             <button
                                 key={index}
-                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Alert Configuration" ? "onboarding-sidebar-alert-setting" : undefined}
+                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Alert Configuration" ? "onboarding-sidebar-alert-setting" : label === "Refill log" ? "onboarding-sidebar-refill-log" : label === "Reports" ? "onboarding-sidebar-reports" : label === "Users" ? "onboarding-sidebar-users" : undefined}
                                 onClick={() => handleNavigation(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
@@ -313,8 +313,9 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
 
                 {/* Profile */}
                 <button
+                    id="onboarding-sidebar-profile"
                     type="button"
-                    onClick={() => navigate("/user-profile")}
+                    onClick={() => { navigate(resolvePath("/user-profile")); closeMobile(); }}
                     className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
                 >
                     <img src={UserIcon} alt="" className="w-5 h-5 flex-shrink-0" />
