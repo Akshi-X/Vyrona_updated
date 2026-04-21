@@ -33,6 +33,9 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
     const isCompleted = progress?.status === "completed";
 
+    // Show interlude screen (between tour completion and quiz) only when quiz hasn't started yet
+    const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
+
     const answerMap = useMemo(() => {
         return state.quizAnswers[levelId] || {};
     }, [state.quizAnswers, levelId]);
@@ -74,12 +77,14 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         resetLevel(levelId);
         logEvent({ type: "tour_retry", levelId });
         setQuizResult(null);
+        setShowInterlude(true);
     };
 
     const handleRetryQuiz = () => {
         setQuizIndex(levelId, 0);
         logEvent({ type: "quiz_retry", levelId });
         setQuizResult(null);
+        setShowInterlude(true);
     };
 
     if (quizResult === "fail") {
@@ -153,16 +158,63 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
+    if (showInterlude && !isCompleted && quizResult === null) {
+        const interlude = levelConfig?.interlude;
+        return (
+            <div className="space-y-6">
+                <div className="space-y-1">
+                    <h3 className="text-xl font-semibold text-slate-900">
+                        {interlude?.title ?? "Tour complete!"}
+                    </h3>
+                    {interlude?.message && (
+                        <p className="text-sm text-slate-500">{interlude.message}</p>
+                    )}
+                </div>
+
+                {interlude?.covered && interlude.covered.length > 0 && (
+                    <ul className="space-y-2">
+                        {interlude.covered.map((item) => (
+                            <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white font-bold">✓</span>
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() => setShowInterlude(false)}
+                    className="inline-flex rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                    Start Quiz →
+                </button>
+            </div>
+        );
+    }
+
     if (isCompleted || quizResult === "pass") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
         const finalScore = progress?.score ?? 0;
         const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+        const completion = levelConfig?.completion;
 
         return (
-            <div className="space-y-4">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Level complete</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-900">{levelConfig?.title}</h3>
+            <div className="space-y-5">
+                {/* Completion header from JSON */}
+                <div className="flex items-start gap-4">
+                    {completion?.badge && (
+                        <span className="text-5xl leading-none">{completion.badge}</span>
+                    )}
+                    <div className="space-y-1 min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Level complete</p>
+                        <h3 className="text-xl font-semibold text-slate-900">
+                            {completion?.title ?? levelConfig?.title}
+                        </h3>
+                        {completion?.message && (
+                            <p className="text-sm text-slate-600 leading-relaxed">{completion.message}</p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Score card */}

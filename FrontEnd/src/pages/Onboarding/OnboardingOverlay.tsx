@@ -6,6 +6,7 @@ import { useTourNavContext } from "../../contexts/TourNavContext";
 import OnboardingWelcome from "./Welcome";
 import OnboardingTimeline from "./Timeline";
 import LevelOverlay from "./LevelOverlay";
+import LevelWelcomeCard from "./LevelWelcomeCard";
 
 export default function OnboardingOverlay() {
     const location  = useLocation();
@@ -15,6 +16,8 @@ export default function OnboardingOverlay() {
 
     const [isOpen, setIsOpen] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
+    const [showLevelWelcome, setShowLevelWelcome] = useState(false);
+    const [levelWelcomeId, setLevelWelcomeId] = useState<string | null>(null);
 
     // Register openOverlay so the tour close button can open this panel
     useEffect(() => {
@@ -77,9 +80,34 @@ export default function OnboardingOverlay() {
         setIsOpen(false);
     };
 
+    const handleStartWelcome = (levelId: string) => {
+        setLevelWelcomeId(levelId);
+        setShowLevelWelcome(true);
+        setShowWelcome(false);
+        setShowTimeline(false);
+        setIsOpen(true);
+    };
+
+    const handleBeginTourFromWelcome = () => {
+        if (levelWelcomeId) {
+            tourNavCtx?.setPendingStartLevelId(levelWelcomeId);
+        }
+        setShowLevelWelcome(false);
+        setLevelWelcomeId(null);
+        setIsOpen(false);
+    };
+
     const renderContent = () => {
+        if (showLevelWelcome && levelWelcomeId) {
+            return <LevelWelcomeCard levelId={levelWelcomeId} onBeginTour={handleBeginTourFromWelcome} />;
+        }
         if (showTimeline) {
-            return <OnboardingTimeline onStart={() => { setShowTimeline(false); setIsOpen(false); }} />;
+            return (
+                <OnboardingTimeline
+                    onStart={() => { setShowTimeline(false); setIsOpen(false); }}
+                    onStartWelcome={(id) => { setShowTimeline(false); handleStartWelcome(id); }}
+                />
+            );
         }
         if (activeLevelId && tourComplete) {
             return <LevelOverlay levelId={activeLevelId} onComplete={() => { setShowTimeline(true); }} />;
@@ -87,7 +115,12 @@ export default function OnboardingOverlay() {
         if (showWelcome) {
             return <OnboardingWelcome onStart={handleStartTour} />;
         }
-        return <OnboardingTimeline onStart={() => setIsOpen(false)} />;
+        return (
+            <OnboardingTimeline
+                onStart={() => setIsOpen(false)}
+                onStartWelcome={handleStartWelcome}
+            />
+        );
     };
 
     // Hide the floating button and panel while tour is actively running
@@ -100,7 +133,7 @@ export default function OnboardingOverlay() {
             {!isTourOpen && (
                 <button
                     type="button"
-                    onClick={() => { setShowWelcome(false); setIsOpen(true); }}
+                    onClick={() => { setShowWelcome(false); setShowLevelWelcome(false); setIsOpen(true); }}
                     className="fixed right-6 top-6 z-40 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg"
                 >
                     Onboarding

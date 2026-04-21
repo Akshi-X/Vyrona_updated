@@ -5,9 +5,10 @@ import { useTour } from "@reactour/tour";
 
 interface OnboardingTimelineProps {
     onStart?: () => void;
+    onStartWelcome?: (levelId: string) => void;
 }
 
-export default function OnboardingTimeline({ onStart }: OnboardingTimelineProps) {
+export default function OnboardingTimeline({ onStart, onStartWelcome }: OnboardingTimelineProps) {
     const { levels, state, getQuiz, resetLevel } = useOnboarding();
     const tourNavCtx = useTourNavContext();
     const { setCurrentStep } = useTour();
@@ -56,9 +57,13 @@ export default function OnboardingTimeline({ onStart }: OnboardingTimelineProps)
                                             onClick={() => {
                                                 resetLevel(level.id);
                                                 setCurrentStep(0);
-                                                tourNavCtx?.setPendingStartLevelId(level.id);
                                                 navigate(level.route);
-                                                onStart?.();
+                                                if (onStartWelcome) {
+                                                    onStartWelcome(level.id);
+                                                } else {
+                                                    tourNavCtx?.setPendingStartLevelId(level.id);
+                                                    onStart?.();
+                                                }
                                             }}
                                             className="mt-2 inline-flex rounded-full border border-slate-300 px-4 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                                         >
@@ -81,9 +86,13 @@ export default function OnboardingTimeline({ onStart }: OnboardingTimelineProps)
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        tourNavCtx?.setPendingStartLevelId(level.id);
                                                         navigate(level.route);
-                                                        onStart?.();
+                                                        if (status === "available" && onStartWelcome) {
+                                                            onStartWelcome(level.id);
+                                                        } else {
+                                                            tourNavCtx?.setPendingStartLevelId(level.id);
+                                                            onStart?.();
+                                                        }
                                                     }}
                                                     className="inline-flex rounded-full bg-slate-900 px-4 py-1 text-xs font-semibold text-white"
                                                 >
@@ -95,9 +104,13 @@ export default function OnboardingTimeline({ onStart }: OnboardingTimelineProps)
                                                         onClick={() => {
                                                             resetLevel(level.id);
                                                             setCurrentStep(0);
-                                                            tourNavCtx?.setPendingStartLevelId(level.id);
                                                             navigate(level.route);
-                                                            onStart?.();
+                                                            if (onStartWelcome) {
+                                                                onStartWelcome(level.id);
+                                                            } else {
+                                                                tourNavCtx?.setPendingStartLevelId(level.id);
+                                                                onStart?.();
+                                                            }
                                                         }}
                                                         className="inline-flex rounded-full border border-slate-300 px-4 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                                                     >
