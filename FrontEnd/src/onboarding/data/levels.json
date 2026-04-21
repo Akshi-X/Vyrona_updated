@@ -7,7 +7,27 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-1.steps.json",
         "quizFile": "level-1.quiz.json",
-        "replica": "dashboard"
+        "replica": "dashboard",
+        "welcome": {
+            "title": "Dashboard Quest",
+            "subtitle": "Level 1 · Starter Mission",
+            "description": "Get acquainted with your mGrape dashboard — your control center for KPIs, live alerts, and shipment tracking at a glance.",
+            "badge": "🗺️"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the core dashboard. Here's what you covered:",
+            "covered": [
+                "Dashboard KPI summary cards",
+                "Live alerts panel",
+                "Active shipments tracker"
+            ]
+        },
+        "completion": {
+            "title": "Dashboard Mastered!",
+            "message": "You navigated the dashboard with confidence. KPIs, alerts, and shipments are no longer a mystery.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-2",
@@ -17,7 +37,28 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-2.steps.json",
         "quizFile": "level-2.quiz.json",
-        "replica": "control-tower"
+        "replica": "control-tower",
+        "welcome": {
+            "title": "Control Tower Quest",
+            "subtitle": "Level 2 · Operations Mission",
+            "description": "Step into the Control Tower to monitor branch operations, manage pending actions, and oversee logistics lanes in real time.",
+            "badge": "🗼"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the Control Tower. Here's what you covered:",
+            "covered": [
+                "Control Tower overview",
+                "Branch performance KPIs",
+                "Pending action items",
+                "Logistics lane risk view"
+            ]
+        },
+        "completion": {
+            "title": "Control Tower Cleared!",
+            "message": "You can now monitor live operations and respond to actions from the Control Tower like a pro.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-3",
@@ -27,7 +68,27 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-3.steps.json",
         "quizFile": "level-3.quiz.json",
-        "replica": "control-tower"
+        "replica": "control-tower",
+        "welcome": {
+            "title": "Branch Deep Dive",
+            "subtitle": "Level 3 · Branch Mission",
+            "description": "Zoom into individual branch performance. Learn to filter, compare, and act on branch-level data to keep every location running smoothly.",
+            "badge": "🔍"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored branch-level data. Here's what you covered:",
+            "covered": [
+                "Branch filter & selection panel",
+                "Branch performance detail view",
+                "Comparative branch metrics"
+            ]
+        },
+        "completion": {
+            "title": "Branch Expert!",
+            "message": "You can drill into any branch and read its performance snapshot at a glance. Branch data holds no secrets for you.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-4",
@@ -37,7 +98,27 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-4.steps.json",
         "quizFile": "level-4.quiz.json",
-        "replica": "alert-setting"
+        "replica": "alert-setting",
+        "welcome": {
+            "title": "Alert Configuration",
+            "subtitle": "Level 4 · Alert Mission",
+            "description": "Set up and fine-tune alert thresholds so your clinic never misses a critical LN2 event. Stay one step ahead of every warning.",
+            "badge": "🔔"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the alert settings. Here's what you covered:",
+            "covered": [
+                "Alert settings navigation",
+                "LN2 threshold configuration",
+                "Alert notification rules"
+            ]
+        },
+        "completion": {
+            "title": "Alerts Configured!",
+            "message": "Your clinic's alert system is now fully under your control. Every critical event will reach the right person at the right time.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-5",
@@ -47,7 +128,27 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-5.steps.json",
         "quizFile": "level-5.quiz.json",
-        "replica": "refill-log"
+        "replica": "refill-log",
+        "welcome": {
+            "title": "Refill Log",
+            "subtitle": "Level 5 · Supply Mission",
+            "description": "Track every LN2 refill event — who performed it, when, and how much was added. Keep your supply chain fully transparent.",
+            "badge": "📋"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the Refill Log. Here's what you covered:",
+            "covered": [
+                "Refill log overview",
+                "Individual refill event entries",
+                "Refill history & audit trail"
+            ]
+        },
+        "completion": {
+            "title": "Supply Chain Visible!",
+            "message": "You can now trace every refill event and maintain a complete, auditable view of your LN2 supply.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-6",
@@ -57,7 +158,28 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-6.steps.json",
         "quizFile": "level-6.quiz.json",
-        "replica": "reports"
+        "replica": "reports",
+        "welcome": {
+            "title": "Reports",
+            "subtitle": "Level 6 · Insights Mission",
+            "description": "Unlock the power of reporting — filter activity logs, download data exports, and review your clinic's full operational history.",
+            "badge": "📊"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the Reports section. Here's what you covered:",
+            "covered": [
+                "Reports sidebar navigation",
+                "Report type selector & filters",
+                "Activity log entries",
+                "Export & download options"
+            ]
+        },
+        "completion": {
+            "title": "Reports Unlocked!",
+            "message": "You can now generate, filter, and analyze reports to make smarter, data-driven decisions for your clinic.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-7",
@@ -67,7 +189,28 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-7.steps.json",
         "quizFile": "level-7.quiz.json",
-        "replica": "user-profile"
+        "replica": "user-profile",
+        "welcome": {
+            "title": "Profile",
+            "subtitle": "Level 7 · Identity Mission",
+            "description": "Manage your personal information, review your support ticket history, and configure your notification preferences all in one place.",
+            "badge": "👤"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored your Profile. Here's what you covered:",
+            "covered": [
+                "Profile sidebar navigation",
+                "Basic information section",
+                "Support activity & tickets",
+                "Notification preferences"
+            ]
+        },
+        "completion": {
+            "title": "Profile Complete!",
+            "message": "Your account is fully configured. You know exactly where to update your info, track support, and manage notifications.",
+            "badge": "🏆"
+        }
     },
     {
         "id": "level-8",
@@ -77,6 +220,26 @@
         "unlockDelayHours": 0,
         "tourStepsFile": "level-8.steps.json",
         "quizFile": "level-8.quiz.json",
-        "replica": "users"
+        "replica": "users",
+        "welcome": {
+            "title": "Users",
+            "subtitle": "Level 8 · Admin Mission",
+            "description": "Manage your clinic's user roster — filter by role and branch, invite new members, and control who has access to your mGrape account.",
+            "badge": "👥"
+        },
+        "interlude": {
+            "title": "Nice work! Tour complete.",
+            "message": "You've explored the Users page. Here's what you covered:",
+            "covered": [
+                "Users sidebar navigation",
+                "Role & branch filter panel",
+                "User list with access controls"
+            ]
+        },
+        "completion": {
+            "title": "Team Managed!",
+            "message": "You have full control over your clinic's user access. Adding, filtering, and managing team members is now second nature.",
+            "badge": "🏆"
+        }
     }
 ]

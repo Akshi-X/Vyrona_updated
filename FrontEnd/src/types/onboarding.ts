@@ -1,4 +1,30 @@
-export type OnboardingReplica = "dashboard" | "control-tower";
+export type OnboardingReplica =
+    | "dashboard"
+    | "control-tower"
+    | "alert-setting"
+    | "refill-log"
+    | "reports"
+    | "user-profile"
+    | "users";
+
+export interface OnboardingLevelWelcome {
+    title: string;
+    subtitle: string;
+    description: string;
+    badge: string;
+}
+
+export interface OnboardingLevelCompletion {
+    title: string;
+    message: string;
+    badge: string;
+}
+
+export interface OnboardingLevelInterlude {
+    title: string;
+    message: string;
+    covered: string[];
+}
 
 export interface OnboardingLevelConfig {
     id: string;
@@ -9,6 +35,9 @@ export interface OnboardingLevelConfig {
     tourStepsFile: string;
     quizFile: string;
     replica: OnboardingReplica;
+    welcome?: OnboardingLevelWelcome;
+    interlude?: OnboardingLevelInterlude;
+    completion?: OnboardingLevelCompletion;
 }
 
 export interface OnboardingStep {
