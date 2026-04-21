@@ -26,6 +26,11 @@ export interface OnboardingLevelInterlude {
     covered: string[];
 }
 
+export interface OnboardingLevelSection {
+    title: string;
+    text: string;
+}
+
 export interface OnboardingLevelConfig {
     id: string;
     title: string;
@@ -35,6 +40,7 @@ export interface OnboardingLevelConfig {
     tourStepsFile: string;
     quizFile: string;
     replica: OnboardingReplica;
+    sections?: OnboardingLevelSection[];
     welcome?: OnboardingLevelWelcome;
     interlude?: OnboardingLevelInterlude;
     completion?: OnboardingLevelCompletion;

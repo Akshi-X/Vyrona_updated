@@ -1,5 +1,29 @@
 [
     {
+        "id": "level-0",
+        "title": "Welcome",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 0,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "",
+        "quizFile": "",
+        "replica": "dashboard",
+        "sections": [
+            {
+                "title": "Welcome to the Quest",
+                "text": "Explore the platform through guided tours and unlock new levels as you earn points."
+            },
+            {
+                "title": "Play to Learn",
+                "text": "Each level combines an interactive tour with a short quiz. Pass the quiz to advance."
+            },
+            {
+                "title": "Stay in Control",
+                "text": "Track your progress and unlock new missions after the cool-down period."
+            }
+        ]
+    },
+    {
         "id": "level-1",
         "title": "Dashboard Quest",
         "route": "/onboarding/dashboard",
