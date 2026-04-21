@@ -23,7 +23,14 @@ import type {
     OnboardingStep,
 } from "../../types/onboarding";
 
-export const onboardingLevels = levelConfigs as OnboardingLevelConfig[];
+// level-0 is the welcome-only entry; exclude it from the playable levels list
+export const onboardingLevels = (levelConfigs as OnboardingLevelConfig[]).filter(
+    (l) => l.id !== "level-0",
+);
+
+export const level0Config = (levelConfigs as OnboardingLevelConfig[]).find(
+    (l) => l.id === "level-0",
+);
 
 export const onboardingStepsByLevel: Record<string, OnboardingStep[]> = {
     "level-1": level1Steps as OnboardingStep[],
