@@ -307,7 +307,7 @@ export default function RefillLogTable({ canisterNumber }: RefillLogTableProps) 
   }, [canisterNumber, newRefillLog]);
 
   return (
-    <div className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
+    <div id="onboarding-ivf-refill-log" className="bg-white border border-[#E7E1E1] rounded-lg p-4 h-[398px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-black text-[16px]">Refill Log</h3>
         <div className="flex items-center gap-3">

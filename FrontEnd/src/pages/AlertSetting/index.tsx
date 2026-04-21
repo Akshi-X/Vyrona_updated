@@ -1341,7 +1341,7 @@ export default function AlertSetting() {
                         {/* Left: filters + containers (Control Tower UI) */}
                         <div className="w-full xl1:w-[380px] xl1:shrink-0 flex flex-col gap-6">
                             {/* Filters card - hidden on mobile (shown via header filter icon) */}
-                            <div className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
+                            <div id="onboarding-alert-filters" className="hidden md:flex bg-white border border-[#E7E1E1] rounded-lg px-3 py-3 flex-col gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Branch
@@ -1416,7 +1416,7 @@ export default function AlertSetting() {
                             </div>
 
                             {/* Active Containers card */}
-                            <div className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
+                            <div id="onboarding-alert-containers" className="bg-white border border-[#E7E1E1] rounded-lg p-3 flex flex-col overflow-hidden flex-1 min-h-[340px]">
                                 <div className="flex items-center justify-between mb-2">
                                     <h2 className="font-bold text-black text-base">
                                         Active Containers
@@ -1532,7 +1532,7 @@ export default function AlertSetting() {
                                 onClick={() => { setShowKpiPanel(false); setSelectedContainers([]); }}
                             />
                         )}
-                        <section className={`bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
+                        <section id="onboarding-alert-kpi-panel" className={`bg-white rounded-lg border border-[#E7E1E1] p-4 min-w-0 overflow-y-auto xl1:flex xl1:flex-1 xl1:flex-col xl1:overflow-hidden xl1:relative xl1:inset-auto xl1:z-auto ${showKpiPanel ? "fixed inset-x-3 top-14 bottom-3 z-50 flex flex-col" : "hidden"}`}>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="font-bold text-black text-base">
                                     Alert Configuration{" "}

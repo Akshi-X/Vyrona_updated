@@ -1,0 +1,51 @@
+[
+    {
+        "id": "al4-sidebar-intro",
+        "target": "#onboarding-sidebar-alert-setting",
+        "title": "Alert Configuration",
+        "icon": "Bell",
+        "content": "This is the Alert Configuration page. Here you can set KPI thresholds and notification rules for every container across all branches.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "al4-sidebar-click",
+        "target": "#onboarding-sidebar-alert-setting",
+        "title": "Open Alert Configuration",
+        "icon": "Bell",
+        "content": "Click here to navigate to the Alert Configuration page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-alert-setting"],
+        "prevDisable": true
+    },
+    {
+        "id": "al4-filters",
+        "target": "#onboarding-alert-filters",
+        "title": "Branch Filters",
+        "icon": "SlidersHorizontal",
+        "content": "Use the branch filter to narrow the container list to a specific location. This makes it easy to manage alerts across large multi-branch deployments.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-containers",
+        "target": "#onboarding-alert-containers",
+        "title": "Active Containers",
+        "icon": "Package",
+        "content": "Every active container is listed here. Select one (or multiple) to configure its KPI alert thresholds — critical and soft alerts can be set independently per sensor.",
+        "placement": "right",
+        "requireClick": false
+    },
+    {
+        "id": "al4-kpi-panel",
+        "target": "#onboarding-alert-kpi-panel",
+        "title": "Alert Configuration Panel",
+        "icon": "BellRing",
+        "content": "This panel shows the full KPI alert setup for the selected container. Set minimum and maximum thresholds, choose critical or soft alert types, and control cooldown periods to avoid notification fatigue.",
+        "placement": "left",
+        "requireClick": false
+    }
+]

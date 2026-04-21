@@ -1,0 +1,77 @@
+alert_id,timestamp,branch_name,tank_code,mg_tank_id,kpi_name,severity,status,alert_type,message
+19a9d0f0-3715-4244-9722-08da9ab6a838,9 Apr 2026 09:56 AM,Egmore,T15,84,Battery Level,Low,Active,Deviation alert,Battery Level is deviated to 10.00 in Egmore branch for T15 tank
+a36056e4-cbfb-4a32-9ffd-4ff22beffe96,8 Apr 2026 02:22 PM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.68 in Egmore branch for T6 tank
+752c7d6c-b50a-4409-8c03-170a6a0d05bf,6 Apr 2026 06:02 PM,Egmore,T15,84,Lid State,Low,Active,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+2da151ec-dc24-4a3c-b032-c5b6f1f97298,6 Apr 2026 04:09 AM,Egmore,T14,32,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 17.11 in Egmore branch for T14 tank
+015348b8-cf8d-4389-9654-3f732ba8209c,6 Apr 2026 04:03 AM,Egmore,T15,84,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 16.84 in Egmore branch for T15 tank
+a7db3505-788b-416d-af29-9bb3da0e911e,6 Apr 2026 03:43 AM,Egmore,T7,4,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 17.34 in Egmore branch for T7 tank
+2f141ea0-ce57-4ad3-a8f1-3cde39616859,6 Apr 2026 03:42 AM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 16.89 in Egmore branch for T6 tank
+5c16b189-e0a3-4735-885c-0441a267f5cf,4 Apr 2026 07:04 PM,Egmore,T15,84,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.36 in Egmore branch for T15 tank
+fbb260cc-8a0e-41c3-9ad0-fa605d628f70,4 Apr 2026 07:04 PM,Egmore,T7,4,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.80 in Egmore branch for T7 tank
+8037e886-01a4-4524-895e-fba59d2d5c81,4 Apr 2026 06:59 PM,Egmore,T14,32,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.61 in Egmore branch for T14 tank
+b442f327-e9ab-470f-ae52-6dfe58e6c1a0,4 Apr 2026 05:12 PM,Egmore,T3,72,Internal Temperature,Low,Active,Deviation alert,Internal Temperature is deviated to -41.25 in Egmore branch for T3 tank
+06119240-c8ad-446a-b561-4f2a2f300b12,4 Apr 2026 05:02 PM,Egmore,T3,72,Shock Detection,Low,Active,Deviation alert,Shock Detection is deviated to 1.10 in Egmore branch for T3 tank
+b3e88259-b67e-4ea2-b11c-07d4945147d6,4 Apr 2026 04:02 PM,Egmore,T3,72,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.69 in Egmore branch for T3 tank
+5c2711cb-15a7-4033-846c-63654dd4777e,4 Apr 2026 02:34 PM,Egmore,T15,84,Lid State,Low,Active,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+95364ed8-3d33-4836-82de-9107547ece77,4 Apr 2026 05:30 AM,Bangalore,T1,60,LN2,High,Active,Deviation alert,LN2 crossed L2 in Bangalore branch for T1 tank
+b1547b5f-f4c6-48a6-987d-535a91261819,4 Apr 2026 04:09 AM,Egmore,T14,32,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 17.96 in Egmore branch for T14 tank
+270bb4e9-08b6-4af6-a3c3-9c91b44d804e,4 Apr 2026 04:04 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 17.07 in Egmore branch for T15 tank
+7ad650ba-1ee3-4d57-a53d-2051e8492dad,4 Apr 2026 03:44 AM,Egmore,T7,4,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.30 in Egmore branch for T7 tank
+4b7a735e-f766-482b-9c0b-15f9efb5e537,4 Apr 2026 03:43 AM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 17.62 in Egmore branch for T6 tank
+ec27bb8e-192f-4611-8210-70bf053a22ac,3 Apr 2026 02:21 PM,Bangalore,T1,60,LN2,High,Active,Deviation alert,LN2 crossed L2 in Bangalore branch for T1 tank
+0fd6608c-b1d6-420b-9cf2-ac6d6ad3f19b,3 Apr 2026 12:34 PM,Bangalore,T1,60,LN2,High,Active,Deviation alert,LN2 crossed L2 in Bangalore branch for T1 tank
+654df05f-4a05-4a14-8dab-f551ae5d2ac0,3 Apr 2026 04:10 AM,Egmore,T14,32,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.99 in Egmore branch for T14 tank
+dc1c6e4e-f139-477b-a881-521fea3ca820,2 Apr 2026 08:04 PM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.66 in Egmore branch for T15 tank
+46aefe64-6504-4f4b-9d61-540b85b3b5ce,2 Apr 2026 09:35 AM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+cefadb69-7d1c-4a16-a975-05a9930691f4,2 Apr 2026 09:33 AM,Egmore,T6,8,Internal Temperature,Low,Active,Deviation alert,Internal Temperature is deviated to -125.88 in Egmore branch for T6 tank
+6828b290-038c-4a9a-b11d-0c90bf28a252,1 Apr 2026 10:10 PM,Egmore,T14,32,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.87 in Egmore branch for T14 tank
+a773ff96-feda-40b9-98e2-98e3d92a62cd,1 Apr 2026 07:34 PM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.83 in Egmore branch for T15 tank
+7a24866b-c12e-4466-ab67-cb4bcbfcf921,1 Apr 2026 03:09 PM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+a0e379fc-8b2b-42d1-9db9-fecf568eb1f3,1 Apr 2026 08:05 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.21 in Egmore branch for T15 tank
+a3226daf-c15e-4926-a143-5c6386bd972d,1 Apr 2026 04:05 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.25 in Egmore branch for T15 tank
+abe88d03-a086-489f-9224-cf092b3e540c,1 Apr 2026 03:45 AM,Egmore,T7,4,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.38 in Egmore branch for T7 tank
+f545c730-6237-4758-972a-d220fad377a9,1 Apr 2026 03:43 AM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 18.82 in Egmore branch for T6 tank
+a4fa8266-2f15-452d-9132-d27f0bc4b11a,30 Mar 2026 10:35 AM,Egmore,T15,84,Internal Temperature,High,Acknowledged,Deviation alert,Internal Temperature is deviated to -178.31 in Egmore branch for T15 tank
+b0dac69f-8498-4b53-8ec7-c08f1aa7435b,28 Mar 2026 04:43 PM,Bangalore,T1,60,Lid State,Low,Active,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+72abf145-962b-4ff9-afe8-f119356347df,28 Mar 2026 10:03 AM,Bangalore,T2,45,Internal Temperature,High,Active,Deviation alert,Internal Temperature is deviated to -179.75 in Bangalore branch for T2 tank
+6fd141fa-8a32-4ee2-b56b-b41008997331,28 Mar 2026 10:03 AM,Bangalore,T1,60,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+b54d1ae2-cd06-4fb9-8574-4f80a2745c9c,28 Mar 2026 09:15 AM,Bangalore,T1,60,Internal Temperature,High,Active,Deviation alert,Internal Temperature is deviated to -179.25 in Bangalore branch for T1 tank
+e11f2034-c532-4e11-baff-7aa6f4fa908c,28 Mar 2026 09:05 AM,Bangalore,T1,60,Internal Temperature,High,Active,Deviation alert,Internal Temperature is deviated to -179.25 in Bangalore branch for T1 tank
+39e9e1ce-1acc-4cd5-9dfa-580eb5f5f080,27 Mar 2026 01:26 AM,Egmore,T7,4,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.87 in Egmore branch for T7 tank
+6fe1be4f-a4ed-40ea-a4a1-3b22d2967ae2,26 Mar 2026 06:06 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.94 in Egmore branch for T15 tank
+acc3e908-9955-4342-ad52-924ad308c42c,26 Mar 2026 05:45 AM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 18.96 in Egmore branch for T6 tank
+e1b49fad-ff88-4cbb-a942-06f0cb029524,26 Mar 2026 04:06 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.62 in Egmore branch for T15 tank
+6573fb60-db29-414f-aa57-8ad0eb237879,26 Mar 2026 03:45 AM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 18.60 in Egmore branch for T6 tank
+30c5e388-9a66-4135-9ba0-3602e71ef278,25 Mar 2026 05:57 AM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 18.83 in Egmore branch for T15 tank
+6400be8b-e7f2-4110-8f8c-423b3653002e,24 Mar 2026 09:26 PM,Egmore,T3,72,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.96 in Egmore branch for T3 tank
+6f2a09fe-628f-45fb-962f-4a2a5f0284ae,24 Mar 2026 07:58 PM,Egmore,T15,84,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 19.98 in Egmore branch for T15 tank
+8d72ceda-bda4-48d7-b603-6dd6eb70e143,24 Mar 2026 07:38 PM,Egmore,T6,8,External Temperature,Low,Active,Deviation alert,External Temperature is deviated to 19.98 in Egmore branch for T6 tank
+b6c4d21d-6d8d-4e82-94e7-34308953def0,24 Mar 2026 07:26 PM,Egmore,T3,72,Shock Detection,Low,Acknowledged,Deviation alert,Shock Detection is deviated to 1.10 in Egmore branch for T3 tank
+12232925-a9f2-4867-a148-01b39809f367,21 Mar 2026 11:06 AM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 14.17 in Egmore branch for T15 tank
+5d9217d7-ef5a-48cd-879c-7d5e837e8b8d,21 Mar 2026 11:06 AM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+5f47540e-3867-438d-8199-10ab37576b63,21 Mar 2026 10:06 AM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 10.21 in Egmore branch for T15 tank
+0b7202c0-12b3-4aa6-a466-63fcd7d3c108,21 Mar 2026 10:06 AM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+e86523cc-3c7d-45b0-b08e-a97e3744a848,20 Mar 2026 05:39 PM,Bangalore,T1,60,External Temperature,Low,Acknowledged,Deviation alert,External Temperature is deviated to 30.54 in Bangalore branch for T1 tank
+658936cb-256e-40e8-8fc0-85c7e3b52978,20 Mar 2026 03:26 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 13.85 in Egmore branch for T15 tank
+5e93644e-7ee0-44b9-a396-c636f8a5bd13,20 Mar 2026 03:26 PM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+1f2dd44f-999e-4399-86f8-503097612e9d,20 Mar 2026 03:20 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 1.44 in Egmore branch for T15 tank
+890f9a6f-084d-4aff-a6fc-533d3c4e6d8d,20 Mar 2026 03:11 PM,Bangalore,T1,60,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 1.26 in Bangalore branch for T1 tank
+2e5578a5-7308-46a0-87a9-5f2d6d134cbc,20 Mar 2026 02:57 PM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+96fb84ea-6845-4160-b722-d97d2b3243c5,20 Mar 2026 02:57 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 17.05 in Egmore branch for T15 tank
+58c73bdc-27af-4522-af12-af0737e4c2f2,20 Mar 2026 02:43 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 19.73 in Egmore branch for T15 tank
+e2b2cfee-d0b7-4971-9876-694434360940,20 Mar 2026 02:40 PM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+3f7e3635-5f6f-4e85-9521-d5d254756405,20 Mar 2026 02:40 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 14.00 in Egmore branch for T15 tank
+4b64d743-5c28-4f31-b492-9c9b06dd2611,20 Mar 2026 02:12 PM,Bangalore,T1,60,Internal Temperature,High,Acknowledged,Deviation alert,Internal Temperature is deviated to 25.89 in Bangalore branch for T1 tank
+a6795160-52bb-496d-8dff-a3eafcd640b6,20 Mar 2026 02:07 PM,Bangalore,T1,60,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+a6436ffb-a920-458f-bbd9-f92a88635509,20 Mar 2026 02:00 PM,Egmore,T15,84,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Egmore branch for T15 tank
+6c53f942-56ec-4481-b6ec-b039258bae5b,20 Mar 2026 02:00 PM,Egmore,T15,84,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 13.52 in Egmore branch for T15 tank
+d931ee25-822c-4f14-99a6-163feb4084ae,20 Mar 2026 01:59 PM,Bangalore,T1,60,Lid State,Low,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+84a83d98-9e94-4bff-a5ee-1de2f82b7758,20 Mar 2026 01:59 PM,Bangalore,T1,60,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 12.50 in Bangalore branch for T1 tank
+c6e18e7a-c381-475e-93da-408109240dad,19 Mar 2026 08:06 PM,Bangalore,T1,60,Evaporation Rate,Low,Acknowledged,Deviation alert,Evaporation Rate is deviated to 2.92 in Bangalore branch for T1 tank
+03b8d311-b65f-4c8b-b311-713a0f4135f1,14 Mar 2026 04:21 PM,Bangalore,T1,60,Lid State,High,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+75589546-12bd-4698-afb7-a9323bf0514d,12 Mar 2026 03:30 AM,Bangalore,T1,60,Lid State,High,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+0eca6c30-44ee-47db-ba8d-e652abe76b92,3 Mar 2026 05:58 AM,Bangalore,T1,60,Lid State,High,Acknowledged,Deviation alert,Lid State is OPEN in Bangalore branch for T1 tank
+87b89319-45a8-4de6-8c64-bb83a1e1f1ea,2 Mar 2026 05:53 AM,Egmore,T14,32,Internal Temperature,Low,Acknowledged,Deviation alert,Internal Temperature is deviated to 25.36 in Egmore branch for T14 tank
+a145cbea-bede-4be4-ab57-5adad6c32b9f,2 Mar 2026 04:06 AM,Egmore,T7,4,Internal Temperature,Low,Acknowledged,Deviation alert,Internal Temperature is deviated to 22.35 in Egmore branch for T7 tank
+00674274-dec1-492f-ac0e-176f4511ab8e,1 Mar 2026 04:11 PM,Bangalore,T1,60,Battery Level,Low,Acknowledged,Deviation alert,Battery Level is deviated to 19.00 in Bangalore branch for T1 tank
+39fd6b35-3197-4bd9-8df6-344abbc128af,1 Mar 2026 01:35 PM,Bangalore,T1,60,LN2,High,Acknowledged,Deviation alert,LN2 crossed L2 in Bangalore branch for T1 tank

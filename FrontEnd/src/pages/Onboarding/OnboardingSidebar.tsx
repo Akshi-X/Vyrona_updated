@@ -147,6 +147,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                         return (
                             <button
                                 key={idx}
+                                id={path === "/onboarding/alert-setting" ? "onboarding-sidebar-alert-setting" : undefined}
                                 onClick={() => go(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
