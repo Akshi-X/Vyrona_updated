@@ -1,0 +1,42 @@
+[
+    {
+        "id": "rp6-sidebar-intro",
+        "target": "#onboarding-sidebar-reports",
+        "title": "Reports",
+        "icon": "FileText",
+        "content": "The Reports page lets you generate and export summaries across your IVF operations — monthly KPI snapshots, critical alert history, and detailed refill logs — all in one place.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "rp6-sidebar-click",
+        "target": "#onboarding-sidebar-reports",
+        "title": "Open Reports",
+        "icon": "FileText",
+        "content": "Click here to open the Reports page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-reports"],
+        "prevDisable": true
+    },
+    {
+        "id": "rp6-filters",
+        "target": "#onboarding-reports-filters",
+        "title": "Report Filters",
+        "icon": "Filter",
+        "content": "Use these filters to narrow your report by branch, date range, and report type. Select the parameters that matter for your audit or review, then generate the report.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/reports"
+    },
+    {
+        "id": "rp6-results",
+        "target": "#onboarding-reports-results",
+        "title": "Report Results",
+        "icon": "BarChart2",
+        "content": "Generated report data appears here. You can review the results on screen or export them to CSV for sharing with your compliance team or clinic management.",
+        "placement": "top",
+        "requireClick": false
+    }
+]

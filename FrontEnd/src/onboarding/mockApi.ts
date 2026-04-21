@@ -363,6 +363,104 @@ export const enableOnboardingMocks = () => {
             return dashboardData.ivfTankRefillLogs;
         }
 
+        // Reports page — monthly summary.
+        if (endpoint.startsWith("/api/ivf/reports/monthly-summary")) {
+            return dashboardData.reportsMonthlySummary;
+        }
+
+        // Reports page — critical alerts report.
+        if (endpoint.startsWith("/api/ivf/reports/critical-alerts")) {
+            return dashboardData.reportsCriticalAlerts;
+        }
+
+        // Reports page — refill logs report.
+        if (endpoint.startsWith("/api/ivf/reports/refill-logs")) {
+            return dashboardData.reportsRefillLogs;
+        }
+
+        // Reports page — activity logs (filtered by query params).
+        if (endpoint.startsWith("/api/activity-logs")) {
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const actionsParam = qs.get("actions");
+            const allowedActions = actionsParam ? actionsParam.split(",").map(s => s.trim()).filter(Boolean) : [];
+            const outcomeParam  = qs.get("outcome")    ?? "";
+            const actorTypeParam = qs.get("actor_type") ?? "";
+            const searchParam   = (qs.get("search")    ?? "").toLowerCase();
+            const dateFrom      = qs.get("date_from")  ?? "";
+            const dateTo        = qs.get("date_to")    ?? "";
+            const page          = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize      = parseInt(qs.get("page_size") ?? "20", 10);
+
+            type LogRow = typeof dashboardData.reportsActivityLogs.logs[number];
+            let logs: LogRow[] = [...dashboardData.reportsActivityLogs.logs];
+
+            if (allowedActions.length > 0) {
+                logs = logs.filter(l => allowedActions.includes(l.action));
+            }
+            if (outcomeParam) {
+                logs = logs.filter(l => l.outcome === outcomeParam);
+            }
+            if (actorTypeParam) {
+                logs = logs.filter(l => l.actor_type === actorTypeParam);
+            }
+            if (searchParam) {
+                logs = logs.filter(l =>
+                    (l.action        ?? "").toLowerCase().includes(searchParam) ||
+                    (l.actor_label   ?? "").toLowerCase().includes(searchParam) ||
+                    (l.target_label  ?? "").toLowerCase().includes(searchParam) ||
+                    (l.outcome       ?? "").toLowerCase().includes(searchParam),
+                );
+            }
+            if (dateFrom) {
+                logs = logs.filter(l => l.created_at >= dateFrom);
+            }
+            if (dateTo) {
+                const toEnd = dateTo + "T23:59:59Z";
+                logs = logs.filter(l => l.created_at <= toEnd);
+            }
+
+            const total = logs.length;
+            const start = (page - 1) * pageSize;
+            logs = logs.slice(start, start + pageSize);
+
+            return { logs, total_count: total, page, page_size: pageSize, status: "ok" };
+        }
+
+        // Refill Log page — pending detections.
+        if (endpoint.startsWith("/api/quality-tracking/refill-detections/pending")) {
+            return dashboardData.refillPendingDetections;
+        }
+
+        // Refill Log page — all-tanks refill logs.
+        if (endpoint.startsWith("/api/quality-tracking/tanks/all-refill-logs")) {
+            return dashboardData.refillAllLogs;
+        }
+
+        // Refill Log page — tanks refill summary.
+        if (endpoint.startsWith("/api/quality-tracking/tanks/refill-summary")) {
+            return dashboardData.refillSummary;
+        }
+
+        // Refill Log page — reservoirs list.
+        if (endpoint.startsWith("/api/ivf/reservoirs")) {
+            return dashboardData.refillReservoirs;
+        }
+
+        // Refill Log page — reservoir logs.
+        if (endpoint.startsWith("/api/ivf/reservoir-logs")) {
+            return dashboardData.refillReservoirLogs;
+        }
+
+        // Users page — hospital user list.
+        if (endpoint.startsWith("/api/hospital/users")) {
+            return dashboardData.hospitalUsers;
+        }
+
+        // Profile page — user feedback tickets.
+        if (endpoint.startsWith("/api/feedback/user/") || endpoint.startsWith("/api/feedback/admin")) {
+            return dashboardData.profileFeedbackTickets;
+        }
+
         // IVF track shipment — canister tasks.
         if (endpoint.startsWith("/api/canisters/") && endpoint.includes("/tasks")) {
             return dashboardData.ivfTankTasks;

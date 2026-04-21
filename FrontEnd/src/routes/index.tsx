@@ -268,6 +268,8 @@ export const router = createBrowserRouter([
             { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/user-profile",                          element: <><UserProfilePage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },

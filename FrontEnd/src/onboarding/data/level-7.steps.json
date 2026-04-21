@@ -1,0 +1,51 @@
+[
+    {
+        "id": "pf7-sidebar-intro",
+        "target": "#onboarding-sidebar-profile",
+        "title": "Your Profile",
+        "icon": "User",
+        "content": "Your profile section lets you manage your personal details, review your support activity, and configure notification preferences — all in one place.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "pf7-sidebar-click",
+        "target": "#onboarding-sidebar-profile",
+        "title": "Open Profile",
+        "icon": "User",
+        "content": "Click your profile card to open the profile page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-profile"],
+        "prevDisable": true
+    },
+    {
+        "id": "pf7-basic-info",
+        "target": "#onboarding-profile-basic-info",
+        "title": "Basic Information",
+        "icon": "UserCircle",
+        "content": "Here you can view and edit your name, email, phone number, and role. Keeping this up to date ensures alerts and notifications reach the right person.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/user-profile"
+    },
+    {
+        "id": "pf7-support-activity",
+        "target": "#onboarding-profile-support-activity",
+        "title": "Support Activity",
+        "icon": "MessageSquare",
+        "content": "All support tickets you've raised are tracked here — bugs, feature requests, and general queries. You can monitor their status and follow up directly from this panel.",
+        "placement": "top",
+        "requireClick": false
+    },
+    {
+        "id": "pf7-notifications",
+        "target": "#onboarding-profile-notifications",
+        "title": "Notifications",
+        "icon": "Bell",
+        "content": "Control how you receive alerts. Toggle email notifications on or off here so you only get notified through the channels that work best for you.",
+        "placement": "top",
+        "requireClick": false
+    }
+]

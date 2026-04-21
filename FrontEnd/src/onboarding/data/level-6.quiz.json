@@ -1,0 +1,38 @@
+[
+    {
+        "id": "q6-1",
+        "prompt": "What types of reports can you generate from the Reports page?",
+        "choices": [
+            "Only temperature trend reports",
+            "Monthly KPI summaries, critical alert history, and refill logs",
+            "Patient sample tracking only",
+            "WebSocket connection logs"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q6-2",
+        "prompt": "What can the Report Filters help you do?",
+        "choices": [
+            "Adjust alert thresholds",
+            "Filter reports by branch, date range, and report type",
+            "Modify sensor configurations",
+            "Assign refill tasks to technicians"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q6-3",
+        "prompt": "What can you do with the results shown in the Report Results section?",
+        "choices": [
+            "Only view them on screen, no export available",
+            "Review on screen or export to CSV for compliance and management",
+            "Share directly to patient records",
+            "Automatically schedule refills"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    }
+]
