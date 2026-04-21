@@ -9961,5 +9961,83 @@
         }
       ]
     }
+  },
+  "alertSettingKpiConfigList": {
+    "tank_id": 161,
+    "tank_code": "T-161",
+    "branch_id": 16,
+    "hospital_id": 1,
+    "config": [
+      {
+        "id": 1,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "temp_internal",
+        "alert_name": "Internal Temperature",
+        "min": -200.0,
+        "max": -180.0,
+        "unit": "\u00b0C",
+        "alert_type": "critical",
+        "cooldown_minutes": 30,
+        "status": true
+      },
+      {
+        "id": 2,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "temp_external",
+        "alert_name": "External Temperature",
+        "min": 20.0,
+        "max": 30.0,
+        "unit": "\u00b0C",
+        "alert_type": "soft",
+        "cooldown_minutes": 30,
+        "status": true
+      },
+      {
+        "id": 3,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "ln2_level",
+        "alert_name": "LN2 Level",
+        "min": 22.0,
+        "max": null,
+        "unit": "Ln2 in kg",
+        "alert_type": "critical",
+        "cooldown_minutes": 60,
+        "status": true
+      },
+      {
+        "id": 4,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "tive_battery_percentage",
+        "alert_name": "Battery Level",
+        "min": 20.0,
+        "max": 100.0,
+        "unit": "%",
+        "alert_type": "soft",
+        "cooldown_minutes": 60,
+        "status": true
+      },
+      {
+        "id": 5,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "shock",
+        "alert_name": "Shock Detection",
+        "min": 0.0,
+        "max": 1.5,
+        "unit": "g",
+        "alert_type": null,
+        "cooldown_minutes": 30,
+        "status": true
+      }
+    ]
   }
 }

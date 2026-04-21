@@ -28,5 +28,15 @@
         "tourStepsFile": "level-3.steps.json",
         "quizFile": "level-3.quiz.json",
         "replica": "control-tower"
+    },
+    {
+        "id": "level-4",
+        "title": "Alert Configuration",
+        "route": "/onboarding/dashboard",
+        "pointsRequired": 60,
+        "unlockDelayHours": 0,
+        "tourStepsFile": "level-4.steps.json",
+        "quizFile": "level-4.quiz.json",
+        "replica": "alert-setting"
     }
 ]

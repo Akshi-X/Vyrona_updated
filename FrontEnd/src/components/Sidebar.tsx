@@ -287,7 +287,7 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
                         return (
                             <button
                                 key={index}
-                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : undefined}
+                                id={label === "Control Tower" ? "onboarding-sidebar-control-tower" : label === "Alert Configuration" ? "onboarding-sidebar-alert-setting" : undefined}
                                 onClick={() => handleNavigation(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"

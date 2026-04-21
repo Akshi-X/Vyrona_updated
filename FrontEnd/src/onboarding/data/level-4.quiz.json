@@ -1,0 +1,38 @@
+[
+    {
+        "id": "q4-1",
+        "prompt": "What is the purpose of setting a cooldown period on a KPI alert?",
+        "choices": [
+            "To delay the alert until the next day",
+            "To prevent repeated notifications for the same ongoing breach",
+            "To increase the alert threshold automatically",
+            "To disable the alert after it fires once"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q4-2",
+        "prompt": "Which alert type should be used for a sensor value that requires immediate action if breached?",
+        "choices": [
+            "Soft alert",
+            "Warning alert",
+            "Critical alert",
+            "Info alert"
+        ],
+        "correctIndex": 2,
+        "points": 20
+    },
+    {
+        "id": "q4-3",
+        "prompt": "How can you apply the same alert thresholds to multiple containers at once?",
+        "choices": [
+            "Edit each container individually",
+            "Use the branch filter to show all containers, then select multiple and apply in bulk",
+            "Contact support to update thresholds",
+            "Thresholds can only be set per hospital, not per container"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    }
+]

@@ -137,6 +137,34 @@ function buildMockKpiHistory() {
     return { tank_code: "T1", tank_id: 60, kpi_series: kpiSeries };
 }
 
+// ── KPI history timestamp shifter ──────────────────────────────────────────
+// Static mock data has hardcoded timestamps that age out of the chart's time
+// window filter (displayReadings filters to Date.now() - windowMs).
+// This re-stamps every point so the last point lands at `now` and earlier
+// points keep the same relative spacing.
+function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
+    const now = Date.now();
+    // Find the latest timestamp across all series
+    let maxMs = 0;
+    for (const points of Object.values(data.kpi_series)) {
+        for (const p of points) {
+            const t = new Date(p.timestamp).getTime();
+            if (t > maxMs) maxMs = t;
+        }
+    }
+    if (!maxMs) return data;
+    const offset = now - maxMs;
+
+    const shiftedSeries: typeof data.kpi_series = {} as typeof data.kpi_series;
+    for (const [key, points] of Object.entries(data.kpi_series)) {
+        (shiftedSeries as Record<string, typeof points>)[key] = points.map((p) => ({
+            ...p,
+            timestamp: new Date(new Date(p.timestamp).getTime() + offset).toISOString().replace("Z", ""),
+        }));
+    }
+    return { ...data, kpi_series: shiftedSeries };
+}
+
 // ── Enable / disable ────────────────────────────────────────────────────────
 
 export const enableOnboardingMocks = () => {
@@ -274,6 +302,25 @@ export const enableOnboardingMocks = () => {
             return controlTowerData.controlTowerMap;
         }
 
+        // Alert Setting — branch list for filter dropdown.
+        if (endpoint.startsWith("/api/ivf/branches")) {
+            const branches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+                branch_id: b.branch_id,
+                branch_name: b.branch_name,
+            }));
+            return { branches };
+        }
+
+        // Alert Setting — KPI config list for a specific tank.
+        if (endpoint.startsWith("/api/ivf/quality/kpi-config/list")) {
+            return dashboardData.alertSettingKpiConfigList;
+        }
+
+        // Alert Setting — hospital notification settings.
+        if (endpoint.startsWith("/api/ivf/quality/hospital-notification-settings")) {
+            return { is_email_notifify: true, is_whatsapp_notify: false };
+        }
+
         // Control Tower (IVF) canisters and branch map data.
         if (endpoint.startsWith("/api/ivf/control_tower/active_canisters")) {
             return controlTowerData.activeCanisters;
@@ -301,8 +348,8 @@ export const enableOnboardingMocks = () => {
         // IVF track shipment — tank KPI history (any tankId, any duration).
         // Generated dynamically so LIVE range (last 10 min) always has data.
         if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/kpi-history")) {
-            if (endpoint.includes("duration_minutes=10080")) return dashboardData.ivfKpiHistory7D;
-            if (endpoint.includes("duration_minutes=1440")) return dashboardData.ivfKpiHistory24H;
+            if (endpoint.includes("duration_minutes=10080")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory7D);
+            if (endpoint.includes("duration_minutes=1440")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory24H);
             return buildMockKpiHistory(); // LIVE and 1H
         }
 

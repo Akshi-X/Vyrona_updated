@@ -1,0 +1,4 @@
+branch_id,branch_name,total_readings,total_deviation_flagged,total_alerts,kpi_alert_counts
+4,Egmore,380412,12909,56,"External Temperature:30, Lid State:10, Evaporation Rate:8, Internal Temperature:5, Shock Detection:2, Battery Level:1"
+17,Bangalore,262778,31667,20,"Lid State:7, Internal Temperature:4, LN2:4, Evaporation Rate:3, Battery Level:1, External Temperature:1"
+TOTAL,All Branches,643190,44576,76,"External Temperature:31, Lid State:17, Evaporation Rate:11, Internal Temperature:9, LN2:4, Shock Detection:2, Battery Level:2"
