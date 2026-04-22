@@ -622,11 +622,11 @@ export function IVFQualityParametersTable({ tankId }: IVFQualityParametersTableP
       ? tankBodyBottom - (tankBodyHeight * (100 - ((ln2_100per - l2) / ln2_100per) * 100)) / 100
       : null;
   
-  // Returns true if this KPI source has an alert_type configured (show tile), false = hide tile.
-  // If no config entry exists at all, default to showing the tile.
+  // Returns true only when this KPI has at least one non-null alert_type in kpi-config.
+  // Hide tiles when alert_type is null or config is missing.
   const hasAlert = (kpiKey: string): boolean => {
     const entry = kpiLimits[kpiKey];
-    if (!entry || Object.keys(entry).length === 0) return true;
+    if (!entry || Object.keys(entry).length === 0) return false;
     return Object.values(entry).some((band) => band?.alert_type != null);
   };
 
