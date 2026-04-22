@@ -940,6 +940,7 @@ export default function AlertSetting() {
 
     const alertTypeOptions = [
         { value: null as string | null, label: "Alert Disabled" },
+        { value: "no_alert", label: "No Alert" },
         { value: "soft", label: "Soft Alert" },
         { value: "critical", label: "Critical Alert" },
     ];
@@ -1666,11 +1667,7 @@ export default function AlertSetting() {
                                                                 );
 
                                                             const isAlertEnabled =
-                                                                !!(
-                                                                    typeVal &&
-                                                                    typeVal !==
-                                                                        ""
-                                                                );
+                                                                isActiveAlertType(typeVal);
                                                             const isCritical =
                                                                 typeVal ===
                                                                 "critical";
@@ -2167,19 +2164,7 @@ export default function AlertSetting() {
                                                                                             )
                                                                                         }
                                                                                     >
-                                                                                        <span>
-                                                                                            {typeVal
-                                                                                                ? alertTypeOptions.find(
-                                                                                                      (
-                                                                                                          opt,
-                                                                                                      ) =>
-                                                                                                          opt.value ===
-                                                                                                          typeVal,
-                                                                                                  )
-                                                                                                      ?.label ||
-                                                                                                  "No Alert"
-                                                                                                : "No Alert"}
-                                                                                        </span>
+                                                                                        <span>{alertTypeOptions.find((opt) => opt.value === typeVal)?.label}</span>
                                                                                         <ChevronDown
                                                                                             className={`w-4 h-4 transition-transform ${openDropdowns[`multi-${kpiName}`] ? "rotate-180" : ""}`}
                                                                                         />
@@ -2378,8 +2363,7 @@ export default function AlertSetting() {
                                                                 );
 
                                                             const isAlertEnabled =
-                                                                !!(typeVal &&
-                                                                typeVal !== "");
+                                                                isActiveAlertType(typeVal);
                                                             const isCritical =
                                                                 typeVal ===
                                                                 "critical";
@@ -2798,19 +2782,7 @@ export default function AlertSetting() {
                                                                                             )
                                                                                         }
                                                                                     >
-                                                                                        <span>
-                                                                                            {typeVal
-                                                                                                ? alertTypeOptions.find(
-                                                                                                      (
-                                                                                                          opt,
-                                                                                                      ) =>
-                                                                                                          opt.value ===
-                                                                                                          typeVal,
-                                                                                                  )
-                                                                                                      ?.label ||
-                                                                                                  "No Alert"
-                                                                                                : "No Alert"}
-                                                                                        </span>
+                                                                                        <span>{alertTypeOptions.find((opt) => opt.value === typeVal)?.label}</span>
                                                                                         <ChevronDown
                                                                                             className={`w-4 h-4 transition-transform ${openDropdowns[`single-${r.id}`] ? "rotate-180" : ""}`}
                                                                                         />
@@ -3354,19 +3326,7 @@ export default function AlertSetting() {
                                                                                         )
                                                                                     }
                                                                                 >
-                                                                                    <span>
-                                                                                        {typeVal
-                                                                                            ? alertTypeOptions.find(
-                                                                                                  (
-                                                                                                      opt,
-                                                                                                  ) =>
-                                                                                                      opt.value ===
-                                                                                                      typeVal,
-                                                                                              )
-                                                                                                  ?.label ||
-                                                                                              "No Alert"
-                                                                                            : "No Alert"}
-                                                                                    </span>
+                                                                                    <span>{alertTypeOptions.find((opt) => opt.value === typeVal)?.label}</span>
                                                                                     <ChevronDown
                                                                                         className={`w-4 h-4 transition-transform ${openDropdowns[`single-missing-${kpiName}`] ? "rotate-180" : ""}`}
                                                                                     />
@@ -3423,9 +3383,7 @@ export default function AlertSetting() {
                                                                                 )}
                                                                             </div>
                                                                             {/* Cooldown Minutes */}
-                                                                            {typeVal &&
-                                                                                typeVal !==
-                                                                                    "" && (
+                                                                            {isActiveAlertType(typeVal) && (
                                                                                     <label className="block min-w-[72px] max-w-[120px] border border-gray-200 rounded-lg px-3 py-1 bg-white cursor-text focus-within:ring-2 focus-within:ring-[#6b1176] focus-within:border-transparent">
                                                                                         <span className="text-[10px] text-gray-400 block">Cooldown</span>
                                                                                         <div className="flex items-center gap-1">
