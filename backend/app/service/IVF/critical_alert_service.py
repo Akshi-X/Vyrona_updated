@@ -607,12 +607,12 @@ class CriticalAlertService:
                         checked_kpi_configs.append(kpi_config.id)
                         continue
 
-            ## Check if last alert created/updated for this config is not acknowledged and occurred within last 1 hour,
+            ## Check if last alert created for this config is not acknowledged and occurred within last 1 hour,
             # if yes skip creating new alert to avoid alert spam.
             # Use occurred_at for cooldown ordering to avoid reminder/ack updates
             # unintentionally resetting the cooldown window.
             last_activity_col = func.coalesce(
-                CriticalAlert.occurred_at, CriticalAlert.created_at
+                CriticalAlert.created_at
             )
             # Build LIKE patterns anchored to tank_id to avoid false matches
             # (e.g. kpi_config_id=5 must not match :15, :25, :55, etc.)
