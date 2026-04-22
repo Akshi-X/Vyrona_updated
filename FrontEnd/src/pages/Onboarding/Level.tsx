@@ -9,7 +9,7 @@ interface OnboardingLevelProps {
 }
 
 export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
-    const { getSteps, getLevelProgress, startLevel, setStepIndex, logEvent } = useOnboarding();
+    const { getSteps, getLevelProgress, startLevel, setStepIndex } = useOnboarding();
     const navigate = useNavigate();
     const location = useLocation();
     const { setIsOpen, setSteps, setCurrentStep } = useTour();
@@ -61,12 +61,11 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     useEffect(() => {
         if (stepCount > 0 && stepIndex >= stepCount && !completionLoggedRef.current) {
-            logEvent({ type: "tour_completed", levelId });
             completionLoggedRef.current = true;
             setIsTourActive(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stepCount, stepIndex, logEvent, levelId]);
+    }, [stepCount, stepIndex, levelId]);
 
     // ── 3. Tour steps setup & initial position ─────────────────────
     useEffect(() => {
@@ -215,7 +214,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
                 const nextIndex = stepIndex + 1;
                 setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
                 setCurrentStep(nextIndex);
                 setStepIndex(levelId, nextIndex);
 
@@ -226,7 +224,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
                 const nextIndex = stepIndex + 1;
                 setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
                 setCurrentStep(nextIndex);
                 setStepIndex(levelId, nextIndex);
 
@@ -239,7 +236,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             document.removeEventListener("pointerdown", handlePointerDown, true);
             restoreDisabledStyles();
         };
-    }, [activeStep, confirmedSteps, stepIndex, levelId, logEvent, setCurrentStep, setStepIndex, isTourActive]);
+    }, [activeStep, confirmedSteps, stepIndex, levelId, setCurrentStep, setStepIndex, isTourActive]);
 
     // ── Navigation handlers ─────────────────────────────────────────
     const goNext = useCallback(() => {
@@ -247,8 +244,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const nextIndex = stepIndex + 1;
         setCurrentStep(nextIndex);
         setStepIndex(levelId, nextIndex);
-        logEvent({ type: "tour_step", levelId, payload: { stepIndex: nextIndex } });
-    }, [canNext, stepIndex, levelId, setCurrentStep, setStepIndex, logEvent]);
+    }, [canNext, stepIndex, levelId, setCurrentStep, setStepIndex]);
 
     const goPrev = useCallback(() => {
         if (!canPrev) return;
@@ -262,8 +258,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         });
         setCurrentStep(prevTargetIndex);
         setStepIndex(levelId, prevTargetIndex);
-        logEvent({ type: "tour_step", levelId, payload: { stepIndex: prevTargetIndex } });
-    }, [canPrev, prevTargetIndex, stepIndex, steps, levelId, setCurrentStep, setStepIndex, logEvent]);
+    }, [canPrev, prevTargetIndex, stepIndex, steps, levelId, setCurrentStep, setStepIndex]);
 
     // ── Publish nav state ───────────────────────────────────────────
     const navState = useMemo<TourNavState>(() => ({
@@ -304,7 +299,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         tourNavCtx.setPendingStartLevelId(null);
         if (progress?.status === "available") {
             startLevel(levelId);
-            logEvent({ type: "level_start", levelId });
         }
         setIsTourActive(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,7 +309,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const fn = () => {
             if (progress?.status === "available") {
                 startLevel(levelId);
-                logEvent({ type: "level_start", levelId });
             }
             setIsTourActive(true);
             if (stepCount > 0 && stepIndex < stepCount) {

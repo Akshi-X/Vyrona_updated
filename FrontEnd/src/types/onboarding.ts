@@ -74,7 +74,14 @@ export type OnboardingLevelStatus = "locked" | "available" | "in_progress" | "co
 export interface OnboardingLevelProgress {
     id: string;
     status: OnboardingLevelStatus;
-    score: number;
+    /** Score of the current/latest quiz attempt — resets to 0 on retry */
+    currentScore: number;
+    /** Best score ever achieved (set on completion, never reset) */
+    highScore: number;
+    /** Total steps in this level (from config, stored for backend convenience) */
+    totalSteps: number;
+    /** Total quiz questions in this level (from config, stored for backend convenience) */
+    totalQuiz: number;
     attempts: number;
     startedAt?: string;
     completedAt?: string;
@@ -83,19 +90,8 @@ export interface OnboardingLevelProgress {
     lastQuizIndex: number;
 }
 
-export interface OnboardingEvent {
-    id: string;
-    type: string;
-    timestamp: string;
-    levelId?: string;
-    payload?: Record<string, unknown>;
-}
-
 export interface OnboardingState {
-    welcomeStage: number;
     activeLevelId?: string;
     levels: Record<string, OnboardingLevelProgress>;
-    quizAnswers: Record<string, Record<string, number>>;
-    events: OnboardingEvent[];
     lastUpdatedAt?: string;
 }

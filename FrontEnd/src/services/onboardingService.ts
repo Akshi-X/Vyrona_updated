@@ -1,5 +1,5 @@
 import { BaseApiService } from "./baseApiService";
-import type { OnboardingState, OnboardingEvent } from "../types/onboarding";
+import type { OnboardingState } from "../types/onboarding";
 import { authUtils } from "../utils/auth";
 
 export interface OnboardingStateResponse {
@@ -31,22 +31,7 @@ export class OnboardingService extends BaseApiService {
                 body: JSON.stringify({ state }),
             });
         } catch {
-            // Ignore sync errors for now
-        }
-    }
-
-    async appendEvents(events: OnboardingEvent[]): Promise<void> {
-        if (events.length === 0) return;
-        if (!authUtils.getToken()) {
-            return;
-        }
-        try {
-            await this.request("/api/onboarding/events", {
-                method: "POST",
-                body: JSON.stringify({ events }),
-            });
-        } catch {
-            // Ignore sync errors for now
+            // Ignore sync errors
         }
     }
 }

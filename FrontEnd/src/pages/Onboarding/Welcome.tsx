@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 import { level0Config } from "../../onboarding/data";
 
@@ -7,50 +6,33 @@ interface OnboardingWelcomeProps {
 }
 
 export default function OnboardingWelcome({ onStart }: OnboardingWelcomeProps) {
-    const { state, advanceWelcome, logEvent } = useOnboarding();
+    const { completeLevel } = useOnboarding();
 
     const sections = level0Config?.sections ?? [];
-    const visibleSections = useMemo(() => sections.slice(0, state.welcomeStage + 1), [state.welcomeStage, sections]);
-
-    const handleNext = () => {
-        advanceWelcome();
-        logEvent({ type: "welcome_next" });
-    };
 
     const handleStart = () => {
-        logEvent({ type: "welcome_start", levelId: "level-1" });
+        completeLevel("level-0", 0);
         onStart?.();
     };
 
     return (
         <div className="mx-auto max-w-4xl">
-            <div className="rounded-3xl border border-white/60 bg-white/80 p-8 ">
+            <div className="rounded-3xl border border-white/60 bg-white/80 p-8">
                 <div className="grid gap-8 md:grid-cols-[1.1fr_0.9fr]">
                     <div className="space-y-6">
-                        {visibleSections.map((section) => (
+                        {sections.map((section) => (
                             <div key={section.title} className="space-y-2">
                                 <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
                                 <p className="text-sm text-slate-600">{section.text}</p>
                             </div>
                         ))}
-                        <div className="flex flex-wrap gap-3">
-                            {state.welcomeStage < sections.length - 1 && (
-                                <button
-                                    type="button"
-                                    onClick={handleNext}
-                                    className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white"
-                                >
-                                    Next
-                                </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={handleStart}
-                                className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-900 shadow-sm"
-                            >
-                                Start Tour →
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={handleStart}
+                            className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white"
+                        >
+                            Start Tour →
+                        </button>
                     </div>
                     <div className="flex items-center justify-center">
                         <img
