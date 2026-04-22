@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
@@ -11,7 +11,6 @@ interface LevelOverlayProps {
 export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps) {
     const {
         levels,
-        state,
         getSteps,
         getQuiz,
         getLevelProgress,
@@ -19,7 +18,6 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         setQuizIndex,
         completeLevel,
         resetLevel,
-        logEvent,
     } = useOnboarding();
 
     const { setIsOpen: setTourOpen } = useTour();
@@ -36,53 +34,43 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     // Show interlude screen (between tour completion and quiz) only when quiz hasn't started yet
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
-    const answerMap = useMemo(() => {
-        return state.quizAnswers[levelId] || {};
-    }, [state.quizAnswers, levelId]);
-
     const levelConfig = levels.find((level) => level.id === levelId);
 
     const currentQuestion = quiz[quizIndex];
 
     const handleAnswer = (choiceIndex: number) => {
         if (!currentQuestion) return;
+
+        // answerQuiz increments currentScore in state; compute it locally too
+        // so we can use it immediately without waiting for a re-render.
+        const isCorrect = choiceIndex === currentQuestion.correctIndex;
+        const newScore = (progress?.currentScore ?? 0) + (isCorrect ? currentQuestion.points : 0);
+
         answerQuiz(levelId, currentQuestion.id, choiceIndex);
-        logEvent({ type: "quiz_answer", levelId, payload: { questionId: currentQuestion.id, choiceIndex } });
 
         if (quizIndex + 1 < quiz.length) {
             setQuizIndex(levelId, quizIndex + 1);
             return;
         }
 
-        const score = quiz.reduce((sum, question) => {
-            const resolved = question.id === currentQuestion.id
-                ? choiceIndex
-                : answerMap?.[question.id];
-            return resolved === question.correctIndex ? sum + question.points : sum;
-        }, 0);
-
-        setLastScore(score);
-        if (score >= (levelConfig?.pointsRequired ?? 0)) {
-            completeLevel(levelId, score);
-            logEvent({ type: "quiz_pass", levelId, payload: { score } });
+        setLastScore(newScore);
+        if (newScore >= (levelConfig?.pointsRequired ?? 0)) {
+            completeLevel(levelId, newScore);
             setQuizResult("pass");
             onComplete?.();
         } else {
-            logEvent({ type: "quiz_fail", levelId, payload: { score } });
             setQuizResult("fail");
         }
     };
 
     const handleRetry = () => {
         resetLevel(levelId);
-        logEvent({ type: "tour_retry", levelId });
         setQuizResult(null);
         setShowInterlude(true);
     };
 
     const handleRetryQuiz = () => {
         setQuizIndex(levelId, 0);
-        logEvent({ type: "quiz_retry", levelId });
         setQuizResult(null);
         setShowInterlude(true);
     };
@@ -195,7 +183,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
 
     if (isCompleted || quizResult === "pass") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
-        const finalScore = progress?.score ?? 0;
+        const finalScore = progress?.highScore ?? 0;
         const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
         const completion = levelConfig?.completion;
 

@@ -43,15 +43,15 @@ export default function OnboardingOverlay() {
         ? activeLevelSteps.length > 0 && (activeLevelProgress?.lastStepIndex ?? 0) >= activeLevelSteps.length
         : false;
 
-    const level1Status = state.levels["level-1"]?.status;
+    const level0Status = state.levels["level-0"]?.status;
 
-    // Auto-open welcome on first dashboard landing
+    // Auto-open welcome on first dashboard landing (only if level-0 not yet completed)
     useEffect(() => {
-        if (location.pathname === "/onboarding/dashboard" && level1Status === "available") {
+        if (location.pathname === "/onboarding/dashboard" && level0Status !== "completed") {
             setShowWelcome(true);
             setIsOpen(true);
         }
-    }, [location.pathname, level1Status]);
+    }, [location.pathname, level0Status]);
 
     const [showTimeline, setShowTimeline] = useState(false);
 
@@ -68,12 +68,12 @@ export default function OnboardingOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tourComplete, activeLevelProgress?.status]);
 
-    // Once tour starts, drop welcome view
+    // Once level-0 is completed, hide the welcome view permanently
     useEffect(() => {
-        if (level1Status !== "available" && level1Status !== undefined) {
+        if (level0Status === "completed") {
             setShowWelcome(false);
         }
-    }, [level1Status]);
+    }, [level0Status]);
 
     const handleStartTour = () => {
         tourNavCtx?.startTour?.();

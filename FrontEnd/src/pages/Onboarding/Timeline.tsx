@@ -9,7 +9,7 @@ interface OnboardingTimelineProps {
 }
 
 export default function OnboardingTimeline({ onStart, onStartWelcome }: OnboardingTimelineProps) {
-    const { levels, state, getQuiz, resetLevel } = useOnboarding();
+    const { levels, state, resetLevel } = useOnboarding();
     const tourNavCtx = useTourNavContext();
     const { setCurrentStep } = useTour();
     const navigate = useNavigate();
@@ -24,14 +24,9 @@ export default function OnboardingTimeline({ onStart, onStartWelcome }: Onboardi
                 {levels.map((level) => {
                     const progress = state.levels[level.id];
                     const status = progress?.status ?? "locked";
-                    const quiz = getQuiz(level.id);
-                    const answers = state.quizAnswers?.[level.id] || {};
-                    const quizScore = quiz.reduce((sum, q) => {
-                        return answers[q.id] === q.correctIndex ? sum + q.points : sum;
-                    }, 0);
-                    const currentScore = Math.max(progress?.score ?? 0, quizScore);
+                    const highScore = progress?.highScore ?? 0;
                     const pointsRequired = level.pointsRequired ?? 0;
-                    const remaining = Math.max(pointsRequired - currentScore, 0);
+                    const remaining = Math.max(pointsRequired - highScore, 0);
 
                     return (
                         <div
@@ -42,8 +37,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome }: Onboardi
                                 <div className="space-y-0.5">
                                     <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{level.id}</p>
                                     <h3 className="text-base font-semibold">{level.title}</h3>
-                                    <p className="text-xs text-slate-500">Current points: {currentScore} / {pointsRequired}</p>
-                                    <p className="text-xs text-slate-500">Quiz points scored: {quizScore}</p>
+                                    <p className="text-xs text-slate-500">High score: {highScore} / {pointsRequired}</p>
                                     <p className="text-xs text-slate-500">Points remaining: {remaining}</p>
                                 </div>
                                 <div className="text-right">
