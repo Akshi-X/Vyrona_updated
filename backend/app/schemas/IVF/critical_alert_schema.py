@@ -52,11 +52,25 @@ class AcknowledgeAlertRequest(BaseModel):
     alert_id: str = Field(..., description="UUID of the alert to acknowledge")
 
 
+class AcknowledgeAlertsRequest(BaseModel):
+    """Schema for acknowledging multiple alerts"""
+    alert_id: List[str] = Field(..., description="UUIDs of alerts to acknowledge")
+
+
 class AcknowledgeAlertResponse(BaseModel):
     """Schema for acknowledge alert response"""
     alert_id: str = Field(..., description="UUID of the alert")
     status: AlertStatus
     message: str = Field(..., description="Success message")
+    acknowledged_at: datetime
+
+
+class AcknowledgeAlertsResponse(BaseModel):
+    """Schema for acknowledge-all response"""
+    alert_id: List[str] = Field(..., description="UUIDs of acknowledged alerts")
+    status: AlertStatus
+    message: str = Field(..., description="Success message")
+    acknowledged_count: int
     acknowledged_at: datetime
 
 
