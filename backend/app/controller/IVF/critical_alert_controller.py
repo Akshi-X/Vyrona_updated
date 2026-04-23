@@ -17,6 +17,8 @@ from app.schemas.IVF.critical_alert_schema import (
     CriticalAlertListResponse,
     AcknowledgeAlertRequest,
     AcknowledgeAlertResponse,
+    AcknowledgeAlertsRequest,
+    AcknowledgeAlertsResponse,
     TankAlertsResponse,
     HospitalAlertsResponse
 )
@@ -153,6 +155,51 @@ def acknowledge_alert(
         if isinstance(e, AppException):
             raise HTTPException(status_code=e.status_code, detail=e.message)
         raise HTTPException(status_code=500, detail=f"Error acknowledging alert: {str(e)}")
+
+
+@router.post("/acknowledge-all", response_model=AcknowledgeAlertsResponse)
+def acknowledge_alerts(
+    request_data: AcknowledgeAlertsRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Acknowledge multiple alerts in one request.
+
+    Request body:
+    - alert_id: Array of alert UUIDs to acknowledge
+    """
+    try:
+        if not hasattr(request.state, "current_user"):
+            raise HTTPException(status_code=401, detail="User not authenticated")
+
+        user = request.state.current_user
+        user_id = user.user_id
+
+        service = CriticalAlertService(db)
+        result = service.acknowledge_alerts(request_data.alert_id, user_id)
+
+        ActivityLogService(db).log_activity(
+            action="alert.acknowledged_all",
+            outcome=ActivityOutcome.SUCCESS.value,
+            actor=build_actor_from_user(user),
+            target=build_target("alert", "bulk"),
+            metadata={
+                "status": AlertStatus.ACKNOWLEDGED.value,
+                "alert_id": request_data.alert_id,
+                "acknowledged_count": result.acknowledged_count,
+            },
+            audit_log_disabled=getattr(request.state, "audit_log_disabled", False),
+        )
+        return result
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        if isinstance(e, AppException):
+            raise HTTPException(status_code=e.status_code, detail=e.message)
+        raise HTTPException(status_code=500, detail=f"Error acknowledging alerts: {str(e)}")
 
 class CheckKpiRequest(BaseModel):
     tank_id: int | None = None

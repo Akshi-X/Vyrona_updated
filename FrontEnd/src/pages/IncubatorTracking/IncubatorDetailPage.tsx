@@ -584,6 +584,10 @@ export default function IncubatorDetailPage() {
           await ivfAlertsService.acknowledgeAlert(alertId);
           fetchCriticalAlerts();
         }}
+        onAcknowledgeAll={async (alertIds) => {
+          await ivfAlertsService.acknowledgeAlerts(alertIds);
+          fetchCriticalAlerts();
+        }}
       />
       <MyTasksModal
         isOpen={showMyTasks}

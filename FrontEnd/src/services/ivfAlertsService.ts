@@ -46,10 +46,22 @@ export interface AcknowledgeAlertRequest {
   alert_id: string;
 }
 
+export interface AcknowledgeAlertsRequest {
+  alert_id: string[];
+}
+
 export interface AcknowledgeAlertResponse {
   alert_id: string;
   status: 'Active' | 'Acknowledged';
   message: string;
+  acknowledged_at: string;
+}
+
+export interface AcknowledgeAlertsResponse {
+  alert_id: string[];
+  status: 'Active' | 'Acknowledged';
+  message: string;
+  acknowledged_count: number;
   acknowledged_at: string;
 }
 
@@ -89,6 +101,16 @@ export class IvfAlertsService extends BaseApiService {
     return await this.post<AcknowledgeAlertResponse>(
       '/api/ivf/alerts/acknowledge',
       { alert_id: alertId }
+    );
+  }
+
+  /**
+   * Acknowledge multiple alerts
+   */
+  async acknowledgeAlerts(alertIds: string[]): Promise<AcknowledgeAlertsResponse> {
+    return await this.post<AcknowledgeAlertsResponse>(
+      '/api/ivf/alerts/acknowledge-all',
+      { alert_id: alertIds }
     );
   }
 
