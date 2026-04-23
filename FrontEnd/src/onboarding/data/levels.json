@@ -35,7 +35,7 @@
         "welcome": {
             "title": "Dashboard Quest",
             "subtitle": "Level 1 · Starter Mission",
-            "description": "Get acquainted with your mGrape dashboard — your control center for KPIs, live alerts, and shipment tracking at a glance.",
+            "description": "Get acquainted with your mgSCALE dashboard — your control center for KPIs, live alerts, and shipment tracking at a glance.",
             "badge": "🗺️"
         },
         "interlude": {
@@ -248,7 +248,7 @@
         "welcome": {
             "title": "Users",
             "subtitle": "Level 8 · Admin Mission",
-            "description": "Manage your clinic's user roster — filter by role and branch, invite new members, and control who has access to your mGrape account.",
+            "description": "Manage your clinic's user roster — filter by role and branch, invite new members, and control who has access to your mgSCALE account.",
             "badge": "👥"
         },
         "interlude": {
