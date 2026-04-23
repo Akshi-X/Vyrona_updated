@@ -2,6 +2,16 @@
     {
         "id": "dash-kpis",
         "target": "#onboarding-dashboard-kpis",
+        "title": "myGrape Genie",
+        "icon": "LayoutDashboard",
+        "content": "Hi, Welcome to mgSCALE, I was checking with the ",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining.webp"
+    },
+    {
+        "id": "dash-kpis",
+        "target": "#onboarding-dashboard-kpis",
         "title": "KPI Pulse",
         "icon": "LayoutDashboard",
         "content": "This is your embryologist's command centre. Every KPI shown here is tailored to what you need to act on — storage volumes, container health, and deviations — all in one view the moment you log in.",
