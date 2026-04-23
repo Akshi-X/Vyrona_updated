@@ -59,6 +59,9 @@ export interface OnboardingStep {
     disableClickID?: string[];
     genieImage?: string;
     startPage?: string;
+    inputText?: string;
+    stepDelay?: number;
+    onboardingEvent?: string;
 }
 
 export interface OnboardingQuizQuestion {

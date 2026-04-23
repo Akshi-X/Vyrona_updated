@@ -369,6 +369,29 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         }
     }, [isOpen, currentUserName, currentUserId]);
 
+    // Onboarding: pre-fill the new task form with valid demo data so the
+    // user can click Save without hitting validation errors.
+    useEffect(() => {
+        const handler = () => {
+            setShowInputRow(true);
+            setValidationErrors({});
+            setNewTask({
+                patientId: "",
+                canisterNumber: defaultCanisterNumber || "T-161",
+                taskName: "Schedule LN2 top-up",
+                description: "LN2 level approaching L1 threshold. Top-up required.",
+                assigneeBy: currentUserName || "Demo User",
+                assignedTo: currentUserName || "Demo User",
+                assigneeId: currentUserId || "USR-DEMO",
+                dueDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+                priority: "High",
+                status: "Not started",
+            });
+        };
+        document.addEventListener("onboarding:prefill-task-form", handler);
+        return () => document.removeEventListener("onboarding:prefill-task-form", handler);
+    }, [currentUserName, currentUserId, defaultCanisterNumber]);
+
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -520,6 +543,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             headerAction={
                 onAdd && (!isUserRole || isIvfVariant) ? (
                     <button
+                        id="onboarding-my-tasks-add-btn"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleAddClick();
@@ -1007,7 +1031,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     <tbody>
                         {/* Input row for new task */}
                         {showInputRow && (
-                            <tr className="border-b border-[#eeeeee]">
+                            <tr id="onboarding-my-tasks-input-row" className="border-b border-[#eeeeee]">
                                 <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
                                     <div>
                                         <input
@@ -1331,6 +1355,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                 <td className="bg-[#fbf8fd] p-2 md:p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-center sticky z-10">
                                     <div className="flex items-center justify-center gap-2">
                                         <button
+                                            id="onboarding-my-tasks-save-btn"
                                             onClick={handleSaveAdd}
                                             disabled={isSaving}
                                             className={`inline-flex items-center justify-center px-2 py-1 text-sm font-medium rounded transition-colors ${

@@ -4,6 +4,22 @@ import dashboardData from "./mocks/dashboard-data.json";
 import controlTowerData from "./mocks/control-tower-data.json";
 import liveFeedFrames from "./mocks/live-feed-data.json";
 
+// ── Mutable in-memory alert state (reset each time mocks are enabled) ────────
+// Allows the acknowledge action to update alert status within the same session.
+let mockTankAlerts: typeof dashboardData.ivfTankAlerts;
+
+// ── Mutable in-memory chat state ───────────────────────────────────────────
+// Allows sent messages to appear immediately on the subsequent refresh call.
+let mockTankChatMessages: typeof dashboardData.ivfTankChatMessages;
+
+// ── Mutable in-memory task state ───────────────────────────────────────────
+// Allows created tasks to appear in the list after the POST resolves.
+let mockCanisterTasks: typeof dashboardData.ivfTankTasks;
+
+// ── Mutable in-memory refill log state ─────────────────────────────────────
+// Allows newly created refill log entries to appear on the subsequent GET.
+let mockCanisterRefillLogs: typeof dashboardData.ivfTankRefillLogs;
+
 // ── KPI unit map for live-feed messages ────────────────────────────────────
 const KPI_UNIT_MAP: Record<string, string> = {
     temp_internal:           "°C",
@@ -168,8 +184,14 @@ function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
 // ── Enable / disable ────────────────────────────────────────────────────────
 
 export const enableOnboardingMocks = () => {
+    // Deep-clone so mutations don't bleed across sessions
+    mockTankAlerts = JSON.parse(JSON.stringify(dashboardData.ivfTankAlerts));
+    mockTankChatMessages = JSON.parse(JSON.stringify(dashboardData.ivfTankChatMessages));
+    mockCanisterTasks = JSON.parse(JSON.stringify(dashboardData.ivfTankTasks));
+    mockCanisterRefillLogs = JSON.parse(JSON.stringify(dashboardData.ivfTankRefillLogs));
+
     BaseApiService.setMockEnabled(true);
-    BaseApiService.setMockResolver(async (endpoint) => {
+    BaseApiService.setMockResolver(async (endpoint, options) => {
         // User profile — hit real API only for onboarding, preserve real role as real_role, override role to Admin.
         if (endpoint.startsWith("/api/profile")) {
             try {
@@ -187,7 +209,22 @@ export const enableOnboardingMocks = () => {
 
         // IVF alerts for a specific tank (canister detail page).
         if (endpoint.startsWith("/api/ivf/alerts/tank/")) {
-            return dashboardData.ivfTankAlerts;
+            return mockTankAlerts;
+        }
+
+        // Acknowledge a single IVF alert — flip its status in the mutable copy.
+        if (endpoint.startsWith("/api/ivf/alerts/acknowledge")) {
+            try {
+                const body = options?.body ? JSON.parse(options.body as string) : {};
+                const alertId: string = body.alert_id ?? body.alertId ?? "";
+                const alert = mockTankAlerts.alerts.find((a) => a.alert_id === alertId);
+                if (alert) {
+                    alert.status = "Acknowledged";
+                    alert.acknowledged_by = "USR-DEMO";
+                    alert.acknowledged_at = new Date().toISOString();
+                }
+            } catch { /* ignore parse errors */ }
+            return { success: true };
         }
 
         // IVF alerts feed for IVF dashboard cards.
@@ -358,9 +395,37 @@ export const enableOnboardingMocks = () => {
             return dashboardData.ivfTankTrackingDetails;
         }
 
-        // IVF track shipment — refill logs.
+        // IVF track shipment — create refill log entry.
+        if (
+            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/]+\/refill-logs$/) &&
+            options?.method === "POST"
+        ) {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const newLog = {
+                tank_id: 60,
+                log_id: mockCanisterRefillLogs.refill_logs.length + 500,
+                refill_date: body.refill_date ?? new Date().toISOString().split("T")[0],
+                refill_time: body.refill_time ?? "00:00:00",
+                refilled_by: body.refilled_by ?? "",
+                description: body.description ?? "",
+                status: body.status ?? "Not started",
+                cryoshipper: body.cryoshipper ?? null,
+                disinfected_shipper_infected_tank_description: body.disinfected_shipper_infected_tank_description ?? null,
+                reservoir: body.reservoir ?? null,
+                ln2_ordered_date: body.ln2_ordered_date ?? null,
+                ln2_received_date: body.ln2_received_date ?? null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                created_by: "demo@onboarding.local",
+                updated_by: null,
+            };
+            mockCanisterRefillLogs.refill_logs.unshift(newLog);
+            return { success: true, log: newLog };
+        }
+
+        // IVF track shipment — refill logs (GET).
         if (endpoint.startsWith("/api/quality-tracking/tanks/") && endpoint.includes("/refill-logs")) {
-            return dashboardData.ivfTankRefillLogs;
+            return mockCanisterRefillLogs;
         }
 
         // Reports page — monthly summary.
@@ -461,14 +526,64 @@ export const enableOnboardingMocks = () => {
             return dashboardData.profileFeedbackTickets;
         }
 
-        // IVF track shipment — canister tasks.
+        // IVF track shipment — canister tasks (GET).
         if (endpoint.startsWith("/api/canisters/") && endpoint.includes("/tasks")) {
-            return dashboardData.ivfTankTasks;
+            return mockCanisterTasks;
+        }
+
+        // Task creation — append to mock list and return success.
+        if (endpoint === "/api/tasks" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const newTask = {
+                id: mockCanisterTasks.tasks.length + 200,
+                task_name: body.task_name ?? "New Task",
+                description: body.description ?? "",
+                assignee_id: body.assignee_id ?? "USR-DEMO",
+                tank_id: body.tank_id ?? null,
+                tank_code: body.tank_code ?? "T-161",
+                due_date: body.due_date ?? new Date().toISOString(),
+                priority: body.priority ?? "Medium",
+                status: body.status ?? "Not started",
+                created_by: { first_name: "Demo", last_name: "User" },
+                assignee: { first_name: "Demo", last_name: "User" },
+                canister_number: "161",
+                patient_id: null,
+            };
+            mockCanisterTasks.tasks.push(newTask);
+            return { success: true, task: newTask };
         }
 
         // IVF track shipment — stakeholder chat messages.
         if (endpoint.startsWith("/api/chat/canisters/") && endpoint.includes("/messages")) {
-            return dashboardData.ivfTankChatMessages;
+            return mockTankChatMessages;
+        }
+
+        // Stakeholder chat — send a new message.
+        if (endpoint === "/api/chat/messages" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const newMsg = {
+                id: mockTankChatMessages.messages.length + 100,
+                message_content: body.message_content ?? "",
+                canister_number: body.tank_code ?? null,
+                sender_id: "USR-DEMO",
+                sender_name: "Demo User",
+                sender_role: "Admin",
+                tagged_user_ids: body.tagged_user_ids ?? [],
+                created_at: new Date().toISOString(),
+                is_read: true,
+                read_at: new Date().toISOString(),
+            };
+            mockTankChatMessages.messages.push(newMsg);
+            mockTankChatMessages.total_messages = mockTankChatMessages.messages.length;
+            return newMsg;
+        }
+
+        // Stakeholder chat — mark as read.
+        if (
+            (endpoint.startsWith("/api/chat/canisters/") && endpoint.includes("/mark-read")) ||
+            (endpoint.startsWith("/api/chat/patients/") && endpoint.includes("/mark-read"))
+        ) {
+            return { success: true, last_read_message_id: 0, unread_count: 0 };
         }
 
         return undefined;
