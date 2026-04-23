@@ -524,14 +524,14 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 )}
 
                 {Object.entries(groupedByDateAndKpi).map(
-                    ([dateLabel, dateGroups]) => (
+                    ([dateLabel, dateGroups], dateIndex) => (
                         <div key={dateLabel} className="space-y-2">
                             <div className="inline-flex items-center rounded-full bg-[#f0f0f0] px-3 py-1 text-sm font-medium text-[#3a3a3a]">
                                 {dateLabel}
                             </div>
 
                             <div className="space-y-2">
-                                {dateGroups.map((group) => {
+                                {dateGroups.map((group, groupIndex) => {
                                     const latestAlert = group.alerts[0];
                                     const olderAlerts = group.alerts.slice(1);
                                     const hiddenCount = olderAlerts.length;
@@ -671,6 +671,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                     {onAcknowledge && (
                                                         latestAlert.status === "Active" ? (
                                                             <button
+                                                                id={dateIndex === 0 && groupIndex === 0 ? "onboarding-critical-alert-ack-btn" : undefined}
                                                                 onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
                                                                 disabled={acknowledgingIds.has(latestAlert.id)}
                                                                 className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
@@ -781,7 +782,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
 
             {pendingAcknowledgeAlertId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
+                    <div id="onboarding-critical-alert-confirm-dialog" className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
                         <h4 className="text-base font-semibold text-[#1f2937]">
                             Acknowledge alert
                         </h4>
@@ -799,6 +800,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                 Cancel
                             </button>
                             <button
+                                id="onboarding-critical-alert-confirm-btn"
                                 type="button"
                                 onClick={handleAcknowledgeConfirm}
                                 className="px-4 py-2 text-sm font-medium rounded-lg bg-[#6b1176] text-white hover:bg-[#5a0f66]"

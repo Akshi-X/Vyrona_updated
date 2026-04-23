@@ -17,7 +17,8 @@
         "content": "Click the Bangalore marker to zoom in and filter the view to that branch.",
         "placement": "bottom",
         "requireClick": true,
-        "clickOnlyId": ["#map-marker-Bangalore"]
+        "clickOnlyId": ["#map-marker-Bangalore"],
+        "startPage": "/onboarding/control-tower"
     },
     {
         "id": "ct3-containers-after-marker",
@@ -26,7 +27,8 @@
         "icon": "Package",
         "content": "The list has updated to show only Bangalore containers. Find Container T-161 and click it to inspect its details.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": false,
+        "startPage": "/onboarding/control-tower"
     },
     {
         "id": "ct3-container-t161-click",
@@ -36,7 +38,18 @@
         "content": "Click this container row to drill into its sensor readings and full history.",
         "placement": "right",
         "requireClick": true,
-        "clickOnlyId": ["#tank-Bangalore-T-161"]
+        "clickOnlyId": ["#tank-Bangalore-T-161"],
+        "startPage": "/onboarding/control-tower"
+    },
+    {
+        "id": "ct3-cryocan-page-overview",
+        "target": "#onboarding-page-layout",
+        "title": "Cryocan Page Overview",
+        "icon": "Package",
+        "content": "You are now on the Cryocan page. This screen gives you a complete view of this container, including live parameters, trend charts, and operational logs.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
     },
     {
         "id": "ct3-quality-parameters",
@@ -49,13 +62,323 @@
         "startPage": "/onboarding/ivf-track-shipment/161"
     },
     {
+        "id": "ct3-cryocan-svg",
+        "target": "#onboarding-cryocan-svg",
+        "title": "Cryocan Tank Diagram",
+        "icon": "FlaskConical",
+        "content": "This diagram is a live visual representation of the cryogenic tank. The liquid fill level inside the cylinder rises and falls in real time based on the LN2 sensor reading — giving you an instant, at-a-glance health check of the tank without reading numbers.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-cryocan-l1-marker",
+        "target": "#onboarding-cryocan-l2-marker",
+        "title": "LN2 Threshold Marker (L1)",
+        "icon": "AlertTriangle",
+        "content": "The dashed line marks your configured L1 alert threshold — the minimum safe LN2 level for this tank. When the liquid surface drops below this line, an alert is triggered. The warning icon beside it turns red as the level approaches the limit.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-cryocan-level-text",
+        "target": "#onboarding-cryocan-level-text",
+        "title": "LN2 Fill Percentage",
+        "icon": "Percent",
+        "content": "This number shows the current LN2 level as a percentage of the tank's maximum capacity. 100% means full; anything below your L1 threshold requires immediate attention. The colour of the fill behind it — green, yellow, or red — reinforces the urgency at a glance.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-kpi-lid",
+        "target": "#onboarding-kpi-lid",
+        "title": "Lid State",
+        "icon": "Lock",
+        "content": "Shows whether the tank lid is currently open or closed. An open lid during storage is a critical deviation — LN2 evaporates rapidly and sample integrity is immediately at risk. This tile turns red the moment the lid is detected open.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-kpi-internal-temp",
+        "target": "#onboarding-kpi-internal-temp",
+        "title": "Internal Temperature",
+        "icon": "Thermometer",
+        "content": "The temperature measured inside the tank, where the samples are stored. For a healthy cryogenic container this should stay near −196 °C. Any rise above the threshold signals a breach in the cold chain and requires urgent investigation.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-kpi-external-temp",
+        "target": "#onboarding-kpi-external-temp",
+        "title": "External Temperature",
+        "icon": "Sun",
+        "content": "The ambient temperature just outside the tank. Unusually high external temperatures can accelerate LN2 evaporation and stress the insulation. Tracking this alongside the internal reading lets you diagnose whether a temperature excursion is environment-driven or equipment-driven.",
+        "placement": "left",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-kpi-evap-rate",
+        "target": "#onboarding-kpi-evap-rate",
+        "title": "Evaporation Rate",
+        "icon": "Droplets",
+        "content": "How fast LN2 is evaporating from this tank, measured in kg/hr. A normal rate is low and steady. A sudden spike indicates a lid left open, a seal failure, or unusual thermal load — any of which puts your stored samples at risk and requires an immediate check.",
+        "placement": "left",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-kpi-battery",
+        "target": "#onboarding-kpi-battery",
+        "title": "Battery Level",
+        "icon": "Battery",
+        "content": "This bar shows the charge level of the container's monitoring device. When the battery drops to 0%, the sensor goes offline — internal temperature, external temperature, and shock detection readings are no longer available until the device is recharged. Keep an eye on this to avoid unexpected data gaps.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
         "id": "ct3-quality-chart",
         "target": "#onboarding-ivf-quality-chart",
         "title": "Quality Tracking Chart",
         "icon": "BarChart2",
         "content": "Visualise any KPI over LIVE, 1H, 24H, or 7D windows. Switch tabs to compare temperature, LN2 level, shock events, and more across time.",
         "placement": "bottom",
-        "requireClick": false
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-chart-tab-ln2",
+        "target": "#onboarding-chart-kpi-tabs",
+        "title": "KPI Tabs",
+        "icon": "BarChart2",
+        "content": "Each tab switches the chart to a different sensor metric. Click LN2 to see the liquid nitrogen level trend for this container.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-chart-tab-ln2"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-chart-ln2-graph",
+        "target": "#onboarding-ivf-quality-chart",
+        "title": "LN2 Level Graph",
+        "icon": "TrendingDown",
+        "content": "This is the live LN2 level trend for the container. The line plots sensor readings over time — a flat line means stable nitrogen levels, while a downward slope means the tank is losing LN2. Any sharp drop warrants an immediate investigation.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-chart-range-switcher",
+        "target": "#onboarding-chart-range-switcher",
+        "title": "Time Range",
+        "icon": "Clock",
+        "content": "Control how much history the chart shows. LATEST streams live data, while 1H, 24H, and 7D fetch aggregated readings from the database. Click 24H to view the last 24 hours of LN2 levels.",
+        "placement": "top",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-chart-range-24h"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-chart-24h-result",
+        "target": "#onboarding-ivf-quality-chart",
+        "title": "24-Hour LN2 Trend",
+        "icon": "TrendingDown",
+        "content": "You are now viewing the LN2 level over the last 24 hours. A steady line means stable storage. A steep drop signals rapid evaporation and warrants an immediate check — correlate the dip with the Refill Log to confirm whether a top-up already occurred.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-critical-alerts-icon",
+        "target": "#onboarding-ivf-critical-alerts-icon",
+        "title": "Critical Alerts",
+        "icon": "AlertTriangle",
+        "content": "The red badge shows how many unresolved critical alerts exist for this container right now. Click the icon to review them.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-ivf-critical-alerts-icon"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "onboarding-ivf-critical-alerts-modal",
+        "target": "#onboarding-ivf-critical-alerts-modal",
+        "title": "Critical Alerts Panel",
+        "icon": "AlertTriangle",
+        "content": "Each card here is an unresolved critical event for this container. Review the details and take the necessary action in the lab before acknowledging.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-alert-ack-click",
+        "target": "#onboarding-ivf-critical-alerts-modal",
+        "title": "Acknowledge the Alert",
+        "icon": "CheckCircle",
+        "content": "Click the highlighted Acknowledge button on the first alert to mark it as reviewed.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-critical-alert-ack-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-alert-confirm-dialog",
+        "target": "#onboarding-critical-alert-confirm-dialog",
+        "title": "Confirm Acknowledgement",
+        "icon": "CheckCircle",
+        "content": "A confirmation dialog appears before any alert is acknowledged — this prevents accidental dismissals. Click Acknowledge to confirm.",
+        "placement": "bottom",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-critical-alert-confirm-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-alert-acknowledged",
+        "target": "#onboarding-ivf-critical-alerts-modal",
+        "title": "Alert Acknowledged",
+        "icon": "CheckCircle",
+        "content": "The alert has been acknowledged and moved out of the active queue. Acknowledged alerts remain visible in the log for audit purposes — nothing is ever deleted. Close this panel to continue.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-modal-close-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-stakeholder-chats",
+        "target": "#onboarding-ivf-stakeholder-chats-icon",
+        "title": "Stakeholder Chats",
+        "icon": "MessageSquare",
+        "content": "This opens a live chat channel with stakeholders — doctors, embryologists, and lab coordinators — for this container. A red badge shows the number of unread messages. Keep this clear to ensure no important communication is missed.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-stakeholder-chats-open",
+        "target": "#onboarding-ivf-stakeholder-chats-icon",
+        "title": "Open Stakeholder Chats",
+        "icon": "MessageSquare",
+        "content": "Click the icon to open the chat panel for this container.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-ivf-stakeholder-chats-icon"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-stakeholder-chatbox",
+        "target": "#onboarding-stakeholder-chatbox",
+        "title": "Stakeholder Chat",
+        "icon": "MessageSquare",
+        "content": "This is the live chat thread for this container. All stakeholders — embryologists, coordinators, and technicians — can post updates here. Messages are timestamped and persistent, giving you a full communication audit trail.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-chat-type",
+        "target": "#onboarding-chat-input",
+        "title": "Type a Message",
+        "icon": "MessageSquare",
+        "content": "You can post updates directly in this thread. A message has been pre-filled for you — click Send to share it with all stakeholders.",
+        "placement": "top",
+        "requireClick": false,
+        "prevDisable": true,
+        "inputText": "LN2 level looks stable. Confirmed top-up is scheduled for tomorrow morning.",
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-chat-send",
+        "target": "#onboarding-chat-send-btn",
+        "title": "Send the Message",
+        "icon": "Send",
+        "content": "Click Send to post your message to the thread.",
+        "placement": "top",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-chat-send-btn"],
+        "stepDelay": 400,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-chat-sent",
+        "target": "#onboarding-stakeholder-chatbox",
+        "title": "Message Sent",
+        "icon": "CheckCircle",
+        "content": "Your message is now visible to all stakeholders in this thread. The full conversation history is preserved here for reference and audit. Close the panel to continue.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-chat-close-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-my-tasks",
+        "target": "#onboarding-ivf-my-tasks-icon",
+        "title": "My Tasks",
+        "icon": "CheckSquare",
+        "content": "Tasks assigned to or created by you for this container appear here. Use this panel to track pending actions, update task status, and ensure nothing falls through the cracks. Click the icon to open.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-ivf-my-tasks-icon"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-my-tasks-modal",
+        "target": "#onboarding-my-tasks-modal",
+        "title": "My Tasks Panel",
+        "icon": "CheckSquare",
+        "content": "This panel lists all tasks linked to this container. Each row shows the task name, assignee, due date, priority, and status — giving you a full picture of what needs to be done.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-my-tasks-add",
+        "target": "#onboarding-my-tasks-add-btn",
+        "title": "Add a Task",
+        "icon": "PlusCircle",
+        "content": "Click ADD to create a new task for this container.",
+        "placement": "bottom",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-my-tasks-add-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-my-tasks-form",
+        "target": "#onboarding-my-tasks-input-row",
+        "title": "New Task Form",
+        "icon": "ClipboardList",
+        "content": "A new row appears pre-filled with a demo task. In the real app you can fill in the task name, description, assignee, due date, and priority. Click the green checkmark to save it.",
+        "placement": "top",
+        "requireClick": true,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:prefill-task-form",
+        "clickOnlyId": ["#onboarding-my-tasks-save-btn"],
+        "stepDelay": 600,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-ivf-my-tasks-saved",
+        "target": "#onboarding-my-tasks-modal",
+        "title": "Task Created",
+        "icon": "CheckCircle",
+        "content": "The task has been created and added to the list. All assignees are notified and can update the status as work progresses. Close this panel to continue.",
+        "placement": "left",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-modal-close-btn"],
+        "startPage": "/onboarding/ivf-track-shipment/161"
     },
     {
         "id": "ct3-container-data",
@@ -64,6 +387,7 @@
         "icon": "Database",
         "content": "A full log of every sample stored in this container — patient IDs, sample types, dates, and current status — so nothing is ever lost or untracked.",
         "placement": "top",
+        "prevDisable": false,
         "requireClick": false
     },
     {
@@ -74,5 +398,42 @@
         "content": "Every LN2 top-up is recorded here with timestamp, quantity, and technician. A complete audit trail for compliance and maintenance planning.",
         "placement": "top",
         "requireClick": false
+    },
+    {
+        "id": "ct3-refill-log-add",
+        "target": "#onboarding-refill-log-add-btn",
+        "title": "Log a Refill",
+        "icon": "PlusCircle",
+        "content": "Click ADD to record a new LN2 top-up entry.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-log-add-btn"],
+        "stepDelay": 200,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-refill-log-form",
+        "target": "#onboarding-refill-log-input-row",
+        "title": "Refill Entry Form",
+        "icon": "ClipboardList",
+        "content": "Fill in the details for this top-up — Refilled Date, Refill Time, Refilled By, Description, and Status. A demo entry has been pre-filled. Click the green checkmark to save it.",
+        "placement": "top",
+        "requireClick": true,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:prefill-refill-form",
+        "clickOnlyId": ["#onboarding-refill-log-save-btn"],
+        "stepDelay": 600,
+        "startPage": "/onboarding/ivf-track-shipment/161"
+    },
+    {
+        "id": "ct3-refill-log-saved",
+        "target": "#onboarding-ivf-refill-log",
+        "title": "Refill Logged",
+        "icon": "CheckCircle",
+        "content": "The new entry appears at the top of the Refill Log. Every top-up is timestamped and linked to the technician who performed it — giving you a tamper-proof maintenance audit trail.",
+        "placement": "top",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/ivf-track-shipment/161"
     }
 ]

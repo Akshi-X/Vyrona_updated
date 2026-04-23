@@ -1255,13 +1255,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       </div>
 
       {/* KPI Tabs (from DB kpi_config when available) */}
-      <div className="flex gap-1 mb-3 flex-wrap">
+      <div id="onboarding-chart-kpi-tabs" className="flex gap-1 mb-3 flex-wrap">
         {!hasLoadedKpiConfig ? (
           <span className="text-xs text-[#7C7C7C]">Loading...</span>
         ) : (
           kpiTabs.map((tab) => (
             <button
               key={tab.id}
+              id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
@@ -1366,12 +1367,13 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
       </div>
 
       {/* Time range toggle: fetch from API for range; live data still appends */}
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 flex-wrap">
+      <div id="onboarding-chart-range-switcher" className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 flex-wrap">
         <span className="text-xs text-[#7C7C7C] mr-1">Range:</span>
         <div className="flex rounded-md border border-gray-200 overflow-hidden bg-gray-50">
           {TIME_RANGES.map((range) => (
             <button
               key={range.id}
+              id={range.id === '24H' ? 'onboarding-chart-range-24h' : undefined}
               type="button"
               onClick={() => {
                 if (range.id !== timeRange) setIsRangeLoading(true);

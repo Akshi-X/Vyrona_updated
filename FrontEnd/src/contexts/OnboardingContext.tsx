@@ -118,6 +118,15 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                             ? incomingLevel.status
                             : current.status;
 
+                    // Walk back past any prevDisable steps so we never resume
+                    // inside an unopened modal after a reload or cross-device sync.
+                    const rawStepIndex = Math.max(current.lastStepIndex, incomingLevel.lastStepIndex);
+                    const levelSteps = onboardingStepsByLevel[levelId] ?? [];
+                    let safeStepIndex = rawStepIndex;
+                    while (safeStepIndex > 0 && (levelSteps[safeStepIndex] as OnboardingStep | undefined)?.prevDisable) {
+                        safeStepIndex -= 1;
+                    }
+
                     mergedLevels[levelId] = {
                         ...current,
                         ...incomingLevel,
@@ -125,7 +134,7 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                         // Always keep the highest values to avoid going backwards
                         currentScore: incomingLevel.currentScore ?? current.currentScore,
                         attempts: Math.max(current.attempts, incomingLevel.attempts),
-                        lastStepIndex: Math.max(current.lastStepIndex, incomingLevel.lastStepIndex),
+                        lastStepIndex: safeStepIndex,
                         lastQuizIndex: Math.max(current.lastQuizIndex, incomingLevel.lastQuizIndex),
                         highScore: Math.max(current.highScore, incomingLevel.highScore ?? 0),
                         // Keep whichever timestamp was set first
@@ -326,10 +335,11 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // saved progress with initialState before hydration fires.
     const [state, dispatch] = useReducer(reducer, undefined, () => {
         const stored = loadFromStorage();
-        if (stored) {
-            return reducer(initialState, { type: "HYDRATE", payload: stored });
-        }
-        return initialState;
+        // HYDRATE already walks back prevDisable steps, so the returned state
+        // is always safe to use directly.
+        return stored
+            ? reducer(initialState, { type: "HYDRATE", payload: stored })
+            : initialState;
     });
 
     const didHydrateFromApiRef = useRef(false);
