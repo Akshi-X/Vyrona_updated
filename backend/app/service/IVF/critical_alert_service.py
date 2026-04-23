@@ -648,7 +648,7 @@ class CriticalAlertService:
 
             # Ensure timezone-aware comparison using the most recent timestamp (updated_at or created_at)
             if last_alert:
-                last_alert_time = last_alert.occurred_at or last_alert.created_at
+                last_alert_time = last_alert.created_at
                 if last_alert_time:
                     last_alert_time = (
                         last_alert_time
