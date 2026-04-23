@@ -476,6 +476,37 @@ def test_acknowledge_alert_not_found(alert_service, db_session):
     assert "not found" in str(exc_info.value).lower()
 
 
+def test_acknowledge_alerts_success(alert_service, db_session):
+    """Test acknowledging multiple alerts successfully"""
+    alert_id_1 = str(uuid.uuid4())
+    alert_id_2 = str(uuid.uuid4())
+    mock_alert_1 = Mock()
+    mock_alert_1.alert_id = alert_id_1
+    mock_alert_1.status = AlertStatus.ACTIVE.value
+    mock_alert_1.acknowledged_by = None
+    mock_alert_1.acknowledged_at = None
+    mock_alert_2 = Mock()
+    mock_alert_2.alert_id = alert_id_2
+    mock_alert_2.status = AlertStatus.ACTIVE.value
+    mock_alert_2.acknowledged_by = None
+    mock_alert_2.acknowledged_at = None
+
+    query = MagicMock()
+    query.filter.return_value = query
+    query.all.return_value = [mock_alert_1, mock_alert_2]
+    db_session.query.return_value = query
+
+    result = alert_service.acknowledge_alerts([alert_id_1, alert_id_2], "USER-123")
+
+    assert result.alert_id == [alert_id_1, alert_id_2]
+    assert result.acknowledged_count == 2
+    assert mock_alert_1.status == AlertStatus.ACKNOWLEDGED.value
+    assert mock_alert_2.status == AlertStatus.ACKNOWLEDGED.value
+    assert mock_alert_1.acknowledged_by == "USER-123"
+    assert mock_alert_2.acknowledged_by == "USER-123"
+    db_session.commit.assert_called_once()
+
+
 # ==========================================
 # Tests for check_and_create_alerts
 # ==========================================
