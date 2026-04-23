@@ -447,6 +447,15 @@ export default function IVFTrackShipmentPage() {
                         throw error;
                     }
                 }}
+                onAcknowledgeAll={async (alertIds) => {
+                    try {
+                        await ivfAlertsService.acknowledgeAlerts(alertIds);
+                        fetchCriticalAlerts();
+                    } catch (error) {
+                        console.error("Error acknowledging alerts:", error);
+                        throw error;
+                    }
+                }}
             />
             <MyTasksModal
                 isOpen={showMyTasks}

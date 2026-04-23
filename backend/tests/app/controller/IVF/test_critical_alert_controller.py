@@ -13,6 +13,7 @@ from app.constants.enums import AlertStatus
 from app.exceptions.custom_exceptions import AppException
 from app.schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
+    AcknowledgeAlertsResponse,
     HospitalAlertsResponse,
     TankAlertsResponse,
 )
@@ -252,6 +253,48 @@ def test_acknowledge_alert_success(app, monkeypatch, mock_request):
     assert response.status_code == 200
     data = response.json()
     assert data["alert_id"] == alert_id
+
+
+def test_acknowledge_alerts_success(app, monkeypatch, mock_request):
+    """Test acknowledging multiple alerts successfully"""
+    alert_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+
+    mock_response = AcknowledgeAlertsResponse(
+        alert_id=alert_ids,
+        status=AlertStatus.ACKNOWLEDGED,
+        message="Alerts acknowledged successfully",
+        acknowledged_count=2,
+        acknowledged_at=datetime.now(timezone.utc)
+    )
+
+    mock_service = MagicMock()
+    mock_service.acknowledge_alerts.return_value = mock_response
+
+    monkeypatch.setattr(
+        critical_alert_controller,
+        "CriticalAlertService",
+        MagicMock(return_value=mock_service)
+    )
+
+    app.dependency_overrides[critical_alert_controller.get_db] = override_get_db
+
+    @app.middleware("http")
+    async def set_request_state(request, call_next):
+        request.state.current_user = mock_request.state.current_user
+        response = await call_next(request)
+        return response
+
+    client = TestClient(app)
+    response = client.post(
+        "/ivf/alerts/acknowledge-all",
+        json={"alert_id": alert_ids}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["alert_id"] == alert_ids
+    assert data["acknowledged_count"] == 2
+    mock_service.acknowledge_alerts.assert_called_once_with(alert_ids, "USER-123")
 
 
 def test_acknowledge_alert_not_authenticated(app, monkeypatch):

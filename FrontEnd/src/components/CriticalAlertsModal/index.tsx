@@ -20,6 +20,7 @@ interface CriticalAlertsModalProps {
     alerts: CriticalAlert[];
     loading?: boolean;
     onAcknowledge?: (alertId: string) => Promise<void>;
+    onAcknowledgeAll?: (alertIds: string[]) => Promise<void>;
     patientIdLabel?: string;
     id?: string;
 }
@@ -30,6 +31,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     alerts,
     loading = false,
     onAcknowledge,
+    onAcknowledgeAll,
     patientIdLabel = "Tank Code",
     id,
 }) => {
@@ -40,9 +42,8 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(
         new Set(),
     );
-    const [pendingAcknowledgeAlertId, setPendingAcknowledgeAlertId] = useState<
-        string | null
-    >(null);
+    const [pendingAcknowledgeAlertIds, setPendingAcknowledgeAlertIds] =
+        useState<string[] | null>(null);
     const [isAcknowledgeAllPending, setIsAcknowledgeAllPending] =
         useState(false);
     // Filter states
@@ -60,7 +61,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
             setStatusFilter("all");
             setIsFilterPanelOpen(false);
             setExpandedGroupKeys(new Set());
-            setPendingAcknowledgeAlertId(null);
+            setPendingAcknowledgeAlertIds(null);
             setIsAcknowledgeAllPending(false);
         }
     }, [isOpen]);
@@ -103,33 +104,43 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const activeFilterCount =
         (priorityFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0);
 
-    const handleAcknowledgeRequest = (alertId: string) => {
-        setPendingAcknowledgeAlertId(alertId);
+    const handleAcknowledgeRequest = (alertIds: string | string[]) => {
+        setPendingAcknowledgeAlertIds(
+            Array.isArray(alertIds) ? alertIds : [alertIds],
+        );
     };
 
     const handleAcknowledgeConfirm = async () => {
-        const alertId = pendingAcknowledgeAlertId;
-        if (!alertId) return;
-        if (!onAcknowledge) return;
+        const alertIds = pendingAcknowledgeAlertIds;
+        if (!alertIds || alertIds.length === 0) return;
+        if (!onAcknowledge && !onAcknowledgeAll) return;
 
-        setAcknowledgingIds((prev) => new Set(prev).add(alertId));
-        setPendingAcknowledgeAlertId(null);
+        setAcknowledgingIds((prev) => new Set([...prev, ...alertIds]));
+        setPendingAcknowledgeAlertIds(null);
         try {
-            await onAcknowledge(alertId);
+            if (alertIds.length > 1 && onAcknowledgeAll) {
+                await onAcknowledgeAll(alertIds);
+            } else if (alertIds.length === 1 && onAcknowledge) {
+                await onAcknowledge(alertIds[0]);
+            } else if (onAcknowledgeAll) {
+                await onAcknowledgeAll(alertIds);
+            } else {
+                await Promise.all(alertIds.map((id) => onAcknowledge!(id)));
+            }
         } catch (error) {
             console.error("Error acknowledging alert:", error);
             // You could show a toast notification here
         } finally {
             setAcknowledgingIds((prev) => {
                 const next = new Set(prev);
-                next.delete(alertId);
+                alertIds.forEach((id) => next.delete(id));
                 return next;
             });
         }
     };
 
     const handleAcknowledgeAllConfirm = async () => {
-        if (!onAcknowledge) return;
+        if (!onAcknowledge && !onAcknowledgeAll) return;
         const activeAlerts = visibleAlerts.filter((a) => a.status === "Active");
         if (activeAlerts.length === 0) {
             setIsAcknowledgeAllPending(false);
@@ -142,7 +153,11 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         setIsAcknowledgeAllPending(false);
 
         try {
-            await Promise.all(idsToAcknowledge.map((id) => onAcknowledge!(id)));
+            if (onAcknowledgeAll) {
+                await onAcknowledgeAll(idsToAcknowledge);
+            } else {
+                await Promise.all(idsToAcknowledge.map((id) => onAcknowledge!(id)));
+            }
         } catch (error) {
             console.error("Error acknowledging alerts:", error);
         } finally {
@@ -230,6 +245,9 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
         return alert.patientId?.trim() || alert.id;
     };
 
+    const getAcknowledgementGroupId = (alert: CriticalAlert): string =>
+        alert.status === "Acknowledged" ? "acknowledged" : "active";
+
     const groupedByDateAndKpi = Object.entries(groupedAlerts).reduce<
         Record<
             string,
@@ -237,6 +255,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 groupKey: string;
                 tankGroupId: string;
                 kpiConfigId: string;
+                acknowledgementGroupId: string;
                 alerts: CriticalAlert[];
             }[]
         >
@@ -245,7 +264,8 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
             (inner, alert) => {
                 const tankGroupId = getTankGroupId(alert);
                 const kpiConfigId = getKpiConfigId(alert);
-                const compositeGroupId = `${tankGroupId}__${kpiConfigId}`;
+                const acknowledgementGroupId = getAcknowledgementGroupId(alert);
+                const compositeGroupId = `${tankGroupId}__${kpiConfigId}__${acknowledgementGroupId}`;
                 if (!inner[compositeGroupId]) {
                     inner[compositeGroupId] = [];
                 }
@@ -262,21 +282,33 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                         parseTimestampValue(b.timestamp) -
                         parseTimestampValue(a.timestamp),
                 );
-                const [tankGroupId = "", kpiConfigId = ""] =
+                const [
+                    tankGroupId = "",
+                    kpiConfigId = "",
+                    acknowledgementGroupId = "",
+                ] =
                     compositeGroupId.split("__");
                 return {
                     groupKey: `${dateLabel}__${compositeGroupId}`,
                     tankGroupId,
                     kpiConfigId,
+                    acknowledgementGroupId,
                     alerts: sortedAlerts,
                 };
             },
         );
 
         groups.sort(
-            (a, b) =>
-                parseTimestampValue(b.alerts[0]?.timestamp || "") -
-                parseTimestampValue(a.alerts[0]?.timestamp || ""),
+            (a, b) => {
+                if (a.acknowledgementGroupId !== b.acknowledgementGroupId) {
+                    return a.acknowledgementGroupId === "active" ? -1 : 1;
+                }
+
+                return (
+                    parseTimestampValue(b.alerts[0]?.timestamp || "") -
+                    parseTimestampValue(a.alerts[0]?.timestamp || "")
+                );
+            },
         );
 
         acc[dateLabel] = groups;
@@ -377,7 +409,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
 
     const filterHeaderAction = (
         <div className="flex items-center gap-3">
-            {onAcknowledge &&
+            {(onAcknowledge || onAcknowledgeAll) &&
                 visibleAlerts.some((a) => a.status === "Active") && (
                     <button
                         onClick={(e) => {
@@ -535,6 +567,17 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                     const latestAlert = group.alerts[0];
                                     const olderAlerts = group.alerts.slice(1);
                                     const hiddenCount = olderAlerts.length;
+                                    const activeGroupAlertIds = group.alerts
+                                        .filter(
+                                            (alert) =>
+                                                alert.status === "Active",
+                                        )
+                                        .map((alert) => alert.id);
+                                    const isAcknowledgingGroup =
+                                        activeGroupAlertIds.length > 0 &&
+                                        activeGroupAlertIds.every((id) =>
+                                            acknowledgingIds.has(id),
+                                        );
                                     const isExpanded = expandedGroupKeys.has(
                                         group.groupKey,
                                     );
@@ -608,18 +651,16 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             </span>
                                                             <span
                                                                 className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                                    latestAlert.status ===
-                                                                    "Active"
+                                                                    activeGroupAlertIds.length >
+                                                                    0
                                                                         ? "bg-green-50 text-green-700"
-                                                                        : latestAlert.status ===
-                                                                            "Acknowledged"
-                                                                          ? "bg-gray-100 text-gray-600"
-                                                                          : "bg-gray-100 text-gray-600"
+                                                                        : "bg-gray-100 text-gray-600"
                                                                 }`}
                                                             >
-                                                                {
-                                                                    latestAlert.status
-                                                                }
+                                                                {activeGroupAlertIds.length >
+                                                                0
+                                                                    ? "Active"
+                                                                    : "Acknowledged"}
                                                             </span>
                                                         </div>
                                                         <div className="mt-1 text-sm text-[#333333]">
@@ -659,7 +700,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* Acknowledge — right on desktop */}
+                                                {/* Acknowledge group — right on desktop */}
                                                 <div className="hidden md:flex items-center gap-2">
                                                     {hiddenCount > 0 && (
                                                         <div className="p-2" title={isExpanded ? "Collapse older alerts" : "Show older alerts"}>
@@ -668,14 +709,14 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             </svg>
                                                         </div>
                                                     )}
-                                                    {onAcknowledge && (
-                                                        latestAlert.status === "Active" ? (
+                                                    {(onAcknowledge || onAcknowledgeAll) && (
+                                                        activeGroupAlertIds.length > 0 ? (
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
-                                                                disabled={acknowledgingIds.has(latestAlert.id)}
-                                                                className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
+                                                                onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
+                                                                disabled={isAcknowledgingGroup}
+                                                                className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
                                                             >
-                                                                {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                                {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
                                                             </button>
                                                         ) : (
                                                             <span className="text-gray-400 text-xs">-</span>
@@ -684,8 +725,8 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Acknowledge — bottom on mobile */}
-                                            {onAcknowledge && (
+                                            {/* Acknowledge group — bottom on mobile */}
+                                            {(onAcknowledge || onAcknowledgeAll) && (
                                                 <div className="md:hidden mt-3 flex items-center justify-between gap-2">
                                                     {hiddenCount > 0 && (
                                                         <div className="p-1" title={isExpanded ? "Collapse older alerts" : "Show older alerts"}>
@@ -694,13 +735,13 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                             </svg>
                                                         </div>
                                                     )}
-                                                    {latestAlert.status === "Active" ? (
+                                                    {activeGroupAlertIds.length > 0 ? (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(latestAlert.id); }}
-                                                            disabled={acknowledgingIds.has(latestAlert.id)}
-                                                            className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${acknowledgingIds.has(latestAlert.id) ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
+                                                            onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
+                                                            disabled={isAcknowledgingGroup}
+                                                            className={`w-full py-2 text-xs font-semibold rounded-lg transition-colors ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
                                                         >
-                                                            {acknowledgingIds.has(latestAlert.id) ? "Acknowledging..." : "Acknowledge"}
+                                                            {isAcknowledgingGroup ? "Acknowledging..." : "Acknowledge"}
                                                         </button>
                                                     ) : (
                                                         <span className="text-xs text-gray-400">Already acknowledged</span>
@@ -728,43 +769,6 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                {onAcknowledge && (
-                                                                    <>
-                                                                        {alert.status ===
-                                                                        "Active" ? (
-                                                                            <button
-                                                                                onClick={(
-                                                                                    e,
-                                                                                ) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleAcknowledgeRequest(
-                                                                                        alert.id,
-                                                                                    );
-                                                                                }}
-                                                                                disabled={acknowledgingIds.has(
-                                                                                    alert.id,
-                                                                                )}
-                                                                                className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${
-                                                                                    acknowledgingIds.has(
-                                                                                        alert.id,
-                                                                                    )
-                                                                                        ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                                                                                        : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"
-                                                                                }`}
-                                                                            >
-                                                                                {acknowledgingIds.has(
-                                                                                    alert.id,
-                                                                                )
-                                                                                    ? "Acknowledging..."
-                                                                                    : "Acknowledge"}
-                                                                            </button>
-                                                                        ) : (
-                                                                            <span className="text-gray-400 text-xs">
-                                                                                -
-                                                                            </span>
-                                                                        )}
-                                                                    </>
-                                                                )}
                                                             </div>
                                                         ),
                                                     )}
@@ -779,20 +783,24 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 )}
             </div>
 
-            {pendingAcknowledgeAlertId && (
+            {pendingAcknowledgeAlertIds && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="w-full max-w-md rounded-xl bg-white border border-[#E7E1E1] shadow-xl p-5">
                         <h4 className="text-base font-semibold text-[#1f2937]">
-                            Acknowledge alert
+                            {pendingAcknowledgeAlertIds.length > 1
+                                ? "Acknowledge alerts"
+                                : "Acknowledge alert"}
                         </h4>
                         <p className="mt-2 text-sm text-gray-600">
-                            Are you sure you want to acknowledge this alert?
+                            {pendingAcknowledgeAlertIds.length > 1
+                                ? `Are you sure you want to acknowledge these ${pendingAcknowledgeAlertIds.length} alerts?`
+                                : "Are you sure you want to acknowledge this alert?"}
                         </p>
                         <div className="mt-5 flex items-center justify-end gap-2">
                             <button
                                 type="button"
                                 onClick={() =>
-                                    setPendingAcknowledgeAlertId(null)
+                                    setPendingAcknowledgeAlertIds(null)
                                 }
                                 className="px-4 py-2 text-sm font-medium rounded-lg border border-[#E7E1E1] text-gray-700 hover:bg-gray-50"
                             >
