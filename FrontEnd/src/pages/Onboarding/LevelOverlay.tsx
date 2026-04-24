@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
@@ -7,6 +6,8 @@ interface LevelOverlayProps {
     levelId: string;
     onComplete?: () => void;
 }
+
+const OPTION_LABELS = ["A", "B", "C", "D", "E"];
 
 export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps) {
     const {
@@ -18,6 +19,8 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         setQuizIndex,
         completeLevel,
         resetLevel,
+        resetQuiz,
+        failQuiz,
     } = useOnboarding();
 
     const { setIsOpen: setTourOpen } = useTour();
@@ -25,56 +28,78 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     const quiz = getQuiz(levelId);
     const progress = getLevelProgress(levelId);
     const quizIndex = progress?.lastQuizIndex ?? 0;
-    const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(null);
-    const [lastScore, setLastScore] = useState<number>(0);
-
-    const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
     const isCompleted = progress?.status === "completed";
 
-    // Show interlude screen (between tour completion and quiz) only when quiz hasn't started yet
+    // quizIndex >= quiz.length (and not completed) means quiz was answered but failed
+    const persistedFail = quiz.length > 0 && quizIndex >= quiz.length && !isCompleted;
+
+    const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(() =>
+        persistedFail ? "fail" : null
+    );
+    const [lastScore, setLastScore] = useState<number>(() =>
+        persistedFail ? (progress?.currentScore ?? 0) : 0
+    );
+
+    // Reveal state — set when user clicks an answer, cleared when advancing
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [isRevealed, setIsRevealed] = useState(false);
+
+    const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
+
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
     const levelConfig = levels.find((level) => level.id === levelId);
-
-    const currentQuestion = quiz[quizIndex];
+    const currentQuestion = persistedFail ? undefined : quiz[quizIndex];
 
     const handleAnswer = (choiceIndex: number) => {
-        if (!currentQuestion) return;
+        if (!currentQuestion || isRevealed) return;
 
-        // answerQuiz increments currentScore in state; compute it locally too
-        // so we can use it immediately without waiting for a re-render.
+        setSelectedIndex(choiceIndex);
+        setIsRevealed(true);
+
         const isCorrect = choiceIndex === currentQuestion.correctIndex;
         const newScore = (progress?.currentScore ?? 0) + (isCorrect ? currentQuestion.points : 0);
 
-        answerQuiz(levelId, currentQuestion.id, choiceIndex);
+        // Delay advancing so the user sees the green/red feedback
+        setTimeout(() => {
+            setSelectedIndex(null);
+            setIsRevealed(false);
 
-        if (quizIndex + 1 < quiz.length) {
-            setQuizIndex(levelId, quizIndex + 1);
-            return;
-        }
+            answerQuiz(levelId, currentQuestion.id, choiceIndex);
 
-        setLastScore(newScore);
-        if (newScore >= (levelConfig?.pointsRequired ?? 0)) {
-            completeLevel(levelId, newScore);
-            setQuizResult("pass");
-            onComplete?.();
-        } else {
-            setQuizResult("fail");
-        }
+            if (quizIndex + 1 < quiz.length) {
+                setQuizIndex(levelId, quizIndex + 1);
+                return;
+            }
+
+            setLastScore(newScore);
+            if (newScore >= (levelConfig?.pointsRequired ?? 0)) {
+                completeLevel(levelId, newScore);
+                setQuizResult("pass");
+            } else {
+                failQuiz(levelId, newScore);
+                setQuizResult("fail");
+            }
+        }, 900);
     };
 
     const handleRetry = () => {
         resetLevel(levelId);
         setQuizResult(null);
+        setSelectedIndex(null);
+        setIsRevealed(false);
         setShowInterlude(true);
     };
 
     const handleRetryQuiz = () => {
-        setQuizIndex(levelId, 0);
+        resetQuiz(levelId);
         setQuizResult(null);
+        setSelectedIndex(null);
+        setIsRevealed(false);
         setShowInterlude(true);
     };
 
+    // ── Fail screen ─────────────────────────────────────────────────────────
     if (quizResult === "fail") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
         const needed = levelConfig?.pointsRequired ?? 0;
@@ -110,7 +135,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <button
                         type="button"
                         onClick={handleRetry}
@@ -125,11 +150,19 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     >
                         Retry quiz
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => onComplete?.()}
+                        className="inline-flex rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    >
+                        Continue →
+                    </button>
                 </div>
             </div>
         );
     }
 
+    // ── Tour still in progress ───────────────────────────────────────────────
     if (!tourComplete) {
         return (
             <div className="space-y-3">
@@ -146,6 +179,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
+    // ── Interlude (between tour and quiz) ────────────────────────────────────
     if (showInterlude && !isCompleted && quizResult === null) {
         const interlude = levelConfig?.interlude;
         return (
@@ -181,6 +215,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
+    // ── Completion screen ────────────────────────────────────────────────────
     if (isCompleted || quizResult === "pass") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
         const finalScore = progress?.highScore ?? 0;
@@ -189,7 +224,6 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
 
         return (
             <div className="space-y-5">
-                {/* Completion header from JSON */}
                 <div className="flex items-start gap-4">
                     {completion?.badge && (
                         <span className="text-5xl leading-none">{completion.badge}</span>
@@ -205,7 +239,6 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </div>
                 </div>
 
-                {/* Score card */}
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
                     <div className="flex items-end justify-between">
                         <div>
@@ -229,12 +262,13 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </div>
                 </div>
 
-                <Link
-                    to="/onboarding/status"
+                <button
+                    type="button"
+                    onClick={() => onComplete?.()}
                     className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                 >
-                    View status →
-                </Link>
+                    Continue →
+                </button>
             </div>
         );
     }
@@ -248,30 +282,101 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
+    // ── Quiz question ────────────────────────────────────────────────────────
+    const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
+    const currentScore = progress?.currentScore ?? 0;
+    const scorePct = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
+
     return (
-        <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">Quick Quiz</h3>
-            <p className="text-sm text-slate-600">{currentQuestion.prompt}</p>
-            <div className="grid gap-3">
-                {currentQuestion.choices.map((choice, index) => (
-                    <button
-                        key={choice}
-                        type="button"
-                        onClick={() => handleAnswer(index)}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 shadow-sm hover:border-slate-300"
-                    >
-                        {choice}
-                    </button>
-                ))}
+        <div className="space-y-5">
+
+            {/* Header: question counter + live score */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                    {quiz.map((_, i) => (
+                        <span
+                            key={i}
+                            className={`block rounded-full transition-all duration-300 ${
+                                i < quizIndex
+                                    ? "h-2 w-2 bg-slate-900"
+                                    : i === quizIndex
+                                      ? "h-2 w-5 bg-slate-900"
+                                      : "h-2 w-2 bg-slate-200"
+                            }`}
+                        />
+                    ))}
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.2em]">
+                    {quizIndex + 1} / {quiz.length}
+                </span>
             </div>
-            <p className="text-xs text-slate-500">Question {quizIndex + 1} of {quiz.length}</p>
-            <button
-                type="button"
-                onClick={handleRetry}
-                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-900"
-            >
-                Retry tour
-            </button>
+
+            {/* Points badge + question */}
+            <div className="space-y-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                    ⚡ {currentQuestion.points} pts
+                </span>
+                <p className="text-[15px] font-semibold text-slate-900 leading-snug">
+                    {currentQuestion.prompt}
+                </p>
+            </div>
+
+            {/* Answer options */}
+            <div className="grid gap-2.5">
+                {currentQuestion.choices.map((choice, index) => {
+                    const isCorrect = index === currentQuestion.correctIndex;
+                    const isSelected = index === selectedIndex;
+
+                    let style = "border-slate-200 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 cursor-pointer";
+                    let labelStyle = "bg-slate-100 text-slate-500";
+                    let icon: string | null = null;
+
+                    if (isRevealed) {
+                        if (isCorrect) {
+                            style = "border-emerald-400 bg-emerald-50 text-emerald-900 cursor-default";
+                            labelStyle = "bg-emerald-400 text-white";
+                            icon = "✓";
+                        } else if (isSelected) {
+                            style = "border-red-400 bg-red-50 text-red-900 cursor-default";
+                            labelStyle = "bg-red-400 text-white";
+                            icon = "✕";
+                        } else {
+                            style = "border-slate-100 bg-slate-50 text-slate-400 cursor-default opacity-50";
+                            labelStyle = "bg-slate-200 text-slate-400";
+                        }
+                    }
+
+                    return (
+                        <button
+                            key={choice}
+                            type="button"
+                            disabled={isRevealed}
+                            onClick={() => handleAnswer(index)}
+                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-sm transition-all duration-200 ${style}`}
+                        >
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-200 ${labelStyle}`}>
+                                {isRevealed && icon ? icon : OPTION_LABELS[index]}
+                            </span>
+                            <span className="flex-1 leading-snug">{choice}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Live score bar */}
+            <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                    <span>Score so far</span>
+                    <span className="font-semibold text-slate-600">{currentScore} / {maxScore} pts</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                        className="h-full rounded-full bg-slate-900 transition-all duration-500"
+                        style={{ width: `${scorePct}%` }}
+                    />
+                </div>
+            </div>
+
         </div>
     );
 }

@@ -115,12 +115,19 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const interval = setInterval(() => {
             if (document.querySelector(activeStep.target)) {
                 clearInterval(interval);
-                setCurrentStep(stepIndex);
+                // Force @reactour to reposition even if stepIndex hasn't changed —
+                // calling setCurrentStep with the same value is a no-op in @reactour,
+                // so close + reopen on the next frame to trigger a fresh spotlight.
+                setIsOpen(false);
+                requestAnimationFrame(() => {
+                    setCurrentStep(stepIndex);
+                    setIsOpen(true);
+                });
             }
         }, 50);
 
         return () => clearInterval(interval);
-    }, [activeStep, stepIndex, stepCount, setCurrentStep]);
+    }, [activeStep, stepIndex, stepCount, setCurrentStep, setIsOpen]);
 
     // ── 5c. Dispatch onboardingEvent when a step becomes active ──────
     useEffect(() => {

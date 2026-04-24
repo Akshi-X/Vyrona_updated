@@ -39,12 +39,11 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-branch-dropdown"],
-        "stepDelay": 150,
         "startPage": "/onboarding/alert-setting"
     },
     {
         "id": "al4-branch-bangalore",
-        "target": "#onboarding-alert-branch-bangalore",
+        "target": "#onboarding-alert-branch-dropdown-list",
         "title": "Select Bangalore",
         "icon": "MapPin",
         "content": "Click Bangalore to filter the container list to this branch.",
@@ -52,7 +51,6 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-alert-branch-bangalore"],
-        "stepDelay": 300,
         "startPage": "/onboarding/alert-setting"
     },
     {
@@ -64,7 +62,6 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-container-T-161"],
-        "stepDelay": 400,
         "startPage": "/onboarding/alert-setting"
     },
     {

@@ -86,7 +86,7 @@
     },
     {
         "id": "level-3",
-        "title": "Branch Deep Dive",
+        "title": "Cryocan Quality Tracking",
         "route": "/onboarding/control-tower",
         "pointsRequired": 60,
         "unlockDelayHours": 0,
@@ -94,7 +94,7 @@
         "quizFile": "level-3.quiz.json",
         "replica": "control-tower",
         "welcome": {
-            "title": "Branch Deep Dive",
+            "title": "Cryocan Quality Tracking",
             "subtitle": "Level 3 · Branch Mission",
             "description": "Zoom into individual branch performance. Learn to filter, compare, and act on branch-level data to keep every location running smoothly.",
             "badge": "🔍"
