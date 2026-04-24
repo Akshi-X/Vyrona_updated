@@ -1386,7 +1386,7 @@ export default function AlertSetting() {
                                             </svg>
                                         </button>
                                         {isBranchDropdownOpen && (
-                                            <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                            <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                                 {branchOptions.map((opt) => (
                                                     <button
                                                         key={opt}

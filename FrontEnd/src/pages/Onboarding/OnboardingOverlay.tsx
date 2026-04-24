@@ -14,15 +14,54 @@ export default function OnboardingOverlay() {
     const { isOpen: isTourOpen } = useTour();
     const tourNavCtx = useTourNavContext();
 
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(() => location.pathname.startsWith("/onboarding/"));
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLevelWelcome, setShowLevelWelcome] = useState(false);
     const [levelWelcomeId, setLevelWelcomeId] = useState<string | null>(null);
+    // Tracks which level's quiz/completion screen to show.
+    // Kept separately so it survives activeLevelId changing after completeLevel fires.
+    // Initialized synchronously from persisted state so there is no timeline flash on reload.
+    const [quizLevelId, setQuizLevelId] = useState<string | null>(() => {
+        const inProgress = levels.find((l) => state.levels[l.id]?.status === "in_progress");
+        if (!inProgress) return null;
+        const prog = state.levels[inProgress.id];
+        if (prog?.status === "completed") return null;
+        const steps = getSteps(inProgress.id);
+        const isTourDone = steps.length > 0 && (prog?.lastStepIndex ?? 0) >= steps.length;
+        return isTourDone ? inProgress.id : null;
+    });
+
+    // Lock scroll while tour is active — covers body AND inner scrollable elements
+    useEffect(() => {
+        if (!isTourOpen) return;
+
+        const prevent = (e: Event) => e.preventDefault();
+
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        document.addEventListener("wheel", prevent, { passive: false });
+        document.addEventListener("touchmove", prevent, { passive: false });
+
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            document.removeEventListener("wheel", prevent);
+            document.removeEventListener("touchmove", prevent);
+        };
+    }, [isTourOpen]);
+
+    // Mutable ref so the openOverlay closure (registered once) can read live quiz state
+    const quizStateRef = useRef({ tourComplete: false, activeLevelId: null as string | null, status: undefined as string | undefined });
 
     // Register openOverlay so the tour close button can open this panel
     useEffect(() => {
         tourNavCtx?.setOpenOverlay(() => {
             setShowWelcome(false);
+            setShowLevelWelcome(false);
+            const { tourComplete: tc, activeLevelId: alid, status } = quizStateRef.current;
+            if (tc && alid && status !== "completed") {
+                setQuizLevelId(alid);
+                setShowTimeline(false);
+            }
             setIsOpen(true);
         });
         return () => { tourNavCtx?.setOpenOverlay(null); };
@@ -43,6 +82,9 @@ export default function OnboardingOverlay() {
         ? activeLevelSteps.length > 0 && (activeLevelProgress?.lastStepIndex ?? 0) >= activeLevelSteps.length
         : false;
 
+    // Keep ref in sync so openOverlay closure always reads current values
+    quizStateRef.current = { tourComplete, activeLevelId, status: activeLevelProgress?.status };
+
     const level0Status = state.levels["level-0"]?.status;
 
     // Auto-open welcome on first dashboard landing (only if level-0 not yet completed)
@@ -55,24 +97,42 @@ export default function OnboardingOverlay() {
 
     const [showTimeline, setShowTimeline] = useState(false);
 
-    // Only open quiz overlay when tourComplete transitions false → true (not on mount/navigation)
-    const prevTourCompleteRef = useRef(tourComplete);
+    // Open quiz overlay when tour is complete — on reload (already true on mount)
+    // AND on fresh completion (false → true transition).
+    // Captures activeLevelId into quizLevelId BEFORE completeLevel can change activeLevelId.
+    const prevTourCompleteRef = useRef(false);
     useEffect(() => {
-        const justCompleted = tourComplete && !prevTourCompleteRef.current;
         prevTourCompleteRef.current = tourComplete;
-        if (justCompleted && activeLevelProgress?.status !== "completed") {
+        if (tourComplete && activeLevelId && activeLevelProgress?.status !== "completed") {
+            setQuizLevelId(activeLevelId);
             setShowWelcome(false);
             setShowTimeline(false);
             setIsOpen(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tourComplete, activeLevelProgress?.status]);
+    }, [tourComplete, activeLevelId, activeLevelProgress?.status]);
 
-    // Once level-0 is completed, hide the welcome view permanently
+    // When level-0 transitions to completed, hide welcome and show level-1's welcome card.
+    // On reload (already completed), just hide welcome without re-showing the card.
+    const prevLevel0StatusRef = useRef(level0Status);
     useEffect(() => {
+        const prev = prevLevel0StatusRef.current;
+        prevLevel0StatusRef.current = level0Status;
+
         if (level0Status === "completed") {
             setShowWelcome(false);
+            if (prev !== "completed") {
+                // Fresh completion — show the first real level's welcome card
+                const firstLevel = levels.find((l) => l.id !== "level-0");
+                if (firstLevel && state.levels[firstLevel.id]?.status !== "completed") {
+                    setLevelWelcomeId(firstLevel.id);
+                    setShowLevelWelcome(true);
+                    setShowTimeline(false);
+                    setIsOpen(true);
+                }
+            }
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [level0Status]);
 
     const handleStartTour = () => {
@@ -84,6 +144,12 @@ export default function OnboardingOverlay() {
         setLevelWelcomeId(levelId);
         setShowLevelWelcome(true);
         setShowWelcome(false);
+        setShowTimeline(false);
+        setIsOpen(true);
+    };
+
+    const handleResumeToQuiz = (levelId: string) => {
+        setQuizLevelId(levelId);
         setShowTimeline(false);
         setIsOpen(true);
     };
@@ -101,16 +167,23 @@ export default function OnboardingOverlay() {
         if (showLevelWelcome && levelWelcomeId) {
             return <LevelWelcomeCard levelId={levelWelcomeId} onBeginTour={handleBeginTourFromWelcome} />;
         }
+        // Quiz / completion screen — shown for the captured level even after activeLevelId changes
+        if (quizLevelId) {
+            return (
+                <LevelOverlay
+                    levelId={quizLevelId}
+                    onComplete={() => { setQuizLevelId(null); setShowTimeline(true); }}
+                />
+            );
+        }
         if (showTimeline) {
             return (
                 <OnboardingTimeline
                     onStart={() => { setShowTimeline(false); setIsOpen(false); }}
                     onStartWelcome={(id) => { setShowTimeline(false); handleStartWelcome(id); }}
+                    onResumeToQuiz={handleResumeToQuiz}
                 />
             );
-        }
-        if (activeLevelId && tourComplete) {
-            return <LevelOverlay levelId={activeLevelId} onComplete={() => { setShowTimeline(true); }} />;
         }
         if (showWelcome) {
             return <OnboardingWelcome onStart={handleStartTour} />;
@@ -119,6 +192,7 @@ export default function OnboardingOverlay() {
             <OnboardingTimeline
                 onStart={() => setIsOpen(false)}
                 onStartWelcome={handleStartWelcome}
+                onResumeToQuiz={handleResumeToQuiz}
             />
         );
     };
@@ -134,14 +208,14 @@ export default function OnboardingOverlay() {
                 <button
                     type="button"
                     onClick={() => { setShowWelcome(false); setShowLevelWelcome(false); setIsOpen(true); }}
-                    className="fixed right-6 top-6 z-40 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg"
+                    className="fixed top-0 left-1/2 -translate-x-1/2 z-40 rounded-b-2xl bg-slate-900/90 backdrop-blur-sm px-8 py-2.5 text-xs font-semibold text-white shadow-[0_4px_20px_rgba(0,0,0,0.25)] border border-t-0 border-white/10 tracking-wide"
                 >
                     Onboarding
                 </button>
             )}
 
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30 p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
                     <div className="relative w-full max-w-xl rounded-3xl border border-white/60 bg-white/95 p-6 shadow-2xl">
 
                         {/* Header */}
@@ -152,10 +226,18 @@ export default function OnboardingOverlay() {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setIsOpen(false)}
+                                onClick={() => {
+                                    if (quizLevelId) {
+                                        // Exit quiz/interlude → show timeline instead of closing
+                                        setQuizLevelId(null);
+                                        setShowTimeline(true);
+                                    } else {
+                                        setIsOpen(false);
+                                    }
+                                }}
                                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                             >
-                                Close
+                                {quizLevelId ? "← Timeline" : "Close"}
                             </button>
                         </div>
 
