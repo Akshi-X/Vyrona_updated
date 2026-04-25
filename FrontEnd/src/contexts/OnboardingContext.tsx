@@ -290,14 +290,15 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
             };
 
             // Stamp the full unlock schedule when welcome completes.
-            // level[i] unlocks at 00:00 IST on (today + (i+1)*2 days).
-            // Stored as UTC: e.g. started 24 Apr → level-1 = 25 Apr 18:30 UTC (= 26 Apr 00:00 IST)
+            // level[i] unlocks at 00:00 IST on (today + i*2 days).
+            // level-1 (index 0) → daysFromNow=0 → today's midnight IST (already past) → immediately available.
+            // Stored as UTC: e.g. started 25 Apr → level-2 = 26 Apr 18:30 UTC (= 27 Apr 00:00 IST)
             if (action.levelId === "level-0") {
                 onboardingLevels.forEach((lvl, index) => {
                     if (updatedLevels[lvl.id] && !updatedLevels[lvl.id].unlockedAt) {
                         updatedLevels[lvl.id] = {
                             ...updatedLevels[lvl.id],
-                            unlockedAt: istMidnightUtc((index + 1) * 2),
+                            unlockedAt: istMidnightUtc(index * 2),
                         };
                     }
                 });
