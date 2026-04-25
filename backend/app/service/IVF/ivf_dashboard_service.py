@@ -50,7 +50,6 @@ class IVFDashboardService:
                             WHERE
                                 c.hospital_id = :hospital_id
                                 AND c.source = 'KPI'
-                                AND c.status = 'Active'
                                 AND (:branch_id IS NULL OR c.branch_id = :branch_id)
                             GROUP BY
                                 COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');""")
@@ -386,13 +385,23 @@ class IVFDashboardService:
         """
         # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        
+
         deviations = self.get_deviation_counts_by_kpi(hospital_id=hospital_id, branch_id=filter_branch_id, role=role)
-        
-        print(f"Deviation counts by KPI for hospital_id={hospital_id}, branch_id={branch_id}, role={role}: {deviations}")
-        
+
+        # Count only Active alerts (for notification badge)
+        active_query = text("""
+            SELECT COUNT(c.alert_id)
+            FROM critical_alerts c
+            WHERE c.hospital_id = :hospital_id
+              AND c.source = 'KPI'
+              AND c.status = 'Active'
+              AND (:branch_id IS NULL OR c.branch_id = :branch_id)
+        """)
+        active_count = self.db.execute(active_query, {"hospital_id": hospital_id, "branch_id": filter_branch_id}).scalar() or 0
+
         return {
             "total_deviations": sum(deviations.values()),
+            "active_total_deviations": int(active_count),
             "deviations_by_kpi": deviations
         }
     
@@ -492,7 +501,6 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
             GROUP BY
                 b.branch_name,
@@ -524,7 +532,6 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
             GROUP BY
                 b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
@@ -611,7 +618,6 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
             GROUP BY
                 c.branch_id, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
         )
