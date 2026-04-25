@@ -10,6 +10,19 @@ import { disableOnboardingMocks, enableOnboardingMocks } from "../../onboarding/
 import OnboardingOverlay from "./OnboardingOverlay";
 import { TourNavStoreProvider, useTourNavContext } from "../../contexts/TourNavContext";
 import TourStepHeading from "./TourStepHeading";
+import {
+    GeniePreloaderProvider,
+    useGeniePreloader,
+} from "../../contexts/GeniePreloaderContext";
+import { GeniePreloaderCard } from "../../components/GeniePreloaderCard";
+
+// Holds back the onboarding viewport until the genie image cache is fully
+// populated — guarantees the tour never shows a broken or half-loaded image.
+function GeniePreloaderGate({ children }: { children: React.ReactNode }) {
+    const { state } = useGeniePreloader();
+    if (state.status === "ready") return <>{children}</>;
+    return <GeniePreloaderCard />;
+}
 
 // ── Custom tour content – title row with X dismiss + description ──────────────
 function TourContent({ content }: { content: unknown }) {
@@ -150,45 +163,49 @@ export default function OnboardingShell() {
     // when navigating between sidebar and no-sidebar pages — tour state is preserved.
     return (
         <OnboardingModeProvider value={true}>
-            <TourNavStoreProvider>
-                <TourProvider
-                    steps={[]}
-                    disableInteraction={false}
-                    disableDotsNavigation={true}
-                    disableKeyboardNavigation={true}
-                    onClickMask={() => {}}
-                    onClickClose={() => {}}
-                    components={{
-                        Content: TourContent,
-                        Navigation: TourNavigation,
-                        Close: () => null,
-                    }}
-                    styles={{
-                        popover: (base) => ({
-                            ...base,
-                            borderRadius: 16,
-                            padding: 20,
-                            maxWidth: 360,
-                        }),
-                    }}
-                >
-                    {hideSidebar ? (
-                        // Pages with their own full-width layout — no sidebar, no offset wrapper.
-                        <>
-                            <Outlet />
-                            <OnboardingOverlay />
-                        </>
-                    ) : (
-                        <div className="bg-[#FDFAFF] flex w-full min-h-screen overflow-x-hidden">
-                            <Sidebar onLogout={handleLogout} />
-                            <div className="flex-1 ml-0 md:ml-60 min-w-0">
-                                <Outlet />
-                                <OnboardingOverlay />
-                            </div>
-                        </div>
-                    )}
-                </TourProvider>
-            </TourNavStoreProvider>
+            <GeniePreloaderProvider>
+                <TourNavStoreProvider>
+                    <TourProvider
+                        steps={[]}
+                        disableInteraction={false}
+                        disableDotsNavigation={true}
+                        disableKeyboardNavigation={true}
+                        onClickMask={() => {}}
+                        onClickClose={() => {}}
+                        components={{
+                            Content: TourContent,
+                            Navigation: TourNavigation,
+                            Close: () => null,
+                        }}
+                        styles={{
+                            popover: (base) => ({
+                                ...base,
+                                borderRadius: 16,
+                                padding: 20,
+                                maxWidth: 360,
+                            }),
+                        }}
+                    >
+                        <GeniePreloaderGate>
+                            {hideSidebar ? (
+                                // Pages with their own full-width layout — no sidebar, no offset wrapper.
+                                <>
+                                    <Outlet />
+                                    <OnboardingOverlay />
+                                </>
+                            ) : (
+                                <div className="bg-[#FDFAFF] flex w-full min-h-screen overflow-x-hidden">
+                                    <Sidebar onLogout={handleLogout} />
+                                    <div className="flex-1 ml-0 md:ml-60 min-w-0">
+                                        <Outlet />
+                                        <OnboardingOverlay />
+                                    </div>
+                                </div>
+                            )}
+                        </GeniePreloaderGate>
+                    </TourProvider>
+                </TourNavStoreProvider>
+            </GeniePreloaderProvider>
         </OnboardingModeProvider>
     );
 }
