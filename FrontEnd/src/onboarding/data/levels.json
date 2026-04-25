@@ -6,7 +6,6 @@
         "pointsRequired": 0,
         "unlockDelayHours": 0,
         "tourStepsFile": "",
-        "quizFile": "",
         "replica": "dashboard",
         "sections": [
             {
@@ -30,15 +29,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-1.steps.json",
-        "quizFile": "level-1.quiz.json",
         "replica": "dashboard",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-1.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Dashboard Quest",
             "subtitle": "Level 1 · Starter Mission",
             "description": "Get acquainted with your mgSCALE dashboard — your control center for KPIs, live alerts, and shipment tracking at a glance.",
             "badge": "🗺️"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the core dashboard. Here's what you covered:",
             "covered": [
@@ -48,6 +52,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Dashboard Mastered!",
             "message": "You navigated the dashboard with confidence. KPIs, alerts, and shipments are no longer a mystery.",
             "badge": "🏆"
@@ -60,15 +65,20 @@
         "pointsRequired": 70,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-2.steps.json",
-        "quizFile": "level-2.quiz.json",
         "replica": "control-tower",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-2.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Control Tower Quest",
             "subtitle": "Level 2 · Operations Mission",
             "description": "Step into the Control Tower to monitor branch operations, manage pending actions, and oversee logistics lanes in real time.",
             "badge": "🗼"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the Control Tower. Here's what you covered:",
             "covered": [
@@ -79,6 +89,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Control Tower Cleared!",
             "message": "You can now monitor live operations and respond to actions from the Control Tower like a pro.",
             "badge": "🏆"
@@ -91,15 +102,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-3.steps.json",
-        "quizFile": "level-3.quiz.json",
         "replica": "control-tower",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-3.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Cryocan Quality Tracking",
             "subtitle": "Level 3 · Branch Mission",
             "description": "Zoom into individual branch performance. Learn to filter, compare, and act on branch-level data to keep every location running smoothly.",
             "badge": "🔍"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored branch-level data. Here's what you covered:",
             "covered": [
@@ -109,6 +125,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Branch Expert!",
             "message": "You can drill into any branch and read its performance snapshot at a glance. Branch data holds no secrets for you.",
             "badge": "🏆"
@@ -121,15 +138,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-4.steps.json",
-        "quizFile": "level-4.quiz.json",
         "replica": "alert-setting",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-4.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Alert Configuration",
             "subtitle": "Level 4 · Alert Mission",
             "description": "Set up and fine-tune alert thresholds so your clinic never misses a critical LN2 event. Stay one step ahead of every warning.",
             "badge": "🔔"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the alert settings. Here's what you covered:",
             "covered": [
@@ -139,6 +161,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Alerts Configured!",
             "message": "Your clinic's alert system is now fully under your control. Every critical event will reach the right person at the right time.",
             "badge": "🏆"
@@ -151,15 +174,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-5.steps.json",
-        "quizFile": "level-5.quiz.json",
         "replica": "refill-log",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-5.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Refill Log",
             "subtitle": "Level 5 · Supply Mission",
             "description": "Track every LN2 refill event — who performed it, when, and how much was added. Keep your supply chain fully transparent.",
             "badge": "📋"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the Refill Log. Here's what you covered:",
             "covered": [
@@ -169,6 +197,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Supply Chain Visible!",
             "message": "You can now trace every refill event and maintain a complete, auditable view of your LN2 supply.",
             "badge": "🏆"
@@ -181,15 +210,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-6.steps.json",
-        "quizFile": "level-6.quiz.json",
         "replica": "reports",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-6.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Reports",
             "subtitle": "Level 6 · Insights Mission",
             "description": "Unlock the power of reporting — filter activity logs, download data exports, and review your clinic's full operational history.",
             "badge": "📊"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the Reports section. Here's what you covered:",
             "covered": [
@@ -200,6 +234,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Reports Unlocked!",
             "message": "You can now generate, filter, and analyze reports to make smarter, data-driven decisions for your clinic.",
             "badge": "🏆"
@@ -212,15 +247,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-7.steps.json",
-        "quizFile": "level-7.quiz.json",
         "replica": "user-profile",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-7.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Profile",
             "subtitle": "Level 7 · Identity Mission",
             "description": "Manage your personal information, review your support ticket history, and configure your notification preferences all in one place.",
             "badge": "👤"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored your Profile. Here's what you covered:",
             "covered": [
@@ -231,6 +271,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Profile Complete!",
             "message": "Your account is fully configured. You know exactly where to update your info, track support, and manage notifications.",
             "badge": "🏆"
@@ -243,15 +284,20 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-8.steps.json",
-        "quizFile": "level-8.quiz.json",
         "replica": "users",
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-8.quiz.json"
+        },
         "welcome": {
+            "headerTitle": "Tour",
             "title": "Users",
             "subtitle": "Level 8 · Admin Mission",
             "description": "Manage your clinic's user roster — filter by role and branch, invite new members, and control who has access to your mgSCALE account.",
             "badge": "👥"
         },
         "interlude": {
+            "headerTitle": "Tour",
             "title": "Nice work! Tour complete.",
             "message": "You've explored the Users page. Here's what you covered:",
             "covered": [
@@ -261,6 +307,7 @@
             ]
         },
         "completion": {
+            "headerTitle": "Quiz Scorecard",
             "title": "Team Managed!",
             "message": "You have full control over your clinic's user access. Adding, filtering, and managing team members is now second nature.",
             "badge": "🏆"

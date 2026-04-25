@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext } from "../../contexts/TourNavContext";
 import { useTour } from "@reactour/tour";
+import { Lock } from "lucide-react";
 
 interface OnboardingTimelineProps {
     onStart?: () => void;
@@ -84,6 +85,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                 </div>
             )}
 
+
             <div className="mb-5">
                 <h2 className="text-sm font-semibold text-slate-900">Your Progress</h2>
                 <p className="text-[11px] text-slate-400 mt-0.5">Complete each level to unlock the next.</p>
@@ -105,6 +107,14 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                         const isCompleted = status === "completed";
                         const isAvailable = status === "available";
                         const isInProgress = status === "in_progress";
+
+                        // Per-level tour completion — determines whether Resume opens tour or quiz
+                        const levelSteps = getSteps(level.id);
+                        const levelTourComplete = levelSteps.length > 0 && (progress?.lastStepIndex ?? 0) >= levelSteps.length;
+
+                        const unlockDate = progress?.unlockedAt
+                            ? new Date(progress.unlockedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                            : null;
 
                         return (
                             <div key={level.id} className="relative flex gap-4">
@@ -166,10 +176,18 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                 </div>
                                             )}
 
-                                            {/* Unlock time */}
-                                            {status === "locked" && progress?.unlockedAt && (
+                                            {/* Unlock hint */}
+                                            {isLocked && unlockDate && (
+                                                <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-100/80 px-3 py-1.5">
+                                                    <Lock className="h-3 w-3 shrink-0 text-slate-400" />
+                                                    <p className="text-[10px] font-semibold text-slate-500">
+                                                        Unlocks on {unlockDate}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {isLocked && !unlockDate && (
                                                 <p className="mt-1 text-[10px] text-slate-400">
-                                                    Unlocks {new Date(progress.unlockedAt).toLocaleString()}
+                                                    Complete the welcome to unlock
                                                 </p>
                                             )}
                                         </div>
@@ -210,7 +228,9 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                             type="button"
                                                             onClick={() => {
                                                                 navigate(level.route);
-                                                                if (isAvailable && onStartWelcome) {
+                                                                if (isInProgress && levelTourComplete && onResumeToQuiz) {
+                                                                    onResumeToQuiz(level.id);
+                                                                } else if (isAvailable && onStartWelcome) {
                                                                     onStartWelcome(level.id);
                                                                 } else {
                                                                     tourNavCtx?.setPendingStartLevelId(level.id);
@@ -219,7 +239,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                                             }}
                                                             className="inline-flex rounded-full bg-slate-900 px-4 py-1.5 text-[11px] font-semibold text-white shadow-sm"
                                                         >
-                                                            {isInProgress ? "Resume →" : "Start →"}
+                                                            {isInProgress && levelTourComplete ? "Take Quiz →" : isInProgress ? "Resume →" : "Start →"}
                                                         </button>
                                                         {isInProgress && (
                                                             <button

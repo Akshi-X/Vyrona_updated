@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Zap } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import { useOnboarding } from "../../contexts/OnboardingContext";
@@ -10,7 +11,8 @@ import LevelWelcomeCard from "./LevelWelcomeCard";
 
 export default function OnboardingOverlay() {
     const location  = useLocation();
-    const { levels, getSteps, state } = useOnboarding();
+    const { levels, getSteps, getQuiz, state } = useOnboarding();
+    const overallScore = levels.reduce((sum, l) => sum + (state.levels[l.id]?.highScore ?? 0), 0);
     const { isOpen: isTourOpen } = useTour();
     const tourNavCtx = useTourNavContext();
 
@@ -18,6 +20,7 @@ export default function OnboardingOverlay() {
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLevelWelcome, setShowLevelWelcome] = useState(false);
     const [levelWelcomeId, setLevelWelcomeId] = useState<string | null>(null);
+    const [currentHeaderTitle, setCurrentHeaderTitle] = useState("Onboarding Mission Control");
     // Tracks which level's quiz/completion screen to show.
     // Kept separately so it survives activeLevelId changing after completeLevel fires.
     // Initialized synchronously from persisted state so there is no timeline flash on reload.
@@ -85,6 +88,10 @@ export default function OnboardingOverlay() {
     // Keep ref in sync so openOverlay closure always reads current values
     quizStateRef.current = { tourComplete, activeLevelId, status: activeLevelProgress?.status };
 
+    const activeLevelConfig = activeLevelId ? levels.find((l) => l.id === activeLevelId) : null;
+    // When showing LevelOverlay (quiz/completion), prefer the quizLevel's title over the next active level
+    const displayLevelConfig = quizLevelId ? levels.find((l) => l.id === quizLevelId) : activeLevelConfig;
+
     const level0Status = state.levels["level-0"]?.status;
 
     // Auto-open welcome on first dashboard landing (only if level-0 not yet completed)
@@ -100,44 +107,35 @@ export default function OnboardingOverlay() {
     // Open quiz overlay when tour is complete — on reload (already true on mount)
     // AND on fresh completion (false → true transition).
     // Captures activeLevelId into quizLevelId BEFORE completeLevel can change activeLevelId.
+    // Does NOT re-open if the user has already answered all quiz questions (pass or fail) —
+    // that prevents the effect from overriding the Continue button on the fail screen.
     const prevTourCompleteRef = useRef(false);
     useEffect(() => {
         prevTourCompleteRef.current = tourComplete;
         if (tourComplete && activeLevelId && activeLevelProgress?.status !== "completed") {
+            const quiz = getQuiz(activeLevelId);
+            const quizAttempted = quiz.length > 0 && (activeLevelProgress?.lastQuizIndex ?? 0) >= quiz.length;
+            if (quizAttempted) return;
             setQuizLevelId(activeLevelId);
             setShowWelcome(false);
             setShowTimeline(false);
             setIsOpen(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tourComplete, activeLevelId, activeLevelProgress?.status]);
+    }, [tourComplete, activeLevelId, activeLevelProgress?.status, activeLevelProgress?.lastQuizIndex]);
 
     // When level-0 transitions to completed, hide welcome and show level-1's welcome card.
     // On reload (already completed), just hide welcome without re-showing the card.
-    const prevLevel0StatusRef = useRef(level0Status);
     useEffect(() => {
-        const prev = prevLevel0StatusRef.current;
-        prevLevel0StatusRef.current = level0Status;
-
         if (level0Status === "completed") {
             setShowWelcome(false);
-            if (prev !== "completed") {
-                // Fresh completion — show the first real level's welcome card
-                const firstLevel = levels.find((l) => l.id !== "level-0");
-                if (firstLevel && state.levels[firstLevel.id]?.status !== "completed") {
-                    setLevelWelcomeId(firstLevel.id);
-                    setShowLevelWelcome(true);
-                    setShowTimeline(false);
-                    setIsOpen(true);
-                }
-            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [level0Status]);
 
     const handleStartTour = () => {
-        tourNavCtx?.startTour?.();
-        setIsOpen(false);
+        setShowWelcome(false);
+        setShowTimeline(true);
     };
 
     const handleStartWelcome = (levelId: string) => {
@@ -165,6 +163,9 @@ export default function OnboardingOverlay() {
 
     const renderContent = () => {
         if (showLevelWelcome && levelWelcomeId) {
+            const cfg = levels.find((l) => l.id === levelWelcomeId);
+            const title = cfg?.welcome?.headerTitle ?? "Tour";
+            if (currentHeaderTitle !== title) setCurrentHeaderTitle(title);
             return <LevelWelcomeCard levelId={levelWelcomeId} onBeginTour={handleBeginTourFromWelcome} />;
         }
         // Quiz / completion screen — shown for the captured level even after activeLevelId changes
@@ -172,10 +173,12 @@ export default function OnboardingOverlay() {
             return (
                 <LevelOverlay
                     levelId={quizLevelId}
-                    onComplete={() => { setQuizLevelId(null); setShowTimeline(true); }}
+                    onComplete={() => { setQuizLevelId(null); setShowTimeline(true); setCurrentHeaderTitle("Onboarding Mission Control"); }}
+                    onHeaderTitle={setCurrentHeaderTitle}
                 />
             );
         }
+        if (currentHeaderTitle !== "Onboarding Mission Control") setCurrentHeaderTitle("Onboarding Mission Control");
         if (showTimeline) {
             return (
                 <OnboardingTimeline
@@ -185,7 +188,7 @@ export default function OnboardingOverlay() {
                 />
             );
         }
-        if (showWelcome) {
+        if (showWelcome || level0Status !== "completed") {
             return <OnboardingWelcome onStart={handleStartTour} />;
         }
         return (
@@ -215,30 +218,42 @@ export default function OnboardingOverlay() {
             )}
 
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-6">
                     <div className="relative w-full max-w-xl rounded-3xl border border-white/60 bg-white/95 p-6 shadow-2xl">
 
                         {/* Header */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Immersive Journey</p>
-                                <h2 className="text-lg font-semibold">Onboarding Mission Control</h2>
+                                <p className={`text-xs uppercase tracking-[0.3em] ${(quizLevelId || showLevelWelcome) ? "text-[#6b1176]" : "text-slate-400"}`}>
+                                    {(quizLevelId || showLevelWelcome) ? currentHeaderTitle : "Immersive Journey"}
+                                </p>
+                                <h2 className="text-lg font-semibold">{(quizLevelId || showLevelWelcome) ? displayLevelConfig?.title ?? "Onboarding Mission Control" : "Onboarding Mission Control"}</h2>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (quizLevelId) {
-                                        // Exit quiz/interlude → show timeline instead of closing
-                                        setQuizLevelId(null);
-                                        setShowTimeline(true);
-                                    } else {
-                                        setIsOpen(false);
-                                    }
-                                }}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                            >
-                                {quizLevelId ? "← Timeline" : "Close"}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 rounded-full bg-[#6b1176] px-3 py-1">
+                                    <Zap className="h-3 w-3 text-violet-200" fill="currentColor" />
+                                    <span className="text-sm font-bold text-white">{overallScore}</span>
+                                    <span className="text-[10px] font-semibold text-violet-300">pts</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (quizLevelId) {
+                                            setQuizLevelId(null);
+                                            setShowTimeline(true);
+                                        } else if (showLevelWelcome) {
+                                            setShowLevelWelcome(false);
+                                            setLevelWelcomeId(null);
+                                            setShowTimeline(true);
+                                        } else {
+                                            setIsOpen(false);
+                                        }
+                                    }}
+                                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                                >
+                                    {quizLevelId || showLevelWelcome ? "← Timeline" : "Close"}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Content */}
