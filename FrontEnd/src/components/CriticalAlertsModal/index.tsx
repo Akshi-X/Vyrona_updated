@@ -556,14 +556,14 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                 )}
 
                 {Object.entries(groupedByDateAndKpi).map(
-                    ([dateLabel, dateGroups], dateIndex) => (
+                    ([dateLabel, dateGroups]) => (
                         <div key={dateLabel} className="space-y-2">
                             <div className="inline-flex items-center rounded-full bg-[#f0f0f0] px-3 py-1 text-sm font-medium text-[#3a3a3a]">
                                 {dateLabel}
                             </div>
 
                             <div className="space-y-2">
-                                {dateGroups.map((group, groupIndex) => {
+                                {dateGroups.map((group) => {
                                     const latestAlert = group.alerts[0];
                                     const olderAlerts = group.alerts.slice(1);
                                     const hiddenCount = olderAlerts.length;
