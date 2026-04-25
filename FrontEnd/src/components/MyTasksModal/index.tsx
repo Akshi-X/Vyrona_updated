@@ -30,7 +30,7 @@ interface MyTasksModalProps {
     tasks: MyTask[];
     loading?: boolean;
     onAdd?: () => void;
-    onEdit?: (task: MyTask) => void;
+    onEdit?: (task: MyTask) => void | Promise<void>;
     onDelete?: (taskId: string) => void;
     variant?: "dashboard" | "track" | "ivf"; // Add variant to differentiate between Dashboard, Track & Trace and IVF
     currentUserName?: string; // Current user's full name for "Assigned by" field
@@ -88,11 +88,9 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         Record<string, string>
     >({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isEditSaving, setIsEditSaving] = useState(false);
     const [users, setUsers] = useState<UserListItem[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
-    const statusCellRefs = useRef<{
-        [key: string]: HTMLTableCellElement | null;
-    }>({});
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Filter states
@@ -275,21 +273,22 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
         }
     };
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (editedTask && onEdit) {
-            // Find assigneeId from the selected user name if not already stored
-            let assigneeId = editedTask.assigneeId;
-            if (!assigneeId && editedTask.assignedTo) {
-                const user = findUserByName(editedTask.assignedTo);
-                if (user) {
-                    assigneeId = user.user_id;
+            setIsEditSaving(true);
+            try {
+                let assigneeId = editedTask.assigneeId;
+                if (!assigneeId && editedTask.assignedTo) {
+                    const user = findUserByName(editedTask.assignedTo);
+                    if (user) assigneeId = user.user_id;
                 }
+                const taskToSave = assigneeId
+                    ? { ...editedTask, assigneeId, status: editedTask.status }
+                    : { ...editedTask, status: editedTask.status };
+                await onEdit(taskToSave);
+            } finally {
+                setIsEditSaving(false);
             }
-            // Pass the task with assigneeId if available, ensuring status is included
-            const taskToSave = assigneeId
-                ? { ...editedTask, assigneeId, status: editedTask.status }
-                : { ...editedTask, status: editedTask.status };
-            onEdit(taskToSave);
         }
         setEditingTaskId(null);
         setEditedTask(null);
@@ -368,6 +367,29 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             });
         }
     }, [isOpen, currentUserName, currentUserId]);
+
+    // Onboarding: pre-fill the new task form with valid demo data so the
+    // user can click Save without hitting validation errors.
+    useEffect(() => {
+        const handler = () => {
+            setShowInputRow(true);
+            setValidationErrors({});
+            setNewTask({
+                patientId: "",
+                canisterNumber: defaultCanisterNumber || "T-161",
+                taskName: "Schedule LN2 top-up",
+                description: "LN2 level approaching L1 threshold. Top-up required.",
+                assigneeBy: currentUserName || "Demo User",
+                assignedTo: currentUserName || "Demo User",
+                assigneeId: currentUserId || "USR-DEMO",
+                dueDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+                priority: "High",
+                status: "Not started",
+            });
+        };
+        document.addEventListener("onboarding:prefill-task-form", handler);
+        return () => document.removeEventListener("onboarding:prefill-task-form", handler);
+    }, [currentUserName, currentUserId, defaultCanisterNumber]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -488,10 +510,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
     // Helper function to get editable fields for a task
     const getEditableFields = (task: MyTask): Set<string> => {
         if (isTaskCreatedByMe(task)) {
-            // Creator can edit all fields except "Assigned by" and "Patient ID"
-            return new Set(["status"]);
+            return new Set(["taskName", "description", "status"]);
         } else if (isTaskAssignedToMe(task)) {
-            // Assignee can only edit status
             return new Set(["status"]);
         }
         return new Set();
@@ -520,6 +540,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
             headerAction={
                 onAdd && (!isUserRole || isIvfVariant) ? (
                     <button
+                        id="onboarding-my-tasks-add-btn"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleAddClick();
@@ -543,6 +564,8 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     </button>
                 ) : undefined
             }
+            containerClassName="w-full max-w-[750px]"
+            contentHeightClassName="md:h-[520px]"
             loading={loading}
             loadingText="Loading tasks..."
             emptyText="No tasks found"
@@ -557,1406 +580,387 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                     {validationErrors.submit}
                 </div>
             )}
-            <div className="relative" ref={scrollContainerRef}>
+            <div ref={scrollContainerRef}>
                 <style>{`
-          /* Date picker styling - purple selected date */
-          input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
-          }
-          input[type="date"]::-webkit-datetime-edit-text {
-            color: #333;
-          }
-          input[type="date"]::-webkit-datetime-edit-month-field,
-          input[type="date"]::-webkit-datetime-edit-day-field,
-          input[type="date"]::-webkit-datetime-edit-year-field {
-            color: #333;
-          }
-          input[type="date"]:focus::-webkit-datetime-edit-month-field,
-          input[type="date"]:focus::-webkit-datetime-edit-day-field,
-          input[type="date"]:focus::-webkit-datetime-edit-year-field {
-            color: #6b1176;
-          }
-          /* Style the calendar popup - selected date purple */
-          input[type="date"]::-webkit-calendar-picker-indicator:hover {
-            filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
-          }
-          /* For Firefox */
-          input[type="date"] {
-            color-scheme: light;
-          }
-          /* Additional styling for date input value */
-          input[type="date"]:not(:placeholder-shown) {
-            color: #6b1176;
-            font-weight: 500;
-          }
-          .alert-card-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-          }
-          .alert-card-table thead {
-            position: sticky;
-            top: 0;
-            z-index: 1020;
-            background-color: rgb(250 245 255);
-          }
-          .alert-card-table th.sticky,
-          .alert-card-table td.sticky {
-            position: sticky;
-            right: 0;
-            background-color: inherit;
-          }
-          .alert-card-table thead th.sticky {
-            background-color: rgb(250 245 255) !important;
-            z-index: 1020;
-            position: sticky;
-            right: 0;
-            top: 0;
-          }
-          .alert-card-table tbody td.sticky {
-            background-color: white !important;
-            z-index: 1010;
-          }
-          .alert-card-table tbody tr:hover td.sticky {
-            background-color: white !important;
-          }
-          .alert-card-table tbody tr.bg-gray-50 td.sticky {
-            background-color: rgb(249 250 251) !important;
-          }
-          .alert-card-table th,
-          .alert-card-table td {
-            display: table-cell !important;
-            visibility: visible !important;
-            overflow: visible !important;
-          }
-          .alert-card-table th:not(:last-child):not(.sticky),
-          .alert-card-table td:not(:last-child):not(.sticky) {
-            padding-right: 20px !important;
-          }
-          .alert-card-table th:not(:first-child):not(.sticky),
-          .alert-card-table td:not(:first-child):not(.sticky) {
-            padding-left: 15px !important;
-          }
-        `}</style>
-                <table
-                    className="alert-card-table divide-y divide-gray-200"
-                    style={{ width: "100%", tableLayout: "auto" }}
-                >
-                    <colgroup>
-                        <col style={{ width: "auto", minWidth: "100px" }} />
-                        <col style={{ width: "auto", minWidth: "150px" }} />
-                        <col style={{ width: "auto", minWidth: "80px" }} />
-                        <col style={{ width: "auto", minWidth: "130px" }} />
-                        <col style={{ width: "auto", minWidth: "150px" }} />
-                        {/* Due date */}
-                        <col style={{ width: "auto", minWidth: "120px" }} />
-                        {/* Priority */}
-                        <col style={{ width: "auto", minWidth: "120px" }} />
-                        {/* Status */}
-                        <col style={{ width: "auto", minWidth: "120px" }} />
-                        {(variant === "track" || variant === "ivf") && (
-                            <col style={{ width: "80px", minWidth: "80px" }} />
-                        )}
-                    </colgroup>
-                    <thead className="bg-[#fdeeff]">
-                        <tr className="border-b border-[#eeeeee]">
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                Tank Code
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                Task Name
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                Description
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                    <span>Assigned by</span>
-                                    <div
-                                        className="relative"
-                                        ref={assignedByFilterRef}
-                                    >
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsAssignedByFilterOpen(
-                                                    !isAssignedByFilterOpen,
-                                                );
-                                            }}
-                                            className={`p-1 rounded hover:bg-purple-100 transition-colors ${
-                                                assignedByFilter !== "all"
-                                                    ? "text-[#6b1176]"
-                                                    : "text-gray-400"
-                                            }`}
-                                            title="Filter by assigned by"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                                                />
-                                            </svg>
-                                        </button>
-                                        {isAssignedByFilterOpen && (
-                                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden max-h-60 overflow-y-auto flex flex-col">
-                                                <button
-                                                    onClick={() => {
-                                                        setAssignedByFilter(
-                                                            "all",
-                                                        );
-                                                        setIsAssignedByFilterOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                        assignedByFilter ===
-                                                        "all"
-                                                            ? "bg-[#6b1176] text-white"
-                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                    }`}
-                                                >
-                                                    All
-                                                </button>
-                                                {uniqueAssignedBy.map(
-                                                    (name) => (
-                                                        <button
-                                                            key={name}
-                                                            onClick={() => {
-                                                                setAssignedByFilter(
-                                                                    name,
-                                                                );
-                                                                setIsAssignedByFilterOpen(
-                                                                    false,
-                                                                );
-                                                            }}
-                                                            className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                assignedByFilter ===
-                                                                name
-                                                                    ? "bg-[#6b1176] text-white"
-                                                                    : "text-[#6b1176] hover:bg-gray-100"
-                                                            }`}
-                                                        >
-                                                            {name}
-                                                        </button>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                    <span>Assigned to</span>
-                                    <div
-                                        className="relative"
-                                        ref={assignedToFilterRef}
-                                    >
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsAssignedToFilterOpen(
-                                                    !isAssignedToFilterOpen,
-                                                );
-                                            }}
-                                            className={`p-1 rounded hover:bg-purple-100 transition-colors ${
-                                                assignedToFilter !== "all"
-                                                    ? "text-[#6b1176]"
-                                                    : "text-gray-400"
-                                            }`}
-                                            title="Filter by assigned to"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                                                />
-                                            </svg>
-                                        </button>
-                                        {isAssignedToFilterOpen && (
-                                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden max-h-60 overflow-y-auto flex flex-col">
-                                                <button
-                                                    onClick={() => {
-                                                        setAssignedToFilter(
-                                                            "all",
-                                                        );
-                                                        setIsAssignedToFilterOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                        assignedToFilter ===
-                                                        "all"
-                                                            ? "bg-[#6b1176] text-white"
-                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                    }`}
-                                                >
-                                                    All
-                                                </button>
-                                                {uniqueAssignedTo.map(
-                                                    (name) => (
-                                                        <button
-                                                            key={name}
-                                                            onClick={() => {
-                                                                setAssignedToFilter(
-                                                                    name,
-                                                                );
-                                                                setIsAssignedToFilterOpen(
-                                                                    false,
-                                                                );
-                                                            }}
-                                                            className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                                assignedToFilter ===
-                                                                name
-                                                                    ? "bg-[#6b1176] text-white"
-                                                                    : "text-[#6b1176] hover:bg-gray-100"
-                                                            }`}
-                                                        >
-                                                            {name}
-                                                        </button>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                Due date
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                    <span>Priority</span>
-                                    <div
-                                        className="relative"
-                                        ref={priorityFilterRef}
-                                    >
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsPriorityFilterOpen(
-                                                    !isPriorityFilterOpen,
-                                                );
-                                            }}
-                                            className={`p-1 rounded hover:bg-purple-100 transition-colors ${
-                                                priorityFilter !== "all"
-                                                    ? "text-[#6b1176]"
-                                                    : "text-gray-400"
-                                            }`}
-                                            title="Filter by priority"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                                                />
-                                            </svg>
-                                        </button>
-                                        {isPriorityFilterOpen && (
-                                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
-                                                <button
-                                                    onClick={() => {
-                                                        setPriorityFilter(
-                                                            "all",
-                                                        );
-                                                        setIsPriorityFilterOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                        priorityFilter === "all"
-                                                            ? "bg-[#6b1176] text-white"
-                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                    }`}
-                                                >
-                                                    All
-                                                </button>
-                                                {priorities.map((priority) => (
-                                                    <button
-                                                        key={priority}
-                                                        onClick={() => {
-                                                            setPriorityFilter(
-                                                                priority,
-                                                            );
-                                                            setIsPriorityFilterOpen(
-                                                                false,
-                                                            );
-                                                        }}
-                                                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                            priorityFilter ===
-                                                            priority
-                                                                ? "bg-[#6b1176] text-white"
-                                                                : "text-[#6b1176] hover:bg-gray-100"
-                                                        }`}
-                                                    >
-                                                        {priority}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </th>
-                            <th className="p-2 md:p-[15px] font-semibold text-[#6b1176] text-xs md:text-sm text-left whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                    <span>Status</span>
-                                    <div
-                                        className="relative"
-                                        ref={statusFilterRef}
-                                    >
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsStatusFilterOpen(
-                                                    !isStatusFilterOpen,
-                                                );
-                                            }}
-                                            className={`p-1 rounded hover:bg-purple-100 transition-colors ${
-                                                statusFilter !== "all"
-                                                    ? "text-[#6b1176]"
-                                                    : "text-gray-400"
-                                            }`}
-                                            title="Filter by status"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                                                />
-                                            </svg>
-                                        </button>
-                                        {isStatusFilterOpen && (
-                                            <div className="absolute right-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] overflow-hidden flex flex-col">
-                                                <button
-                                                    onClick={() => {
-                                                        setStatusFilter("all");
-                                                        setIsStatusFilterOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                        statusFilter === "all"
-                                                            ? "bg-[#6b1176] text-white"
-                                                            : "text-[#6b1176] hover:bg-gray-100"
-                                                    }`}
-                                                >
-                                                    All
-                                                </button>
-                                                {statuses.map((status) => (
-                                                    <button
-                                                        key={status}
-                                                        onClick={() => {
-                                                            setStatusFilter(
-                                                                status,
-                                                            );
-                                                            setIsStatusFilterOpen(
-                                                                false,
-                                                            );
-                                                        }}
-                                                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                                            statusFilter ===
-                                                            status
-                                                                ? "bg-[#6b1176] text-white"
-                                                                : "text-[#6b1176] hover:bg-gray-100"
-                                                        }`}
-                                                    >
-                                                        {status}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </th>
-                            {(variant === "track" || variant === "ivf") && (
-                                <th className="p-2 md:p-[15px] font-semibold text-[#4b0d52] text-sm text-left whitespace-nowrap sticky bg-[#ead8f4]">
-                                    Actions
-                                </th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {/* Input row for new task */}
-                        {showInputRow && (
-                            <tr className="border-b border-[#eeeeee]">
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={
-                                                isIvfVariant
-                                                    ? newTask.canisterNumber
-                                                    : newTask.patientId
-                                            }
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    isIvfVariant
-                                                        ? "canisterNumber"
-                                                        : "patientId",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder={
-                                                isIvfVariant
-                                                    ? "Canister ID"
-                                                    : "Patient ID"
-                                            }
-                                            required
-                                            readOnly
-                                            className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 bg-gray-50 text-gray-700 cursor-not-allowed ${
-                                                (
-                                                    isIvfVariant
-                                                        ? validationErrors.canisterNumber
-                                                        : validationErrors.patientId
-                                                )
-                                                    ? "border-red-500 focus:ring-red-200"
-                                                    : "border-gray-300 focus:ring-purple-200"
-                                            }`}
-                                        />
-                                        {(isIvfVariant
-                                            ? validationErrors.canisterNumber
-                                            : validationErrors.patientId) && (
-                                            <div className="text-xs text-red-500 mt-1">
-                                                {isIvfVariant
-                                                    ? validationErrors.canisterNumber
-                                                    : validationErrors.patientId}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={newTask.taskName}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    "taskName",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Task Name"
-                                            required
-                                            className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
-                                                validationErrors.taskName
-                                                    ? "border-red-500 focus:ring-red-200"
-                                                    : "border-gray-300 focus:ring-purple-200"
-                                            }`}
-                                        />
-                                        {validationErrors.taskName && (
-                                            <div className="text-xs text-red-500 mt-1">
-                                                {validationErrors.taskName}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={newTask.description}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    "description",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Description"
-                                            required
-                                            className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
-                                                validationErrors.description
-                                                    ? "border-red-500 focus:ring-red-200"
-                                                    : "border-gray-300 focus:ring-purple-200"
-                                            }`}
-                                        />
-                                        {validationErrors.description && (
-                                            <div className="text-xs text-red-500 mt-1">
-                                                {validationErrors.description}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <input
-                                        type="text"
-                                        value={newTask.assigneeBy}
-                                        readOnly
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-700 cursor-not-allowed"
-                                    />
-                                </td>
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <div>
-                                        <select
-                                            value={newTask.assigneeId || ""}
-                                            onChange={(e) => {
-                                                const selectedUserId =
-                                                    e.target.value;
-                                                const selectedUser = users.find(
-                                                    (u) =>
-                                                        u.user_id ===
-                                                        selectedUserId,
-                                                );
-                                                handleInputChange(
-                                                    "assigneeId",
-                                                    selectedUserId,
-                                                );
-                                                handleInputChange(
-                                                    "assignedTo",
-                                                    selectedUser
-                                                        ? `${selectedUser.first_name} ${selectedUser.last_name}`.trim()
-                                                        : "",
-                                                );
-                                            }}
-                                            required
-                                            disabled={loadingUsers}
-                                            className={`w-full min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
-                                                validationErrors.assignedTo
-                                                    ? "border-red-500 focus:ring-red-200"
-                                                    : "border-gray-300 focus:ring-purple-200"
-                                            } ${loadingUsers ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                                        >
-                                            <option value="">
-                                                Select a user
-                                            </option>
-                                            {users.map((user) => (
-                                                <option
-                                                    key={user.user_id}
-                                                    value={user.user_id}
-                                                >
-                                                    {user.first_name}{" "}
-                                                    {user.last_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {validationErrors.assignedTo && (
-                                            <div className="text-xs text-red-500 mt-1">
-                                                {validationErrors.assignedTo}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                    <div>
-                                        <input
-                                            type="date"
-                                            value={newTask.dueDate}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    "dueDate",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            min={
-                                                new Date()
-                                                    .toISOString()
-                                                    .split("T")[0]
-                                            }
-                                            required
-                                            className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 ${
-                                                validationErrors.dueDate
-                                                    ? "border-red-500 focus:ring-red-200"
-                                                    : "border-gray-300 focus:ring-purple-200"
-                                            }`}
-                                        />
-                                        {validationErrors.dueDate && (
-                                            <div className="text-xs text-red-500 mt-1">
-                                                {validationErrors.dueDate}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td
-                                    className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
-                                    style={{ overflow: "visible" }}
-                                >
-                                    <div
-                                        className="relative"
-                                        style={{ zIndex: 1000 }}
-                                    >
-                                        <select
-                                            value={newTask.priority}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    "priority",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
-                                                newTask.priority === "High"
-                                                    ? "bg-red-100 text-red-800"
-                                                    : newTask.priority ===
-                                                        "Medium"
-                                                      ? "bg-orange-100 text-orange-800"
-                                                      : "bg-green-100 text-green-800"
-                                            }`}
-                                            style={{
-                                                minHeight: "32px",
-                                                position: "relative",
-                                                zIndex: 1000,
-                                                backgroundColor:
-                                                    newTask.priority === "High"
-                                                        ? "#fee2e2"
-                                                        : newTask.priority ===
-                                                            "Medium"
-                                                          ? "#fed7aa"
-                                                          : "#dcfce7",
-                                            }}
-                                        >
-                                            <option
-                                                value="Low"
-                                                style={{
-                                                    backgroundColor: "#dcfce7",
-                                                    color: "#166534",
-                                                }}
-                                            >
-                                                Low
-                                            </option>
-                                            <option
-                                                value="Medium"
-                                                style={{
-                                                    backgroundColor: "#fed7aa",
-                                                    color: "#9a3412",
-                                                }}
-                                            >
-                                                Medium
-                                            </option>
-                                            <option
-                                                value="High"
-                                                style={{
-                                                    backgroundColor: "#fee2e2",
-                                                    color: "#991b1b",
-                                                }}
-                                            >
-                                                High
-                                            </option>
-                                        </select>
-                                    </div>
-                                </td>
-                                <td
-                                    className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
-                                    style={{ overflow: "visible" }}
-                                >
-                                    <div
-                                        className="relative"
-                                        style={{ zIndex: 1000 }}
-                                    >
-                                        <select
-                                            value={newTask.status}
-                                            onChange={(e) =>
-                                                handleInputChange(
-                                                    "status",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={`w-full px-2 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
-                                                newTask.status === "Done"
-                                                    ? "bg-green-100 text-green-800"
-                                                    : newTask.status ===
-                                                        "In progress"
-                                                      ? "bg-blue-100 text-blue-800"
-                                                      : "bg-gray-100 text-gray-800"
-                                            }`}
-                                            style={{
-                                                minHeight: "32px",
-                                                position: "relative",
-                                                zIndex: 1000,
-                                                backgroundColor:
-                                                    newTask.status === "Done"
-                                                        ? "#dcfce7"
-                                                        : newTask.status ===
-                                                            "In progress"
-                                                          ? "#dbeafe"
-                                                          : "#f3f4f6",
-                                            }}
-                                        >
-                                            <option
-                                                value="Not started"
-                                                style={{
-                                                    backgroundColor: "#f3f4f6",
-                                                    color: "#1f2937",
-                                                }}
-                                            >
-                                                Not started
-                                            </option>
-                                            <option
-                                                value="In progress"
-                                                style={{
-                                                    backgroundColor: "#dbeafe",
-                                                    color: "#1e40af",
-                                                }}
-                                            >
-                                                In progress
-                                            </option>
-                                            <option
-                                                value="Done"
-                                                style={{
-                                                    backgroundColor: "#dcfce7",
-                                                    color: "#166534",
-                                                }}
-                                            >
-                                                Done
-                                            </option>
-                                        </select>
-                                    </div>
-                                </td>
-                                <td className="bg-[#fbf8fd] p-2 md:p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-center sticky z-10">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={handleSaveAdd}
-                                            disabled={isSaving}
-                                            className={`inline-flex items-center justify-center px-2 py-1 text-sm font-medium rounded transition-colors ${
-                                                isSaving
-                                                    ? "text-gray-400 cursor-not-allowed"
-                                                    : "text-green-600 hover:text-green-800 hover:bg-green-50"
-                                            }`}
-                                            title="Save new task"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M5 13l4 4L19 7"
-                                                />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            onClick={handleCancelAdd}
-                                            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                                            title="Cancel adding task"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M6 18L18 6M6 6l12 12"
-                                                />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                        {visibleTasks.length === 0 && !showInputRow && (
-                            <tr>
-                                <td
-                                    colSpan={
-                                        variant === "track" || variant === "ivf"
-                                            ? 9
-                                            : 8
-                                    }
-                                    className="bg-white p-2 md:p-[15px] text-center text-gray-500 text-sm"
-                                >
-                                    No tasks match the current filters
-                                </td>
-                            </tr>
-                        )}
-                        {visibleTasks.map((task) => {
-                            const isEditing = editingTaskId === task.id;
-                            const displayTask =
-                                isEditing && editedTask ? editedTask : task;
-                            const canEdit = canEditTask(task);
-                            const editableFields = getEditableFields(task);
-                            const isCreatedByMe = isTaskCreatedByMe(task);
+                  input[type="date"]::-webkit-calendar-picker-indicator {
+                    cursor: pointer;
+                    filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(270deg) brightness(94%) contrast(97%);
+                  }
+                  input[type="date"]:not(:placeholder-shown) {
+                    color: #6b1176;
+                    font-weight: 500;
+                  }
+                  input[type="date"] { color-scheme: light; }
+                `}</style>
 
-                            return (
-                                <tr
-                                    key={task.id}
-                                    className={`border-b border-[#eeeeee] hover:bg-white/50 ${isEditing ? "bg-gray-50" : ""}`}
+                {/* Filter bar */}
+                <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-[#eeeeee] bg-[#faf5ff]">
+                    {/* Assigned by filter */}
+                    <div className="relative" ref={assignedByFilterRef}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsAssignedByFilterOpen(!isAssignedByFilterOpen); }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                                assignedByFilter !== "all"
+                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                            }`}
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Assigned by{assignedByFilter !== "all" ? `: ${assignedByFilter}` : ""}
+                        </button>
+                        {isAssignedByFilterOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] max-h-60 overflow-y-auto flex flex-col">
+                                <button onClick={() => { setAssignedByFilter("all"); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                {uniqueAssignedBy.map((name) => (
+                                    <button key={name} onClick={() => { setAssignedByFilter(name); setIsAssignedByFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedByFilter === name ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{name}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Assigned to filter */}
+                    <div className="relative" ref={assignedToFilterRef}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsAssignedToFilterOpen(!isAssignedToFilterOpen); }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                                assignedToFilter !== "all"
+                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                            }`}
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Assigned to{assignedToFilter !== "all" ? `: ${assignedToFilter}` : ""}
+                        </button>
+                        {isAssignedToFilterOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px] max-h-60 overflow-y-auto flex flex-col">
+                                <button onClick={() => { setAssignedToFilter("all"); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                {uniqueAssignedTo.map((name) => (
+                                    <button key={name} onClick={() => { setAssignedToFilter(name); setIsAssignedToFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${assignedToFilter === name ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{name}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Priority filter */}
+                    <div className="relative" ref={priorityFilterRef}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsPriorityFilterOpen(!isPriorityFilterOpen); }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                                priorityFilter !== "all"
+                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                            }`}
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Priority{priorityFilter !== "all" ? `: ${priorityFilter}` : ""}
+                        </button>
+                        {isPriorityFilterOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] flex flex-col">
+                                <button onClick={() => { setPriorityFilter("all"); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                {priorities.map((p) => (
+                                    <button key={p} onClick={() => { setPriorityFilter(p); setIsPriorityFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${priorityFilter === p ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{p}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Status filter */}
+                    <div className="relative" ref={statusFilterRef}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsStatusFilterOpen(!isStatusFilterOpen); }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                                statusFilter !== "all"
+                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                            }`}
+                        >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Status{statusFilter !== "all" ? `: ${statusFilter}` : ""}
+                        </button>
+                        {isStatusFilterOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] flex flex-col">
+                                <button onClick={() => { setStatusFilter("all"); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === "all" ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>All</button>
+                                {statuses.map((s) => (
+                                    <button key={s} onClick={() => { setStatusFilter(s); setIsStatusFilterOpen(false); }} className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${statusFilter === s ? "bg-[#6b1176] text-white" : "text-[#6b1176] hover:bg-gray-100"}`}>{s}</button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Clear filters */}
+                    {(assignedByFilter !== "all" || assignedToFilter !== "all" || priorityFilter !== "all" || statusFilter !== "all") && (
+                        <button
+                            onClick={() => { setAssignedByFilter("all"); setAssignedToFilter("all"); setPriorityFilter("all"); setStatusFilter("all"); }}
+                            className="text-xs text-gray-500 hover:text-[#6b1176] underline ml-1"
+                        >
+                            Clear all
+                        </button>
+                    )}
+                </div>
+
+                {/* New task form card */}
+                {showInputRow && (
+                    <div id="onboarding-my-tasks-input-row" className="mx-4 mt-4 mb-2 border border-[#6b1176] rounded-xl bg-purple-50 p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">{isIvfVariant ? "Canister ID" : "Patient ID"}</label>
+                                <input
+                                    type="text"
+                                    value={isIvfVariant ? newTask.canisterNumber : newTask.patientId}
+                                    onChange={(e) => handleInputChange(isIvfVariant ? "canisterNumber" : "patientId", e.target.value)}
+                                    placeholder={isIvfVariant ? "Canister ID" : "Patient ID"}
+                                    readOnly
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white text-gray-700 cursor-not-allowed focus:outline-none ${(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) ? "border-red-400" : "border-gray-300"}`}
+                                />
+                                {(isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId) && <p className="text-xs text-red-500 mt-0.5">{isIvfVariant ? validationErrors.canisterNumber : validationErrors.patientId}</p>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Task Name</label>
+                                <input
+                                    type="text"
+                                    value={newTask.taskName}
+                                    onChange={(e) => handleInputChange("taskName", e.target.value)}
+                                    placeholder="Task Name"
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.taskName ? "border-red-400" : "border-gray-300"}`}
+                                />
+                                {validationErrors.taskName && <p className="text-xs text-red-500 mt-0.5">{validationErrors.taskName}</p>}
+                            </div>
+                            <div className="sm:col-span-2">
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Description</label>
+                                <input
+                                    type="text"
+                                    value={newTask.description}
+                                    onChange={(e) => handleInputChange("description", e.target.value)}
+                                    placeholder="Description"
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.description ? "border-red-400" : "border-gray-300"}`}
+                                />
+                                {validationErrors.description && <p className="text-xs text-red-500 mt-0.5">{validationErrors.description}</p>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Assigned by</label>
+                                <input type="text" value={newTask.assigneeBy} disabled className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed select-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Assign to</label>
+                                <select
+                                    value={newTask.assigneeId || ""}
+                                    onChange={(e) => {
+                                        const selectedUserId = e.target.value;
+                                        const selectedUser = users.find((u) => u.user_id === selectedUserId);
+                                        handleInputChange("assigneeId", selectedUserId);
+                                        handleInputChange("assignedTo", selectedUser ? `${selectedUser.first_name} ${selectedUser.last_name}`.trim() : "");
+                                    }}
+                                    disabled={loadingUsers}
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.assignedTo ? "border-red-400" : "border-gray-300"} ${loadingUsers ? "bg-gray-100 cursor-not-allowed" : ""}`}
                                 >
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        <div className="font-mono truncate">
-                                            {task.tankCode ||
-                                                (isIvfVariant
-                                                    ? task.canisterNumber ||
-                                                      "N/A"
-                                                    : task.patientId)}
-                                        </div>
-                                    </td>
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        {isEditing &&
-                                        editableFields.has("taskName") ? (
-                                            <input
-                                                type="text"
-                                                value={
-                                                    displayTask.taskName || ""
-                                                }
-                                                onChange={(e) =>
-                                                    handleEditInputChange(
-                                                        "taskName",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                            />
-                                        ) : (
-                                            <div
-                                                className="truncate overflow-hidden text-ellipsis whitespace-nowrap"
-                                                style={{ maxWidth: "100%" }}
-                                                title={task.taskName}
-                                            >
-                                                {task.taskName}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        {isEditing &&
-                                        editableFields.has("description") ? (
-                                            <input
-                                                type="text"
-                                                value={
-                                                    displayTask.description ||
-                                                    ""
-                                                }
-                                                onChange={(e) =>
-                                                    handleEditInputChange(
-                                                        "description",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                            />
-                                        ) : (
-                                            <div
-                                                className="truncate overflow-hidden text-ellipsis whitespace-nowrap"
-                                                style={{ maxWidth: "100%" }}
-                                                title={task.description}
-                                            >
-                                                {task.description}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        {/* Assigned by is always read-only, even when editing */}
-                                        <div
-                                            className="whitespace-nowrap"
-                                            title={task.assigneeBy}
-                                        >
-                                            {task.assigneeBy}
-                                        </div>
-                                    </td>
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        {isEditing &&
-                                        editableFields.has("assignedTo") ? (
+                                    <option value="">Select a user</option>
+                                    {users.map((user) => (
+                                        <option key={user.user_id} value={user.user_id}>{user.first_name} {user.last_name}</option>
+                                    ))}
+                                </select>
+                                {validationErrors.assignedTo && <p className="text-xs text-red-500 mt-0.5">{validationErrors.assignedTo}</p>}
+                                {validationErrors.assigneeBy && <p className="text-xs text-red-500 mt-0.5">{validationErrors.assigneeBy}</p>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Due Date</label>
+                                <input
+                                    type="date"
+                                    value={newTask.dueDate}
+                                    onChange={(e) => handleInputChange("dueDate", e.target.value)}
+                                    min={new Date().toISOString().split("T")[0]}
+                                    className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 ${validationErrors.dueDate ? "border-red-400" : "border-gray-300"}`}
+                                />
+                                {validationErrors.dueDate && <p className="text-xs text-red-500 mt-0.5">{validationErrors.dueDate}</p>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-[#6b1176] mb-1">Priority</label>
+                                <select
+                                    value={newTask.priority}
+                                    onChange={(e) => handleInputChange("priority", e.target.value)}
+                                    className={`w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 font-semibold ${newTask.priority === "High" ? "bg-red-50 text-red-800" : newTask.priority === "Medium" ? "bg-orange-50 text-orange-800" : "bg-green-50 text-green-800"}`}
+                                >
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-purple-200">
+                            <button
+                                id="onboarding-my-tasks-save-btn"
+                                onClick={handleSaveAdd}
+                                disabled={isSaving}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${isSaving ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#8b2a96]"}`}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Save
+                            </button>
+                            <button
+                                onClick={handleCancelAdd}
+                                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Card list */}
+                <div className="flex flex-col gap-3 p-4">
+                    {visibleTasks.length === 0 && !showInputRow && (
+                        <div className="text-center text-gray-500 text-sm py-8">No tasks match the current filters</div>
+                    )}
+                    {visibleTasks.map((task) => {
+                        const isEditing = editingTaskId === task.id;
+                        const displayTask = isEditing && editedTask ? editedTask : task;
+                        const canEdit = canEditTask(task);
+                        const editableFields = getEditableFields(task);
+                        const isCreatedByMe = isTaskCreatedByMe(task);
+
+                        return (
+                            <div
+                                key={task.id}
+                                className={`border rounded-xl p-4 transition-colors ${isEditing ? "border-[#6b1176] bg-purple-50" : "border-gray-200 bg-white hover:border-purple-200"}`}
+                            >
+                                {/* Card header */}
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                            {task.tankCode || (isIvfVariant ? task.canisterNumber || "N/A" : task.patientId)}
+                                        </span>
+                                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.priority === "High" ? "bg-red-100 text-red-800" : task.priority === "Medium" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800"}`}>
+                                            {task.priority}
+                                        </span>
+                                        {isEditing && editableFields.has("status") ? (
                                             <select
-                                                value={(() => {
-                                                    // Find user ID from assignedTo name
-                                                    const user = findUserByName(
-                                                        displayTask.assignedTo ||
-                                                            "",
-                                                    );
-                                                    return user?.user_id || "";
-                                                })()}
-                                                onChange={(e) => {
-                                                    const selectedUserId =
-                                                        e.target.value;
-                                                    const selectedUser =
-                                                        users.find(
-                                                            (u) =>
-                                                                u.user_id ===
-                                                                selectedUserId,
-                                                        );
-                                                    if (
-                                                        selectedUser &&
-                                                        editedTask
-                                                    ) {
-                                                        const fullName =
-                                                            `${selectedUser.first_name} ${selectedUser.last_name}`.trim();
-                                                        // Update both assignedTo name and store assigneeId in a way we can access it
-                                                        setEditedTask({
-                                                            ...editedTask,
-                                                            assignedTo:
-                                                                fullName,
-                                                            assigneeId:
-                                                                selectedUserId,
-                                                        });
-                                                    }
-                                                }}
-                                                className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
+                                                value={displayTask.status}
+                                                onChange={(e) => handleEditInputChange("status", e.target.value as "Not started" | "In progress" | "Done" | "Cancelled")}
+                                                className={`px-2 py-0.5 text-xs font-semibold border rounded-full focus:outline-none focus:ring-1 focus:ring-purple-300 ${displayTask.status === "Done" ? "bg-green-100 text-green-800 border-green-300" : displayTask.status === "In progress" ? "bg-blue-100 text-blue-800 border-blue-300" : displayTask.status === "Cancelled" ? "bg-red-100 text-red-800 border-red-300" : "bg-gray-100 text-gray-800 border-gray-300"}`}
                                             >
-                                                <option value="">
-                                                    Select a user
-                                                </option>
-                                                {users.map((user) => (
-                                                    <option
-                                                        key={user.user_id}
-                                                        value={user.user_id}
-                                                    >
-                                                        {user.first_name}{" "}
-                                                        {user.last_name}
-                                                    </option>
-                                                ))}
+                                                <option value="Not started">Not started</option>
+                                                <option value="In progress">In progress</option>
+                                                <option value="Done">Done</option>
+                                                <option value="Cancelled">Cancelled</option>
                                             </select>
                                         ) : (
-                                            <div
-                                                className="whitespace-nowrap"
-                                                title={task.assignedTo || "N/A"}
-                                            >
-                                                {task.assignedTo || "N/A"}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm">
-                                        {isEditing &&
-                                        editableFields.has("dueDate") ? (
-                                            <input
-                                                type="date"
-                                                value={
-                                                    displayTask.dueDate || ""
-                                                }
-                                                onChange={(e) =>
-                                                    handleEditInputChange(
-                                                        "dueDate",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                min={
-                                                    new Date()
-                                                        .toISOString()
-                                                        .split("T")[0]
-                                                }
-                                                className="w-full min-w-0 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                            />
-                                        ) : (
-                                            <div
-                                                className="whitespace-nowrap"
-                                                title={task.dueDate}
-                                            >
-                                                {task.dueDate}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td
-                                        className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm relative"
-                                        style={{ overflow: "visible" }}
-                                    >
-                                        {isEditing &&
-                                        editableFields.has("priority") ? (
-                                            <div
-                                                className="relative"
-                                                style={{ zIndex: 1 }}
-                                            >
-                                                <select
-                                                    value={displayTask.priority}
-                                                    onChange={(e) =>
-                                                        handleEditInputChange(
-                                                            "priority",
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
-                                                        displayTask.priority ===
-                                                        "High"
-                                                            ? "bg-red-100 text-red-800"
-                                                            : displayTask.priority ===
-                                                                "Medium"
-                                                              ? "bg-orange-100 text-orange-800"
-                                                              : "bg-green-100 text-green-800"
-                                                    }`}
-                                                    style={{
-                                                        minHeight: "32px",
-                                                        position: "relative",
-                                                        zIndex: 1,
-                                                        backgroundColor:
-                                                            displayTask.priority ===
-                                                            "High"
-                                                                ? "#fee2e2"
-                                                                : displayTask.priority ===
-                                                                    "Medium"
-                                                                  ? "#fed7aa"
-                                                                  : "#dcfce7",
-                                                    }}
-                                                >
-                                                    <option
-                                                        value="Low"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#dcfce7",
-                                                            color: "#166534",
-                                                        }}
-                                                    >
-                                                        Low
-                                                    </option>
-                                                    <option
-                                                        value="Medium"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#fed7aa",
-                                                            color: "#9a3412",
-                                                        }}
-                                                    >
-                                                        Medium
-                                                    </option>
-                                                    <option
-                                                        value="High"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#fee2e2",
-                                                            color: "#991b1b",
-                                                        }}
-                                                    >
-                                                        High
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <span
-                                                className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                                                    task.priority === "High"
-                                                        ? "bg-red-100 text-red-800"
-                                                        : task.priority ===
-                                                            "Medium"
-                                                          ? "bg-orange-100 text-orange-800"
-                                                          : "bg-green-100 text-green-800"
-                                                }`}
-                                            >
-                                                {task.priority}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td
-                                        ref={(el) => {
-                                            statusCellRefs.current[task.id] =
-                                                el;
-                                        }}
-                                        className="bg-white p-2 md:p-[15px] font-normal text-[#333333] text-xs md:text-sm whitespace-nowrap relative"
-                                        style={{ overflow: "visible" }}
-                                    >
-                                        {isEditing &&
-                                        editableFields.has("status") ? (
-                                            <div
-                                                className="relative"
-                                                style={{ zIndex: 1 }}
-                                            >
-                                                <select
-                                                    value={displayTask.status}
-                                                    onChange={(e) => {
-                                                        const newStatus = e
-                                                            .target.value as
-                                                            | "Not started"
-                                                            | "In progress"
-                                                            | "Done"
-                                                            | "Cancelled";
-                                                        handleEditInputChange(
-                                                            "status",
-                                                            newStatus,
-                                                        );
-                                                    }}
-                                                    className={`min-w-[120px] w-full px-2.5 py-1 text-sm border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-200 text-xs font-semibold ${
-                                                        displayTask.status ===
-                                                        "Done"
-                                                            ? "bg-green-100 text-green-800"
-                                                            : displayTask.status ===
-                                                                "In progress"
-                                                              ? "bg-blue-100 text-blue-800"
-                                                              : "bg-gray-100 text-gray-800"
-                                                    }`}
-                                                    style={{
-                                                        minHeight: "32px",
-                                                        position: "relative",
-                                                        zIndex: 1,
-                                                        backgroundColor:
-                                                            displayTask.status ===
-                                                            "Done"
-                                                                ? "#dcfce7"
-                                                                : displayTask.status ===
-                                                                    "In progress"
-                                                                  ? "#dbeafe"
-                                                                  : "#f3f4f6",
-                                                    }}
-                                                >
-                                                    <option
-                                                        value="Not started"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#f3f4f6",
-                                                            color: "#1f2937",
-                                                        }}
-                                                    >
-                                                        Not started
-                                                    </option>
-                                                    <option
-                                                        value="In progress"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#dbeafe",
-                                                            color: "#1e40af",
-                                                        }}
-                                                    >
-                                                        In progress
-                                                    </option>
-                                                    <option
-                                                        value="Done"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#dcfce7",
-                                                            color: "#166534",
-                                                        }}
-                                                    >
-                                                        Done
-                                                    </option>
-                                                    <option
-                                                        value="Cancelled"
-                                                        style={{
-                                                            backgroundColor:
-                                                                "#fee2e2",
-                                                            color: "#991b1b",
-                                                        }}
-                                                    >
-                                                        Cancelled
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <span
-                                                className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                                                    task.status === "Done"
-                                                        ? "bg-green-100 text-green-800"
-                                                        : task.status ===
-                                                            "In progress"
-                                                          ? "bg-blue-100 text-blue-800"
-                                                          : "bg-gray-100 text-gray-800"
-                                                }`}
-                                            >
+                                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.status === "Done" ? "bg-green-100 text-green-800" : task.status === "In progress" ? "bg-blue-100 text-blue-800" : task.status === "Cancelled" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}>
                                                 {task.status}
                                             </span>
                                         )}
-                                    </td>
-                                    {(variant === "track" ||
-                                        variant === "ivf") && (
-                                        <td
-                                            className="bg-[#fbf8fd] p-2 md:p-[15px] font-medium text-[#3f3f46] text-sm whitespace-nowrap text-right sticky"
-                                            style={{ zIndex: 1010 }}
-                                        >
-                                            {canEdit && (
+                                    </div>
+                                    {(variant === "track" || variant === "ivf") && canEdit && (
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            {isEditing ? (
                                                 <>
-                                                    {isEditing ? (
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button
-                                                                onClick={
-                                                                    handleSaveEdit
-                                                                }
-                                                                className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
-                                                                title="Save changes"
-                                                            >
-                                                                <svg
-                                                                    className="w-4 h-4"
-                                                                    fill="none"
-                                                                    viewBox="0 0 24 24"
-                                                                    stroke="currentColor"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={
-                                                                            2
-                                                                        }
-                                                                        d="M5 13l4 4L19 7"
-                                                                    />
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                onClick={
-                                                                    handleCancelEdit
-                                                                }
-                                                                className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded transition-colors"
-                                                                title="Cancel editing"
-                                                            >
-                                                                <svg
-                                                                    className="w-4 h-4"
-                                                                    fill="none"
-                                                                    viewBox="0 0 24 24"
-                                                                    stroke="currentColor"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={
-                                                                            2
-                                                                        }
-                                                                        d="M6 18L18 6M6 6l12 12"
-                                                                    />
-                                                                </svg>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingTaskId(
-                                                                    task.id,
-                                                                );
-                                                                // Convert dueDate to YYYY-MM-DD format for date input
-                                                                const formattedTask =
-                                                                    { ...task };
-                                                                if (
-                                                                    task.dueDate &&
-                                                                    task.dueDate !==
-                                                                        "N/A"
-                                                                ) {
-                                                                    try {
-                                                                        // Try to parse the date - handle both locale format and ISO format
-                                                                        const dateObj =
-                                                                            new Date(
-                                                                                task.dueDate,
-                                                                            );
-                                                                        if (
-                                                                            !isNaN(
-                                                                                dateObj.getTime(),
-                                                                            )
-                                                                        ) {
-                                                                            // Format as YYYY-MM-DD for HTML date input
-                                                                            const year =
-                                                                                dateObj.getFullYear();
-                                                                            const month =
-                                                                                String(
-                                                                                    dateObj.getMonth() +
-                                                                                        1,
-                                                                                ).padStart(
-                                                                                    2,
-                                                                                    "0",
-                                                                                );
-                                                                            const day =
-                                                                                String(
-                                                                                    dateObj.getDate(),
-                                                                                ).padStart(
-                                                                                    2,
-                                                                                    "0",
-                                                                                );
-                                                                            formattedTask.dueDate = `${year}-${month}-${day}`;
-                                                                        }
-                                                                    } catch {
-                                                                        // If parsing fails, keep original value
-                                                                        formattedTask.dueDate =
-                                                                            task.dueDate;
-                                                                    }
-                                                                }
-                                                                setEditedTask(
-                                                                    formattedTask,
-                                                                );
-                                                                // If user is not the creator (only status is editable), scroll to status column
-                                                                if (
-                                                                    !isCreatedByMe
-                                                                ) {
-                                                                    setTimeout(
-                                                                        () => {
-                                                                            const statusCell =
-                                                                                statusCellRefs
-                                                                                    .current[
-                                                                                    task
-                                                                                        .id
-                                                                                ];
-                                                                            if (
-                                                                                statusCell
-                                                                            ) {
-                                                                                // Find the scrollable container (parent with overflow-x-auto)
-                                                                                let container: HTMLElement | null =
-                                                                                    statusCell.parentElement;
-                                                                                while (
-                                                                                    container &&
-                                                                                    !container.classList.contains(
-                                                                                        "overflow-x-auto",
-                                                                                    )
-                                                                                ) {
-                                                                                    container =
-                                                                                        container.parentElement;
-                                                                                }
-                                                                                if (
-                                                                                    container
-                                                                                ) {
-                                                                                    const cellRect =
-                                                                                        statusCell.getBoundingClientRect();
-                                                                                    const containerRect =
-                                                                                        container.getBoundingClientRect();
-                                                                                    const scrollLeft =
-                                                                                        container.scrollLeft +
-                                                                                        (cellRect.left -
-                                                                                            containerRect.left) -
-                                                                                        containerRect.width /
-                                                                                            2 +
-                                                                                        cellRect.width /
-                                                                                            2;
-                                                                                    container.scrollTo(
-                                                                                        {
-                                                                                            left: Math.max(
-                                                                                                0,
-                                                                                                scrollLeft,
-                                                                                            ),
-                                                                                            behavior:
-                                                                                                "smooth",
-                                                                                        },
-                                                                                    );
-                                                                                }
-                                                                            }
-                                                                        },
-                                                                        100,
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="inline-flex items-center justify-center px-2 py-1 text-gray-700 hover:text-gray-900 rounded transition-colors"
-                                                            title={
-                                                                isCreatedByMe
-                                                                    ? "Edit task"
-                                                                    : "Edit status"
-                                                            }
-                                                        >
-                                                            <svg
-                                                                className="w-4 h-4"
-                                                                fill="currentColor"
-                                                                viewBox="0 0 24 24"
-                                                            >
-                                                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
+                                                    <button onClick={handleSaveEdit} disabled={isEditSaving} className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${isEditSaving ? "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed" : "text-green-700 bg-green-50 border-green-300 hover:bg-green-100"}`} title="Save changes">
+                                                        {isEditSaving ? (
+                                                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                                        ) : (
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                        )}
+                                                        {isEditSaving ? "Saving..." : "Save"}
+                                                    </button>
+                                                    <button onClick={handleCancelEdit} className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Cancel">
+                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        Cancel
+                                                    </button>
                                                 </>
+                                            ) : (
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingTaskId(task.id);
+                                                        const formattedTask = { ...task };
+                                                        if (task.dueDate && task.dueDate !== "N/A") {
+                                                            try {
+                                                                const dateObj = new Date(task.dueDate);
+                                                                if (!isNaN(dateObj.getTime())) {
+                                                                    const year = dateObj.getFullYear();
+                                                                    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+                                                                    const day = String(dateObj.getDate()).padStart(2, "0");
+                                                                    formattedTask.dueDate = `${year}-${month}-${day}`;
+                                                                }
+                                                            } catch { formattedTask.dueDate = task.dueDate; }
+                                                        }
+                                                        setEditedTask(formattedTask);
+                                                    }}
+                                                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:border-[#6b1176] hover:text-[#6b1176] transition-colors"
+                                                    title={isCreatedByMe ? "Edit task" : "Edit status"}
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" /></svg>
+                                                    Edit
+                                                </button>
                                             )}
-                                        </td>
+                                        </div>
                                     )}
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                                </div>
+
+                                {/* Task name */}
+                                {isEditing && editableFields.has("taskName") ? (
+                                    <input type="text" value={displayTask.taskName || ""} onChange={(e) => handleEditInputChange("taskName", e.target.value)} className="w-full px-2 py-1 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 mb-1" />
+                                ) : (
+                                    <p className="text-sm font-semibold text-[#333] mb-1" title={task.taskName}>{task.taskName}</p>
+                                )}
+
+                                {/* Description */}
+                                {isEditing && editableFields.has("description") ? (
+                                    <input type="text" value={displayTask.description || ""} onChange={(e) => handleEditInputChange("description", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-200 mb-2 text-gray-600" />
+                                ) : (
+                                    <p className="text-xs text-gray-500 mb-3" title={task.description}>{task.description}</p>
+                                )}
+
+                                {/* Meta row */}
+                                <div className="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-gray-100">
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned by</p>
+                                        <p className="text-xs text-gray-700 truncate">{task.assigneeBy || "—"}</p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned to</p>
+                                        {isEditing && editableFields.has("assignedTo") ? (
+                                            <select
+                                                value={(() => { const u = findUserByName(displayTask.assignedTo || ""); return u?.user_id || ""; })()}
+                                                onChange={(e) => {
+                                                    const selectedUserId = e.target.value;
+                                                    const selectedUser = users.find((u) => u.user_id === selectedUserId);
+                                                    if (selectedUser && editedTask) {
+                                                        setEditedTask({ ...editedTask, assignedTo: `${selectedUser.first_name} ${selectedUser.last_name}`.trim(), assigneeId: selectedUserId });
+                                                    }
+                                                }}
+                                                className="w-full px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-200"
+                                            >
+                                                <option value="">Select a user</option>
+                                                {users.map((user) => <option key={user.user_id} value={user.user_id}>{user.first_name} {user.last_name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-xs text-gray-700 truncate">{task.assignedTo || "—"}</p>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Due date</p>
+                                        {isEditing && editableFields.has("dueDate") ? (
+                                            <input type="date" value={displayTask.dueDate || ""} onChange={(e) => handleEditInputChange("dueDate", e.target.value)} min={new Date().toISOString().split("T")[0]} className="w-full px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-200" />
+                                        ) : (
+                                            <p className="text-xs text-gray-700">{task.dueDate || "—"}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </AlertCard>
     );

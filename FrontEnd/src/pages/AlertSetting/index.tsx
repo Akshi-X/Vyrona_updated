@@ -1351,6 +1351,7 @@ export default function AlertSetting() {
                                         ref={branchDropdownRef}
                                     >
                                         <button
+                                            id="onboarding-alert-branch-dropdown"
                                             type="button"
                                             onClick={() => {
                                                 setIsBranchDropdownOpen(
@@ -1385,10 +1386,11 @@ export default function AlertSetting() {
                                             </svg>
                                         </button>
                                         {isBranchDropdownOpen && (
-                                            <div className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                                            <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
                                                 {branchOptions.map((opt) => (
                                                     <button
                                                         key={opt}
+                                                        id={opt === "Bangalore" ? "onboarding-alert-branch-bangalore" : undefined}
                                                         type="button"
                                                         onClick={() => {
                                                             setBranchFilter(
@@ -1491,6 +1493,7 @@ export default function AlertSetting() {
                                             return (
                                                 <div
                                                     key={`${c.branch_id}-${c.tank_id}-${c.canisterId}`}
+                                                    id={`onboarding-alert-container-${c.canisterId}`}
                                                     onClick={
                                                         lockContainerSelection
                                                             ? undefined
