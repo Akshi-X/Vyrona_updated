@@ -47,8 +47,8 @@
             "message": "You've explored the core dashboard. Here's what you covered:",
             "covered": [
                 "Dashboard KPI summary cards",
-                "Live alerts panel",
-                "Active shipments tracker"
+                "Live Notification Panels",
+                "Site's Data Visibility"
             ]
         },
         "completion": {
