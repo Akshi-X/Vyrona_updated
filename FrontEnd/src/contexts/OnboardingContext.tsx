@@ -27,8 +27,6 @@ interface OnboardingContextValue {
     completeLevel: (levelId: string, score: number) => void;
     resetLevel: (levelId: string) => void;
     resetQuiz: (levelId: string) => void;
-    failQuiz: (levelId: string, score: number) => void;
-    syncUnlocks: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
@@ -36,6 +34,21 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(unde
 const STORAGE_KEY = "onboarding_state_v1";
 
 const nowIso = () => new Date().toISOString();
+
+// Returns the ISO UTC string for 00:00 IST (UTC+5:30) on the date that is
+// `daysFromNow` calendar days after today in IST.
+// e.g. called on 24 Apr, daysFromNow=2 → "2026-04-25T18:30:00.000Z" (= 26 Apr 00:00 IST)
+const istMidnightUtc = (daysFromNow: number): string => {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +05:30 in ms
+    // Current time shifted to IST so we can extract the IST calendar date
+    const nowInIST = new Date(Date.now() + IST_OFFSET_MS);
+    const y = nowInIST.getUTCFullYear();
+    const m = nowInIST.getUTCMonth();
+    const d = nowInIST.getUTCDate();
+    // Midnight IST on target day = that day's 00:00 IST expressed in UTC
+    const midnightIST = new Date(Date.UTC(y, m, d + daysFromNow, 0, 0, 0) - IST_OFFSET_MS);
+    return midnightIST.toISOString();
+};
 
 const createInitialProgress = (levels: OnboardingLevelConfig[]): Record<string, OnboardingLevelProgress> => {
     // level-0 = the welcome screen (no steps, no quiz)
@@ -57,7 +70,8 @@ const createInitialProgress = (levels: OnboardingLevelConfig[]): Record<string, 
         const quiz = onboardingQuizByLevel[level.id] ?? [];
         progress[level.id] = {
             id: level.id,
-            status: "available",
+            // All real levels start locked — unlocked on a schedule when welcome completes
+            status: "locked",
             currentScore: 0,
             highScore: 0,
             totalSteps: steps.length,
@@ -82,11 +96,24 @@ type Action =
     | { type: "SET_STEP_INDEX"; levelId: string; index: number }
     | { type: "SET_QUIZ_INDEX"; levelId: string; index: number }
     | { type: "ANSWER_QUIZ"; levelId: string; currentScore: number }
-    | { type: "COMPLETE_LEVEL"; levelId: string; score: number; unlockNextAt?: string }
+    | { type: "COMPLETE_LEVEL"; levelId: string; score: number }
     | { type: "RESET_LEVEL"; levelId: string }
     | { type: "RESET_QUIZ"; levelId: string }
-    | { type: "FAIL_QUIZ"; levelId: string; score: number; totalQuiz: number }
-    | { type: "SYNC_UNLOCKS"; now: string };
+    | { type: "FAIL_QUIZ"; levelId: string; score: number; totalQuiz: number };
+
+// Flip locked → available for any level whose unlock date has passed.
+// Mutates `levels` in-place (caller spreads first).
+const applyDateUnlocks = (
+    levels: Record<string, OnboardingLevelProgress>,
+    now: string,
+) => {
+    onboardingLevels.forEach((level) => {
+        const prog = levels[level.id];
+        if (!prog || prog.status !== "locked") return;
+        if (!prog.unlockedAt || prog.unlockedAt > now) return;
+        levels[level.id] = { ...prog, status: "available" };
+    });
+};
 
 const reducer = (state: OnboardingState, action: Action): OnboardingState => {
     switch (action.type) {
@@ -150,6 +177,9 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                     };
                 });
             }
+
+            // Unlock any level whose date has passed (date-only gate)
+            applyDateUnlocks(mergedLevels, nowIso());
 
             return {
                 ...state,
@@ -240,35 +270,41 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
         }
 
         // Mark a level as completed and update the high score.
-        // Also stamps unlockedAt on the next level in sequence so the
-        // SYNC_UNLOCKS timer can flip it to available after the delay expires.
+        // When level-0 (welcome) completes, stamps the full unlock schedule for all
+        // real levels: level[i].unlockedAt = now + i*2 days (idempotent — skips
+        // levels that already have a date).
+        // After marking complete, runs an inline sync so any level whose date has
+        // already passed is immediately flipped to available.
         case "COMPLETE_LEVEL": {
             const level = state.levels[action.levelId];
             if (!level) return state;
-
-            const nextLevelId = onboardingLevels.find((_item, index) => {
-                const currentIndex = onboardingLevels.findIndex((config) => config.id === action.levelId);
-                return index === currentIndex + 1;
-            })?.id;
 
             const updatedLevels: Record<string, OnboardingLevelProgress> = {
                 ...state.levels,
                 [action.levelId]: {
                     ...level,
                     status: "completed",
-                    // Keep the highest score ever — retrying can't lower it
                     highScore: Math.max(level.highScore, action.score),
                     completedAt: nowIso(),
                 },
             };
 
-            // Stamp the next level with its unlock time (may be immediate if delay = 0)
-            if (nextLevelId && updatedLevels[nextLevelId]) {
-                updatedLevels[nextLevelId] = {
-                    ...updatedLevels[nextLevelId],
-                    unlockedAt: action.unlockNextAt,
-                };
+            // Stamp the full unlock schedule when welcome completes.
+            // level[i] unlocks at 00:00 IST on (today + (i+1)*2 days).
+            // Stored as UTC: e.g. started 24 Apr → level-1 = 25 Apr 18:30 UTC (= 26 Apr 00:00 IST)
+            if (action.levelId === "level-0") {
+                onboardingLevels.forEach((lvl, index) => {
+                    if (updatedLevels[lvl.id] && !updatedLevels[lvl.id].unlockedAt) {
+                        updatedLevels[lvl.id] = {
+                            ...updatedLevels[lvl.id],
+                            unlockedAt: istMidnightUtc((index + 1) * 2),
+                        };
+                    }
+                });
             }
+
+            // Immediately flip any level whose unlock date has already passed
+            applyDateUnlocks(updatedLevels, nowIso());
 
             return {
                 ...state,
@@ -338,19 +374,6 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
             };
         }
 
-        // Run periodically (every 60 s) to flip any locked level whose unlockedAt
-        // timestamp has passed to available, respecting the unlockDelayHours config.
-        case "SYNC_UNLOCKS": {
-            const now = action.now;
-            const updatedLevels = { ...state.levels };
-            Object.values(updatedLevels).forEach((level) => {
-                if (level.status === "locked" && level.unlockedAt && level.unlockedAt <= now) {
-                    level.status = "available";
-                }
-            });
-            return { ...state, levels: updatedLevels, lastUpdatedAt: nowIso() };
-        }
-
         default:
             return state;
     }
@@ -415,13 +438,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
     }, [state, isAuthenticated]);
 
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            dispatch({ type: "SYNC_UNLOCKS", now: nowIso() });
-        }, 60_000);
-        return () => window.clearInterval(interval);
-    }, []);
-
     const value = useMemo<OnboardingContextValue>(() => ({
         state,
         levels: onboardingLevels,
@@ -450,21 +466,10 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
         completeLevel: (levelId, score) => {
             apiSyncNeededRef.current = true;
-            const levelIndex = onboardingLevels.findIndex((level) => level.id === levelId);
-            const nextLevel = onboardingLevels[levelIndex + 1];
-            const unlockAt = nextLevel
-                ? new Date(Date.now() + nextLevel.unlockDelayHours * 60 * 60 * 1000).toISOString()
-                : undefined;
-            dispatch({ type: "COMPLETE_LEVEL", levelId, score, unlockNextAt: unlockAt });
+            dispatch({ type: "COMPLETE_LEVEL", levelId, score });
         },
         resetLevel: (levelId) => dispatch({ type: "RESET_LEVEL", levelId }),
         resetQuiz: (levelId) => dispatch({ type: "RESET_QUIZ", levelId }),
-        failQuiz: (levelId, score) => {
-            apiSyncNeededRef.current = true;
-            const totalQuiz = (onboardingQuizByLevel[levelId] ?? []).length;
-            dispatch({ type: "FAIL_QUIZ", levelId, score, totalQuiz });
-        },
-        syncUnlocks: () => dispatch({ type: "SYNC_UNLOCKS", now: nowIso() }),
     }), [state]);
 
     return (

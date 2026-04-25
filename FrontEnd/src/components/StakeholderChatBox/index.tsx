@@ -5,27 +5,19 @@ import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { usePatientChatWebSocket, useCanisterChatWebSocket } from '../../hooks/useChatWebSocket';
 
-// Utility function to format date in UTC consistently across all browsers
-const formatUTCTimestamp = (dateString: string): string => {
+const formatTimestamp = (dateString: string): string => {
   try {
     const date = new Date(dateString);
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return dateString; // Return original string if invalid
-    }
-    
-    // Format: YYYY-MM-DD HH:mm:ss UTC
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
-  } catch (error) {
-    return dateString; // Return original string on error
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateString;
   }
 };
 
@@ -146,7 +138,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         chatId: chatIdentifier || '',
         sender: isFromMe ? 'me' : 'them',
         text: msg.message_content,
-        at: formatUTCTimestamp(msg.created_at),
+        at: formatTimestamp(msg.created_at),
         senderName: msg.sender_name,
         senderId: msg.sender_id,
         senderRole: msg.sender_role || 'User',
