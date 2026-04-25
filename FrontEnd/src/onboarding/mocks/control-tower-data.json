@@ -1,468 +1,684 @@
 {
-    "activeRoutes": {
-        "routes": [
-            {
-                "id": 1,
-                "patient_id": "PT-092",
-                "origin": "Bangalore",
-                "destination": "Chennai",
-                "provider": "Atlas Care",
-                "status": "Safe",
-                "start_date": "2026-04-10T06:00:00.000Z",
-                "region": "South",
-                "source_region": "South",
-                "destination_region": "South"
-            },
-            {
-                "id": 2,
-                "patient_id": "PT-104",
-                "origin": "Delhi",
-                "destination": "Mumbai",
-                "provider": "Zenith",
-                "status": "Risk",
-                "start_date": "2026-04-10T05:30:00.000Z",
-                "region": "North",
-                "source_region": "North",
-                "destination_region": "West"
-            }
-        ]
-    },
-    "controlTowerMap": {
-        "routes": [
-            {
-                "shipment_id": 1,
-                "patient_id": "PT-092",
-                "source_location": "Bangalore",
-                "destination_location": "Chennai",
-                "source_latitude": 12.9716,
-                "source_longitude": 77.5946,
-                "destination_latitude": 13.0827,
-                "destination_longitude": 80.2707,
-                "route_status": "Safe"
-            },
-            {
-                "shipment_id": 2,
-                "patient_id": "PT-104",
-                "source_location": "Delhi",
-                "destination_location": "Mumbai",
-                "source_latitude": 28.6139,
-                "source_longitude": 77.209,
-                "destination_latitude": 19.076,
-                "destination_longitude": 72.8777,
-                "route_status": "Risk"
-            }
-        ]
-    },
-    "ivfControlTower": {
-        "hospitalName": "ARC Fertility Hospitals",
-        "hospital_type": "IVF",
-        "highest_branch_count_country": "India",
-        "states": {
-            "Tamil Nadu": [
-                {
-                    "branch_name": "Tambaram",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "ARC Fertility Hospitals, 13, Grand Southern Trunk Rd, West Tambaram, Irumbuliyur",
-                        "district": "Chennai",
-                        "pincode": "600045"
-                    },
-                    "geoLocation": {
-                        "latitude": 12.9193105,
-                        "longitude": 80.1088591
-                    }
-                },
-                {
-                    "branch_name": "Coimbatore",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Avinashi Rd, Lakshmi Mills Junction",
-                        "district": "Coimbatore",
-                        "pincode": "641037"
-                    },
-                    "geoLocation": {
-                        "latitude": 11.0127502,
-                        "longitude": 76.9858686
-                    }
-                },
-                {
-                    "branch_name": "Egmore",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "19, CASA Major Rd, Sulaiman Zackria Avenue, Egmore",
-                        "district": "Chennai",
-                        "pincode": "600008"
-                    },
-                    "geoLocation": {
-                        "latitude": 13.069505,
-                        "longitude": 80.255197
-                    }
-                },
-                {
-                    "branch_name": "Tirunelveli",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "S Bypass Rd, Melapalayam",
-                        "district": "Tirunelveli",
-                        "pincode": "627005"
-                    },
-                    "geoLocation": {
-                        "latitude": 8.7307,
-                        "longitude": 77.7183
-                    }
-                }
-            ],
-            "Uttar Pradesh": [
-                {
-                    "branch_name": "Lucknow",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Hazratganj, Lucknow",
-                        "district": "Lucknow",
-                        "pincode": "226001"
-                    },
-                    "geoLocation": {
-                        "latitude": 26.8467,
-                        "longitude": 80.9462
-                    }
-                },
-                {
-                    "branch_name": "Varanasi",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Lanka, Varanasi",
-                        "district": "Varanasi",
-                        "pincode": "221005"
-                    },
-                    "geoLocation": {
-                        "latitude": 25.3176,
-                        "longitude": 82.9739
-                    }
-                }
-            ],
-            "Rajasthan": [
-                {
-                    "branch_name": "Jaipur",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "MI Road, Jaipur",
-                        "district": "Jaipur",
-                        "pincode": "302001"
-                    },
-                    "geoLocation": {
-                        "latitude": 26.9124,
-                        "longitude": 75.7873
-                    }
-                }
-            ],
-            "Maharashtra": [
-                {
-                    "branch_name": "Mumbai",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Bandra Kurla Complex",
-                        "district": "Mumbai",
-                        "pincode": "400051"
-                    },
-                    "geoLocation": {
-                        "latitude": 19.0760,
-                        "longitude": 72.8777
-                    }
-                },
-                {
-                    "branch_name": "Pune",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "FC Road, Shivajinagar",
-                        "district": "Pune",
-                        "pincode": "411005"
-                    },
-                    "geoLocation": {
-                        "latitude": 18.5204,
-                        "longitude": 73.8567
-                    }
-                }
-            ],
-            "Chhattisgarh": [
-                {
-                    "branch_name": "Raipur",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Pandri, Raipur",
-                        "district": "Raipur",
-                        "pincode": "492001"
-                    },
-                    "geoLocation": {
-                        "latitude": 21.2514,
-                        "longitude": 81.6296
-                    }
-                }
-            ],
-            "Jammu & Kashmir": [
-                {
-                    "branch_name": "Srinagar",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Residency Rd, Lal Chowk",
-                        "district": "Srinagar",
-                        "pincode": "190001"
-                    },
-                    "geoLocation": {
-                        "latitude": 34.0837,
-                        "longitude": 74.7973
-                    }
-                }
-            ],
-            "Kerala": [
-                {
-                    "branch_name": "Kochin",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "KNS Towers, Mamangalam, Palarivattom",
-                        "district": "Kochi",
-                        "pincode": "682025"
-                    },
-                    "geoLocation": {
-                        "latitude": 10.0112263,
-                        "longitude": 76.3027264
-                    }
-                }
-            ],
-            "Delhi": [
-                {
-                    "branch_name": "Delhi",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Connaught Place, New Delhi",
-                        "district": "New Delhi",
-                        "pincode": "110001"
-                    },
-                    "geoLocation": {
-                        "latitude": 28.6139,
-                        "longitude": 77.2090
-                    }
-                }
-            ],
-            "West Bengal": [
-                {
-                    "branch_name": "Kolkata",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Eastern Metropolitan Bypass, Kasba",
-                        "district": "Kolkata",
-                        "pincode": "700039"
-                    },
-                    "geoLocation": {
-                        "latitude": 22.5186046,
-                        "longitude": 88.3993699
-                    }
-                }
-            ],
-            "Telangana": [
-                {
-                    "branch_name": "Hyderabad",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Old Mumbai Hwy, Gachibowli",
-                        "district": "Hyderabad",
-                        "pincode": "500032"
-                    },
-                    "geoLocation": {
-                        "latitude": 17.4394351,
-                        "longitude": 78.3620235
-                    }
-                }
-            ],
-            "Karnataka": [
-                {
-                    "branch_name": "Bangalore",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "80 Feet Rd, Koramangala",
-                        "district": "Bangalore",
-                        "pincode": "560034"
-                    },
-                    "geoLocation": {
-                        "latitude": 12.9898385,
-                        "longitude": 77.6087951
-                    }
-                }
-            ],
-            "Andhra Pradesh": [
-                {
-                    "branch_name": "Nellore",
-                    "branch_status": "safe",
-                    "country_name": "India",
-                    "address": {
-                        "area": "Grand Trunk Road, Dargamitta",
-                        "district": "Nellore",
-                        "pincode": "524003"
-                    },
-                    "geoLocation": {
-                        "latitude": 14.433914,
-                        "longitude": 79.968437
-                    }
-                }
-            ]
+  "activeRoutes": {
+    "routes": [
+      {
+        "id": 1,
+        "patient_id": "PT-092",
+        "origin": "Bangalore",
+        "destination": "Chennai",
+        "provider": "Atlas Care",
+        "status": "Safe",
+        "start_date": "2026-04-10T06:00:00.000Z",
+        "region": "South",
+        "source_region": "South",
+        "destination_region": "South"
+      },
+      {
+        "id": 2,
+        "patient_id": "PT-104",
+        "origin": "Delhi",
+        "destination": "Mumbai",
+        "provider": "Zenith",
+        "status": "Risk",
+        "start_date": "2026-04-10T05:30:00.000Z",
+        "region": "North",
+        "source_region": "North",
+        "destination_region": "West"
+      }
+    ]
+  },
+  "controlTowerMap": {
+    "routes": [
+      {
+        "shipment_id": 1,
+        "patient_id": "PT-092",
+        "source_location": "Bangalore",
+        "destination_location": "Chennai",
+        "source_latitude": 12.9716,
+        "source_longitude": 77.5946,
+        "destination_latitude": 13.0827,
+        "destination_longitude": 80.2707,
+        "route_status": "Safe"
+      },
+      {
+        "shipment_id": 2,
+        "patient_id": "PT-104",
+        "source_location": "Delhi",
+        "destination_location": "Mumbai",
+        "source_latitude": 28.6139,
+        "source_longitude": 77.209,
+        "destination_latitude": 19.076,
+        "destination_longitude": 72.8777,
+        "route_status": "Risk"
+      }
+    ]
+  },
+  "ivfControlTower": {
+    "hospitalName": "ARC Fertility Hospitals",
+    "hospital_type": "IVF",
+    "highest_branch_count_country": "India",
+    "states": {
+      "Tamil Nadu": [
+        {
+          "branch_name": "Tambaram",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "ARC Fertility Hospitals, 13, Grand Southern Trunk Rd, West Tambaram, Irumbuliyur",
+            "district": "Chennai",
+            "pincode": "600045"
+          },
+          "geoLocation": {
+            "latitude": 12.9193105,
+            "longitude": 80.1088591
+          }
+        },
+        {
+          "branch_name": "Coimbatore",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Avinashi Rd, Lakshmi Mills Junction",
+            "district": "Coimbatore",
+            "pincode": "641037"
+          },
+          "geoLocation": {
+            "latitude": 11.0127502,
+            "longitude": 76.9858686
+          }
+        },
+        {
+          "branch_name": "Egmore",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "19, CASA Major Rd, Sulaiman Zackria Avenue, Egmore",
+            "district": "Chennai",
+            "pincode": "600008"
+          },
+          "geoLocation": {
+            "latitude": 13.069505,
+            "longitude": 80.255197
+          }
+        },
+        {
+          "branch_name": "Tirunelveli",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "S Bypass Rd, Melapalayam",
+            "district": "Tirunelveli",
+            "pincode": "627005"
+          },
+          "geoLocation": {
+            "latitude": 8.7307,
+            "longitude": 77.7183
+          }
         }
-    },
-    "activeCanisters": {
-        "branches": [
-            {
-                "branch_id": 1,
-                "branch_name": "Tambaram",
-                "tanks": [
-                    { "tank_id": 11, "tank_code": "T-11", "updated_at": "2026-04-16T07:50:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 12, "tank_code": "T-12", "updated_at": "2026-04-16T07:40:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 2,
-                "branch_name": "Coimbatore",
-                "tanks": [
-                    { "tank_id": 21, "tank_code": "T-21", "updated_at": "2026-04-16T08:00:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 3,
-                "branch_name": "Egmore",
-                "tanks": [
-                    { "tank_id": 31,  "tank_code": "T-31",  "updated_at": "2026-04-16T06:30:00.000Z", "status": "Critical", "deviations": 3 },
-                    { "tank_id": 32,  "tank_code": "T-32",  "updated_at": "2026-04-16T07:10:00.000Z", "status": "Risk",     "deviations": 1 },
-                    { "tank_id": 33,  "tank_code": "T-33",  "updated_at": "2026-04-16T07:55:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 34,  "tank_code": "T-34",  "updated_at": "2026-04-16T07:00:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 35,  "tank_code": "T-35",  "updated_at": "2026-04-16T07:05:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 36,  "tank_code": "T-36",  "updated_at": "2026-04-16T07:15:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 37,  "tank_code": "T-37",  "updated_at": "2026-04-16T07:20:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 38,  "tank_code": "T-38",  "updated_at": "2026-04-16T07:25:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 39,  "tank_code": "T-39",  "updated_at": "2026-04-16T07:30:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 310, "tank_code": "T-310", "updated_at": "2026-04-16T07:35:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 311, "tank_code": "T-311", "updated_at": "2026-04-16T07:40:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 312, "tank_code": "T-312", "updated_at": "2026-04-16T07:45:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 313, "tank_code": "T-313", "updated_at": "2026-04-16T07:50:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 314, "tank_code": "T-314", "updated_at": "2026-04-16T07:52:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 315, "tank_code": "T-315", "updated_at": "2026-04-16T07:58:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 4,
-                "branch_name": "Tirunelveli",
-                "tanks": [
-                    { "tank_id": 41, "tank_code": "T-41", "updated_at": "2026-04-16T08:05:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 5,
-                "branch_name": "Lucknow",
-                "tanks": [
-                    { "tank_id": 51, "tank_code": "T-51", "updated_at": "2026-04-16T07:20:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 52, "tank_code": "T-52", "updated_at": "2026-04-16T08:00:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 6,
-                "branch_name": "Mumbai",
-                "tanks": [
-                    { "tank_id": 61, "tank_code": "T-61", "updated_at": "2026-04-16T07:45:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 7,
-                "branch_name": "Varanasi",
-                "tanks": [
-                    { "tank_id": 71, "tank_code": "T-71", "updated_at": "2026-04-16T07:30:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 8,
-                "branch_name": "Jaipur",
-                "tanks": [
-                    { "tank_id": 81, "tank_code": "T-81", "updated_at": "2026-04-16T06:50:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 82, "tank_code": "T-82", "updated_at": "2026-04-16T07:55:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 9,
-                "branch_name": "Raipur",
-                "tanks": [
-                    { "tank_id": 91, "tank_code": "T-91", "updated_at": "2026-04-16T08:10:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 10,
-                "branch_name": "Pune",
-                "tanks": [
-                    { "tank_id": 101, "tank_code": "T-101", "updated_at": "2026-04-16T07:15:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 11,
-                "branch_name": "Srinagar",
-                "tanks": [
-                    { "tank_id": 111, "tank_code": "T-111", "updated_at": "2026-04-16T08:00:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 12,
-                "branch_name": "Kochin",
-                "tanks": [
-                    { "tank_id": 121, "tank_code": "T-121", "updated_at": "2026-04-16T07:40:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 13,
-                "branch_name": "Delhi",
-                "tanks": [
-                    { "tank_id": 131, "tank_code": "T-131", "updated_at": "2026-04-16T06:45:00.000Z", "status": "Safe",     "deviations": 0 },
-                    { "tank_id": 132, "tank_code": "T-132", "updated_at": "2026-04-16T07:50:00.000Z", "status": "Safe",     "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 14,
-                "branch_name": "Kolkata",
-                "tanks": [
-                    { "tank_id": 141, "tank_code": "T-141", "updated_at": "2026-04-16T07:35:00.000Z", "status": "Critical", "deviations": 2 }
-                ]
-            },
-            {
-                "branch_id": 15,
-                "branch_name": "Hyderabad",
-                "tanks": [
-                    { "tank_id": 151, "tank_code": "T-151", "updated_at": "2026-04-16T08:05:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 16,
-                "branch_name": "Bangalore",
-                "tanks": [
-                    { "tank_id": 161, "tank_code": "T-161", "updated_at": "2026-04-16T07:00:00.000Z", "status": "Safe",   "deviations": 0 },
-                    { "tank_id": 162, "tank_code": "T-162", "updated_at": "2026-04-16T07:50:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            },
-            {
-                "branch_id": 17,
-                "branch_name": "Nellore",
-                "tanks": [
-                    { "tank_id": 171, "tank_code": "T-171", "updated_at": "2026-04-16T08:00:00.000Z", "status": "Safe",   "deviations": 0 }
-                ]
-            }
-        ],
-        "total": 26
+      ],
+      "Uttar Pradesh": [
+        {
+          "branch_name": "Lucknow",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Hazratganj, Lucknow",
+            "district": "Lucknow",
+            "pincode": "226001"
+          },
+          "geoLocation": {
+            "latitude": 26.8467,
+            "longitude": 80.9462
+          }
+        },
+        {
+          "branch_name": "Varanasi",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Lanka, Varanasi",
+            "district": "Varanasi",
+            "pincode": "221005"
+          },
+          "geoLocation": {
+            "latitude": 25.3176,
+            "longitude": 82.9739
+          }
+        }
+      ],
+      "Rajasthan": [
+        {
+          "branch_name": "Jaipur",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "MI Road, Jaipur",
+            "district": "Jaipur",
+            "pincode": "302001"
+          },
+          "geoLocation": {
+            "latitude": 26.9124,
+            "longitude": 75.7873
+          }
+        }
+      ],
+      "Maharashtra": [
+        {
+          "branch_name": "Mumbai",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Bandra Kurla Complex",
+            "district": "Mumbai",
+            "pincode": "400051"
+          },
+          "geoLocation": {
+            "latitude": 19.076,
+            "longitude": 72.8777
+          }
+        },
+        {
+          "branch_name": "Pune",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "FC Road, Shivajinagar",
+            "district": "Pune",
+            "pincode": "411005"
+          },
+          "geoLocation": {
+            "latitude": 18.5204,
+            "longitude": 73.8567
+          }
+        }
+      ],
+      "Chhattisgarh": [
+        {
+          "branch_name": "Raipur",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Pandri, Raipur",
+            "district": "Raipur",
+            "pincode": "492001"
+          },
+          "geoLocation": {
+            "latitude": 21.2514,
+            "longitude": 81.6296
+          }
+        }
+      ],
+      "Jammu & Kashmir": [
+        {
+          "branch_name": "Srinagar",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Residency Rd, Lal Chowk",
+            "district": "Srinagar",
+            "pincode": "190001"
+          },
+          "geoLocation": {
+            "latitude": 34.0837,
+            "longitude": 74.7973
+          }
+        }
+      ],
+      "Kerala": [
+        {
+          "branch_name": "Kochin",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "KNS Towers, Mamangalam, Palarivattom",
+            "district": "Kochi",
+            "pincode": "682025"
+          },
+          "geoLocation": {
+            "latitude": 10.0112263,
+            "longitude": 76.3027264
+          }
+        }
+      ],
+      "Delhi": [
+        {
+          "branch_name": "Delhi",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Connaught Place, New Delhi",
+            "district": "New Delhi",
+            "pincode": "110001"
+          },
+          "geoLocation": {
+            "latitude": 28.6139,
+            "longitude": 77.209
+          }
+        }
+      ],
+      "West Bengal": [
+        {
+          "branch_name": "Kolkata",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Eastern Metropolitan Bypass, Kasba",
+            "district": "Kolkata",
+            "pincode": "700039"
+          },
+          "geoLocation": {
+            "latitude": 22.5186046,
+            "longitude": 88.3993699
+          }
+        }
+      ],
+      "Telangana": [
+        {
+          "branch_name": "Hyderabad",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Old Mumbai Hwy, Gachibowli",
+            "district": "Hyderabad",
+            "pincode": "500032"
+          },
+          "geoLocation": {
+            "latitude": 17.4394351,
+            "longitude": 78.3620235
+          }
+        }
+      ],
+      "Karnataka": [
+        {
+          "branch_name": "Bangalore",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "80 Feet Rd, Koramangala",
+            "district": "Bangalore",
+            "pincode": "560034"
+          },
+          "geoLocation": {
+            "latitude": 12.9898385,
+            "longitude": 77.6087951
+          }
+        }
+      ],
+      "Andhra Pradesh": [
+        {
+          "branch_name": "Nellore",
+          "branch_status": "safe",
+          "country_name": "India",
+          "address": {
+            "area": "Grand Trunk Road, Dargamitta",
+            "district": "Nellore",
+            "pincode": "524003"
+          },
+          "geoLocation": {
+            "latitude": 14.433914,
+            "longitude": 79.968437
+          }
+        }
+      ]
     }
+  },
+  "activeCanisters": {
+    "branches": [
+      {
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "tanks": [
+          {
+            "tank_id": 11,
+            "tank_code": "T-11",
+            "updated_at": "2026-04-16T11:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 12,
+            "tank_code": "T-12",
+            "updated_at": "2026-04-10T10:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 2,
+        "branch_name": "Coimbatore",
+        "tanks": [
+          {
+            "tank_id": 21,
+            "tank_code": "T-21",
+            "updated_at": "2026-04-07T10:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "tanks": [
+          {
+            "tank_id": 31,
+            "tank_code": "T-31",
+            "updated_at": "2026-04-18T08:15:00.000Z",
+            "status": "Critical",
+            "deviations": 3
+          },
+          {
+            "tank_id": 32,
+            "tank_code": "T-32",
+            "updated_at": "2026-04-09T11:00:00.000Z",
+            "status": "Risk",
+            "deviations": 1
+          },
+          {
+            "tank_id": 33,
+            "tank_code": "T-33",
+            "updated_at": "2026-04-14T09:00:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 34,
+            "tank_code": "T-34",
+            "updated_at": "2026-04-16T09:00:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 35,
+            "tank_code": "T-35",
+            "updated_at": "2026-04-07T11:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 36,
+            "tank_code": "T-36",
+            "updated_at": "2026-04-09T13:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 37,
+            "tank_code": "T-37",
+            "updated_at": "2026-04-08T11:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 38,
+            "tank_code": "T-38",
+            "updated_at": "2026-04-07T10:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 39,
+            "tank_code": "T-39",
+            "updated_at": "2026-04-08T15:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 310,
+            "tank_code": "T-310",
+            "updated_at": "2026-04-10T12:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 311,
+            "tank_code": "T-311",
+            "updated_at": "2026-04-10T12:00:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 312,
+            "tank_code": "T-312",
+            "updated_at": "2026-04-15T16:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 313,
+            "tank_code": "T-313",
+            "updated_at": "2026-04-09T14:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 314,
+            "tank_code": "T-314",
+            "updated_at": "2026-04-13T17:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 315,
+            "tank_code": "T-315",
+            "updated_at": "2026-04-12T09:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 4,
+        "branch_name": "Tirunelveli",
+        "tanks": [
+          {
+            "tank_id": 41,
+            "tank_code": "T-41",
+            "updated_at": "2026-04-17T09:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "tanks": [
+          {
+            "tank_id": 51,
+            "tank_code": "T-51",
+            "updated_at": "2026-04-16T12:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 52,
+            "tank_code": "T-52",
+            "updated_at": "2026-04-16T16:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 6,
+        "branch_name": "Mumbai",
+        "tanks": [
+          {
+            "tank_id": 61,
+            "tank_code": "T-61",
+            "updated_at": "2026-04-14T09:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 7,
+        "branch_name": "Varanasi",
+        "tanks": [
+          {
+            "tank_id": 71,
+            "tank_code": "T-71",
+            "updated_at": "2026-04-12T10:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 8,
+        "branch_name": "Jaipur",
+        "tanks": [
+          {
+            "tank_id": 81,
+            "tank_code": "T-81",
+            "updated_at": "2026-04-17T12:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 82,
+            "tank_code": "T-82",
+            "updated_at": "2026-04-19T13:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 9,
+        "branch_name": "Raipur",
+        "tanks": [
+          {
+            "tank_id": 91,
+            "tank_code": "T-91",
+            "updated_at": "2026-04-14T07:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 10,
+        "branch_name": "Pune",
+        "tanks": [
+          {
+            "tank_id": 101,
+            "tank_code": "T-101",
+            "updated_at": "2026-04-07T07:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 11,
+        "branch_name": "Srinagar",
+        "tanks": [
+          {
+            "tank_id": 111,
+            "tank_code": "T-111",
+            "updated_at": "2026-04-18T14:45:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 12,
+        "branch_name": "Kochin",
+        "tanks": [
+          {
+            "tank_id": 121,
+            "tank_code": "T-121",
+            "updated_at": "2026-04-10T11:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 13,
+        "branch_name": "Delhi",
+        "tanks": [
+          {
+            "tank_id": 131,
+            "tank_code": "T-131",
+            "updated_at": "2026-04-09T13:30:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 132,
+            "tank_code": "T-132",
+            "updated_at": "2026-04-08T12:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 14,
+        "branch_name": "Kolkata",
+        "tanks": [
+          {
+            "tank_id": 141,
+            "tank_code": "T-141",
+            "updated_at": "2026-04-09T17:30:00.000Z",
+            "status": "Critical",
+            "deviations": 2
+          }
+        ]
+      },
+      {
+        "branch_id": 15,
+        "branch_name": "Hyderabad",
+        "tanks": [
+          {
+            "tank_id": 151,
+            "tank_code": "T-151",
+            "updated_at": "2026-04-12T17:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "tanks": [
+          {
+            "tank_id": 161,
+            "tank_code": "T-161",
+            "updated_at": "2026-04-09T16:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          },
+          {
+            "tank_id": 162,
+            "tank_code": "T-162",
+            "updated_at": "2026-04-09T14:15:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      },
+      {
+        "branch_id": 17,
+        "branch_name": "Nellore",
+        "tanks": [
+          {
+            "tank_id": 171,
+            "tank_code": "T-171",
+            "updated_at": "2026-04-07T16:00:00.000Z",
+            "status": "Safe",
+            "deviations": 0
+          }
+        ]
+      }
+    ],
+    "total": 26
+  }
 }

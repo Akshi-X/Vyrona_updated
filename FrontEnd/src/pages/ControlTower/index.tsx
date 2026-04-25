@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { shipmentService, type ActiveRouteItem } from '../../services/shipmentService';
 import ControlTowerMap from '../../components/ControlTowerMap';
@@ -39,14 +39,15 @@ const ControlTower = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isOnboarding = location.pathname.startsWith("/onboarding");
+  const [searchParams, setSearchParams] = useSearchParams();
 
     const [selectedRegion, setSelectedRegion] = useState<string>("All");
     const [selectedStatusInbound, setSelectedStatusInbound] =
-        useState<string>("All");
+        useState<string>(searchParams.get("status") || "All");
     const [selectedStatusOutbound, setSelectedStatusOutbound] =
         useState<string>("All");
     const [selectedCarrier, setSelectedCarrier] = useState<string>("All");
-    const [selectedBranch, setSelectedBranch] = useState<string>("All");
+    const [selectedBranch, setSelectedBranch] = useState<string>(searchParams.get("branch_id") || "All");
     const [isBranchFilterFromMap, setIsBranchFilterFromMap] =
         useState<boolean>(false);
     const [direction, setDirection] = useState<"inbound" | "outbound">(
@@ -54,6 +55,14 @@ const ControlTower = () => {
     );
     const [department, setDepartment] = useState<string | null>(null);
     const [_userInitials, setUserInitials] = useState<string>("");
+
+    // Sync branch + status filters to URL query params
+    useEffect(() => {
+        const params: Record<string, string> = {};
+        if (selectedBranch !== "All") params.branch_id = selectedBranch;
+        if (selectedStatusInbound !== "All") params.status = selectedStatusInbound;
+        setSearchParams(params, { replace: true });
+    }, [selectedBranch, selectedStatusInbound, setSearchParams]);
 
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
@@ -454,20 +463,26 @@ const ControlTower = () => {
         return ["All", ...Array.from(set).sort()];
     }, [routes]);
 
-    // Build branch options from canisters data (for inbound)
+    // Build branch options from canisters data (for inbound) — value = branchId, label = branchName
     const branchOptions = useMemo(() => {
-        const set = new Set<string>();
+        const map = new Map<string, string>(); // branchId -> branchName
         canisters.forEach((c) => {
-            if (
-                c?.branchName &&
-                c.branchName.trim() &&
-                c.branchName !== "N/A"
-            ) {
-                set.add(c.branchName.trim());
+            if (c?.branchId && c.branchId !== "N/A" && c?.branchName && c.branchName !== "N/A") {
+                map.set(c.branchId, c.branchName.trim());
             }
         });
-        return ["All", ...Array.from(set).sort()];
+        const sorted = Array.from(map.entries())
+            .sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([id, name]) => ({ label: name, value: id }));
+        return ["All" as const, ...sorted];
     }, [canisters]);
+
+    // Resolve branch name from selected branch ID — map always filters/zooms by name
+    const selectedBranchName = useMemo(() => {
+        if (selectedBranch === "All") return "All";
+        const opt = branchOptions.find((o) => typeof o !== "string" && o.value === selectedBranch);
+        return typeof opt === "object" ? opt.label : selectedBranch;
+    }, [selectedBranch, branchOptions]);
 
     const activeFilterCount = useMemo(() => {
         let count = 0;
@@ -503,7 +518,7 @@ const ControlTower = () => {
         let result = canisters || [];
 
         if (selectedBranch && selectedBranch !== "All") {
-            result = result.filter((c) => c.branchName === selectedBranch);
+            result = result.filter((c) => c.branchId === selectedBranch);
         }
 
         if (selectedStatusInbound && selectedStatusInbound !== "All") {
@@ -1038,7 +1053,7 @@ const ControlTower = () => {
                                             ? selectedStatusInbound
                                             : selectedStatusOutbound,
                                     selectedCarrier,
-                                    selectedBranch,
+                                    selectedBranch: selectedBranchName,
                                 }}
                                 direction={direction}
                                 zoomToLocation={zoomToLocation}
@@ -1051,7 +1066,8 @@ const ControlTower = () => {
                                     setZoomToBranchName(null);
                                 }}
                                 onBranchSelect={(branchName) => {
-                                    setSelectedBranch(branchName);
+                                    const match = canisters.find((c) => c.branchName === branchName);
+                                    setSelectedBranch(match?.branchId ?? branchName);
                                     setIsBranchFilterFromMap(true);
                                     setZoomToBranchName(branchName);
                                 }}

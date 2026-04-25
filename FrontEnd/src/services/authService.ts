@@ -54,6 +54,7 @@ export interface AuthResponse {
   branch_id?: number | null;
   hospital_name?: string | null;
   department?: string | null;
+  onboarding_completed?: boolean;
 }
 
 export interface OTPData {

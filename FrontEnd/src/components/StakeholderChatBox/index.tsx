@@ -5,27 +5,19 @@ import renderMessageWithMentions from './utils/renderMessageWithMentions';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { usePatientChatWebSocket, useCanisterChatWebSocket } from '../../hooks/useChatWebSocket';
 
-// Utility function to format date in UTC consistently across all browsers
-const formatUTCTimestamp = (dateString: string): string => {
+const formatTimestamp = (dateString: string): string => {
   try {
     const date = new Date(dateString);
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return dateString; // Return original string if invalid
-    }
-    
-    // Format: YYYY-MM-DD HH:mm:ss UTC
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
-  } catch (error) {
-    return dateString; // Return original string on error
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateString;
   }
 };
 
@@ -146,7 +138,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
         chatId: chatIdentifier || '',
         sender: isFromMe ? 'me' : 'them',
         text: msg.message_content,
-        at: formatUTCTimestamp(msg.created_at),
+        at: formatTimestamp(msg.created_at),
         senderName: msg.sender_name,
         senderId: msg.sender_id,
         senderRole: msg.sender_role || 'User',
@@ -167,6 +159,17 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
     
    
   }, [wsMessages, currentUserId, chatIdentifier, isOpen]);
+
+  // Onboarding: listen for a custom event to pre-fill the draft input.
+  // This avoids the React 18 synthetic-event unreliability of the native setter trick.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      if (typeof text === "string") setDraftMessage(text);
+    };
+    document.addEventListener("onboarding:set-chat-input", handler);
+    return () => document.removeEventListener("onboarding:set-chat-input", handler);
+  }, []);
 
   // Note: Mark as read functionality:
   // 1. When user closes chat dialog (handleClose function)
@@ -660,7 +663,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-sm" onClick={handleClose}>
-      <div className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div id="onboarding-stakeholder-chatbox" className="w-[65vw] max-w-[700px] h-[70vh] bg-white rounded-lg border border-[#E7E1E1] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b">
           <div className="flex items-center justify-between">
@@ -675,7 +678,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                 <p className="text-[11px] text-gray-500">Receive message from stakeholders and team members</p>
               </div>
             </div>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={handleClose}>
+            <button id="onboarding-chat-close-btn" className="p-2 rounded-full hover:bg-gray-100" onClick={handleClose}>
               <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -755,6 +758,7 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
             <div className="flex items-end gap-3">
               <div className="flex-1 relative">
                 <input
+                  id="onboarding-chat-input"
                   ref={inputRef}
                   type="text"
                   placeholder={chatIdentifier ? 'Type a message… (use @ to mention)' : 'Type a message…'}
@@ -800,9 +804,10 @@ const StakeholderChatBox: React.FC<StakeholderChatBoxProps> = ({
                   </div>
                 )}
               </div>
-              <button 
-                disabled={!chatIdentifier || !draftMessage.trim()} 
-                onClick={handleSendDraft} 
+              <button
+                id="onboarding-chat-send-btn"
+                disabled={!chatIdentifier || !draftMessage.trim()}
+                onClick={handleSendDraft}
                 className={`min-w-[44px] h-[44px] rounded-lg flex items-center justify-center transition-all duration-200 shadow-sm ${
                   (!chatIdentifier || !draftMessage.trim()) 
                     ? 'bg-gray-300 cursor-not-allowed' 

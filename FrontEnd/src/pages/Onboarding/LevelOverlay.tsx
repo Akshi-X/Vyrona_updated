@@ -1,17 +1,19 @@
-import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTour } from "@reactour/tour";
+import confetti from "canvas-confetti";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
 interface LevelOverlayProps {
     levelId: string;
     onComplete?: () => void;
+    onHeaderTitle?: (title: string) => void;
 }
 
-export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps) {
+const OPTION_LABELS = ["A", "B", "C", "D", "E"];
+
+export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: LevelOverlayProps) {
     const {
         levels,
-        state,
         getSteps,
         getQuiz,
         getLevelProgress,
@@ -19,7 +21,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         setQuizIndex,
         completeLevel,
         resetLevel,
-        logEvent,
+        resetQuiz,
     } = useOnboarding();
 
     const { setIsOpen: setTourOpen } = useTour();
@@ -27,61 +29,98 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     const quiz = getQuiz(levelId);
     const progress = getLevelProgress(levelId);
     const quizIndex = progress?.lastQuizIndex ?? 0;
+    const isCompleted = progress?.status === "completed";
+
     const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(null);
     const [lastScore, setLastScore] = useState<number>(0);
 
-    const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
-    const isCompleted = progress?.status === "completed";
+    // Fire confetti when score meets or exceeds threshold
+    useEffect(() => {
+        if (quizResult !== "pass" && !isCompleted) return;
+        const end = Date.now() + 2200;
+        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4"];
+        const frame = () => {
+            confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 }, colors });
+            confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        };
+        frame();
+    }, [quizResult, isCompleted]);
 
-    const answerMap = useMemo(() => {
-        return state.quizAnswers[levelId] || {};
-    }, [state.quizAnswers, levelId]);
+    // Reveal state — set when user clicks an answer, cleared when advancing
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [isRevealed, setIsRevealed] = useState(false);
+
+    const tourComplete = steps.length > 0 && (progress?.lastStepIndex ?? 0) >= steps.length;
+
+    const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
     const levelConfig = levels.find((level) => level.id === levelId);
-
     const currentQuestion = quiz[quizIndex];
 
-    const handleAnswer = (choiceIndex: number) => {
-        if (!currentQuestion) return;
-        answerQuiz(levelId, currentQuestion.id, choiceIndex);
-        logEvent({ type: "quiz_answer", levelId, payload: { questionId: currentQuestion.id, choiceIndex } });
-
-        if (quizIndex + 1 < quiz.length) {
-            setQuizIndex(levelId, quizIndex + 1);
-            return;
-        }
-
-        const score = quiz.reduce((sum, question) => {
-            const resolved = question.id === currentQuestion.id
-                ? choiceIndex
-                : answerMap?.[question.id];
-            return resolved === question.correctIndex ? sum + question.points : sum;
-        }, 0);
-
-        setLastScore(score);
-        if (score >= (levelConfig?.pointsRequired ?? 0)) {
-            completeLevel(levelId, score);
-            logEvent({ type: "quiz_pass", levelId, payload: { score } });
-            setQuizResult("pass");
-            onComplete?.();
+    // Notify parent of the current section so the overlay header can update
+    useEffect(() => {
+        if (!onHeaderTitle) return;
+        if (isCompleted) {
+            onHeaderTitle(levelConfig?.completion?.headerTitle ?? "Quiz Scorecard");
+        } else if (quizResult === "fail") {
+            onHeaderTitle(levelConfig?.quiz?.headerTitle ?? "Quiz");
+        } else if (showInterlude) {
+            onHeaderTitle(levelConfig?.interlude?.headerTitle ?? "Tour");
         } else {
-            logEvent({ type: "quiz_fail", levelId, payload: { score } });
-            setQuizResult("fail");
+            onHeaderTitle(levelConfig?.quiz?.headerTitle ?? "Quiz");
         }
+    }, [isCompleted, quizResult, showInterlude, onHeaderTitle, levelConfig]);
+
+    const handleAnswer = (choiceIndex: number) => {
+        if (!currentQuestion || isRevealed) return;
+
+        setSelectedIndex(choiceIndex);
+        setIsRevealed(true);
+
+        const isCorrect = choiceIndex === currentQuestion.correctIndex;
+        const newScore = (progress?.currentScore ?? 0) + (isCorrect ? currentQuestion.points : 0);
+
+        // Delay advancing so the user sees the green/red feedback
+        setTimeout(() => {
+            setSelectedIndex(null);
+            setIsRevealed(false);
+
+            answerQuiz(levelId, currentQuestion.id, choiceIndex);
+
+            if (quizIndex + 1 < quiz.length) {
+                setQuizIndex(levelId, quizIndex + 1);
+                return;
+            }
+
+            setLastScore(newScore);
+            // Always complete the level — score is tracked for highScore but never blocks progress
+            completeLevel(levelId, newScore);
+            if (newScore >= (levelConfig?.pointsRequired ?? 0)) {
+                setQuizResult("pass");
+            } else {
+                setQuizResult("fail");
+            }
+        }, 900);
     };
 
     const handleRetry = () => {
         resetLevel(levelId);
-        logEvent({ type: "tour_retry", levelId });
         setQuizResult(null);
+        setSelectedIndex(null);
+        setIsRevealed(false);
+        setShowInterlude(true);
     };
 
     const handleRetryQuiz = () => {
-        setQuizIndex(levelId, 0);
-        logEvent({ type: "quiz_retry", levelId });
+        resetQuiz(levelId);
         setQuizResult(null);
+        setSelectedIndex(null);
+        setIsRevealed(false);
+        setShowInterlude(true);
     };
 
+    // ── Fail screen ─────────────────────────────────────────────────────────
     if (quizResult === "fail") {
         const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
         const needed = levelConfig?.pointsRequired ?? 0;
@@ -90,8 +129,9 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         return (
             <div className="space-y-4">
                 <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Almost there</h3>
-                    <p className="text-sm text-slate-500">Retry the tour to earn more points.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#6b1176]">{levelConfig?.title ?? "Level"}</p>
+                    <h3 className="text-lg font-semibold text-slate-900">Quiz Score Card</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">Retry the tour to earn more points.</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
@@ -117,7 +157,7 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <button
                         type="button"
                         onClick={handleRetry}
@@ -132,11 +172,19 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     >
                         Retry quiz
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => onComplete?.()}
+                        className="inline-flex rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    >
+                        Continue →
+                    </button>
                 </div>
             </div>
         );
     }
 
+    // ── Tour still in progress ───────────────────────────────────────────────
     if (!tourComplete) {
         return (
             <div className="space-y-3">
@@ -153,19 +201,66 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
-    if (isCompleted || quizResult === "pass") {
-        const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
-        const finalScore = progress?.score ?? 0;
-        const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
-
+    // ── Interlude (between tour and quiz) ────────────────────────────────────
+    if (showInterlude && !isCompleted && quizResult === null) {
+        const interlude = levelConfig?.interlude;
         return (
-            <div className="space-y-4">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Level complete</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-900">{levelConfig?.title}</h3>
+            <div className="space-y-6">
+                <div className="space-y-1">
+                    <h3 className="text-xl font-semibold text-slate-900">
+                        {interlude?.title ?? "Tour complete!"}
+                    </h3>
+                    {interlude?.message && (
+                        <p className="text-sm text-slate-500">{interlude.message}</p>
+                    )}
                 </div>
 
-                {/* Score card */}
+                {interlude?.covered && interlude.covered.length > 0 && (
+                    <ul className="space-y-2">
+                        {interlude.covered.map((item) => (
+                            <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white font-bold">✓</span>
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() => setShowInterlude(false)}
+                    className="inline-flex rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                    Start Quiz →
+                </button>
+            </div>
+        );
+    }
+
+    // ── Completion screen ────────────────────────────────────────────────────
+    if (isCompleted || quizResult === "pass") {
+        const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
+        const finalScore = progress?.highScore ?? 0;
+        const pct = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+        const completion = levelConfig?.completion;
+
+        return (
+            <div className="space-y-5">
+                <div className="flex items-start gap-4">
+                    {completion?.badge && (
+                        <span className="text-5xl leading-none">{completion.badge}</span>
+                    )}
+                    <div className="space-y-1 min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Level complete</p>
+                        <h3 className="text-xl font-semibold text-slate-900">
+                            {completion?.title ?? levelConfig?.title}
+                        </h3>
+                        {completion?.message && (
+                            <p className="text-sm text-slate-600 leading-relaxed">{completion.message}</p>
+                        )}
+                    </div>
+                </div>
+
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
                     <div className="flex items-end justify-between">
                         <div>
@@ -189,12 +284,13 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
                     </div>
                 </div>
 
-                <Link
-                    to="/onboarding/status"
+                <button
+                    type="button"
+                    onClick={() => onComplete?.()}
                     className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                 >
-                    View status →
-                </Link>
+                    Continue →
+                </button>
             </div>
         );
     }
@@ -208,30 +304,101 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         );
     }
 
+    // ── Quiz question ────────────────────────────────────────────────────────
+    const maxScore = quiz.reduce((sum, q) => sum + q.points, 0);
+    const currentScore = progress?.currentScore ?? 0;
+    const scorePct = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
+
     return (
-        <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">Quick Quiz</h3>
-            <p className="text-sm text-slate-600">{currentQuestion.prompt}</p>
-            <div className="grid gap-3">
-                {currentQuestion.choices.map((choice, index) => (
-                    <button
-                        key={choice}
-                        type="button"
-                        onClick={() => handleAnswer(index)}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-800 shadow-sm hover:border-slate-300"
-                    >
-                        {choice}
-                    </button>
-                ))}
+        <div className="space-y-5">
+
+            {/* Header: question counter + live score */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                    {quiz.map((_, i) => (
+                        <span
+                            key={i}
+                            className={`block rounded-full transition-all duration-300 ${
+                                i < quizIndex
+                                    ? "h-2 w-2 bg-slate-900"
+                                    : i === quizIndex
+                                      ? "h-2 w-5 bg-slate-900"
+                                      : "h-2 w-2 bg-slate-200"
+                            }`}
+                        />
+                    ))}
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.2em]">
+                    {quizIndex + 1} / {quiz.length}
+                </span>
             </div>
-            <p className="text-xs text-slate-500">Question {quizIndex + 1} of {quiz.length}</p>
-            <button
-                type="button"
-                onClick={handleRetry}
-                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-900"
-            >
-                Retry tour
-            </button>
+
+            {/* Points badge + question */}
+            <div className="space-y-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+                    ⚡ {currentQuestion.points} pts
+                </span>
+                <p className="text-[15px] font-semibold text-slate-900 leading-snug">
+                    {currentQuestion.prompt}
+                </p>
+            </div>
+
+            {/* Answer options */}
+            <div className="grid gap-2.5">
+                {currentQuestion.choices.map((choice, index) => {
+                    const isCorrect = index === currentQuestion.correctIndex;
+                    const isSelected = index === selectedIndex;
+
+                    let style = "border-slate-200 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 cursor-pointer";
+                    let labelStyle = "bg-slate-100 text-slate-500";
+                    let icon: string | null = null;
+
+                    if (isRevealed) {
+                        if (isCorrect) {
+                            style = "border-emerald-400 bg-emerald-50 text-emerald-900 cursor-default";
+                            labelStyle = "bg-emerald-400 text-white";
+                            icon = "✓";
+                        } else if (isSelected) {
+                            style = "border-red-400 bg-red-50 text-red-900 cursor-default";
+                            labelStyle = "bg-red-400 text-white";
+                            icon = "✕";
+                        } else {
+                            style = "border-slate-100 bg-slate-50 text-slate-400 cursor-default opacity-50";
+                            labelStyle = "bg-slate-200 text-slate-400";
+                        }
+                    }
+
+                    return (
+                        <button
+                            key={choice}
+                            type="button"
+                            disabled={isRevealed}
+                            onClick={() => handleAnswer(index)}
+                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-sm transition-all duration-200 ${style}`}
+                        >
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-200 ${labelStyle}`}>
+                                {isRevealed && icon ? icon : OPTION_LABELS[index]}
+                            </span>
+                            <span className="flex-1 leading-snug">{choice}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Live score bar */}
+            <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                    <span>Score so far</span>
+                    <span className="font-semibold text-slate-600">{currentScore} / {maxScore} pts</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                        className="h-full rounded-full bg-slate-900 transition-all duration-500"
+                        style={{ width: `${scorePct}%` }}
+                    />
+                </div>
+            </div>
+
         </div>
     );
 }

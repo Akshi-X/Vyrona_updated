@@ -53,6 +53,9 @@ class User(Base):
     session_timeout = sqlalchemy.Column(sqlalchemy.Integer, default=30)  # Minutes (custom per user)
     last_login = sqlalchemy.Column(sqlalchemy.DateTime, nullable=True)  # Last successful login
     
+    # Onboarding
+    onboarding_completed = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=True)  # True = has seen/skipped onboarding; default True for all existing users
+
     # Invite token (used when an admin invites a user via email link)
     invite_token = sqlalchemy.Column(sqlalchemy.String, nullable=True, unique=True, index=True)
     invite_token_expires_at = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True), nullable=True)

@@ -9,6 +9,7 @@ export default function OnboardingLayout() {
     const { levels, state } = useOnboarding();
     const location = useLocation();
     const completedCount = levels.filter((level) => state.levels[level.id]?.status === "completed").length;
+    const overallScore = levels.reduce((sum, l) => sum + (state.levels[l.id]?.highScore ?? 0), 0);
 
     useEffect(() => {
         enableOnboardingMocks();
@@ -24,14 +25,18 @@ export default function OnboardingLayout() {
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Onboarding Quest</p>
                     <h1 className="text-2xl font-semibold">Immersive Journey</h1>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
-                    <span className="rounded-full bg-white/70 px-3 py-1 shadow-sm">
-                        {completedCount}/{levels.length} levels complete
-                    </span>
+                <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-1.5 rounded-full bg-white/70 border border-slate-200/60 px-3 py-1.5 shadow-sm">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Score</span>
+                        <span className="text-sm font-bold text-slate-900">{overallScore} pts</span>
+                    </div>
+                    <div className="rounded-full bg-white/70 border border-slate-200/60 px-3 py-1.5 shadow-sm text-[11px] font-semibold text-slate-500">
+                        {completedCount}/{levels.length} levels
+                    </div>
                     {location.pathname !== "/onboarding/status" && (
                         <Link
                             to="/onboarding/status"
-                            className="rounded-full border border-slate-200 bg-white/70 px-3 py-1 shadow-sm hover:border-slate-300"
+                            className="rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-500 shadow-sm hover:border-slate-300 hover:bg-white"
                         >
                             Status
                         </Link>

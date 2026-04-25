@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import PageLayout from "../../components/PageLayout";
 import ContainersIcon from "../../assets/DashBoardIcons/Containers.svg";
 import { useAuth } from "../../contexts/AuthContext";
@@ -48,6 +49,7 @@ const formatDaysAgo = (dateStr: string): string => {
 
 const RefillLog = () => {
     const { isAuthenticated, userRole } = useAuth();
+    const isOnboarding = useOnboardingMode();
     const [selectedBranch] = useState<string>("All");
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
@@ -606,7 +608,7 @@ const RefillLog = () => {
                 <div className="grid grid-cols-1 min-[1436px]:grid-cols-2 min-[1436px]:h-[400px] gap-6">
 
                     {/* Left: Active Tank Status */}
-                    <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
+                    <div id="onboarding-refill-tank-status" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Active Tank Status</h2>
                         </div>
@@ -709,17 +711,19 @@ const RefillLog = () => {
                     </div>
 
                     {/* Right: Reservoir Logs */}
-                    <div className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
+                    <div id="onboarding-refill-reservoir-logs" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
                         <div className="px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
                         <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG + reservoir dropdown */}
                             <div className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
-                                {/* Coming Soon overlay */}
-                                <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
-                                    <span className="px-3 py-1 text-xs font-semibold text-[#6b1176] bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
-                                </div>
+                                {/* Coming Soon overlay — hidden during onboarding */}
+                                {!isOnboarding && (
+                                    <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
+                                        <span className="px-3 py-1 text-xs font-semibold text-[#6b1176] bg-[#F7ECFF] border border-[#d8b4fe] rounded-full shadow-sm">Coming Soon</span>
+                                    </div>
+                                )}
                                 {(() => {
                                     const selected = reservoirs.find(r => r.reservoir_id === selectedReservoirId);
                                     const cur = selected?.current_weight ?? 0;
@@ -921,7 +925,7 @@ const RefillLog = () => {
                 </div>
 
                 {/* Recent Activity Log */}
-                <div className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col min-h-[500px]">
+                <div id="onboarding-refill-activity-log" className="flex-1 min-h-0 bg-white border border-[#E7E1E1] rounded-xl overflow-hidden flex flex-col min-h-[500px]">
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[#E7E1E1]">
                         <div className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6b1176]">

@@ -1,5 +1,6 @@
 import React from 'react';
 import AlertCard from '../AlertCard';
+import StakeholderChatsIcon from '../../assets/DashBoardIcons/Stakeholder_Chats.svg';
 
 interface StakeholderChat {
   id: string;
@@ -18,29 +19,43 @@ interface StakeholderChatsModalProps {
   id?: string;
 }
 
-// Utility function to format timestamp in UTC
-const formatUTCTimestamp = (timestamp: string): string => {
+const formatTimestamp = (timestamp: string): string => {
   try {
-    // Try to parse the timestamp string as a date
     const date = new Date(timestamp);
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      return timestamp; // Return original string if invalid
-    }
-    
-    // Format: YYYY-MM-DD HH:mm:ss UTC
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
+    if (isNaN(date.getTime())) return timestamp;
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
-    return timestamp; // Return original string on error
+    return timestamp;
   }
+};
+
+const getInitials = (name: string): string => {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+};
+
+const avatarColors = [
+  'bg-[#6b1176]',
+  'bg-[#0f766e]',
+  'bg-[#1d4ed8]',
+  'bg-[#b45309]',
+  'bg-[#be185d]',
+  'bg-[#4f46e5]',
+];
+
+const getAvatarColor = (name: string): string => {
+  const idx = name.charCodeAt(0) % avatarColors.length;
+  return avatarColors[idx];
 };
 
 const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
@@ -57,51 +72,51 @@ const StakeholderChatsModal: React.FC<StakeholderChatsModalProps> = ({
       id={id}
       title="Stakeholder Chats"
       description="Communicate with stakeholders and track conversations"
+      containerClassName="w-full max-w-[750px]"
+      contentHeightClassName="md:h-[520px]"
       icon={
-        <svg className="w-[18px] h-[18px] text-[#6b1176]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
+        <img src={StakeholderChatsIcon} alt="Stakeholder Chats" className="w-[24px] h-[24px]" />
       }
       loading={loading}
       loadingText="Loading chats..."
       emptyText="No chats found"
       dataLength={chats.length}
     >
-      <div className="space-y-3">
-        <style>{`
-          .chat-msg-2line {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            word-break: break-word;
-          }
-        `}</style>
+      <div className="flex flex-col gap-2 p-4">
         {chats.map((chat) => (
-          <div 
-            key={chat.id} 
-            className="p-3 rounded-lg border bg-[#fdeeff] border-[#eeeeee] hover:bg-white/50 transition-colors"
+          <div
+            key={chat.id}
+            className={`rounded-xl border p-4 transition-colors ${
+              !chat.isRead
+                ? 'border-[#6b1176] bg-purple-50'
+                : 'border-gray-200 bg-white hover:border-purple-200'
+            }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold bg-[#6b1176]">
-                  {chat.sender.charAt(0)}
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${getAvatarColor(chat.sender)}`}>
+                  {getInitials(chat.sender)}
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-[#333333]">
-                    {chat.sender}
-                  </h4>
-                  <p className="text-xs text-[#333333] font-mono">{chat.patientId}</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-[#333]">{chat.sender}</span>
+                    {!chat.isRead && (
+                      <span className="w-2 h-2 rounded-full bg-[#6b1176] shrink-0" title="Unread" />
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500 font-mono">{chat.patientId}</span>
                 </div>
               </div>
-              <p className="text-sm text-[#333333] flex-1 text-left chat-msg-2line ml-4" title={chat.message}>
-                {chat.message}
-              </p>
-              <span className="text-xs text-[#333333] flex-shrink-0">
-                {formatUTCTimestamp(chat.timestamp)}
+              <span className="text-[11px] text-gray-400 shrink-0 whitespace-nowrap">
+                {formatTimestamp(chat.timestamp)}
               </span>
             </div>
+
+            {/* Message */}
+            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 pl-[42px]">
+              {chat.message}
+            </p>
           </div>
         ))}
       </div>
