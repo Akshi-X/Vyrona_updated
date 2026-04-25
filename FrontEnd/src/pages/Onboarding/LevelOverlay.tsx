@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTour } from "@reactour/tour";
+import confetti from "canvas-confetti";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 
 interface LevelOverlayProps {
     levelId: string;
     onComplete?: () => void;
+    onHeaderTitle?: (title: string) => void;
 }
 
 const OPTION_LABELS = ["A", "B", "C", "D", "E"];
 
-export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps) {
+export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: LevelOverlayProps) {
     const {
         levels,
         getSteps,
@@ -20,7 +22,6 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         completeLevel,
         resetLevel,
         resetQuiz,
-        failQuiz,
     } = useOnboarding();
 
     const { setIsOpen: setTourOpen } = useTour();
@@ -30,15 +31,21 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     const quizIndex = progress?.lastQuizIndex ?? 0;
     const isCompleted = progress?.status === "completed";
 
-    // quizIndex >= quiz.length (and not completed) means quiz was answered but failed
-    const persistedFail = quiz.length > 0 && quizIndex >= quiz.length && !isCompleted;
+    const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(null);
+    const [lastScore, setLastScore] = useState<number>(0);
 
-    const [quizResult, setQuizResult] = useState<"pass" | "fail" | null>(() =>
-        persistedFail ? "fail" : null
-    );
-    const [lastScore, setLastScore] = useState<number>(() =>
-        persistedFail ? (progress?.currentScore ?? 0) : 0
-    );
+    // Fire confetti when score meets or exceeds threshold
+    useEffect(() => {
+        if (quizResult !== "pass" && !isCompleted) return;
+        const end = Date.now() + 2200;
+        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4"];
+        const frame = () => {
+            confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 }, colors });
+            confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        };
+        frame();
+    }, [quizResult, isCompleted]);
 
     // Reveal state — set when user clicks an answer, cleared when advancing
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -49,7 +56,21 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
     const [showInterlude, setShowInterlude] = useState(() => quizIndex === 0 && !isCompleted);
 
     const levelConfig = levels.find((level) => level.id === levelId);
-    const currentQuestion = persistedFail ? undefined : quiz[quizIndex];
+    const currentQuestion = quiz[quizIndex];
+
+    // Notify parent of the current section so the overlay header can update
+    useEffect(() => {
+        if (!onHeaderTitle) return;
+        if (isCompleted) {
+            onHeaderTitle(levelConfig?.completion?.headerTitle ?? "Quiz Scorecard");
+        } else if (quizResult === "fail") {
+            onHeaderTitle(levelConfig?.quiz?.headerTitle ?? "Quiz");
+        } else if (showInterlude) {
+            onHeaderTitle(levelConfig?.interlude?.headerTitle ?? "Tour");
+        } else {
+            onHeaderTitle(levelConfig?.quiz?.headerTitle ?? "Quiz");
+        }
+    }, [isCompleted, quizResult, showInterlude, onHeaderTitle, levelConfig]);
 
     const handleAnswer = (choiceIndex: number) => {
         if (!currentQuestion || isRevealed) return;
@@ -73,11 +94,11 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
             }
 
             setLastScore(newScore);
+            // Always complete the level — score is tracked for highScore but never blocks progress
+            completeLevel(levelId, newScore);
             if (newScore >= (levelConfig?.pointsRequired ?? 0)) {
-                completeLevel(levelId, newScore);
                 setQuizResult("pass");
             } else {
-                failQuiz(levelId, newScore);
                 setQuizResult("fail");
             }
         }, 900);
@@ -108,8 +129,9 @@ export default function LevelOverlay({ levelId, onComplete }: LevelOverlayProps)
         return (
             <div className="space-y-4">
                 <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Almost there</h3>
-                    <p className="text-sm text-slate-500">Retry the tour to earn more points.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#6b1176]">{levelConfig?.title ?? "Level"}</p>
+                    <h3 className="text-lg font-semibold text-slate-900">Quiz Score Card</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">Retry the tour to earn more points.</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">

@@ -8,6 +8,7 @@ export type OnboardingReplica =
     | "users";
 
 export interface OnboardingLevelWelcome {
+    headerTitle?: string;
     title: string;
     subtitle: string;
     description: string;
@@ -15,15 +16,22 @@ export interface OnboardingLevelWelcome {
 }
 
 export interface OnboardingLevelCompletion {
+    headerTitle?: string;
     title: string;
     message: string;
     badge: string;
 }
 
 export interface OnboardingLevelInterlude {
+    headerTitle?: string;
     title: string;
     message: string;
     covered: string[];
+}
+
+export interface OnboardingLevelQuiz {
+    headerTitle?: string;
+    file: string;
 }
 
 export interface OnboardingLevelSection {
@@ -44,6 +52,7 @@ export interface OnboardingLevelConfig {
     welcome?: OnboardingLevelWelcome;
     interlude?: OnboardingLevelInterlude;
     completion?: OnboardingLevelCompletion;
+    quiz?: OnboardingLevelQuiz;
 }
 
 export interface OnboardingStep {

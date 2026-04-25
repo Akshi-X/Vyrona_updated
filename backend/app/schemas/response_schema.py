@@ -75,6 +75,7 @@ class UserProfileResponse(BaseModel):
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    onboarding_completed: bool = True
 
 
 class UserPermissionsResponse(BaseModel):

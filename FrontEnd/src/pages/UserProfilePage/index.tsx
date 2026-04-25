@@ -4,6 +4,7 @@ import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import Header from '../../components/Header';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
  
@@ -38,6 +39,7 @@ const UserProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const isOnboarding = useOnboardingMode();
   const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
  
@@ -390,7 +392,7 @@ const UserProfilePage: React.FC = () => {
   };
  
   const handleSubmitRequest = () => {
-    navigate('/support', {
+    navigate(isOnboarding ? '/onboarding/support' : '/support', {
       state: {
         readonly: false,
         hideAttach: false,
@@ -405,7 +407,7 @@ const UserProfilePage: React.FC = () => {
  
  
   const navigateToTicketPrefilled = (ticket: Ticket) => {
-    navigate('/support', {
+    navigate(isOnboarding ? '/onboarding/support' : '/support', {
       state: {
         readonly: true,
         hideAttach: true,
@@ -429,11 +431,15 @@ const UserProfilePage: React.FC = () => {
   };
  
   const handleBackNavigation = () => {
+    if (isOnboarding) {
+      navigate("/onboarding/dashboard");
+      return;
+    }
     // Check if we came from within the app (same origin)
     const referrer = document.referrer;
     const currentOrigin = window.location.origin;
     const cameFromApp = referrer && referrer.startsWith(currentOrigin);
-   
+
     if (cameFromApp && window.history.length > 1) {
       navigate(-1);
     } else {

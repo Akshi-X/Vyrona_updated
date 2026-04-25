@@ -830,10 +830,16 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                         const editableFields = getEditableFields(task);
                         const isCreatedByMe = isTaskCreatedByMe(task);
 
+                        const priorityAccent = task.priority === "High"
+                            ? "bg-red-50/40"
+                            : task.priority === "Medium"
+                            ? "bg-orange-50/40"
+                            : "bg-green-50/40";
+
                         return (
                             <div
                                 key={task.id}
-                                className={`border rounded-xl p-4 transition-colors ${isEditing ? "border-[#6b1176] bg-purple-50" : "border-gray-200 bg-white hover:border-purple-200"}`}
+                                className={`border rounded-xl p-4 shadow-sm transition-all ${isEditing ? "border-[#6b1176] bg-purple-50" : `border-gray-200 ${priorityAccent} hover:shadow-md`}`}
                             >
                                 {/* Card header */}
                                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -841,7 +847,7 @@ const MyTasksModal: React.FC<MyTasksModalProps> = ({
                                         <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
                                             {task.tankCode || (isIvfVariant ? task.canisterNumber || "N/A" : task.patientId)}
                                         </span>
-                                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.priority === "High" ? "bg-red-100 text-red-800" : task.priority === "Medium" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800"}`}>
+                                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${task.priority === "High" ? "bg-red-100 text-red-700 ring-1 ring-red-300" : task.priority === "Medium" ? "bg-orange-100 text-orange-700 ring-1 ring-orange-300" : "bg-green-100 text-green-700 ring-1 ring-green-300"}`}>
                                             {task.priority}
                                         </span>
                                         {isEditing && editableFields.has("status") ? (
