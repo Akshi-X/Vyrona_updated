@@ -39,6 +39,7 @@ from ...models.IVF.tank_model import Tank
 from ...models.user_model import User
 from ...schemas.IVF.critical_alert_schema import (
     AcknowledgeAlertResponse,
+    AcknowledgeAlertsResponse,
     CriticalAlertListResponse,
     CriticalAlertResponse,
     HospitalAlertsResponse,
@@ -607,12 +608,12 @@ class CriticalAlertService:
                         checked_kpi_configs.append(kpi_config.id)
                         continue
 
-            ## Check if last alert created/updated for this config is not acknowledged and occurred within last 1 hour,
+            ## Check if last alert created for this config is not acknowledged and occurred within last 1 hour,
             # if yes skip creating new alert to avoid alert spam.
             # Use occurred_at for cooldown ordering to avoid reminder/ack updates
             # unintentionally resetting the cooldown window.
             last_activity_col = func.coalesce(
-                CriticalAlert.occurred_at, CriticalAlert.created_at
+                CriticalAlert.created_at
             )
             # Build LIKE patterns anchored to tank_id to avoid false matches
             # (e.g. kpi_config_id=5 must not match :15, :25, :55, etc.)
@@ -648,7 +649,7 @@ class CriticalAlertService:
 
             # Ensure timezone-aware comparison using the most recent timestamp (updated_at or created_at)
             if last_alert:
-                last_alert_time = last_alert.occurred_at or last_alert.created_at
+                last_alert_time = last_alert.created_at
                 if last_alert_time:
                     last_alert_time = (
                         last_alert_time
@@ -1905,6 +1906,54 @@ class CriticalAlertService:
             status=AlertStatus.ACKNOWLEDGED,
             message="Alert acknowledged successfully",
             acknowledged_at=alert.acknowledged_at,
+        )
+
+    def acknowledge_alerts(
+        self, alert_ids: List[str], user_id: str
+    ) -> AcknowledgeAlertsResponse:
+        """Acknowledge multiple alerts in one transaction."""
+        unique_alert_ids = list(dict.fromkeys(alert_ids))
+        if not unique_alert_ids:
+            raise ValueError("No alert IDs provided")
+
+        alerts = (
+            self.db.query(CriticalAlert)
+            .filter(CriticalAlert.alert_id.in_(unique_alert_ids))
+            .all()
+        )
+        alert_by_id = {alert.alert_id: alert for alert in alerts}
+        missing_alert_ids = [
+            alert_id for alert_id in unique_alert_ids if alert_id not in alert_by_id
+        ]
+
+        if missing_alert_ids:
+            raise ValueError(f"Alert(s) not found: {', '.join(missing_alert_ids)}")
+
+        already_acknowledged_ids = [
+            alert.alert_id
+            for alert in alerts
+            if alert.status == AlertStatus.ACKNOWLEDGED.value
+        ]
+        if already_acknowledged_ids:
+            raise ValueError(
+                f"Alert(s) already acknowledged: {', '.join(already_acknowledged_ids)}"
+            )
+
+        acknowledged_at = datetime.now(timezone.utc)
+        for alert in alerts:
+            alert.status = AlertStatus.ACKNOWLEDGED.value
+            alert.acknowledged_by = user_id
+            alert.acknowledged_at = acknowledged_at
+            alert.updated_at = acknowledged_at
+
+        self.db.commit()
+
+        return AcknowledgeAlertsResponse(
+            alert_id=unique_alert_ids,
+            status=AlertStatus.ACKNOWLEDGED,
+            message="Alerts acknowledged successfully",
+            acknowledged_count=len(unique_alert_ids),
+            acknowledged_at=acknowledged_at,
         )
 
     async def send_reminder_emails(self):
