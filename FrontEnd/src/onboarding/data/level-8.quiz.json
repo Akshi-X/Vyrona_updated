@@ -1,0 +1,38 @@
+[
+    {
+        "id": "q8-1",
+        "prompt": "What can you do from the Users page?",
+        "choices": [
+            "Configure LN2 alert thresholds",
+            "View, filter, and manage user access across your clinic",
+            "Download monthly KPI reports",
+            "Monitor live sensor readings"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q8-2",
+        "prompt": "What do the User Filters allow you to narrow by?",
+        "choices": [
+            "Date range and alert severity",
+            "Role and branch",
+            "Tank code and LN2 level",
+            "Outcome and actor type"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q8-3",
+        "prompt": "Which roles can invite new users from the Users page?",
+        "choices": [
+            "All users regardless of role",
+            "Admins",
+            "Only Mygrape super-admins",
+            "Managers only"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    }
+]

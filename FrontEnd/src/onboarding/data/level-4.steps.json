@@ -1,0 +1,78 @@
+[
+    {
+        "id": "al4-sidebar-intro",
+        "target": "#onboarding-sidebar-alert-setting",
+        "title": "Alert Configuration",
+        "icon": "Bell",
+        "content": "This is the Alert Configuration page. Here you can set KPI thresholds and notification rules for every container across all branches.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "al4-sidebar-click",
+        "target": "#onboarding-sidebar-alert-setting",
+        "title": "Open Alert Configuration",
+        "icon": "Bell",
+        "content": "Click here to navigate to the Alert Configuration page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-alert-setting"],
+        "prevDisable": true
+    },
+    {
+        "id": "al4-filters",
+        "target": "#onboarding-alert-filters",
+        "title": "Branch Filters",
+        "icon": "SlidersHorizontal",
+        "content": "Use the branch filter to narrow the container list to a specific location. This makes it easy to manage alerts across large multi-branch deployments.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-branch-open",
+        "target": "#onboarding-alert-branch-dropdown",
+        "title": "Open Branch Dropdown",
+        "icon": "ChevronDown",
+        "content": "Click the Branch dropdown to see all available branches.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-branch-dropdown"],
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-branch-bangalore",
+        "target": "#onboarding-alert-branch-dropdown-list",
+        "title": "Select Bangalore",
+        "icon": "MapPin",
+        "content": "Click Bangalore to filter the container list to this branch.",
+        "placement": "right",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-alert-branch-bangalore"],
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-containers",
+        "target": "#onboarding-alert-containers",
+        "title": "Bangalore Containers",
+        "icon": "Package",
+        "content": "The list now shows containers in the Bangalore branch. Click on Container T-161 to load its alert configuration.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-container-T-161"],
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-kpi-panel",
+        "target": "#onboarding-alert-kpi-panel",
+        "title": "Alert Configuration Panel",
+        "icon": "BellRing",
+        "content": "This panel shows the full KPI alert setup for the selected container. Set minimum and maximum thresholds, choose critical or soft alert types, and control cooldown periods to avoid notification fatigue.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting"
+    }
+]

@@ -809,7 +809,7 @@ export default function ReportsPage() {
     return (
                 <PageLayout title="Reports" lucideIcon={Download}>
 
-                    <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-filters" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">
@@ -1186,7 +1186,7 @@ export default function ReportsPage() {
                         </div>
                     </section>
 
-                    <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-results" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">

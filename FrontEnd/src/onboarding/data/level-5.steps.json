@@ -1,0 +1,51 @@
+[
+    {
+        "id": "rl5-sidebar-intro",
+        "target": "#onboarding-sidebar-refill-log",
+        "title": "Refill Log",
+        "icon": "Droplets",
+        "content": "The Refill Log page gives you a complete view of every LN2 top-up across all containers — tank status, reservoir inventory, and a full activity history.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard"
+    },
+    {
+        "id": "rl5-sidebar-click",
+        "target": "#onboarding-sidebar-refill-log",
+        "title": "Open Refill Log",
+        "icon": "Droplets",
+        "content": "Click here to open the Refill Log page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-refill-log"],
+        "prevDisable": true
+    },
+    {
+        "id": "rl5-tank-status",
+        "target": "#onboarding-refill-tank-status",
+        "title": "Active Tank Status",
+        "icon": "Thermometer",
+        "content": "Every active container and its current LN2 level is listed here. Tanks approaching the minimum threshold are flagged so refills can be scheduled before a critical alert fires.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log"
+    },
+    {
+        "id": "rl5-reservoir-logs",
+        "target": "#onboarding-refill-reservoir-logs",
+        "title": "Reservoir Logs",
+        "icon": "FlaskConical",
+        "content": "Track bulk LN2 orders and deliveries for each branch reservoir. Ordered and received dates are logged here to keep your supply chain transparent and auditable.",
+        "placement": "left",
+        "requireClick": false
+    },
+    {
+        "id": "rl5-activity-log",
+        "target": "#onboarding-refill-activity-log",
+        "title": "Recent Activity Log",
+        "icon": "ClipboardList",
+        "content": "Every refill event — who performed it, when, how much LN2 was added, and any notes — is recorded here. This is your complete audit trail for compliance and maintenance reviews.",
+        "placement": "top",
+        "requireClick": false
+    }
+]

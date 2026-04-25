@@ -226,7 +226,7 @@ export default function UsersPage() {
             }
         >
             {/* Filters */}
-            <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+            <section id="onboarding-users-filters" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <h2 className="text-base font-semibold text-black">Filters</h2>
@@ -271,7 +271,7 @@ export default function UsersPage() {
             </section>
 
             {/* Results */}
-            <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+            <section id="onboarding-users-results" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <h2 className="text-base font-semibold text-black">Users</h2>

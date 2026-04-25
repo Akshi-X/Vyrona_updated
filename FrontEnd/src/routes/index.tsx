@@ -268,6 +268,9 @@ export const router = createBrowserRouter([
             { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/user-profile",                          element: <><UserProfilePage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
@@ -319,8 +322,22 @@ export const router = createBrowserRouter([
     // PROTECTED ROUTES WITHOUT SHARED SIDEBAR
     // ============================================================
     { path: "/track-and-trace", element: <TrackAndTrace /> },
-    { path: "/user-profile", element: <UserProfilePage /> },
-    { path: "/support", element: <Support /> },
+    {
+        path: "/user-profile",
+        element: (
+            <RoleBasedRoute>
+                <UserProfilePage />
+            </RoleBasedRoute>
+        ),
+    },
+    {
+        path: "/support",
+        element: (
+            <RoleBasedRoute>
+                <Support />
+            </RoleBasedRoute>
+        ),
+    },
 
     // ============================================================
     // FALLBACK ROUTE

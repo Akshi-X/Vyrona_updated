@@ -147,6 +147,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                         return (
                             <button
                                 key={idx}
+                                id={path === "/onboarding/alert-setting" ? "onboarding-sidebar-alert-setting" : undefined}
                                 onClick={() => go(path)}
                                 className={`h-auto w-full justify-start gap-4 px-3 py-[7px] rounded-[10px] flex items-center ${
                                     isActive ? "bg-white" : "bg-transparent hover:bg-white/10"
@@ -168,7 +169,7 @@ export default function OnboardingSidebar({ onLogout }: OnboardingSidebarProps) 
                 {/* Profile */}
                 <button
                     type="button"
-                    onClick={() => navigate("/user-profile")}
+                    onClick={() => navigate("/onboarding/user-profile")}
                     className="group w-full flex items-center gap-3 px-6 py-2 md:gap-4 md:px-9 md:py-4 flex-shrink-0 relative z-10 text-white hover:bg-white/10 transition-colors text-left"
                 >
                     <img src={UserIcon} alt="" className="w-5 h-5 flex-shrink-0" />
