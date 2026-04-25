@@ -56,14 +56,13 @@ const ControlTower = () => {
     const [department, setDepartment] = useState<string | null>(null);
     const [_userInitials, setUserInitials] = useState<string>("");
 
-    // Sync branch + status filters to URL query params (skip during onboarding — causes re-renders that close dropdowns)
+    // Sync branch + status filters to URL query params
     useEffect(() => {
-        // if (isOnboarding) return;
         const params: Record<string, string> = {};
         if (selectedBranch !== "All") params.branch_id = selectedBranch;
         if (selectedStatusInbound !== "All") params.status = selectedStatusInbound;
         setSearchParams(params, { replace: true });
-    }, [isOnboarding, selectedBranch, selectedStatusInbound, setSearchParams]);
+    }, [selectedBranch, selectedStatusInbound, setSearchParams]);
 
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
@@ -477,6 +476,13 @@ const ControlTower = () => {
             .map(([id, name]) => ({ label: name, value: id }));
         return ["All" as const, ...sorted];
     }, [canisters]);
+
+    // Resolve branch name from selected branch ID — map always filters/zooms by name
+    const selectedBranchName = useMemo(() => {
+        if (selectedBranch === "All") return "All";
+        const opt = branchOptions.find((o) => typeof o !== "string" && o.value === selectedBranch);
+        return typeof opt === "object" ? opt.label : selectedBranch;
+    }, [selectedBranch, branchOptions]);
 
     const activeFilterCount = useMemo(() => {
         let count = 0;
@@ -1047,7 +1053,7 @@ const ControlTower = () => {
                                             ? selectedStatusInbound
                                             : selectedStatusOutbound,
                                     selectedCarrier,
-                                    selectedBranch,
+                                    selectedBranch: selectedBranchName,
                                 }}
                                 direction={direction}
                                 zoomToLocation={zoomToLocation}

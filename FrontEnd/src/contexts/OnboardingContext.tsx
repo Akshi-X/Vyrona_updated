@@ -101,17 +101,31 @@ type Action =
     | { type: "RESET_QUIZ"; levelId: string }
     | { type: "FAIL_QUIZ"; levelId: string; score: number; totalQuiz: number };
 
-// Flip locked → available for any level whose unlock date has passed.
+// Sync locked ↔ available for every real level based on two gates:
+//   1. Date gate  — unlockedAt must exist and be in the past
+//   2. Score gate — sum of all highScores must meet level.scoreRequired
+// Both must be true to be available; failing either re-locks the level.
+// Only touches "locked" and "available" states — never demotes in_progress/completed.
 // Mutates `levels` in-place (caller spreads first).
 const applyDateUnlocks = (
     levels: Record<string, OnboardingLevelProgress>,
     now: string,
 ) => {
+    const overallHighScore = Object.values(levels).reduce(
+        (sum, p) => sum + (p.highScore ?? 0),
+        0,
+    );
+
     onboardingLevels.forEach((level) => {
         const prog = levels[level.id];
-        if (!prog || prog.status !== "locked") return;
-        if (!prog.unlockedAt || prog.unlockedAt > now) return;
-        levels[level.id] = { ...prog, status: "available" };
+        if (!prog) return;
+        // Never touch in_progress or completed levels
+        if (prog.status === "in_progress" || prog.status === "completed") return;
+
+        const dateOk = !!prog.unlockedAt && prog.unlockedAt <= now;
+        const scoreOk = overallHighScore >= (level.scoreRequired ?? 0);
+
+        levels[level.id] = { ...prog, status: (dateOk && scoreOk) ? "available" : "locked" };
     });
 };
 
