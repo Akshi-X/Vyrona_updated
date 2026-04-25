@@ -295,7 +295,9 @@ export const enableOnboardingMocks = () => {
             try {
                 const body = options?.body ? JSON.parse(options.body as string) : {};
                 const alertId: string = body.alert_id ?? body.alertId ?? "";
-                const alert = mockTankAlerts.alerts.find((a) => a.alert_id === alertId);
+                const alert = mockTankAlerts.alerts.find((a) => a.alert_id === alertId) as
+                    | { status: string; acknowledged_by: string | null; acknowledged_at: string | null }
+                    | undefined;
                 if (alert) {
                     alert.status = "Acknowledged";
                     alert.acknowledged_by = "USR-DEMO";
@@ -715,23 +717,40 @@ export const enableOnboardingMocks = () => {
         if (endpoint === "/api/tasks" && options?.method === "POST") {
             const body = options?.body ? JSON.parse(options.body as string) : {};
             const assigneeId = body.assignee_id ?? cachedProfile?.user_id ?? "USR-DEMO";
-            const assigneeName = cachedProfile
-                ? { first_name: cachedProfile.first_name, last_name: cachedProfile.last_name }
-                : { first_name: "Demo", last_name: "User" };
+            const userInfo = cachedProfile
+                ? {
+                      user_id: cachedProfile.user_id,
+                      first_name: cachedProfile.first_name,
+                      last_name: cachedProfile.last_name,
+                      email: "demo@arcfertility.in",
+                      role: cachedProfile.role,
+                  }
+                : {
+                      user_id: assigneeId,
+                      first_name: "Demo",
+                      last_name: "User",
+                      email: "demo@arcfertility.in",
+                      role: "User",
+                  };
+            const nowIso = new Date().toISOString();
             const newTask = {
                 id: mockCanisterTasks.tasks.length + 200,
                 task_name: body.task_name ?? "New Task",
                 description: body.description ?? "",
-                assignee_id: assigneeId,
-                tank_id: body.tank_id ?? null,
+                assignee: userInfo,
+                created_by: userInfo,
+                patient_id: null,
                 tank_code: body.tank_code ?? "T-161",
-                due_date: body.due_date ?? new Date().toISOString(),
+                tank_id: body.tank_id ?? 0,
+                due_date: body.due_date ?? nowIso,
                 priority: body.priority ?? "Medium",
                 status: body.status ?? "Not started",
-                created_by: assigneeName,
-                assignee: assigneeName,
-                canister_number: "161",
-                patient_id: null,
+                created_at: nowIso,
+                updated_at: nowIso,
+                permissions: {
+                    can_edit_all: true,
+                    can_edit_status_only: false,
+                },
             };
             mockCanisterTasks.tasks.push(newTask);
             return { success: true, task: newTask };
@@ -779,13 +798,11 @@ export const enableOnboardingMocks = () => {
             const newMsg = {
                 id: mockTankChatMessages.messages.length + 100,
                 message_content: body.message_content ?? "",
-                patient_id: null,
-                tank_code: body.tank_code ?? "T-161",
+                canister_number: body.canister_number ?? "161",
                 sender_id: cachedProfile?.user_id ?? "USR-DEMO",
                 sender_name: cachedProfile ? `${cachedProfile.first_name} ${cachedProfile.last_name}` : "Demo User",
                 sender_role: cachedProfile?.role ?? "Admin",
-                tagged_user_ids: body.tagged_user_ids ?? [],
-                tagged_user_names: null,
+                tagged_user_ids: [] as never[],
                 created_at: new Date().toISOString(),
                 is_read: true,
                 read_at: new Date().toISOString(),

@@ -96,7 +96,7 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                 <div className="absolute left-[11px] top-3 bottom-3 w-px bg-slate-200" />
 
                 <div className="space-y-2">
-                    {levels.map((level, idx) => {
+                    {levels.map((level) => {
                         const progress = state.levels[level.id];
                         const status = (progress?.status ?? "locked") as keyof typeof STATUS_CONFIG;
                         const cfg = STATUS_CONFIG[status];
