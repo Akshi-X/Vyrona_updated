@@ -31,13 +31,38 @@
         "startPage": "/onboarding/alert-setting"
     },
     {
+        "id": "al4-branch-open",
+        "target": "#onboarding-alert-branch-dropdown",
+        "title": "Open Branch Dropdown",
+        "icon": "ChevronDown",
+        "content": "Click the Branch dropdown to see all available branches.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-branch-dropdown"],
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
+        "id": "al4-branch-bangalore",
+        "target": "#onboarding-alert-branch-dropdown-list",
+        "title": "Select Bangalore",
+        "icon": "MapPin",
+        "content": "Click Bangalore to filter the container list to this branch.",
+        "placement": "right",
+        "requireClick": true,
+        "prevDisable": true,
+        "clickOnlyId": ["#onboarding-alert-branch-bangalore"],
+        "startPage": "/onboarding/alert-setting"
+    },
+    {
         "id": "al4-containers",
         "target": "#onboarding-alert-containers",
-        "title": "Active Containers",
+        "title": "Bangalore Containers",
         "icon": "Package",
-        "content": "Every active container is listed here. Select one (or multiple) to configure its KPI alert thresholds — critical and soft alerts can be set independently per sensor.",
+        "content": "The list now shows containers in the Bangalore branch. Click on Container T-161 to load its alert configuration.",
         "placement": "right",
-        "requireClick": false
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-alert-container-T-161"],
+        "startPage": "/onboarding/alert-setting"
     },
     {
         "id": "al4-kpi-panel",
@@ -46,6 +71,8 @@
         "icon": "BellRing",
         "content": "This panel shows the full KPI alert setup for the selected container. Set minimum and maximum thresholds, choose critical or soft alert types, and control cooldown periods to avoid notification fatigue.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/alert-setting"
     }
 ]

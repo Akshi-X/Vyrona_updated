@@ -274,12 +274,11 @@ export default function IVFTrackShipmentPage() {
                 </div>
             </div>
             {/* Critical Alerts */}
-            <div className="relative group">
+            <div id="onboarding-ivf-critical-alerts-icon" className="relative group cursor-pointer" onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}>
                 <img
-                    className="w-[25px] h-[25px] cursor-pointer"
+                    className="w-[25px] h-[25px]"
                     alt="Critical Alerts"
                     src={CriticalAlertsIcon}
-                    onClick={() => { fetchCriticalAlerts(); setShowCriticalAlerts(true); }}
                 />
                 {criticalAlertsCount > 0 && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -292,12 +291,11 @@ export default function IVFTrackShipmentPage() {
                 </div>
             </div>
             {/* Stakeholder Chats */}
-            <div className="relative group">
+            <div id="onboarding-ivf-stakeholder-chats-icon" className="relative group cursor-pointer" onClick={() => setShowStakeholderChatScreen(true)}>
                 <img
-                    className="w-[25px] h-[25px] cursor-pointer"
+                    className="w-[25px] h-[25px]"
                     alt="Stakeholder Chats"
                     src={StakeholderChatsIcon}
-                    onClick={() => setShowStakeholderChatScreen(true)}
                 />
                 {stakeholderChatCount > 0 && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -310,12 +308,11 @@ export default function IVFTrackShipmentPage() {
                 </div>
             </div>
             {/* My Tasks */}
-            <div className="relative group">
+            <div id="onboarding-ivf-my-tasks-icon" className="relative group cursor-pointer" onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}>
                 <img
-                    className="w-[25px] h-[25px] cursor-pointer"
+                    className="w-[25px] h-[25px]"
                     alt="My Tasks"
                     src={MyTasksIcon}
-                    onClick={() => { fetchMyTasks(); setShowMyTasks(true); }}
                 />
                 {myTasksCount > 0 && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff0000] rounded-[7px] border border-solid border-white flex items-center justify-center">
@@ -411,6 +408,7 @@ export default function IVFTrackShipmentPage() {
 
             {/* Modals */}
             <CriticalAlertsModal
+                id="onboarding-ivf-critical-alerts-modal"
                 isOpen={showCriticalAlerts}
                 onClose={() => setShowCriticalAlerts(false)}
                 alerts={criticalAlerts.map((a) => ({
@@ -449,6 +447,7 @@ export default function IVFTrackShipmentPage() {
                 }}
             />
             <MyTasksModal
+                id="onboarding-my-tasks-modal"
                 isOpen={showMyTasks}
                 onClose={() => setShowMyTasks(false)}
                 tasks={myTasks.map((task) => {

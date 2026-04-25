@@ -26,6 +26,8 @@ interface OnboardingContextValue {
     answerQuiz: (levelId: string, questionId: string, choiceIndex: number) => void;
     completeLevel: (levelId: string, score: number) => void;
     resetLevel: (levelId: string) => void;
+    resetQuiz: (levelId: string) => void;
+    failQuiz: (levelId: string, score: number) => void;
     syncUnlocks: () => void;
 }
 
@@ -82,6 +84,8 @@ type Action =
     | { type: "ANSWER_QUIZ"; levelId: string; currentScore: number }
     | { type: "COMPLETE_LEVEL"; levelId: string; score: number; unlockNextAt?: string }
     | { type: "RESET_LEVEL"; levelId: string }
+    | { type: "RESET_QUIZ"; levelId: string }
+    | { type: "FAIL_QUIZ"; levelId: string; score: number; totalQuiz: number }
     | { type: "SYNC_UNLOCKS"; now: string };
 
 const reducer = (state: OnboardingState, action: Action): OnboardingState => {
@@ -118,14 +122,26 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                             ? incomingLevel.status
                             : current.status;
 
+                    // Walk back past any prevDisable steps so we never resume
+                    // inside an unopened modal after a reload or cross-device sync.
+                    const rawStepIndex = Math.max(current.lastStepIndex, incomingLevel.lastStepIndex);
+                    const levelSteps = onboardingStepsByLevel[levelId] ?? [];
+                    let safeStepIndex = rawStepIndex;
+                    while (safeStepIndex > 0 && (levelSteps[safeStepIndex] as OnboardingStep | undefined)?.prevDisable) {
+                        safeStepIndex -= 1;
+                    }
+
                     mergedLevels[levelId] = {
                         ...current,
                         ...incomingLevel,
                         status: mergedStatus,
+                        // Always recompute from source — stored values go stale when steps/quiz change
+                        totalSteps: current.totalSteps,
+                        totalQuiz: current.totalQuiz,
                         // Always keep the highest values to avoid going backwards
-                        currentScore: incomingLevel.currentScore ?? current.currentScore,
+                        currentScore: Math.max(current.currentScore, incomingLevel.currentScore ?? 0),
                         attempts: Math.max(current.attempts, incomingLevel.attempts),
-                        lastStepIndex: Math.max(current.lastStepIndex, incomingLevel.lastStepIndex),
+                        lastStepIndex: safeStepIndex,
                         lastQuizIndex: Math.max(current.lastQuizIndex, incomingLevel.lastQuizIndex),
                         highScore: Math.max(current.highScore, incomingLevel.highScore ?? 0),
                         // Keep whichever timestamp was set first
@@ -284,6 +300,44 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
             };
         }
 
+        // Mark the quiz as finished-but-failed: stamp lastQuizIndex one past the end so
+        // the overlay can detect the fail state on reload, and persist the final score.
+        case "FAIL_QUIZ": {
+            const level = state.levels[action.levelId];
+            if (!level) return state;
+            return {
+                ...state,
+                levels: {
+                    ...state.levels,
+                    [action.levelId]: {
+                        ...level,
+                        currentScore: action.score,
+                        lastQuizIndex: action.totalQuiz, // >= quiz.length signals quiz done
+                    },
+                },
+                lastUpdatedAt: nowIso(),
+            };
+        }
+
+        // Reset only quiz progress (score + index) while preserving tour step progress.
+        // Used by "Retry quiz" so the user re-takes the quiz without redoing the tour.
+        case "RESET_QUIZ": {
+            const level = state.levels[action.levelId];
+            if (!level) return state;
+            return {
+                ...state,
+                levels: {
+                    ...state.levels,
+                    [action.levelId]: {
+                        ...level,
+                        currentScore: 0,
+                        lastQuizIndex: 0,
+                    },
+                },
+                lastUpdatedAt: nowIso(),
+            };
+        }
+
         // Run periodically (every 60 s) to flip any locked level whose unlockedAt
         // timestamp has passed to available, respecting the unlockDelayHours config.
         case "SYNC_UNLOCKS": {
@@ -326,10 +380,11 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // saved progress with initialState before hydration fires.
     const [state, dispatch] = useReducer(reducer, undefined, () => {
         const stored = loadFromStorage();
-        if (stored) {
-            return reducer(initialState, { type: "HYDRATE", payload: stored });
-        }
-        return initialState;
+        // HYDRATE already walks back prevDisable steps, so the returned state
+        // is always safe to use directly.
+        return stored
+            ? reducer(initialState, { type: "HYDRATE", payload: stored })
+            : initialState;
     });
 
     const didHydrateFromApiRef = useRef(false);
@@ -403,6 +458,12 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             dispatch({ type: "COMPLETE_LEVEL", levelId, score, unlockNextAt: unlockAt });
         },
         resetLevel: (levelId) => dispatch({ type: "RESET_LEVEL", levelId }),
+        resetQuiz: (levelId) => dispatch({ type: "RESET_QUIZ", levelId }),
+        failQuiz: (levelId, score) => {
+            apiSyncNeededRef.current = true;
+            const totalQuiz = (onboardingQuizByLevel[levelId] ?? []).length;
+            dispatch({ type: "FAIL_QUIZ", levelId, score, totalQuiz });
+        },
         syncUnlocks: () => dispatch({ type: "SYNC_UNLOCKS", now: nowIso() }),
     }), [state]);
 

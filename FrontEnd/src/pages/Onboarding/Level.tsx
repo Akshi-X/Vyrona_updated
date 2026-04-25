@@ -42,7 +42,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     const prevTargetIndex = (() => {
         let target = stepIndex - 1;
-        if (target >= 0 && steps[target]?.prevDisable) target -= 1;
+        while (target >= 0 && steps[target]?.prevDisable) target -= 1;
         return target;
     })();
     const prevLocked = !!activeStep?.prevDisable;
@@ -115,12 +115,48 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const interval = setInterval(() => {
             if (document.querySelector(activeStep.target)) {
                 clearInterval(interval);
-                setCurrentStep(stepIndex);
+                // Force @reactour to reposition even if stepIndex hasn't changed —
+                // calling setCurrentStep with the same value is a no-op in @reactour,
+                // so close + reopen on the next frame to trigger a fresh spotlight.
+                setIsOpen(false);
+                requestAnimationFrame(() => {
+                    setCurrentStep(stepIndex);
+                    setIsOpen(true);
+                });
             }
         }, 50);
 
         return () => clearInterval(interval);
-    }, [activeStep, stepIndex, stepCount, setCurrentStep]);
+    }, [activeStep, stepIndex, stepCount, setCurrentStep, setIsOpen]);
+
+    // ── 5c. Dispatch onboardingEvent when a step becomes active ──────
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.onboardingEvent) return;
+        document.dispatchEvent(new CustomEvent(activeStep.onboardingEvent));
+    }, [activeStep, isTourActive]);
+
+    // ── 5b. Auto-fill inputText via a custom DOM event ───────────────
+    // Dispatches "onboarding:set-chat-input" so the target component can
+    // call setDraftMessage directly — avoids React 18 synthetic-event issues
+    // with the native value-setter trick.
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.inputText) return;
+
+        const dispatch = () => {
+            const el = document.querySelector(activeStep.target);
+            if (!el) return false;
+            document.dispatchEvent(
+                new CustomEvent("onboarding:set-chat-input", { detail: activeStep.inputText })
+            );
+            (el as HTMLElement).focus?.();
+            return true;
+        };
+
+        if (!dispatch()) {
+            const interval = setInterval(() => { if (dispatch()) clearInterval(interval); }, 50);
+            return () => clearInterval(interval);
+        }
+    }, [activeStep, isTourActive]);
 
     // ── 6. Disable pointer-events on non-interactive steps ──────────
     useEffect(() => {
@@ -134,7 +170,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 7. Trail-border animation on clickOnlyId targets ────────────
     useEffect(() => {
         const ids = activeStep?.clickOnlyId;
-        if (!ids?.length) return;
+        if (!ids?.length || !isTourActive) return;
 
         const applyClass = () => {
             ids.forEach((sel) => {
@@ -156,7 +192,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 document.querySelector(sel)?.classList.remove("tour-click-target");
             });
         };
-    }, [activeStep]);
+    }, [activeStep, isTourActive]);
 
     // ── 8. Click guard ───────────────────────────────────────────────
     useEffect(() => {
@@ -212,22 +248,36 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const nextIndex = stepIndex + 1;
-                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                setCurrentStep(nextIndex);
-                setStepIndex(levelId, nextIndex);
-
                 (matchedEl as HTMLElement | null)?.click();
+
+                const advance = () => {
+                    const nextIndex = stepIndex + 1;
+                    setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
+                    setCurrentStep(nextIndex);
+                    setStepIndex(levelId, nextIndex);
+                };
+                if (activeStep.stepDelay) {
+                    setTimeout(advance, activeStep.stepDelay);
+                } else {
+                    advance();
+                }
             } else {
                 const isInsideTarget = target.contains(clickedEl) || hitsBox(target);
                 if (!isInsideTarget) return;
 
-                const nextIndex = stepIndex + 1;
-                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                setCurrentStep(nextIndex);
-                setStepIndex(levelId, nextIndex);
-
                 (target as HTMLElement).click();
+
+                const advance = () => {
+                    const nextIndex = stepIndex + 1;
+                    setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
+                    setCurrentStep(nextIndex);
+                    setStepIndex(levelId, nextIndex);
+                };
+                if (activeStep.stepDelay) {
+                    setTimeout(advance, activeStep.stepDelay);
+                } else {
+                    advance();
+                }
             }
         };
 
@@ -288,7 +338,16 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── Open tour when isTourActive flips to true ───────────────────
     useEffect(() => {
         if (!isTourActive || stepCount === 0 || stepIndex >= stepCount) return;
-        setCurrentStep(stepIndex);
+
+        // Walk back from any prevDisable step — catches mid-session resumes
+        // where HYDRATE hasn't run (no reload).
+        let safeIndex = stepIndex;
+        while (safeIndex > 0 && steps[safeIndex]?.prevDisable) safeIndex--;
+
+        if (safeIndex !== stepIndex) {
+            setStepIndex(levelId, safeIndex);
+        }
+        setCurrentStep(safeIndex);
         setIsOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isTourActive]);
