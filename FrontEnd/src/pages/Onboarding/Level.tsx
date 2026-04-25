@@ -181,9 +181,9 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         applyClass();
 
         const interval = setInterval(() => {
-            const missing = ids.some((sel) => !document.querySelector(sel));
-            if (!missing) { clearInterval(interval); return; }
             applyClass();
+            const allFound = ids.every((sel) => !!document.querySelector(sel));
+            if (allFound) clearInterval(interval);
         }, 50);
 
         return () => {

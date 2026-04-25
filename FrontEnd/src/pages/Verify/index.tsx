@@ -49,6 +49,7 @@ const VerifyOtp: React.FC = () => {
     // State to track if OTP was successfully verified
     const [otpVerified, setOtpVerified] = useState(false);
     const [verifiedRole, setVerifiedRole] = useState<string | undefined>(undefined);
+    const [verifiedOnboardingCompleted, setVerifiedOnboardingCompleted] = useState<boolean>(true);
 
     const [otp, setOtp] = useState("");
     const [error, setError] = useState("");
@@ -245,12 +246,13 @@ const VerifyOtp: React.FC = () => {
     // Handle redirect after OTP verification
     useEffect(() => {
         if (otpVerified && isAuthenticated) {
-            // Use the ref value to ensure we have the correct fromPath
             const targetPath = fromPathRef.current;
-            
+
             setTimeout(() => {
-                if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
-                    // Always redirect back to original page if it exists (e.g., approval screen)
+                // Onboarding-pending users always go to onboarding, regardless of fromPath
+                if (!verifiedOnboardingCompleted) {
+                    navigate("/onboarding/dashboard", { replace: true });
+                } else if (targetPath && typeof targetPath === "string" && targetPath.trim() !== "") {
                     navigate(targetPath, { replace: true });
                 } else if (verifiedRole?.toLowerCase() === "mygrape_admin") {
                     navigate("/user-profile", { replace: true });
@@ -259,7 +261,7 @@ const VerifyOtp: React.FC = () => {
                 }
             }, 500);
         }
-    }, [otpVerified, isAuthenticated, verifiedRole, navigate]);
+    }, [otpVerified, isAuthenticated, verifiedRole, verifiedOnboardingCompleted, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -312,6 +314,7 @@ const VerifyOtp: React.FC = () => {
                 // Set flags to trigger redirect in useEffect
                 setOtpVerified(true);
                 setVerifiedRole(response.role);
+                setVerifiedOnboardingCompleted(response.onboarding_completed ?? true);
             } else {
                 setError(response.message || "Invalid OTP");
             }

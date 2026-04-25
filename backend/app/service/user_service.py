@@ -810,6 +810,7 @@ def get_user_profile(user: user_model.User, db: Session) -> UserProfileResponse:
         last_login=user.last_login,
         created_at=user.created_at,
         updated_at=user.updated_at,
+        onboarding_completed=True if getattr(user, 'onboarding_completed', None) is None else user.onboarding_completed,
     )
     return response
 
