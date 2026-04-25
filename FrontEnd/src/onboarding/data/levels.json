@@ -6,7 +6,6 @@
         "pointsRequired": 0,
         "unlockDelayHours": 0,
         "tourStepsFile": "",
-        "quizFile": "",
         "replica": "dashboard",
         "sections": [
             {
@@ -30,9 +29,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-1.steps.json",
-        "quizFile": "level-1.quiz.json",
         "replica": "dashboard",
-        "quiz": { "headerTitle": "Quiz", "file": "level-1.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-1.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Dashboard Quest",
@@ -64,9 +65,11 @@
         "pointsRequired": 70,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-2.steps.json",
-        "quizFile": "level-2.quiz.json",
         "replica": "control-tower",
-        "quiz": { "headerTitle": "Quiz", "file": "level-2.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-2.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Control Tower Quest",
@@ -99,9 +102,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-3.steps.json",
-        "quizFile": "level-3.quiz.json",
         "replica": "control-tower",
-        "quiz": { "headerTitle": "Quiz", "file": "level-3.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-3.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Cryocan Quality Tracking",
@@ -133,9 +138,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-4.steps.json",
-        "quizFile": "level-4.quiz.json",
         "replica": "alert-setting",
-        "quiz": { "headerTitle": "Quiz", "file": "level-4.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-4.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Alert Configuration",
@@ -167,9 +174,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-5.steps.json",
-        "quizFile": "level-5.quiz.json",
         "replica": "refill-log",
-        "quiz": { "headerTitle": "Quiz", "file": "level-5.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-5.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Refill Log",
@@ -201,9 +210,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-6.steps.json",
-        "quizFile": "level-6.quiz.json",
         "replica": "reports",
-        "quiz": { "headerTitle": "Quiz", "file": "level-6.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-6.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Reports",
@@ -236,9 +247,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-7.steps.json",
-        "quizFile": "level-7.quiz.json",
         "replica": "user-profile",
-        "quiz": { "headerTitle": "Quiz", "file": "level-7.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-7.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Profile",
@@ -271,9 +284,11 @@
         "pointsRequired": 60,
         "unlockDelayHours": 0,
         "tourStepsFile": "level-8.steps.json",
-        "quizFile": "level-8.quiz.json",
         "replica": "users",
-        "quiz": { "headerTitle": "Quiz", "file": "level-8.quiz.json" },
+        "quiz": {
+            "headerTitle": "Quiz",
+            "file": "level-8.quiz.json"
+        },
         "welcome": {
             "headerTitle": "Tour",
             "title": "Users",

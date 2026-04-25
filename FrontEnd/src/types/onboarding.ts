@@ -46,7 +46,6 @@ export interface OnboardingLevelConfig {
     pointsRequired: number;
     unlockDelayHours: number;
     tourStepsFile: string;
-    quizFile: string;
     replica: OnboardingReplica;
     sections?: OnboardingLevelSection[];
     welcome?: OnboardingLevelWelcome;
