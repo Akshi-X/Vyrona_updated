@@ -639,16 +639,19 @@ class QualityService:
 
             rows = (
                 self.db.query(KpiConfig)
-                .filter(KpiConfig.tank_id == tank_id, KpiConfig.status == True)
+                .filter(KpiConfig.tank_id == tank_id)
                 .all()
             )
             kpi_limits = {}
             for r in rows:
+                alert_type = (r.alert_type or "").strip() or None
+                if not bool(r.status) and alert_type is None:
+                    continue
                 name = r.kpi_name
                 kpi_limits.setdefault(name, {})[r.alert_name] = {
                     "min": float(r.min) if r.min is not None else None,
                     "max": float(r.max) if r.max is not None else None,
-                    "alert_type": (r.alert_type or "").strip() or None,
+                    "alert_type": alert_type,
                 }
             return {
                 "tank_id": tank_id,
