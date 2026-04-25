@@ -44,6 +44,8 @@ export interface OnboardingLevelConfig {
     title: string;
     route: string;
     pointsRequired: number;
+    /** Minimum sum of all levels' highScore needed to unlock this level */
+    scoreRequired: number;
     unlockDelayHours: number;
     tourStepsFile: string;
     replica: OnboardingReplica;

@@ -268,8 +268,6 @@ export const enableOnboardingMocks = () => {
 
     BaseApiService.setMockEnabled(true);
     BaseApiService.setMockResolver(async (endpoint, options) => {
-        console.log("[onboarding mock]", options?.method ?? "GET", endpoint);
-
         // User profile — hit real API only for onboarding, preserve real role as real_role, override role to Admin.
         if (endpoint.startsWith("/api/profile")) {
             try {
@@ -792,7 +790,6 @@ export const enableOnboardingMocks = () => {
         }
 
         // Stakeholder chat — send a new message.
-        console.log("[onboarding mock] chat send check:", endpoint, "|method:", options?.method);
         if (endpoint === "/api/chat/messages" && options?.method === "POST") {
             const body = options?.body ? JSON.parse(options.body as string) : {};
             const newMsg = {

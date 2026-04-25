@@ -23,6 +23,11 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
     const { setCurrentStep } = useTour();
     const navigate = useNavigate();
 
+    const overallHighScore = Object.values(state.levels).reduce(
+        (sum, p) => sum + (p.highScore ?? 0),
+        0,
+    );
+
     const anyInProgress = levels.some((l) => state.levels[l.id]?.status === "in_progress");
     const activeLevel = levels.find((l) => state.levels[l.id]?.status === "in_progress");
     const activeLevelProgress = activeLevel ? state.levels[activeLevel.id] : undefined;
@@ -177,19 +182,41 @@ export default function OnboardingTimeline({ onStart, onStartWelcome, onResumeTo
                                             )}
 
                                             {/* Unlock hint */}
-                                            {isLocked && unlockDate && (
-                                                <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-100/80 px-3 py-1.5">
-                                                    <Lock className="h-3 w-3 shrink-0 text-slate-400" />
-                                                    <p className="text-[10px] font-semibold text-slate-500">
-                                                        Unlocks on {unlockDate}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {isLocked && !unlockDate && (
-                                                <p className="mt-1 text-[10px] text-slate-400">
-                                                    Complete the welcome to unlock
-                                                </p>
-                                            )}
+                                            {isLocked && (() => {
+                                                if (!unlockDate) {
+                                                    return (
+                                                        <p className="mt-1 text-[10px] text-slate-400">
+                                                            Complete the welcome to unlock
+                                                        </p>
+                                                    );
+                                                }
+                                                const now = new Date().toISOString();
+                                                const dateBlocked = progress?.unlockedAt != null && progress.unlockedAt > now;
+                                                const scoreRequired = level.scoreRequired ?? 0;
+                                                const scoreBlocked = overallHighScore < scoreRequired;
+
+                                                if (dateBlocked) {
+                                                    return (
+                                                        <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-100/80 px-3 py-1.5">
+                                                            <Lock className="h-3 w-3 shrink-0 text-slate-400" />
+                                                            <p className="text-[10px] font-semibold text-slate-500">
+                                                                Unlocks on {unlockDate}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+                                                if (scoreBlocked) {
+                                                    return (
+                                                        <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-100/80 px-3 py-1.5">
+                                                            <Lock className="h-3 w-3 shrink-0 text-slate-400" />
+                                                            <p className="text-[10px] font-semibold text-slate-500">
+                                                                Need {scoreRequired} pts total &mdash; {scoreRequired - overallHighScore} more to go
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
 
                                         {/* Right: action buttons */}
