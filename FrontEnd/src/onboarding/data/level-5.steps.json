@@ -21,6 +21,62 @@
         "prevDisable": true
     },
     {
+        "id": "rl5-refill-detected",
+        "target": "#onboarding-refill-detected",
+        "title": "Refill Detected",
+        "icon": "Droplets",
+        "content": "The system automatically detects when a container has been refilled based on sensor data. Each card here represents a pending detection waiting for your review — confirm or dismiss it to keep the log accurate.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log"
+    },
+    {
+        "id": "rl5-first-detection-card",
+        "target": "#onboarding-refill-first-card",
+        "title": "Detection Card",
+        "icon": "Droplets",
+        "content": "This card shows a refill detected for container T-161 in Bangalore on 21/04/26 at 08:15 AM — 5.2 kg of LN2 added. Click Add Log to convert this detection into a confirmed refill record.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log"
+    },
+    {
+        "id": "rl5-add-logs-btn",
+        "target": "#onboarding-refill-add-logs-btn",
+        "title": "Add Log",
+        "icon": "Plus",
+        "content": "Click here to open the Add Log form for this detection.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-add-logs-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log"
+    },
+    {
+        "id": "rl5-add-modal",
+        "target": "#onboarding-refill-add-modal",
+        "title": "Add Log Form",
+        "icon": "ClipboardList",
+        "content": "The form is pre-filled from the detection — tank T-161, Bangalore reservoir, date and time, and 5.2 kg refill weight. Set who performed the refill and add any notes before saving.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:prefill-add-refill-log",
+        "startPage": "/onboarding/refill-log"
+    },
+    {
+        "id": "rl5-add-save",
+        "target": "#onboarding-refill-add-save-btn",
+        "title": "Save the Log",
+        "icon": "Save",
+        "content": "Click Save to confirm the refill and add it to the activity log.",
+        "placement": "top",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-add-save-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log"
+    },
+    {
         "id": "rl5-tank-status",
         "target": "#onboarding-refill-tank-status",
         "title": "Active Tank Status",
@@ -37,7 +93,8 @@
         "icon": "FlaskConical",
         "content": "Track bulk LN2 orders and deliveries for each branch reservoir. Ordered and received dates are logged here to keep your supply chain transparent and auditable.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log"
     },
     {
         "id": "rl5-activity-log",
@@ -46,6 +103,7 @@
         "icon": "ClipboardList",
         "content": "Every refill event — who performed it, when, how much LN2 was added, and any notes — is recorded here. This is your complete audit trail for compliance and maintenance reviews.",
         "placement": "top",
-        "requireClick": false
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log"
     }
 ]

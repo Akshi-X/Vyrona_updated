@@ -17,6 +17,7 @@
         "content": "Click the Bangalore marker to zoom in and filter the view to that branch.",
         "placement": "bottom",
         "requireClick": true,
+        "rewindOnRefresh": true,
         "clickOnlyId": ["#map-marker-Bangalore"],
         "startPage": "/onboarding/control-tower"
     },
@@ -398,42 +399,5 @@
         "content": "Every LN2 top-up is recorded here with timestamp, quantity, and technician. A complete audit trail for compliance and maintenance planning.",
         "placement": "top",
         "requireClick": false
-    },
-    {
-        "id": "ct3-refill-log-add",
-        "target": "#onboarding-refill-log-add-btn",
-        "title": "Log a Refill",
-        "icon": "PlusCircle",
-        "content": "Click ADD to record a new LN2 top-up entry.",
-        "placement": "left",
-        "requireClick": true,
-        "clickOnlyId": ["#onboarding-refill-log-add-btn"],
-        "stepDelay": 200,
-        "startPage": "/onboarding/ivf-track-shipment/161"
-    },
-    {
-        "id": "ct3-refill-log-form",
-        "target": "#onboarding-refill-log-input-row",
-        "title": "Refill Entry Form",
-        "icon": "ClipboardList",
-        "content": "Fill in the details for this top-up — Refilled Date, Refill Time, Refilled By, Description, and Status. A demo entry has been pre-filled. Click the green checkmark to save it.",
-        "placement": "top",
-        "requireClick": true,
-        "prevDisable": true,
-        "onboardingEvent": "onboarding:prefill-refill-form",
-        "clickOnlyId": ["#onboarding-refill-log-save-btn"],
-        "stepDelay": 600,
-        "startPage": "/onboarding/ivf-track-shipment/161"
-    },
-    {
-        "id": "ct3-refill-log-saved",
-        "target": "#onboarding-ivf-refill-log",
-        "title": "Refill Logged",
-        "icon": "CheckCircle",
-        "content": "The new entry appears at the top of the Refill Log. Every top-up is timestamped and linked to the technician who performed it — giving you a tamper-proof maintenance audit trail.",
-        "placement": "top",
-        "requireClick": false,
-        "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161"
     }
 ]
