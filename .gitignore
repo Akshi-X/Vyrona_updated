@@ -3,3 +3,4 @@ FrontEnd/.env
 .github/
 .cursor/mygrape_rule
 .DS_Store
+.secrets

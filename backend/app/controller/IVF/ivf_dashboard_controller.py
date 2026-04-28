@@ -2,7 +2,9 @@
 IVF Dashboard Controller
 Controller for IVF dashboard metrics endpoints with role-based access control.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from datetime import datetime, timezone
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -214,18 +216,16 @@ def get_outbound_shipments(
 @router.get("/metrics/deviations-graph")
 def get_deviations_graph(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    from_ts: Optional[float] = Query(None, description="Start of range as Unix timestamp in milliseconds (browser locale)"),
+    to_ts: Optional[float] = Query(None, description="End of range as Unix timestamp in milliseconds (browser locale)"),
 ):
     """
     Get deviations graph data for Quality deviation chart.
-    
-    Chart structure (Horizontal bar chart):
-    - Y-axis: Tanks (User view) or Sites (Manager/Admin view)
-    - X-axis: Deviation values (0-100)
-    - For each tank/site: Two horizontal bars
-      1. Stacked bar: Internal Temperature, External Temperature, Shock
-      2. Solid bar: Top risk driver (blue) - maximum deviation value
-    
+
+    Accepts optional from_ts / to_ts (Unix ms from browser locale) to filter
+    by created_at. When omitted, no date filter is applied.
+
     Role-based access:
     - User (IVF): Tank-wise deviations within the site (tank-level monitoring)
     - Manager/Admin (IVF): Cumulative deviations per site with top deviation type
@@ -238,19 +238,31 @@ def get_deviations_graph(
                 status_code=403,
                 detail="User does not have an assigned branch",
             )
+
+        from_dt: Optional[datetime] = (
+            datetime.fromtimestamp(from_ts / 1000, tz=timezone.utc) if from_ts is not None else None
+        )
+        to_dt: Optional[datetime] = (
+            datetime.fromtimestamp(to_ts / 1000, tz=timezone.utc) if to_ts is not None else None
+        )
+
         service = IVFDashboardService(db)
         if role_normalized == "User":
             result = service.get_branch_deviations(
                 hospital_id=request.state.current_user.hospital_id,
                 branch_id=branch_id,
                 role=role,
+                from_dt=from_dt,
+                to_dt=to_dt,
             )
         else:
             result = service.get_deviations_graph_all_branches(
                 hospital_id=request.state.current_user.hospital_id,
                 role=role,
+                from_dt=from_dt,
+                to_dt=to_dt,
             )
-        
+
         return result
     except HTTPException:
         raise
@@ -262,15 +274,15 @@ def get_deviations_graph(
 def get_total_deviations(
     request: Request,
     db: Session = Depends(get_db),
+    from_ts: Optional[float] = Query(None, description="Start of range as Unix timestamp in milliseconds (browser locale)"),
+    to_ts: Optional[float] = Query(None, description="End of range as Unix timestamp in milliseconds (browser locale)"),
 ):
     """
-    Get total count of deviations from IVF quality logs.
-    
-    Counts all records in IVFQualityLog where any deviation flag is True:
-    - Internal temperature deviations (is_temp_internal_loss)
-    - External temperature deviations (is_temp_external_loss)
-    - Shock deviations (is_shock_loss)
-    
+    Get total count of deviations from critical_alerts.
+
+    Accepts optional from_ts / to_ts (Unix ms from browser locale) to filter
+    by created_at. When omitted, no date filter is applied.
+
     Role-based access:
     - Manager (IVF): Count deviations across all branches
     - User (IVF): Count deviations only for their assigned branch/site
@@ -278,12 +290,21 @@ def get_total_deviations(
     """
     try:
         branch_id, role = get_dashboard_branch_filter(request)
-
         hospital_id = request.state.current_user.hospital_id if request.state.current_user else None
-        
+
+        from_dt: Optional[datetime] = (
+            datetime.fromtimestamp(from_ts / 1000, tz=timezone.utc) if from_ts is not None else None
+        )
+        to_dt: Optional[datetime] = (
+            datetime.fromtimestamp(to_ts / 1000, tz=timezone.utc) if to_ts is not None else None
+        )
+
         service = IVFDashboardService(db)
-        result = service.get_total_deviations(hospital_id=hospital_id, branch_id=branch_id, role=role)
-        
+        result = service.get_total_deviations(
+            hospital_id=hospital_id, branch_id=branch_id, role=role,
+            from_dt=from_dt, to_dt=to_dt,
+        )
+
         return result
     except HTTPException:
         raise
