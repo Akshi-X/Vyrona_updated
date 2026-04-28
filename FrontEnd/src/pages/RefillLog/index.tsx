@@ -303,6 +303,14 @@ const RefillLog = () => {
         if (isAuthenticated && userRole !== undefined) loadReservoirData();
     }, [isAuthenticated, userRole]);
 
+    useEffect(() => {
+        const handler = () => {
+            setAddForm((p) => ({ ...p, reservoir_id: "16", refilled_by: "Avery Morgan" }));
+        };
+        document.addEventListener("onboarding:prefill-add-refill-log", handler);
+        return () => document.removeEventListener("onboarding:prefill-add-refill-log", handler);
+    }, []);
+
     const branchOptions = useMemo(() => {
         const options = new Set<string>();
         branches.forEach((b) => { if (b?.branch_name?.trim()) options.add(b.branch_name.trim()); });
@@ -411,6 +419,28 @@ const RefillLog = () => {
             }
             setIsAddRefillOpen(false);
             loadReservoirData();
+            // Reload activity log so the new entry appears immediately
+            try {
+                const tankIdList = containers.map((c) => Number(c.tankId));
+                const logsRes = await ivfService.getAllTanksRefillLogs(tankIdList).catch(() => null);
+                const merged = (logsRes?.logs ?? []).map((log) => ({
+                    timestamp: (() => {
+                        if (!log.refill_date) return "-";
+                        const dt = new Date(`${log.refill_date}T${log.refill_time ?? "00:00:00"}`);
+                        const date = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                        const time = log.refill_time ? dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                        return time ? `${date}, ${time}` : date;
+                    })(),
+                    sortKey: `${log.refill_date ?? ""}T${log.refill_time ?? ""}`,
+                    tankCode: log.tank_code ?? "-",
+                    branch: log.branch_name ?? "-",
+                    operator: log.refilled_by ?? "-",
+                    description: log.description ?? "-",
+                    status: log.status ?? "-",
+                    refillWeight: log.refill_weight ?? null,
+                }));
+                setAllActivityLogs(merged);
+            } catch { /* non-critical */ }
         } catch (error) {
             setAddError((error as Error)?.message || "Failed to create refill log");
         } finally {
@@ -475,7 +505,7 @@ const RefillLog = () => {
 
                 {/* Refill Detection Tiles */}
                 {!detectionsLoading && pendingDetections.length > 0 && (
-                        <div className="relative">
+                        <div id="onboarding-refill-detected" className="relative">
                             {/* Header row */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
@@ -518,7 +548,7 @@ const RefillLog = () => {
                                 className="flex gap-3 overflow-x-auto pb-1 w-fit max-w-full"
                                 style={{ scrollbarWidth: "none" }}
                             >
-                                {pendingDetections.map((detection) => {
+                                {pendingDetections.map((detection, detIdx) => {
                                     const isDismissing = dismissingId === detection.id;
                                     const detectedAtParts = detection.detected_at
                                         ? (() => {
@@ -532,6 +562,7 @@ const RefillLog = () => {
                                     return (
                                         <div
                                             key={detection.id}
+                                            id={detIdx === 0 ? "onboarding-refill-first-card" : undefined}
                                             className="flex-none w-[460px] rounded-xl border-2 border-[#E7D4F0] bg-gradient-to-br from-[#F7ECFF]/60 to-white p-4 flex flex-col gap-3"
                                             style={{
                                                 transition: "opacity 0.25s ease, transform 0.25s ease",
@@ -581,6 +612,7 @@ const RefillLog = () => {
 
                                                 {/* Add Logs button */}
                                                 <button
+                                                    id={detIdx === 0 ? "onboarding-refill-add-logs-btn" : undefined}
                                                     type="button"
                                                     onClick={() => {
                                                         setPendingAddDetectionId(detection.id);
@@ -711,7 +743,7 @@ const RefillLog = () => {
                     </div>
 
                     {/* Right: Reservoir Logs */}
-                    <div id="onboarding-refill-reservoir-logs" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden">
+                    <div id="onboarding-refill-reservoir-logs" className="bg-white border border-[#E7E1E1] rounded-lg flex flex-col overflow-hidden max-h-[420px]">
                         <div className="px-4 py-3 border-b border-[#E7E1E1] shrink-0">
                             <h2 className="font-semibold text-black text-base">Reservoir Logs</h2>
                         </div>
@@ -1023,7 +1055,7 @@ const RefillLog = () => {
             {/* Add Refill / Reservoir Modal */}
             {isAddRefillOpen && (
                 <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-                    <div className="w-full max-w-xl bg-white rounded-lg border border-[#E7E1E1] p-5">
+                    <div id="onboarding-refill-add-modal" className="w-full max-w-xl bg-white rounded-lg border border-[#E7E1E1] p-5">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-black">Add Log</h3>
@@ -1136,7 +1168,7 @@ const RefillLog = () => {
                                 {addError && <div className="text-sm text-red-600">{addError}</div>}
                                 <div className="flex items-center justify-end gap-2 pt-2">
                                     <button type="button" onClick={() => { if (!addSubmitting) { setIsAddRefillOpen(false); setPendingAddDetectionId(null); } }} className="px-4 h-9 rounded-lg border border-[#E7E1E1] text-sm text-gray-700">Cancel</button>
-                                    <button type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
+                                    <button id="onboarding-refill-add-save-btn" type="submit" disabled={addSubmitting} className="px-4 h-9 rounded-lg bg-[#6b1176] text-white text-sm font-medium hover:bg-[#5a0e63] disabled:opacity-60">
                                         {addSubmitting ? "Saving..." : "Save"}
                                     </button>
                                 </div>

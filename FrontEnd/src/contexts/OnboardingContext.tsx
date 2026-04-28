@@ -163,12 +163,14 @@ const reducer = (state: OnboardingState, action: Action): OnboardingState => {
                             ? incomingLevel.status
                             : current.status;
 
-                    // Walk back past any prevDisable steps so we never resume
+                    // Walk back past any prevDisable/rewindOnRefresh steps so we never resume
                     // inside an unopened modal after a reload or cross-device sync.
                     const rawStepIndex = Math.max(current.lastStepIndex, incomingLevel.lastStepIndex);
                     const levelSteps = onboardingStepsByLevel[levelId] ?? [];
                     let safeStepIndex = rawStepIndex;
-                    while (safeStepIndex > 0 && (levelSteps[safeStepIndex] as OnboardingStep | undefined)?.prevDisable) {
+                    while (safeStepIndex > 0) {
+                        const s = levelSteps[safeStepIndex] as OnboardingStep | undefined;
+                        if (!s?.prevDisable && !s?.rewindOnRefresh) break;
                         safeStepIndex -= 1;
                     }
 

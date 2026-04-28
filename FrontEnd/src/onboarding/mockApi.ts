@@ -419,11 +419,32 @@ export const enableOnboardingMocks = () => {
 
         // Alert Setting — branch list for filter dropdown.
         if (endpoint.startsWith("/api/ivf/branches")) {
-            const branches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+            const allBranches = controlTowerData.activeCanisters.branches.map((b: any) => ({
                 branch_id: b.branch_id,
                 branch_name: b.branch_name,
             }));
-            return { branches };
+            // Put Bangalore first so it's immediately visible in the onboarding dropdown
+            const bangalore = allBranches.find((b) => b.branch_name === "Bangalore");
+            const rest = allBranches.filter((b) => b.branch_name !== "Bangalore");
+            return { branches: bangalore ? [bangalore, ...rest] : allBranches };
+        }
+
+        // Alert Setting — bulk upsert KPI configs (POST). Merges into in-memory state
+        // so the subsequent re-fetch reflects the saved changes.
+        if (endpoint === "/api/ivf/quality/kpi-config/bulk" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const configs: any[] = body.configs ?? [];
+            const configList: any[] = dashboardData.alertSettingKpiConfigList.config;
+            let nextId = Math.max(...configList.map((c: any) => c.id), 0) + 1;
+            configs.forEach((incoming: any) => {
+                const existing = configList.find((c: any) => c.kpi_name === incoming.kpi_name);
+                if (existing) {
+                    Object.assign(existing, incoming);
+                } else {
+                    configList.push({ id: nextId++, hospital_id: 1, branch_id: 16, tank_id: 161, ...incoming });
+                }
+            });
+            return { updated: configs.filter((c: any) => configList.some((e: any) => e.kpi_name === c.kpi_name)).length, created: 0 };
         }
 
         // Alert Setting — KPI config list for a specific tank.
@@ -475,12 +496,25 @@ export const enableOnboardingMocks = () => {
 
         // IVF track shipment — create refill log entry.
         if (
-            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/]+\/refill-logs$/) &&
+            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/?]+\/refill-logs(\?|$)/) &&
             options?.method === "POST"
         ) {
+            const cleanPath = endpoint.split("?")[0];
+            const tankIdFromUrl = Number(cleanPath.split("/").filter(Boolean).find((_, i, arr) => arr[i - 1] === "tanks" && arr[i + 1] === "refill-logs") ?? 0);
             const body = options?.body ? JSON.parse(options.body as string) : {};
+
+            // Build a branch-aware log for the activity log list
+            const branchEntry = (() => {
+                for (const b of (controlTowerData as any).activeCanisters?.branches ?? []) {
+                    for (const t of b.tanks ?? []) {
+                        if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
+                    }
+                }
+                return { branch_name: null, tank_code: null };
+            })();
+
             const newLog = {
-                tank_id: 60,
+                tank_id: tankIdFromUrl || 60,
                 log_id: mockCanisterRefillLogs.refill_logs.length + 500,
                 refill_date: body.refill_date ?? new Date().toISOString().split("T")[0],
                 refill_time: body.refill_time ?? "00:00:00",
@@ -498,6 +532,20 @@ export const enableOnboardingMocks = () => {
                 updated_by: null,
             };
             mockCanisterRefillLogs.refill_logs.unshift(newLog);
+
+            // Also prepend to refillAllLogs so the activity log reflects the new entry immediately
+            dashboardData.refillAllLogs.logs.unshift({
+                tank_id: tankIdFromUrl || 60,
+                tank_code: branchEntry.tank_code ?? body.tank_code ?? "—",
+                branch_name: branchEntry.branch_name,
+                refill_date: newLog.refill_date,
+                refill_time: newLog.refill_time,
+                refilled_by: newLog.refilled_by,
+                description: newLog.description,
+                status: newLog.status,
+                refill_weight: body.refill_weight ?? null,
+            });
+
             return { success: true, log: newLog };
         }
 

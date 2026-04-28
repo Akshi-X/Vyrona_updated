@@ -241,7 +241,14 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                     if (el && hitsBox(el)) { matchedEl = el; return true; }
                     return false;
                 });
-                if (!hitWhitelisted) return;
+                if (!hitWhitelisted) {
+                    // Block the event entirely so downstream handlers (e.g. dropdown
+                    // click-outside listeners) don't fire and close overlays the tour
+                    // needs to stay open.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
 
                 // Prevent the native click from also firing so elements like
                 // toggle buttons aren't triggered twice (once real, once synthetic).
@@ -339,10 +346,10 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     useEffect(() => {
         if (!isTourActive || stepCount === 0 || stepIndex >= stepCount) return;
 
-        // Walk back from any prevDisable step — catches mid-session resumes
+        // Walk back from any prevDisable/rewindOnRefresh step — catches mid-session resumes
         // where HYDRATE hasn't run (no reload).
         let safeIndex = stepIndex;
-        while (safeIndex > 0 && steps[safeIndex]?.prevDisable) safeIndex--;
+        while (safeIndex > 0 && (steps[safeIndex]?.prevDisable || steps[safeIndex]?.rewindOnRefresh)) safeIndex--;
 
         if (safeIndex !== stepIndex) {
             setStepIndex(levelId, safeIndex);
