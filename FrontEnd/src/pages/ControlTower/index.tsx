@@ -215,7 +215,7 @@ const ControlTower = () => {
             try {
                 // Always fetch all canisters without filters to populate branch/status options
                 // Filtering will be done client-side
-                const filters: { branch_name?: string; status?: string } = {};
+                const filters: { branch_id?: number; status?: string } = {};
                 const data = await shipmentService.getActiveCanisters(filters);
                 let flattenedCanisters: Array<{
                     id: string;
