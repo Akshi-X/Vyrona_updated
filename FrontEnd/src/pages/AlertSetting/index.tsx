@@ -531,9 +531,11 @@ export default function AlertSetting() {
         if (!isAuthenticated) return;
         setContainersLoading(true);
         setContainersError(null);
-        const filters: { branch_name?: string } = {};
-        if (branchFilter && branchFilter !== "All")
-            filters.branch_name = branchFilter;
+        const filters: { branch_id?: number } = {};
+        if (branchFilter && branchFilter !== "All") {
+            const matched = branches.find((b) => b.branch_name === branchFilter);
+            if (matched) filters.branch_id = matched.branch_id;
+        }
         shipmentService
             .getActiveCanisters(filters)
             .then((data: any) => {

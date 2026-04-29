@@ -143,67 +143,20 @@ def get_ivf_control_tower_map(
 def get_active_canisters(
     request: Request,
     db: Session = Depends(get_db),
-    branch_name: Optional[str] = Query(None, description="Optional branch name filter"),
+    branch_id: Optional[int] = Query(None, description="Optional branch ID filter"),
     status: Optional[CanisterStatus] = Query(None, description="Optional tank status filter (safe, risk, critical)")
 ):
     """
-    Get active tanks grouped by branch for the current logged-in user's branch.
-    
+    Get active tanks grouped by branch for the current logged-in user's hospital.
+
     Role-based access:
     - User (IVF): Only see tanks from their assigned branch
-    - Manager (IVF): See tanks from all branches
-    - Admin: See tanks from all branches
-    
-    Optional filters:
-    - branch_name: Filter by specific branch name
-    - status: Filter by tank status (safe, risk, critical)
-    
-    This endpoint returns all active tanks (is_active = True) grouped by branch with:
-    - branch_id: The ID of the branch
-    - branch_name: The name of the branch
-    - tanks: List of tanks for this branch with:
-        - tank_code: The tank code (e.g., 'T1')
-        - updated_at: Last updated date and time from tanks table updated_at
-        - status: Tank status (safe, risk, critical)
-    
-    Response format:
-    {
-        "branches": [
-            {
-                "branch_id": 1,
-                "branch_name": "Egmore",
-                "tanks": [
-                    {
-                        "tank_code": "T1",
-                        "updated_at": "2024-01-15T10:30:00Z",
-                        "status": "safe"
-                    },
-                    {
-                        "tank_code": "T2",
-                        "updated_at": "2024-01-15T09:15:00Z",
-                        "status": "risk"
-                    }
-                ]
-            }
-        ],
-        "total": 2
-    }
+    - Manager (IVF): See tanks from all branches, optionally filtered by branch_id
+    - Admin: See tanks from all branches, optionally filtered by branch_id
     """
     try:
         user = _ensure_ivf_user(request)
-
-        # Normalize optional branch filter once
-        normalized_branch_name = branch_name.strip() if branch_name else None
-
-        # Resolve hospital scope (always required to prevent cross-hospital data access)
         hospital_id = _resolve_hospital_id(request, db, user)
-        resolved_user_branch = None
-        if user.branch_id:
-            resolved_user_branch = db.query(HospitalBranch).filter(
-                HospitalBranch.branch_id == user.branch_id
-            ).first()
-
-        # Get branch filter info for IVF department users
         user_branch_id, role = get_branch_filter_info(request)
 
         if role is None:
@@ -215,48 +168,30 @@ def get_active_canisters(
         filter_branch_id = None
 
         if role == "User":
-            # User role must always be restricted to own branch
             if user_branch_id is None:
                 raise HTTPException(
                     status_code=403,
                     detail="Access denied: User account is not associated with any branch"
                 )
+            # Users are always restricted to their own branch regardless of what's passed
+            if branch_id is not None and branch_id != user_branch_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: You can only view tanks from your assigned branch"
+                )
             filter_branch_id = user_branch_id
-
-            # If branch_name is explicitly provided by user role, verify it matches their own branch
-            if normalized_branch_name is not None:
-                # Reuse previously fetched branch when possible to avoid an extra query.
-                if (
-                    resolved_user_branch is None
-                    or resolved_user_branch.branch_id != user_branch_id
-                    or resolved_user_branch.hospital_id != hospital_id
-                ):
-                    resolved_user_branch = db.query(HospitalBranch).filter(
-                        HospitalBranch.branch_id == user_branch_id,
-                        HospitalBranch.hospital_id == hospital_id
-                    ).first()
-                if not resolved_user_branch:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Access denied: Assigned branch not found in your hospital"
-                    )
-                if normalized_branch_name.lower() != (resolved_user_branch.branch_name or "").strip().lower():
-                    raise HTTPException(
-                        status_code=403,
-                        detail=f"Access denied: You can only view tanks from your assigned branch ({resolved_user_branch.branch_name})"
-                    )
-        elif normalized_branch_name is not None:
-            # Manager/Admin can filter by branch, but only within their hospital
+        elif branch_id is not None:
+            # Manager/Admin: verify the requested branch belongs to this hospital
             selected_branch = db.query(HospitalBranch).filter(
-                HospitalBranch.branch_name == normalized_branch_name,
+                HospitalBranch.branch_id == branch_id,
                 HospitalBranch.hospital_id == hospital_id
             ).first()
             if not selected_branch:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Branch '{normalized_branch_name}' not found in your hospital"
+                    detail=f"Branch {branch_id} not found in your hospital"
                 )
-            filter_branch_id = selected_branch.branch_id
+            filter_branch_id = branch_id
 
         service = IVFService(db)
         tanks_data = service.get_active_tanks(
