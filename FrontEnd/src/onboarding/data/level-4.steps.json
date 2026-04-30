@@ -7,7 +7,8 @@
         "content": "This is the Alert Configuration page. Here you can set KPI thresholds and notification rules for every container across all branches.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/dashboard"
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-sidebar-click",
@@ -18,7 +19,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-sidebar-alert-setting"],
-        "prevDisable": true
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-filters",
@@ -28,7 +30,8 @@
         "content": "Use the branch filter to narrow the container list to a specific location. This makes it easy to manage alerts across large multi-branch deployments.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "al4-containers-overview",
@@ -38,7 +41,8 @@
         "content": "This panel lists all active containers across your branches. You can filter by branch and click any container to view or edit its alert configuration.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "al4-settings-btn",
@@ -49,7 +53,8 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-settings-btn"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-notify-modal",
@@ -60,7 +65,8 @@
         "placement": "bottom",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "al4-notify-close",
@@ -72,7 +78,8 @@
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-notify-close"],
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-branch-open",
@@ -83,7 +90,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-branch-dropdown"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "al4-branch-bangalore",
@@ -95,7 +103,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-alert-branch-16"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "al4-containers",
@@ -106,7 +115,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-alert-container-T-161"],
-        "startPage": "/onboarding/alert-setting?branch_id=16"
+        "startPage": "/onboarding/alert-setting?branch_id=16",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "al4-kpi-panel",
@@ -117,7 +127,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-kpi-temp-internal",
@@ -128,7 +139,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/idea_with_thermometer.webp"
     },
     {
         "id": "al4-kpi-temp-external",
@@ -139,7 +151,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "al4-kpi-ln2",
@@ -150,7 +163,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "al4-kpi-battery",
@@ -161,7 +175,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-kpi-shock",
@@ -172,7 +187,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/shock.webp"
     },
     {
         "id": "al4-kpi-evaporation",
@@ -184,7 +200,8 @@
         "requireClick": false,
         "onboardingEvent": "onboarding:prefill-alert-evap-lid",
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/refilling.webp"
     },
     {
         "id": "al4-kpi-lid",
@@ -195,7 +212,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/lid_state.webp"
     },
     {
         "id": "al4-save-changes",
@@ -207,7 +225,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-alert-save-btn"],
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "al4-kpi-panel-overview",
@@ -218,6 +237,7 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/alert-setting"
+        "startPage": "/onboarding/alert-setting",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     }
 ]

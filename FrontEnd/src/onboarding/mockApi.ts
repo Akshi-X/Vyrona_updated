@@ -554,19 +554,72 @@ export const enableOnboardingMocks = () => {
             return mockCanisterRefillLogs;
         }
 
-        // Reports page — monthly summary.
+        // Reports page — monthly summary (filter by month).
         if (endpoint.startsWith("/api/ivf/reports/monthly-summary")) {
-            return dashboardData.reportsMonthlySummary;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const monthParam = qs.get("month") ?? "";
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+            const base = dashboardData.reportsMonthlySummary;
+            // Mock data is for 2026-04; other months return empty
+            const rows = (!monthParam || monthParam === base.month) ? [...base.rows] : [];
+            const total = rows.length;
+            const start = (page - 1) * pageSize;
+            return { ...base, rows: rows.slice(start, start + pageSize), total_count: total, total_kpis: total, page, page_size: pageSize };
         }
 
-        // Reports page — critical alerts report.
+        // Reports page — critical alerts report (filter by status, severity, tank_codes, date range).
         if (endpoint.startsWith("/api/ivf/reports/critical-alerts")) {
-            return dashboardData.reportsCriticalAlerts;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam   = qs.get("status")     ?? "";
+            const severityParam = qs.get("severity")   ?? "";
+            const startDate     = qs.get("start_date") ?? "";
+            const endDate       = qs.get("end_date")   ?? "";
+            const tankCodes     = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            // Map UI status labels to mock data status values
+            const statusMap: Record<string, string> = { Active: "open", Acknowledged: "acknowledged" };
+            const normalizedStatus = statusMap[statusParam] ?? statusParam.toLowerCase();
+
+            type AlertRow = typeof dashboardData.reportsCriticalAlerts.alerts[number];
+            let alerts: AlertRow[] = [...dashboardData.reportsCriticalAlerts.alerts];
+
+            if (normalizedStatus) alerts = alerts.filter(a => a.status === normalizedStatus);
+            if (severityParam)    alerts = alerts.filter(a => a.severity.toLowerCase() === severityParam.toLowerCase());
+            if (tankCodes.length) alerts = alerts.filter(a => !!a.tank_code && tankCodes.includes(a.tank_code));
+            if (startDate)        alerts = alerts.filter(a => a.occurred_at >= startDate);
+            if (endDate)          alerts = alerts.filter(a => a.occurred_at <= endDate + "T23:59:59");
+
+            const total = alerts.length;
+            const start = (page - 1) * pageSize;
+            alerts = alerts.slice(start, start + pageSize);
+            return { alerts, total_count: total, page, page_size: pageSize, status: "ok" };
         }
 
-        // Reports page — refill logs report.
+        // Reports page — refill logs report (filter by status, tank_codes, date range).
         if (endpoint.startsWith("/api/ivf/reports/refill-logs")) {
-            return dashboardData.reportsRefillLogs;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam = qs.get("status")     ?? "";
+            const startDate   = qs.get("start_date") ?? "";
+            const endDate     = qs.get("end_date")   ?? "";
+            const tankCodes   = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            type LogRow = typeof dashboardData.reportsRefillLogs.logs[number];
+            let logs: LogRow[] = [...dashboardData.reportsRefillLogs.logs];
+
+            if (statusParam)      logs = logs.filter(l => (l.status ?? "").toLowerCase() === statusParam.toLowerCase());
+            if (tankCodes.length) logs = logs.filter(l => !!l.tank_code && tankCodes.includes(l.tank_code));
+            if (startDate)        logs = logs.filter(l => (l.refill_date ?? "") >= startDate);
+            if (endDate)          logs = logs.filter(l => (l.refill_date ?? "") <= endDate);
+
+            const total = logs.length;
+            const start = (page - 1) * pageSize;
+            logs = logs.slice(start, start + pageSize);
+            return { logs, total_count: total, page, page_size: pageSize, status: "ok" };
         }
 
         // Reports page — activity logs (filtered by query params).
@@ -634,10 +687,22 @@ export const enableOnboardingMocks = () => {
 
         // Refill Log page — reservoirs list.
         if (endpoint.startsWith("/api/ivf/reservoirs")) {
-            return dashboardData.refillReservoirs;
+            const sorted = [...dashboardData.refillReservoirs.reservoirs].sort((a, b) =>
+                (a.branch_name ?? a.reservoir_name).localeCompare(b.branch_name ?? b.reservoir_name)
+            );
+            return { ...dashboardData.refillReservoirs, reservoirs: sorted };
         }
 
-        // Refill Log page — reservoir logs.
+        // Refill Log page — update reservoir log (PUT/PATCH).
+        if (endpoint.match(/^\/api\/ivf\/reservoir-logs\/\d+$/) && (options?.method === "PUT" || options?.method === "PATCH")) {
+            const logId = Number(endpoint.split("/").pop());
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const log = dashboardData.refillReservoirLogs.logs.find((l: any) => l.log_id === logId);
+            if (log) Object.assign(log, body);
+            return { success: true };
+        }
+
+        // Refill Log page — reservoir logs (GET).
         if (endpoint.startsWith("/api/ivf/reservoir-logs")) {
             return dashboardData.refillReservoirLogs;
         }

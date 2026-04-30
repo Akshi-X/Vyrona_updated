@@ -7,7 +7,8 @@
         "content": "Every pin on this map is a live branch. Colour tells you its health — green is safe, yellow is at risk, red is critical. Let's interact with one.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/control-tower"
+        "startPage": "/onboarding/control-tower",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct3-map-bangalore-click",
@@ -19,7 +20,8 @@
         "requireClick": true,
         "rewindOnRefresh": true,
         "clickOnlyId": ["#map-marker-Bangalore"],
-        "startPage": "/onboarding/control-tower"
+        "startPage": "/onboarding/control-tower",
+        "genieImage": "/genie/explaining_with_globe.webp"
     },
     {
         "id": "ct3-containers-after-marker",
@@ -29,7 +31,8 @@
         "content": "The list has updated to show only Bangalore containers. Find Container T-161 and click it to inspect its details.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/control-tower"
+        "startPage": "/onboarding/control-tower",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct3-container-t161-click",
@@ -40,7 +43,8 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#tank-Bangalore-T-161"],
-        "startPage": "/onboarding/control-tower"
+        "startPage": "/onboarding/control-tower",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct3-cryocan-page-overview",
@@ -50,7 +54,8 @@
         "content": "You are now on the Cryocan page. This screen gives you a complete view of this container, including live parameters, trend charts, and operational logs.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     },
     {
         "id": "ct3-quality-parameters",
@@ -60,7 +65,8 @@
         "content": "This panel shows the real-time sensor readings for the container — internal temperature, LN2 level, battery, and more. Values update live every few seconds.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-cryocan-svg",
@@ -70,7 +76,8 @@
         "content": "This diagram is a live visual representation of the cryogenic tank. The liquid fill level inside the cylinder rises and falls in real time based on the LN2 sensor reading — giving you an instant, at-a-glance health check of the tank without reading numbers.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
     },
     {
         "id": "ct3-cryocan-l1-marker",
@@ -80,7 +87,8 @@
         "content": "The dashed line marks your configured L1 alert threshold — the minimum safe LN2 level for this tank. When the liquid surface drops below this line, an alert is triggered. The warning icon beside it turns red as the level approaches the limit.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct3-cryocan-level-text",
@@ -90,7 +98,8 @@
         "content": "This number shows the current LN2 level as a percentage of the tank's maximum capacity. 100% means full; anything below your L1 threshold requires immediate attention. The colour of the fill behind it — green, yellow, or red — reinforces the urgency at a glance.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-kpi-lid",
@@ -100,7 +109,8 @@
         "content": "Shows whether the tank lid is currently open or closed. An open lid during storage is a critical deviation — LN2 evaporates rapidly and sample integrity is immediately at risk. This tile turns red the moment the lid is detected open.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/lid_state.webp"
     },
     {
         "id": "ct3-kpi-internal-temp",
@@ -110,7 +120,8 @@
         "content": "The temperature measured inside the tank, where the samples are stored. For a healthy cryogenic container this should stay near −196 °C. Any rise above the threshold signals a breach in the cold chain and requires urgent investigation.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/idea_with_thermometer.webp"
     },
     {
         "id": "ct3-kpi-external-temp",
@@ -120,7 +131,8 @@
         "content": "The ambient temperature just outside the tank. Unusually high external temperatures can accelerate LN2 evaporation and stress the insulation. Tracking this alongside the internal reading lets you diagnose whether a temperature excursion is environment-driven or equipment-driven.",
         "placement": "left",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "ct3-kpi-evap-rate",
@@ -130,7 +142,8 @@
         "content": "How fast LN2 is evaporating from this tank, measured in kg/hr. A normal rate is low and steady. A sudden spike indicates a lid left open, a seal failure, or unusual thermal load — any of which puts your stored samples at risk and requires an immediate check.",
         "placement": "left",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/refilling.webp"
     },
     {
         "id": "ct3-kpi-battery",
@@ -140,7 +153,8 @@
         "content": "This bar shows the charge level of the container's monitoring device. When the battery drops to 0%, the sensor goes offline — internal temperature, external temperature, and shock detection readings are no longer available until the device is recharged. Keep an eye on this to avoid unexpected data gaps.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_settings.webp"
     },
     {
         "id": "ct3-quality-chart",
@@ -150,7 +164,8 @@
         "content": "Visualise any KPI over LIVE, 1H, 24H, or 7D windows. Switch tabs to compare temperature, LN2 level, shock events, and more across time.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-chart-tab-ln2",
@@ -161,7 +176,8 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-chart-tab-ln2"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-chart-ln2-graph",
@@ -171,7 +187,8 @@
         "content": "This is the live LN2 level trend for the container. The line plots sensor readings over time — a flat line means stable nitrogen levels, while a downward slope means the tank is losing LN2. Any sharp drop warrants an immediate investigation.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-chart-range-switcher",
@@ -182,7 +199,8 @@
         "placement": "top",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-chart-range-24h"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-chart-24h-result",
@@ -192,7 +210,8 @@
         "content": "You are now viewing the LN2 level over the last 24 hours. A steady line means stable storage. A steep drop signals rapid evaporation and warrants an immediate check — correlate the dip with the Refill Log to confirm whether a top-up already occurred.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-ivf-critical-alerts-icon",
@@ -203,7 +222,8 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-critical-alerts-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/shock.webp"
     },
     {
         "id": "onboarding-ivf-critical-alerts-modal",
@@ -214,7 +234,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct3-ivf-alert-ack-click",
@@ -226,7 +247,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-critical-alert-ack-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct3-ivf-alert-confirm-dialog",
@@ -238,7 +260,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-critical-alert-confirm-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_caution.webp"
     },
     {
         "id": "ct3-ivf-alert-acknowledged",
@@ -250,7 +273,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {
         "id": "ct3-ivf-stakeholder-chats",
@@ -260,7 +284,8 @@
         "content": "This opens a live chat channel with stakeholders — doctors, embryologists, and lab coordinators — for this container. A red badge shows the number of unread messages. Keep this clear to ensure no important communication is missed.",
         "placement": "bottom",
         "requireClick": false,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "ct3-ivf-stakeholder-chats-open",
@@ -271,7 +296,8 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-stakeholder-chats-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "ct3-ivf-stakeholder-chatbox",
@@ -282,7 +308,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
     },
     {
         "id": "ct3-ivf-chat-type",
@@ -294,7 +321,8 @@
         "requireClick": false,
         "prevDisable": true,
         "inputText": "LN2 level looks stable. Confirmed top-up is scheduled for tomorrow morning.",
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "ct3-ivf-chat-send",
@@ -307,7 +335,8 @@
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-chat-send-btn"],
         "stepDelay": 400,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_phone.webp"
     },
     {
         "id": "ct3-ivf-chat-sent",
@@ -319,7 +348,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-chat-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {
         "id": "ct3-ivf-my-tasks",
@@ -330,7 +360,8 @@
         "placement": "bottom",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-ivf-my-tasks-icon"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "ct3-ivf-my-tasks-modal",
@@ -341,7 +372,8 @@
         "placement": "left",
         "requireClick": false,
         "prevDisable": true,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "ct3-ivf-my-tasks-add",
@@ -353,7 +385,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-my-tasks-add-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "ct3-ivf-my-tasks-form",
@@ -367,7 +400,8 @@
         "onboardingEvent": "onboarding:prefill-task-form",
         "clickOnlyId": ["#onboarding-my-tasks-save-btn"],
         "stepDelay": 600,
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "ct3-ivf-my-tasks-saved",
@@ -379,7 +413,8 @@
         "requireClick": true,
         "prevDisable": true,
         "clickOnlyId": ["#onboarding-modal-close-btn"],
-        "startPage": "/onboarding/ivf-track-shipment/161"
+        "startPage": "/onboarding/ivf-track-shipment/161",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
     },
     {
         "id": "ct3-container-data",
@@ -389,7 +424,8 @@
         "content": "A full log of every sample stored in this container — patient IDs, sample types, dates, and current status — so nothing is ever lost or untracked.",
         "placement": "top",
         "prevDisable": false,
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_numbers.webp"
     },
     {
         "id": "ct3-refill-log",
@@ -398,6 +434,7 @@
         "icon": "Droplets",
         "content": "Every LN2 top-up is recorded here with timestamp, quantity, and technician. A complete audit trail for compliance and maintenance planning.",
         "placement": "top",
-        "requireClick": false
+        "requireClick": false,
+        "genieImage": "/genie/refilling.webp"
     }
 ]

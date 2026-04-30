@@ -4,6 +4,7 @@ import { COLORS } from "../../constants/colors";
 import { feedbackApi, type FeedbackSubmission } from "../../api/feedbackApi";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../contexts/AuthContext";
+import { useOnboardingMode } from "../../contexts/OnboardingModeContext";
 import Header from "../../components/Header";
 import AttachmentThumbnail from "../../components/AttachmentThumbnail";
 
@@ -88,6 +89,7 @@ const NAME_REGEX = /^[A-Za-z ,.'-]{2,80}$/;
 const Support: React.FC = () => {
     const location = useLocation() as { state?: any };
     const navigate = useNavigate();
+    const isOnboarding = useOnboardingMode();
     const { isEmailNotificationsEnabled, userRole } = useAuth();
     const supportRole = supportRoleFromAuth(userRole);
     const readonly = Boolean(location.state?.readonly);
@@ -136,6 +138,19 @@ const Support: React.FC = () => {
     const [statusUpdateSuccess, setStatusUpdateSuccess] = useState<
         string | null
     >(null);
+
+    useEffect(() => {
+        const handlers: Array<[string, () => void]> = [
+            ["onboarding:support-feedback-type:bug", () => setFeedbackType("bug")],
+            ["onboarding:support-fill-subject",      () => setSubject("Alert not triggering on Tank B-03")],
+            ["onboarding:support-fill-description",  () => setDescription("Tank B-03 failed to trigger a critical alert during the overnight window on 2026-04-28. The temperature dropped below the configured threshold at 02:14 but no notification was sent to the on-call team. Expected: alert within 5 minutes of breach. Actual: no alert received.")],
+            ["onboarding:support-fill-priority",     () => setPriority("high")],
+            ["onboarding:support-fill-modules",      () => setSelectedModuleIndices([0])],
+            ["onboarding:support-fill-agreement",    () => setAgreementChecked(true)],
+        ];
+        handlers.forEach(([event, fn]) => document.addEventListener(event, fn));
+        return () => { handlers.forEach(([event, fn]) => document.removeEventListener(event, fn)); };
+    }, []);
 
     // Fetch user profile data if not provided via prefill
     useEffect(() => {
@@ -523,7 +538,7 @@ const Support: React.FC = () => {
             const response = await feedbackApi.submitFeedback(feedbackData);
 
             // Navigate to success page with ticket information
-            navigate("/success", {
+            navigate(isOnboarding ? "/onboarding/success" : "/success", {
                 state: {
                     ticketId: response.feedback_id,
                     ticketNumber: response.ticket_id,
@@ -584,10 +599,10 @@ const Support: React.FC = () => {
                             </p>
                         </div>
 
-                        <form onSubmit={onSubmit}>
+                        <form onSubmit={onSubmit} id="onboarding-support-form">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {/* Full Name */}
-                                <div>
+                                <div id="onboarding-support-fullname">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Full Name
                                         <span className="text-red-500"> *</span>
@@ -618,7 +633,7 @@ const Support: React.FC = () => {
                                     )}
                                 </div>
                                 {/* Work Email */}
-                                <div>
+                                <div id="onboarding-support-email">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Work Email
                                         <span className="text-red-500"> *</span>
@@ -640,7 +655,7 @@ const Support: React.FC = () => {
                                 </div>
 
                                 {/* Type of Feedback */}
-                                <div>
+                                <div id="onboarding-support-feedback-type">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Type of Feedback
                                         <span className="text-red-500"> *</span>
@@ -681,7 +696,7 @@ const Support: React.FC = () => {
                                 </div>
 
                                 {/* Subject */}
-                                <div className="md:col-span-2">
+                                <div id="onboarding-support-subject" className="md:col-span-2">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Subject / Title
                                         <span className="text-red-500"> *</span>
@@ -704,7 +719,7 @@ const Support: React.FC = () => {
                             </div>
 
                             {/* Description */}
-                            <div className="mt-8">
+                            <div id="onboarding-support-description" className="mt-8">
                                 <label className="block text-sm font-bold text-black mb-2">
                                     Detailed Description
                                     <span className="text-red-500"> *</span>
@@ -860,7 +875,7 @@ const Support: React.FC = () => {
                             {/* Priority and Modules in one alignment (same row) */}
                             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {/* Priority */}
-                                <div>
+                                <div id="onboarding-support-priority">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Priority
                                         <span className="text-red-500"> *</span>
@@ -890,7 +905,7 @@ const Support: React.FC = () => {
                                 </div>
 
                                 {/* Affected Modules (based on logged-in user role) */}
-                                <div>
+                                <div id="onboarding-support-modules">
                                     <label className="block text-sm font-bold text-black mb-2">
                                         Affected Modules
                                         <span className="text-red-500"> *</span>
@@ -1145,7 +1160,7 @@ const Support: React.FC = () => {
 
                             {/* Optional schedule call (full width, below row) */}
                             {!readonly && !hideAttach && (
-                                <div className="mt-8">
+                                <div id="onboarding-support-agreement" className="mt-8">
                                     <h3 className="text-sm font-bold text-black">
                                         Optional: Schedule a Call
                                     </h3>
@@ -1200,6 +1215,7 @@ const Support: React.FC = () => {
                             {!readonly && (
                                 <div className="mt-8 flex flex-col items-end">
                                     <button
+                                        id="onboarding-support-submit-btn"
                                         type="submit"
                                         disabled={
                                             isSubmitting || !agreementChecked
