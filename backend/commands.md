@@ -21,8 +21,8 @@ INSERT INTO devices (
     updated_at
 )
 VALUES (
-    23,                -- use correct branch_id
-    'IOTPRADELT1',
+    26,                -- use correct branch_id
+    'IOTISWT1',        -- update this too
     NOW(),
     NOW()
 )
@@ -55,8 +55,8 @@ INSERT INTO ln2_iot_devices (
     precaution_level_pct
 )
 SELECT
-    91 AS tank_id,
-    11 AS device_id,   -- 👈 use returned ID here
+    94 AS tank_id,     -- update with latest
+    13 AS device_id,   -- 👈 use returned ID here
     tank_max_capacity_reading,
     tank_min_capacity_reading,
     NOW(),
@@ -86,7 +86,7 @@ to check live for iot
 SELECT * FROM ln2_iot_raw_data WHERE payload->>'deviceid' = 'IOTYELDELT1' ORDER BY created_at DESC LIMIT 1;
 
 to check live for tive
-SELECT * FROM ivf_telemetry_data where device_id = 'K1130549' ORDER BY created_at DESC LIMIT 1;
+SELECT * FROM ivf_telemetry_data where device_id = 'K1131601' ORDER BY created_at DESC LIMIT 1;
 
 
 

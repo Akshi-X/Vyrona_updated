@@ -16,11 +16,11 @@
         "prompt": "What does the Direction toggle in the filter panel switch between?",
         "choices": [
             "Inbound and Outbound",
-            "Map view and List view",
             "Cryotanks and Incubators",
+            "Map view and List view",
             "Admin and Staff roles"
         ],
-        "correctIndex": 2,
+        "correctIndex": 1,
         "points": 10
     },
     {
@@ -28,11 +28,11 @@
         "prompt": "What happens when you leave the Branch filter set to 'All Branches'?",
         "choices": [
             "Only the home branch is shown",
-            "The map is hidden",
             "All branches and their assets are visible at once",
+            "The map is hidden",
             "Filters are reset to default"
         ],
-        "correctIndex": 2,
+        "correctIndex": 1,
         "points": 10
     },
     {

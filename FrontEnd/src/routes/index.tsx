@@ -17,6 +17,7 @@ import ReportsPage from "../pages/Reports";
 import UsersPage from "../pages/Users";
 import InviteSignup from "../pages/InviteSignup";
 import EmbryoGradingPage from "../pages/EmbryoGrading";
+import AdvancedEmbryoGradingPage from "../pages/EmbryoGrading/AdvancedToolPage";
 import IncubatorTrackingDashboardPage from "../pages/IncubatorTracking";
 import IncubatorDetailPage from "../pages/IncubatorTracking/IncubatorDetailPage";
 import SidebarLayout from "../components/SidebarLayout";
@@ -31,6 +32,7 @@ import {
     OnboardingLevel,
     OnboardingShell,
 } from "../pages/Onboarding";
+import OnboardingSuccess from "../pages/Onboarding/OnboardingSuccess";
 import Dashboard from "../pages/Dashboard";
 import { OnboardingProvider, useOnboarding } from "../contexts/OnboardingContext";
 import { useTourNavContext } from "../contexts/TourNavContext";
@@ -180,6 +182,12 @@ const EmbryoGradingWithAuth = () => (
     </RoleBasedRoute>
 );
 
+const AdvancedEmbryoGradingWithAuth = () => (
+    <RoleBasedRoute restrictedRoles={["mygrape_admin"]} restrictIVFAdmin={false}>
+        <AdvancedEmbryoGradingPage />
+    </RoleBasedRoute>
+);
+
 /**
  * Incubator Tracking dashboard - list of incubator cards
  */
@@ -268,7 +276,12 @@ export const router = createBrowserRouter([
             { path: "/onboarding/alert-setting",                         element: <><AlertSetting /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/reports",                               element: <><ReportsPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/user-profile",                          element: <><UserProfilePage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/embryo-grading/:his/advanced",          element: <><AdvancedEmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking/:id",                element: <><IncubatorDetailPage /><ActiveOnboardingLevel /></> },
             // Catch-all: any unknown /onboarding/* path → dashboard
@@ -293,6 +306,7 @@ export const router = createBrowserRouter([
             { path: "/refill-log", element: <RefillLogWithAuth /> },
             { path: "/embryo-grading", element: <EmbryoGradingWithAuth /> },
             { path: "/embryo-grading/:his", element: <EmbryoGradingWithAuth /> },
+            { path: "/embryo-grading/:his/advanced", element: <AdvancedEmbryoGradingWithAuth /> },
             { path: "/incubator-tracking/:id", element: <IncubatorDetailWithAuth /> },
             { path: "/incubator-tracking", element: <IncubatorTrackingWithAuth /> },
             { path: "/database", element: <DatabaseWithAuth /> },
@@ -319,8 +333,22 @@ export const router = createBrowserRouter([
     // PROTECTED ROUTES WITHOUT SHARED SIDEBAR
     // ============================================================
     { path: "/track-and-trace", element: <TrackAndTrace /> },
-    { path: "/user-profile", element: <UserProfilePage /> },
-    { path: "/support", element: <Support /> },
+    {
+        path: "/user-profile",
+        element: (
+            <RoleBasedRoute>
+                <UserProfilePage />
+            </RoleBasedRoute>
+        ),
+    },
+    {
+        path: "/support",
+        element: (
+            <RoleBasedRoute>
+                <Support />
+            </RoleBasedRoute>
+        ),
+    },
 
     // ============================================================
     // FALLBACK ROUTE

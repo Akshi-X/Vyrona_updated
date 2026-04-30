@@ -16,6 +16,8 @@ interface AuthContextType {
     token: string | undefined;
     isLoading: boolean;
     userRole?: string;
+    /** undefined = profile not yet fetched; true/false = known value */
+    onboardingCompleted: boolean | undefined;
     isEmailNotificationsEnabled: boolean;
     setIsEmailNotificationsEnabled: (enabled: boolean) => void;
     login: (token: string, role?: string, rememberMe?: boolean) => void;
@@ -39,6 +41,7 @@ export const useAuth = () => {
             token: undefined,
             isLoading: false,
             userRole: undefined,
+            onboardingCompleted: undefined,
             isEmailNotificationsEnabled: true,
             setIsEmailNotificationsEnabled: () => {},
             login: () => {},
@@ -56,6 +59,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [token, setToken] = useState<string | undefined>(undefined);
     const [userRole, setUserRole] = useState<string | undefined>(undefined);
+    const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | undefined>(() => {
+        // Read from localStorage so the value is immediately known on page reload.
+        // undefined = unauthenticated / not yet fetched.
+        try {
+            const stored = localStorage.getItem("onboarding_completed");
+            if (stored !== null) return stored === "true";
+        } catch {}
+        return undefined;
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [rememberMe, setRememberMe] = useState<boolean>(false);
     const sessionTimeoutRef = useRef<number | null>(null);
@@ -211,12 +223,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
-    // If we have a token but the role wasn't persisted (some OTP flows may not return role),
-    // fetch the profile once to hydrate userRole for role-based UI.
+    // Fetch profile once per authenticated session to hydrate userRole and onboardingCompleted.
+    // Runs whenever authenticated — decoupled from userRole so onboardingCompleted is always fresh.
     useEffect(() => {
         if (!isAuthenticated) return;
         if (!token) return;
-        if (userRole) return;
         if (roleSyncAttemptedRef.current) return;
 
         roleSyncAttemptedRef.current = true;
@@ -227,15 +238,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 const role = (profile?.role || "").toString();
                 if (role) {
                     setUserRole(role);
-                    try {
-                        localStorage.setItem("user_role", role);
-                    } catch {}
+                    try { localStorage.setItem("user_role", role); } catch {}
                 }
+                const completed = profile?.onboarding_completed ?? true;
+                setOnboardingCompleted(completed);
+                try { localStorage.setItem("onboarding_completed", String(completed)); } catch {}
             } catch {
-                // If profile fails, keep role undefined; UI will default to non-manager behavior.
+                // Profile fetch failed — default to completed so user isn't stuck
+                setOnboardingCompleted(true);
             }
         })();
-    }, [isAuthenticated, token, userRole]);
+    }, [isAuthenticated, token]);
 
     // Persist email notification preference
     useEffect(() => {
@@ -330,11 +343,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         setRememberMe(false);
         rememberMeRef.current = false;
+        roleSyncAttemptedRef.current = false;
         authService.logout();
         setToken(undefined);
         setUserRole(undefined);
+        setOnboardingCompleted(undefined);
         setIsAuthenticated(false);
         localStorage.removeItem("user_role");
+        localStorage.removeItem("onboarding_completed");
     };
 
     const value: AuthContextType = {
@@ -342,6 +358,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         token,
         isLoading,
         userRole,
+        onboardingCompleted,
         isEmailNotificationsEnabled,
         setIsEmailNotificationsEnabled,
         login,

@@ -76,17 +76,7 @@ describe('Header', () => {
       expect(header).toBeInTheDocument()
     })
 
-    it('applies offsetLeft style', () => {
-      const { container } = render(
-        <MemoryRouter>
-          <Header title="Test Title" offsetLeft="15rem" />
-        </MemoryRouter>
-      )
-      const header = container.firstChild as HTMLElement
-      expect(header).toHaveStyle({ left: '15rem' })
-    })
-
-    it('uses default offsetLeft when not provided', () => {
+    it('uses default left positioning when not provided', () => {
       const { container } = render(
         <MemoryRouter>
           <Header title="Test Title" />

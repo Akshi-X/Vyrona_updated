@@ -23,6 +23,7 @@ export interface UserProfileDto {
   login_attempts: number;
   last_login: string;
   session_timeout: number;
+  onboarding_completed: boolean;
 }
 
 export interface UserListItem {

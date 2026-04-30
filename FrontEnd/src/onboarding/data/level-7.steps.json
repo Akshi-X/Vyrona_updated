@@ -1,0 +1,361 @@
+[
+    {
+        "id": "pf7-sidebar-intro",
+        "target": "#onboarding-sidebar-profile",
+        "title": "Your Profile",
+        "icon": "User",
+        "content": "Your profile section lets you manage your personal details, review your support activity, and configure notification preferences — all in one place.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "pf7-sidebar-click",
+        "target": "#onboarding-sidebar-profile",
+        "title": "Open Profile",
+        "icon": "User",
+        "content": "Click your profile card to open the profile page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-profile"],
+        "startPage": "/onboarding/dashboard",
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+
+    {
+        "id": "pf7-basic-info",
+        "target": "#onboarding-profile-basic-info",
+        "title": "Basic Information",
+        "icon": "UserCircle",
+        "content": "This section holds all your personal details — name, email, role, and phone number. Keep this accurate so alerts and team communications always reach the right person.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/user-profile",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "pf7-first-name",
+        "target": "#onboarding-profile-first-name",
+        "title": "First Name",
+        "icon": "User",
+        "content": "Your first name as it appears across the platform — in alerts, chat messages, task assignments, and audit logs.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining.webp"
+    },
+    {
+        "id": "pf7-last-name",
+        "target": "#onboarding-profile-last-name",
+        "title": "Last Name",
+        "icon": "User",
+        "content": "Your last name. Together with your first name this forms the identity shown to other team members throughout the system.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining.webp"
+    },
+    {
+        "id": "pf7-email",
+        "target": "#onboarding-profile-email",
+        "title": "Email Address",
+        "icon": "Mail",
+        "content": "Your registered work email. This is read-only — it is tied to your account credentials and cannot be changed from this page.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "pf7-role",
+        "target": "#onboarding-profile-role",
+        "title": "Role",
+        "icon": "ShieldCheck",
+        "content": "Your role determines what you can see and do across the platform — User, Manager, or Admin. Roles are assigned by your hospital administrator.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "pf7-phone",
+        "target": "#onboarding-profile-phone",
+        "title": "Phone Number",
+        "icon": "Phone",
+        "content": "Optional contact number. Add this so your team can reach you directly for urgent escalations outside the platform.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "pf7-edit-btn",
+        "target": "#onboarding-profile-edit-btn",
+        "title": "Edit Profile",
+        "icon": "Pencil",
+        "content": "Click Edit Profile to unlock the name and phone fields for editing. Email and role remain read-only as they are managed by your administrator.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-profile-edit-btn"],
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "pf7-edit-mode",
+        "target": "#onboarding-profile-basic-info",
+        "title": "Edit Your Details",
+        "icon": "Pencil",
+        "content": "Your name and phone number fields are now unlocked for editing. Email and role stay locked — those are managed by your administrator and cannot be changed here.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "pf7-save-btn",
+        "target": "#onboarding-profile-save-btn",
+        "title": "Save Changes",
+        "icon": "Check",
+        "content": "Click Save to commit your changes. The form validates your inputs — names must be letters only, phone numbers must be a valid format.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-profile-save-btn"],
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+
+    {
+        "id": "pf7-support-activity",
+        "target": "#onboarding-profile-support-activity",
+        "title": "Support Activity",
+        "icon": "MessageSquare",
+        "content": "All support tickets you've raised — bug reports, feature requests, and general queries — are tracked here. You can monitor their status and add follow-up comments without leaving the platform.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "pf7-submit-request",
+        "target": "#onboarding-profile-submit-request",
+        "title": "Submit New Request",
+        "icon": "PlusCircle",
+        "content": "Opens the support form pre-filled with your identity so you can quickly raise a bug report or feature request. Click the button to open the form now.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-profile-submit-request"],
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+
+    {
+        "id": "pf7-support-fullname",
+        "target": "#onboarding-support-fullname",
+        "title": "Full Name",
+        "icon": "User",
+        "content": "Your name is pre-filled from your profile and locked — this ensures every ticket is correctly attributed to you.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/support",
+        "genieImage": "/genie/explaining.webp"
+    },
+    {
+        "id": "pf7-support-email",
+        "target": "#onboarding-support-email",
+        "title": "Work Email",
+        "icon": "Mail",
+        "content": "Your registered email is also pre-filled and read-only. The support team will use this address to respond to your ticket.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "pf7-support-feedback-type",
+        "target": "#onboarding-support-feedback-type",
+        "title": "Type of Feedback",
+        "icon": "Tag",
+        "content": "Select the category that best describes your issue — Bug, Feature Request, Data Quality Issue, or others. This helps the support team route your ticket to the right person immediately.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-feedback-type:bug",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "pf7-support-subject",
+        "target": "#onboarding-support-subject",
+        "title": "Subject",
+        "icon": "FileText",
+        "content": "Write a short, clear title for your issue — for example 'Alert not triggering on Tank B-03'. A good subject helps support prioritise and find your ticket faster.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-fill-subject",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "pf7-support-description",
+        "target": "#onboarding-support-description",
+        "title": "Detailed Description",
+        "icon": "AlignLeft",
+        "content": "Describe what happened, what you expected, and any relevant tank or shipment IDs. The more detail you provide here, the faster the support team can reproduce and resolve the issue.",
+        "placement": "top",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-fill-description",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "pf7-support-priority",
+        "target": "#onboarding-support-priority",
+        "title": "Priority",
+        "icon": "AlertTriangle",
+        "content": "Set the urgency — Low, Medium, High, or Critical. Use Critical only for issues actively impacting patient safety or live operations.",
+        "placement": "top",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-fill-priority",
+        "genieImage": "/genie/explaining_caution.webp"
+    },
+    {
+        "id": "pf7-support-modules",
+        "target": "#onboarding-support-modules",
+        "title": "Affected Modules",
+        "icon": "Layers",
+        "content": "Tick every part of the platform affected by your issue. This tells the engineering team which area of the codebase or workflow to investigate.",
+        "placement": "top",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-fill-modules",
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "pf7-support-agreement",
+        "target": "#onboarding-support-agreement",
+        "title": "Agreement & Submit",
+        "icon": "CheckSquare",
+        "content": "Check the agreement box to confirm you consent to being contacted about this ticket, then click Submit Feedback to send it. The Submit button stays disabled until the box is ticked.",
+        "placement": "top",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:support-fill-agreement",
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "pf7-support-submit-btn",
+        "target": "#onboarding-support-submit-btn",
+        "title": "Submit Feedback",
+        "icon": "Send",
+        "content": "Click Submit Feedback to send your ticket to the myGrape support team. You will be taken to a confirmation page with your ticket ID — keep it for any follow-up.",
+        "placement": "top",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-support-submit-btn"],
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+
+    {
+        "id": "pf7-success-card",
+        "target": "#onboarding-success-card",
+        "title": "Ticket Submitted!",
+        "icon": "CheckCircle",
+        "content": "Your support ticket has been submitted successfully. The myGrape team will respond within 24 hours.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/success",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
+    },
+    {
+        "id": "pf7-success-ticket",
+        "target": "#onboarding-success-ticket",
+        "title": "Your Ticket ID",
+        "icon": "Hash",
+        "content": "Save this ticket ID — you can use it when following up with the support team. It also appears in your Support Activity on the profile page.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_numbers.webp"
+    },
+    {
+        "id": "pf7-success-profile-btn",
+        "target": "#onboarding-success-profile-btn",
+        "title": "Back to Profile",
+        "icon": "User",
+        "content": "Click Go to Profile to return to your profile page, where the ticket you just submitted will appear in your Support Activity list.",
+        "placement": "top",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-success-profile-btn"],
+        "prevDisable": true,
+        "genieImage": "/genie/welcoming_with_waving_hand.webp"
+    },
+
+    {
+        "id": "pf7-support-table",
+        "target": "#onboarding-profile-support-table",
+        "title": "Your Tickets",
+        "icon": "Table",
+        "content": "The ticket you just submitted now appears here. All your submitted tickets are listed — showing the Ticket ID, title, type, and current status.",
+        "placement": "top",
+        "requireClick": false,
+        "startPage": "/onboarding/user-profile",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "pf7-ticket-id-col",
+        "target": "#onboarding-profile-support-table",
+        "title": "Ticket ID",
+        "icon": "Hash",
+        "content": "Each ticket gets a unique ID like TK-2026-04-001 when it is created. Use this ID when following up with the support team so they can locate your request instantly.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_numbers.webp"
+    },
+    {
+        "id": "pf7-ticket-status",
+        "target": "#onboarding-profile-support-table",
+        "title": "Ticket Status",
+        "icon": "CircleDot",
+        "content": "Tickets move through statuses: Open → In Review → Resolved. You can track progress here without needing to contact support separately.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "pf7-ticket-type",
+        "target": "#onboarding-profile-support-table",
+        "title": "Ticket Type",
+        "icon": "Tag",
+        "content": "Tickets are categorised as Bug Report, Feature Request, or General Query. Type helps the support team route your ticket to the right team immediately.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "pf7-ticket-click",
+        "target": "#onboarding-profile-support-table",
+        "title": "View Ticket Details",
+        "icon": "ExternalLink",
+        "content": "Click any row to open the full ticket — you can read the full description, see comments from the support team, and add follow-up notes of your own.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "pf7-notifications",
+        "target": "#onboarding-profile-notifications",
+        "title": "Notifications",
+        "icon": "Bell",
+        "content": "Control how the platform communicates with you. Notification preferences are saved per account so changes here only affect your experience.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "pf7-notif-ticket",
+        "target": "#onboarding-profile-notif-ticket",
+        "title": "Ticket Update Emails",
+        "icon": "Mail",
+        "content": "Toggle this on to receive an email whenever the status of one of your support tickets changes — useful if you want updates without having to check the platform manually.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "pf7-notif-updates",
+        "target": "#onboarding-profile-notif-updates",
+        "title": "Feature Update Emails",
+        "icon": "Sparkles",
+        "content": "Stay informed about new myGrape features and improvements. This option is coming soon — once enabled, you will receive periodic product update newsletters.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    }
+]

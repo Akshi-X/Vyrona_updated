@@ -9,7 +9,7 @@ interface OnboardingLevelProps {
 }
 
 export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
-    const { getSteps, getLevelProgress, startLevel, setStepIndex, logEvent } = useOnboarding();
+    const { getSteps, getLevelProgress, startLevel, setStepIndex } = useOnboarding();
     const navigate = useNavigate();
     const location = useLocation();
     const { setIsOpen, setSteps, setCurrentStep } = useTour();
@@ -42,7 +42,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     const prevTargetIndex = (() => {
         let target = stepIndex - 1;
-        if (target >= 0 && steps[target]?.prevDisable) target -= 1;
+        while (target >= 0 && steps[target]?.prevDisable) target -= 1;
         return target;
     })();
     const prevLocked = !!activeStep?.prevDisable;
@@ -61,12 +61,11 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     useEffect(() => {
         if (stepCount > 0 && stepIndex >= stepCount && !completionLoggedRef.current) {
-            logEvent({ type: "tour_completed", levelId });
             completionLoggedRef.current = true;
             setIsTourActive(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stepCount, stepIndex, logEvent, levelId]);
+    }, [stepCount, stepIndex, levelId]);
 
     // ── 3. Tour steps setup & initial position ─────────────────────
     useEffect(() => {
@@ -116,12 +115,48 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const interval = setInterval(() => {
             if (document.querySelector(activeStep.target)) {
                 clearInterval(interval);
-                setCurrentStep(stepIndex);
+                // Force @reactour to reposition even if stepIndex hasn't changed —
+                // calling setCurrentStep with the same value is a no-op in @reactour,
+                // so close + reopen on the next frame to trigger a fresh spotlight.
+                setIsOpen(false);
+                requestAnimationFrame(() => {
+                    setCurrentStep(stepIndex);
+                    setIsOpen(true);
+                });
             }
         }, 50);
 
         return () => clearInterval(interval);
-    }, [activeStep, stepIndex, stepCount, setCurrentStep]);
+    }, [activeStep, stepIndex, stepCount, setCurrentStep, setIsOpen]);
+
+    // ── 5c. Dispatch onboardingEvent when a step becomes active ──────
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.onboardingEvent) return;
+        document.dispatchEvent(new CustomEvent(activeStep.onboardingEvent));
+    }, [activeStep, isTourActive]);
+
+    // ── 5b. Auto-fill inputText via a custom DOM event ───────────────
+    // Dispatches "onboarding:set-chat-input" so the target component can
+    // call setDraftMessage directly — avoids React 18 synthetic-event issues
+    // with the native value-setter trick.
+    useEffect(() => {
+        if (!isTourActive || !activeStep?.inputText) return;
+
+        const dispatch = () => {
+            const el = document.querySelector(activeStep.target);
+            if (!el) return false;
+            document.dispatchEvent(
+                new CustomEvent("onboarding:set-chat-input", { detail: activeStep.inputText })
+            );
+            (el as HTMLElement).focus?.();
+            return true;
+        };
+
+        if (!dispatch()) {
+            const interval = setInterval(() => { if (dispatch()) clearInterval(interval); }, 50);
+            return () => clearInterval(interval);
+        }
+    }, [activeStep, isTourActive]);
 
     // ── 6. Disable pointer-events on non-interactive steps ──────────
     useEffect(() => {
@@ -135,7 +170,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── 7. Trail-border animation on clickOnlyId targets ────────────
     useEffect(() => {
         const ids = activeStep?.clickOnlyId;
-        if (!ids?.length) return;
+        if (!ids?.length || !isTourActive) return;
 
         const applyClass = () => {
             ids.forEach((sel) => {
@@ -146,9 +181,9 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         applyClass();
 
         const interval = setInterval(() => {
-            const missing = ids.some((sel) => !document.querySelector(sel));
-            if (!missing) { clearInterval(interval); return; }
             applyClass();
+            const allFound = ids.every((sel) => !!document.querySelector(sel));
+            if (allFound) clearInterval(interval);
         }, 50);
 
         return () => {
@@ -157,11 +192,11 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 document.querySelector(sel)?.classList.remove("tour-click-target");
             });
         };
-    }, [activeStep]);
+    }, [activeStep, isTourActive]);
 
     // ── 8. Click guard ───────────────────────────────────────────────
     useEffect(() => {
-        if (!isTourActive || !activeStep?.requireClick || confirmedSteps[activeStep.id]) return;
+        if (!isTourActive || !activeStep || confirmedSteps[activeStep.id]) return;
 
         const applyDisabledStyles = () => {
             activeStep.disableClickID?.forEach((sel) => {
@@ -180,10 +215,9 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
         const handlePointerDown = (event: Event) => {
             const { clientX, clientY } = event as PointerEvent;
-            const clickedEl = event.target as Element | null;
 
-            const target = document.querySelector(activeStep.target);
-            if (!target) return;
+            // Tour tooltip always passes through (Next / Prev / Close buttons)
+            if ((event.target as Element)?.closest(".reactour__popover")) return;
 
             applyDisabledStyles();
 
@@ -192,45 +226,55 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
             };
 
+            // disableClickID elements are always blocked regardless of step type
             if (activeStep.disableClickID?.some((sel) => {
                 const el = document.querySelector(sel);
                 return el ? hitsBox(el) : false;
-            })) return;
-
-            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
-
-            if (hasWhitelist) {
-                let matchedEl: HTMLElement | null = null;
-                const hitWhitelisted = activeStep.clickOnlyId!.some((sel) => {
-                    const el = document.querySelector(sel) as HTMLElement | null;
-                    if (el && hitsBox(el)) { matchedEl = el; return true; }
-                    return false;
-                });
-                if (!hitWhitelisted) return;
-
-                // Prevent the native click from also firing so elements like
-                // toggle buttons aren't triggered twice (once real, once synthetic).
+            })) {
                 event.preventDefault();
                 event.stopPropagation();
+                return;
+            }
 
+            // No whitelist = read-only step — block everything unconditionally
+            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
+            if (!hasWhitelist) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            // Has whitelist — only allow clicks that land on a whitelisted element
+            let matchedEl: HTMLElement | null = null;
+            const hitWhitelisted = activeStep.clickOnlyId!.some((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (!el) return false;
+                if ((event.target as Element)?.closest(sel)) { matchedEl = el; return true; }
+                if (hitsBox(el)) { matchedEl = el; return true; }
+                return false;
+            });
+            if (!hitWhitelisted) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            // Whitelisted element hit — fire the click and advance the tour
+            event.preventDefault();
+            event.stopPropagation();
+
+            (matchedEl as HTMLElement | null)?.click();
+
+            const advance = () => {
                 const nextIndex = stepIndex + 1;
                 setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
                 setCurrentStep(nextIndex);
                 setStepIndex(levelId, nextIndex);
-
-                (matchedEl as HTMLElement | null)?.click();
+            };
+            if (activeStep.stepDelay) {
+                setTimeout(advance, activeStep.stepDelay);
             } else {
-                const isInsideTarget = target.contains(clickedEl) || hitsBox(target);
-                if (!isInsideTarget) return;
-
-                const nextIndex = stepIndex + 1;
-                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                logEvent({ type: "tour_confirm", levelId, payload: { stepId: activeStep.id } });
-                setCurrentStep(nextIndex);
-                setStepIndex(levelId, nextIndex);
-
-                (target as HTMLElement).click();
+                advance();
             }
         };
 
@@ -239,7 +283,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
             document.removeEventListener("pointerdown", handlePointerDown, true);
             restoreDisabledStyles();
         };
-    }, [activeStep, confirmedSteps, stepIndex, levelId, logEvent, setCurrentStep, setStepIndex, isTourActive]);
+    }, [activeStep, confirmedSteps, stepIndex, levelId, setCurrentStep, setStepIndex, isTourActive]);
 
     // ── Navigation handlers ─────────────────────────────────────────
     const goNext = useCallback(() => {
@@ -247,8 +291,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const nextIndex = stepIndex + 1;
         setCurrentStep(nextIndex);
         setStepIndex(levelId, nextIndex);
-        logEvent({ type: "tour_step", levelId, payload: { stepIndex: nextIndex } });
-    }, [canNext, stepIndex, levelId, setCurrentStep, setStepIndex, logEvent]);
+    }, [canNext, stepIndex, levelId, setCurrentStep, setStepIndex]);
 
     const goPrev = useCallback(() => {
         if (!canPrev) return;
@@ -262,8 +305,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         });
         setCurrentStep(prevTargetIndex);
         setStepIndex(levelId, prevTargetIndex);
-        logEvent({ type: "tour_step", levelId, payload: { stepIndex: prevTargetIndex } });
-    }, [canPrev, prevTargetIndex, stepIndex, steps, levelId, setCurrentStep, setStepIndex, logEvent]);
+    }, [canPrev, prevTargetIndex, stepIndex, steps, levelId, setCurrentStep, setStepIndex]);
 
     // ── Publish nav state ───────────────────────────────────────────
     const navState = useMemo<TourNavState>(() => ({
@@ -293,7 +335,16 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
     // ── Open tour when isTourActive flips to true ───────────────────
     useEffect(() => {
         if (!isTourActive || stepCount === 0 || stepIndex >= stepCount) return;
-        setCurrentStep(stepIndex);
+
+        // Walk back from any prevDisable/rewindOnRefresh step — catches mid-session resumes
+        // where HYDRATE hasn't run (no reload).
+        let safeIndex = stepIndex;
+        while (safeIndex > 0 && (steps[safeIndex]?.prevDisable || steps[safeIndex]?.rewindOnRefresh)) safeIndex--;
+
+        if (safeIndex !== stepIndex) {
+            setStepIndex(levelId, safeIndex);
+        }
+        setCurrentStep(safeIndex);
         setIsOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isTourActive]);
@@ -304,7 +355,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         tourNavCtx.setPendingStartLevelId(null);
         if (progress?.status === "available") {
             startLevel(levelId);
-            logEvent({ type: "level_start", levelId });
         }
         setIsTourActive(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,7 +365,6 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
         const fn = () => {
             if (progress?.status === "available") {
                 startLevel(levelId);
-                logEvent({ type: "level_start", levelId });
             }
             setIsTourActive(true);
             if (stepCount > 0 && stepIndex < stepCount) {

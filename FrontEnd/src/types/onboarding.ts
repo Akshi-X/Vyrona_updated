@@ -1,14 +1,59 @@
-export type OnboardingReplica = "dashboard" | "control-tower";
+export type OnboardingReplica =
+    | "dashboard"
+    | "control-tower"
+    | "alert-setting"
+    | "refill-log"
+    | "reports"
+    | "user-profile"
+    | "users";
+
+export interface OnboardingLevelWelcome {
+    headerTitle?: string;
+    title: string;
+    subtitle: string;
+    description: string;
+    badge: string;
+}
+
+export interface OnboardingLevelCompletion {
+    headerTitle?: string;
+    title: string;
+    message: string;
+    badge: string;
+}
+
+export interface OnboardingLevelInterlude {
+    headerTitle?: string;
+    title: string;
+    message: string;
+    covered: string[];
+}
+
+export interface OnboardingLevelQuiz {
+    headerTitle?: string;
+    file: string;
+}
+
+export interface OnboardingLevelSection {
+    title: string;
+    text: string;
+}
 
 export interface OnboardingLevelConfig {
     id: string;
     title: string;
     route: string;
     pointsRequired: number;
+    /** Minimum sum of all levels' highScore needed to unlock this level */
+    scoreRequired: number;
     unlockDelayHours: number;
     tourStepsFile: string;
-    quizFile: string;
     replica: OnboardingReplica;
+    sections?: OnboardingLevelSection[];
+    welcome?: OnboardingLevelWelcome;
+    interlude?: OnboardingLevelInterlude;
+    completion?: OnboardingLevelCompletion;
+    quiz?: OnboardingLevelQuiz;
 }
 
 export interface OnboardingStep {
@@ -20,10 +65,15 @@ export interface OnboardingStep {
     placement?: "top" | "bottom" | "left" | "right" | "center";
     requireClick?: boolean;
     prevDisable?: boolean;
+    /** On reload/refresh, walk the step index back past this step so the user never resumes mid-flow */
+    rewindOnRefresh?: boolean;
     clickOnlyId?: string[];
     disableClickID?: string[];
     genieImage?: string;
     startPage?: string;
+    inputText?: string;
+    stepDelay?: number;
+    onboardingEvent?: string;
 }
 
 export interface OnboardingQuizQuestion {
@@ -39,7 +89,14 @@ export type OnboardingLevelStatus = "locked" | "available" | "in_progress" | "co
 export interface OnboardingLevelProgress {
     id: string;
     status: OnboardingLevelStatus;
-    score: number;
+    /** Score of the current/latest quiz attempt — resets to 0 on retry */
+    currentScore: number;
+    /** Best score ever achieved (set on completion, never reset) */
+    highScore: number;
+    /** Total steps in this level (from config, stored for backend convenience) */
+    totalSteps: number;
+    /** Total quiz questions in this level (from config, stored for backend convenience) */
+    totalQuiz: number;
     attempts: number;
     startedAt?: string;
     completedAt?: string;
@@ -48,19 +105,8 @@ export interface OnboardingLevelProgress {
     lastQuizIndex: number;
 }
 
-export interface OnboardingEvent {
-    id: string;
-    type: string;
-    timestamp: string;
-    levelId?: string;
-    payload?: Record<string, unknown>;
-}
-
 export interface OnboardingState {
-    welcomeStage: number;
     activeLevelId?: string;
     levels: Record<string, OnboardingLevelProgress>;
-    quizAnswers: Record<string, Record<string, number>>;
-    events: OnboardingEvent[];
     lastUpdatedAt?: string;
 }
