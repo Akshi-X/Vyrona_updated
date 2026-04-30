@@ -419,11 +419,32 @@ export const enableOnboardingMocks = () => {
 
         // Alert Setting — branch list for filter dropdown.
         if (endpoint.startsWith("/api/ivf/branches")) {
-            const branches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+            const allBranches = controlTowerData.activeCanisters.branches.map((b: any) => ({
                 branch_id: b.branch_id,
                 branch_name: b.branch_name,
             }));
-            return { branches };
+            // Put Bangalore first so it's immediately visible in the onboarding dropdown
+            const bangalore = allBranches.find((b) => b.branch_name === "Bangalore");
+            const rest = allBranches.filter((b) => b.branch_name !== "Bangalore");
+            return { branches: bangalore ? [bangalore, ...rest] : allBranches };
+        }
+
+        // Alert Setting — bulk upsert KPI configs (POST). Merges into in-memory state
+        // so the subsequent re-fetch reflects the saved changes.
+        if (endpoint === "/api/ivf/quality/kpi-config/bulk" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const configs: any[] = body.configs ?? [];
+            const configList: any[] = dashboardData.alertSettingKpiConfigList.config;
+            let nextId = Math.max(...configList.map((c: any) => c.id), 0) + 1;
+            configs.forEach((incoming: any) => {
+                const existing = configList.find((c: any) => c.kpi_name === incoming.kpi_name);
+                if (existing) {
+                    Object.assign(existing, incoming);
+                } else {
+                    configList.push({ id: nextId++, hospital_id: 1, branch_id: 16, tank_id: 161, ...incoming });
+                }
+            });
+            return { updated: configs.filter((c: any) => configList.some((e: any) => e.kpi_name === c.kpi_name)).length, created: 0 };
         }
 
         // Alert Setting — KPI config list for a specific tank.
@@ -475,12 +496,25 @@ export const enableOnboardingMocks = () => {
 
         // IVF track shipment — create refill log entry.
         if (
-            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/]+\/refill-logs$/) &&
+            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/?]+\/refill-logs(\?|$)/) &&
             options?.method === "POST"
         ) {
+            const cleanPath = endpoint.split("?")[0];
+            const tankIdFromUrl = Number(cleanPath.split("/").filter(Boolean).find((_, i, arr) => arr[i - 1] === "tanks" && arr[i + 1] === "refill-logs") ?? 0);
             const body = options?.body ? JSON.parse(options.body as string) : {};
+
+            // Build a branch-aware log for the activity log list
+            const branchEntry = (() => {
+                for (const b of (controlTowerData as any).activeCanisters?.branches ?? []) {
+                    for (const t of b.tanks ?? []) {
+                        if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
+                    }
+                }
+                return { branch_name: null, tank_code: null };
+            })();
+
             const newLog = {
-                tank_id: 60,
+                tank_id: tankIdFromUrl || 60,
                 log_id: mockCanisterRefillLogs.refill_logs.length + 500,
                 refill_date: body.refill_date ?? new Date().toISOString().split("T")[0],
                 refill_time: body.refill_time ?? "00:00:00",
@@ -498,6 +532,20 @@ export const enableOnboardingMocks = () => {
                 updated_by: null,
             };
             mockCanisterRefillLogs.refill_logs.unshift(newLog);
+
+            // Also prepend to refillAllLogs so the activity log reflects the new entry immediately
+            dashboardData.refillAllLogs.logs.unshift({
+                tank_id: tankIdFromUrl || 60,
+                tank_code: branchEntry.tank_code ?? body.tank_code ?? "—",
+                branch_name: branchEntry.branch_name,
+                refill_date: newLog.refill_date,
+                refill_time: newLog.refill_time,
+                refilled_by: newLog.refilled_by,
+                description: newLog.description,
+                status: newLog.status,
+                refill_weight: body.refill_weight ?? null,
+            });
+
             return { success: true, log: newLog };
         }
 
@@ -506,19 +554,72 @@ export const enableOnboardingMocks = () => {
             return mockCanisterRefillLogs;
         }
 
-        // Reports page — monthly summary.
+        // Reports page — monthly summary (filter by month).
         if (endpoint.startsWith("/api/ivf/reports/monthly-summary")) {
-            return dashboardData.reportsMonthlySummary;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const monthParam = qs.get("month") ?? "";
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+            const base = dashboardData.reportsMonthlySummary;
+            // Mock data is for 2026-04; other months return empty
+            const rows = (!monthParam || monthParam === base.month) ? [...base.rows] : [];
+            const total = rows.length;
+            const start = (page - 1) * pageSize;
+            return { ...base, rows: rows.slice(start, start + pageSize), total_count: total, total_kpis: total, page, page_size: pageSize };
         }
 
-        // Reports page — critical alerts report.
+        // Reports page — critical alerts report (filter by status, severity, tank_codes, date range).
         if (endpoint.startsWith("/api/ivf/reports/critical-alerts")) {
-            return dashboardData.reportsCriticalAlerts;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam   = qs.get("status")     ?? "";
+            const severityParam = qs.get("severity")   ?? "";
+            const startDate     = qs.get("start_date") ?? "";
+            const endDate       = qs.get("end_date")   ?? "";
+            const tankCodes     = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            // Map UI status labels to mock data status values
+            const statusMap: Record<string, string> = { Active: "open", Acknowledged: "acknowledged" };
+            const normalizedStatus = statusMap[statusParam] ?? statusParam.toLowerCase();
+
+            type AlertRow = typeof dashboardData.reportsCriticalAlerts.alerts[number];
+            let alerts: AlertRow[] = [...dashboardData.reportsCriticalAlerts.alerts];
+
+            if (normalizedStatus) alerts = alerts.filter(a => a.status === normalizedStatus);
+            if (severityParam)    alerts = alerts.filter(a => a.severity.toLowerCase() === severityParam.toLowerCase());
+            if (tankCodes.length) alerts = alerts.filter(a => !!a.tank_code && tankCodes.includes(a.tank_code));
+            if (startDate)        alerts = alerts.filter(a => a.occurred_at >= startDate);
+            if (endDate)          alerts = alerts.filter(a => a.occurred_at <= endDate + "T23:59:59");
+
+            const total = alerts.length;
+            const start = (page - 1) * pageSize;
+            alerts = alerts.slice(start, start + pageSize);
+            return { alerts, total_count: total, page, page_size: pageSize, status: "ok" };
         }
 
-        // Reports page — refill logs report.
+        // Reports page — refill logs report (filter by status, tank_codes, date range).
         if (endpoint.startsWith("/api/ivf/reports/refill-logs")) {
-            return dashboardData.reportsRefillLogs;
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam = qs.get("status")     ?? "";
+            const startDate   = qs.get("start_date") ?? "";
+            const endDate     = qs.get("end_date")   ?? "";
+            const tankCodes   = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            type LogRow = typeof dashboardData.reportsRefillLogs.logs[number];
+            let logs: LogRow[] = [...dashboardData.reportsRefillLogs.logs];
+
+            if (statusParam)      logs = logs.filter(l => (l.status ?? "").toLowerCase() === statusParam.toLowerCase());
+            if (tankCodes.length) logs = logs.filter(l => !!l.tank_code && tankCodes.includes(l.tank_code));
+            if (startDate)        logs = logs.filter(l => (l.refill_date ?? "") >= startDate);
+            if (endDate)          logs = logs.filter(l => (l.refill_date ?? "") <= endDate);
+
+            const total = logs.length;
+            const start = (page - 1) * pageSize;
+            logs = logs.slice(start, start + pageSize);
+            return { logs, total_count: total, page, page_size: pageSize, status: "ok" };
         }
 
         // Reports page — activity logs (filtered by query params).
@@ -586,10 +687,22 @@ export const enableOnboardingMocks = () => {
 
         // Refill Log page — reservoirs list.
         if (endpoint.startsWith("/api/ivf/reservoirs")) {
-            return dashboardData.refillReservoirs;
+            const sorted = [...dashboardData.refillReservoirs.reservoirs].sort((a, b) =>
+                (a.branch_name ?? a.reservoir_name).localeCompare(b.branch_name ?? b.reservoir_name)
+            );
+            return { ...dashboardData.refillReservoirs, reservoirs: sorted };
         }
 
-        // Refill Log page — reservoir logs.
+        // Refill Log page — update reservoir log (PUT/PATCH).
+        if (endpoint.match(/^\/api\/ivf\/reservoir-logs\/\d+$/) && (options?.method === "PUT" || options?.method === "PATCH")) {
+            const logId = Number(endpoint.split("/").pop());
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const log = dashboardData.refillReservoirLogs.logs.find((l: any) => l.log_id === logId);
+            if (log) Object.assign(log, body);
+            return { success: true };
+        }
+
+        // Refill Log page — reservoir logs (GET).
         if (endpoint.startsWith("/api/ivf/reservoir-logs")) {
             return dashboardData.refillReservoirLogs;
         }
