@@ -158,6 +158,7 @@ export default function Dashboard({ }: DashboardProps) {
 
   // IVF quality deviations flagged metric (live API data)
   const [ivfQualityDeviations, setIvfQualityDeviations] = useState<number | null>(null);
+  const [ivfActiveQualityDeviations, setIvfActiveQualityDeviations] = useState<number | null>(null);
   const [loadingIvfQualityDeviations, setLoadingIvfQualityDeviations] = useState(false);
   const [ivfQualityDeviationsError, setIvfQualityDeviationsError] = useState<string | null>(null);
 
@@ -253,7 +254,7 @@ export default function Dashboard({ }: DashboardProps) {
     return alert.status === 'Active';
   }).length;
   const criticalAlertsCount = isIVF
-    ? (ivfQualityDeviations ?? 0)
+    ? (ivfActiveQualityDeviations ?? 0)
     : activeCriticalAlertsCount;
   const myTasksCount = myTasks.filter(task => task.status === 'Not started' || task.status === 'In progress').length;
 
@@ -586,7 +587,10 @@ export default function Dashboard({ }: DashboardProps) {
       setIvfQualityDeviationsError(null);
       try {
         const response = await ivfService.getQualityDeviationsFlagged();
-        if (!cancelled) setIvfQualityDeviations(response?.total_deviations ?? 0);
+        if (!cancelled) {
+          setIvfQualityDeviations(response?.total_deviations ?? 0);
+          setIvfActiveQualityDeviations(response?.total_deviations ?? 0);
+        }
       } catch (e: any) {
         if (!cancelled) {
           setIvfQualityDeviations(null);

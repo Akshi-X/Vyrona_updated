@@ -1,0 +1,296 @@
+[
+    {
+        "id": "rp6-sidebar-intro",
+        "target": "#onboarding-sidebar-reports",
+        "title": "Reports",
+        "icon": "FileText",
+        "content": "The Reports page lets you generate and export summaries across your IVF operations — monthly KPI snapshots, critical alert history, and detailed refill logs — all in one place.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rp6-sidebar-click",
+        "target": "#onboarding-sidebar-reports",
+        "title": "Open Reports",
+        "icon": "FileText",
+        "content": "Click here to open the Reports page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-reports"],
+        "startPage": "/onboarding/dashboard",
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rp6-filters",
+        "target": "#onboarding-reports-filters",
+        "title": "Report Filters",
+        "icon": "Filter",
+        "content": "Use these filters to narrow your report by branch, date range, and report type. Select the parameters that matter for your audit or review, then generate the report.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/reports",
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+
+    {
+        "id": "rp6-type-monthly",
+        "target": "#onboarding-reports-report-type",
+        "title": "Monthly Summary Report",
+        "icon": "CalendarDays",
+        "content": "The Monthly Summary Report gives you a KPI-level breakdown for a selected month — showing how many alerts were sent and how many deviations were detected per parameter.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:report-type:monthly-summary",
+        "genieImage": "/genie/explaining_with_numbers.webp"
+    },
+    {
+        "id": "rp6-filter-month",
+        "target": "#onboarding-filter-month",
+        "title": "Month Filter",
+        "icon": "CalendarDays",
+        "content": "Pick any month to load its summary. The table updates instantly — no need to click a submit button.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_numbers.webp"
+    },
+    {
+        "id": "rp6-results-monthly",
+        "target": "#onboarding-reports-results",
+        "title": "Monthly Summary — Results",
+        "icon": "CalendarDays",
+        "content": "The table shows each KPI config alongside the total alerts sent and deviations found for the selected month. Use this to identify which parameters triggered the most incidents.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_numbers.webp"
+    },
+
+    {
+        "id": "rp6-type-alerts",
+        "target": "#onboarding-reports-report-type",
+        "title": "Critical Alert Report",
+        "icon": "BellRing",
+        "content": "The Critical Alert Report lists every alert triggered across your tanks within a date range. Filter by status, severity, or specific tank codes to drill into incidents that need attention.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:report-type:critical-alerts",
+        "genieImage": "/genie/explaining_caution.webp"
+    },
+    {
+        "id": "rp6-filter-date-from-alerts",
+        "target": "#onboarding-filter-date-from",
+        "title": "Date From",
+        "icon": "CalendarDays",
+        "content": "Set the start of your date range. Only alerts that occurred on or after this date will appear in the results.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-date-to-alerts",
+        "target": "#onboarding-filter-date-to",
+        "title": "Date To",
+        "icon": "CalendarDays",
+        "content": "Set the end of your date range. Combine with Date From to focus on a specific incident window.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-status-alerts",
+        "target": "#onboarding-filter-status",
+        "title": "Status Filter",
+        "icon": "CircleDot",
+        "content": "Filter alerts by their current status — Active alerts are still open, Acknowledged means a team member has reviewed them.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "rp6-filter-severity-alerts",
+        "target": "#onboarding-filter-severity",
+        "title": "Severity Filter",
+        "icon": "AlertTriangle",
+        "content": "Narrow results to High, Medium, or Low severity alerts. High severity alerts typically require immediate action.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_caution.webp"
+    },
+    {
+        "id": "rp6-filter-tank-codes-alerts",
+        "target": "#onboarding-filter-tank-codes",
+        "title": "Tank Codes Filter",
+        "icon": "Cylinder",
+        "content": "Select one or more specific tanks to see only alerts from those containers. Useful for investigating a single tank's incident history.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rp6-results-alerts",
+        "target": "#onboarding-reports-results",
+        "title": "Critical Alerts — Results",
+        "icon": "BellRing",
+        "content": "Each row shows when the alert occurred, its severity and status, the tank it came from, and the alert message. Rows are sorted newest first.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_caution.webp"
+    },
+
+    {
+        "id": "rp6-type-refill",
+        "target": "#onboarding-reports-report-type",
+        "title": "Refill Logs Report",
+        "icon": "Droplets",
+        "content": "The Refill Logs Report tracks every LN2 refill across sites — who performed it, when, which tank, and whether the LN2 was ordered and received on time.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:report-type:refill-logs",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rp6-filter-date-from-refill",
+        "target": "#onboarding-filter-date-from",
+        "title": "Date From",
+        "icon": "CalendarDays",
+        "content": "Filter refill logs starting from this date. Helps you scope the report to a specific operational period.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-date-to-refill",
+        "target": "#onboarding-filter-date-to",
+        "title": "Date To",
+        "icon": "CalendarDays",
+        "content": "Set the upper bound for the refill date range to keep results focused on the period you care about.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-status-refill",
+        "target": "#onboarding-filter-status",
+        "title": "Status Filter",
+        "icon": "CircleDot",
+        "content": "Filter by refill status — Not started, In progress, or Done — to track which refills are still pending or have been completed.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "rp6-filter-tank-codes-refill",
+        "target": "#onboarding-filter-tank-codes",
+        "title": "Tank Codes Filter",
+        "icon": "Cylinder",
+        "content": "Select specific tanks to view only their refill history. Useful for auditing a single container's maintenance record.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rp6-results-refill",
+        "target": "#onboarding-reports-results",
+        "title": "Refill Logs — Results",
+        "icon": "Droplets",
+        "content": "Each row captures a complete refill event — the tank, branch, who refilled it, the refill date and time, the reservoir used, and LN2 order and receipt dates.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/refilling.webp"
+    },
+
+    {
+        "id": "rp6-type-activity",
+        "target": "#onboarding-reports-report-type",
+        "title": "Activity Logs",
+        "icon": "ClipboardList",
+        "content": "Activity Logs give admins and managers a full audit trail — every user action, system event, and automated trigger is recorded here.",
+        "placement": "bottom",
+        "requireClick": false,
+        "onboardingEvent": "onboarding:report-type:activity-logs",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rp6-filter-date-from-activity",
+        "target": "#onboarding-filter-date-from",
+        "title": "Date From",
+        "icon": "CalendarDays",
+        "content": "Restrict the audit trail to events that happened on or after this date.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-date-to-activity",
+        "target": "#onboarding-filter-date-to",
+        "title": "Date To",
+        "icon": "CalendarDays",
+        "content": "Set the end of the window you want to audit. Together with Date From, this scopes the log to a precise time period.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-actions-activity",
+        "target": "#onboarding-filter-actions",
+        "title": "Actions Filter",
+        "icon": "Zap",
+        "content": "Pick one or more specific action types — such as user logins, alert acknowledgements, or refill detections — to filter the log down to exactly the events you need.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rp6-filter-outcome-activity",
+        "target": "#onboarding-filter-outcome",
+        "title": "Outcome Filter",
+        "icon": "CircleCheck",
+        "content": "Filter by outcome — success, failure, or partial — to quickly surface failed operations or partially completed actions that may need follow-up.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rp6-filter-actor-type-activity",
+        "target": "#onboarding-filter-actor-type",
+        "title": "Actor Type Filter",
+        "icon": "User",
+        "content": "Distinguish between actions taken by a human user versus automated system processes, scheduled jobs, or external webhooks.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_casual.webp"
+    },
+    {
+        "id": "rp6-filter-search-activity",
+        "target": "#onboarding-filter-search",
+        "title": "Search",
+        "icon": "Search",
+        "content": "Type a keyword and press Enter to search across actions, actor names, targets, and outcomes. Useful for tracking a specific user's activity or finding a particular event.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "rp6-results-activity",
+        "target": "#onboarding-reports-results",
+        "title": "Activity Logs — Results",
+        "icon": "ClipboardList",
+        "content": "Each row shows the action performed, who did it, what it affected, the outcome, and a metadata summary with the key details of that event.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+
+    {
+        "id": "rp6-results",
+        "target": "#onboarding-reports-results",
+        "title": "Download Your Report",
+        "icon": "Download",
+        "content": "Once you've applied your filters and reviewed the data on screen, click Download CSV to export the full result set for offline analysis or compliance records.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    }
+]

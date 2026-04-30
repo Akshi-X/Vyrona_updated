@@ -1,0 +1,142 @@
+[
+    {
+        "id": "us8-sidebar-intro",
+        "target": "#onboarding-sidebar-users",
+        "title": "Users",
+        "icon": "Users",
+        "content": "The Users page lets you view, filter, and manage everyone who has access to your clinic's mGrape account — from Admins and Managers down to individual branch Users.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "us8-sidebar-click",
+        "target": "#onboarding-sidebar-users",
+        "title": "Open Users",
+        "icon": "Users",
+        "content": "Click here to open the Users page.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-sidebar-users"],
+        "startPage": "/onboarding/dashboard",
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+
+    {
+        "id": "us8-add-btn",
+        "target": "#onboarding-users-add-btn",
+        "title": "Add User",
+        "icon": "UserPlus",
+        "content": "Click this button to invite a new team member. You will enter their email, assign them a role, and optionally link them to a specific branch — then the platform sends them an invite link.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/users",
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+
+    {
+        "id": "us8-filters",
+        "target": "#onboarding-users-filters",
+        "title": "User Filters",
+        "icon": "Filter",
+        "content": "Filter the user list by role or branch to quickly find the person you are looking for. Use Reset Filters to return to the full list.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "us8-filter-role",
+        "target": "#onboarding-users-filter-role",
+        "title": "Filter by Role",
+        "icon": "ShieldCheck",
+        "content": "Narrow the list to Admin, Manager, or User accounts. Useful when you want to audit who holds elevated access across the clinic.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "us8-filter-branch",
+        "target": "#onboarding-users-filter-branch",
+        "title": "Filter by Branch",
+        "icon": "Building2",
+        "content": "Show only users assigned to a specific branch. Managers and Admins see all branches; this filter helps you focus on one site at a time.",
+        "placement": "bottom",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_globe.webp"
+    },
+
+    {
+        "id": "us8-results",
+        "target": "#onboarding-users-results",
+        "title": "User List",
+        "icon": "Users",
+        "content": "All registered users for your hospital appear here. Admins can invite new users, track invite status, and resend invite links directly from this table.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "us8-table",
+        "target": "#onboarding-users-table",
+        "title": "Users Table",
+        "icon": "Table",
+        "content": "Each row represents one user account. The table covers identity, access level, branch assignment, account standing, and login activity — everything you need to manage your team at a glance.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "us8-invite-open",
+        "target": "#onboarding-users-add-btn",
+        "title": "Invite a New User",
+        "icon": "UserPlus",
+        "content": "Let's walk through the invite flow. Click the Add User button to open the invite modal.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-users-add-btn"],
+        "prevDisable": true,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "us8-invite-modal",
+        "target": "#onboarding-users-invite-modal-card",
+        "title": "Invite User Modal",
+        "icon": "UserPlus",
+        "content": "This modal collects the minimum information needed to add someone to your clinic account — their email, the role they should have, and the branch if they are a standard User.",
+        "placement": "left",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_ui_in_hand.webp"
+    },
+    {
+        "id": "us8-invite-email",
+        "target": "#onboarding-users-invite-email",
+        "title": "Email Address",
+        "icon": "Mail",
+        "content": "Enter the person's work email. The platform validates the format before allowing the invite to be sent — no typos means no lost invites.",
+        "placement": "left",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    },
+    {
+        "id": "us8-invite-role",
+        "target": "#onboarding-users-invite-role",
+        "title": "Assign a Role",
+        "icon": "ShieldCheck",
+        "content": "Choose User, Manager, or Admin. Selecting User reveals an additional Branch field — every standard user must be linked to one branch so the system can scope their data access correctly.",
+        "placement": "left",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "us8-invite-actions",
+        "target": "#onboarding-users-invite-actions",
+        "title": "Send or Cancel",
+        "icon": "Send",
+        "content": "Send Invite emails the invite link immediately. The link expires after one week — if the user misses it, use the Resend Invite link in the Users table to issue a fresh one.",
+        "placement": "top",
+        "requireClick": false,
+        "genieImage": "/genie/explaining_with_phone.webp"
+    }
+]

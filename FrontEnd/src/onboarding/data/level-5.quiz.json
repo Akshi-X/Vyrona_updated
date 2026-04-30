@@ -1,0 +1,38 @@
+[
+    {
+        "id": "q5-1",
+        "prompt": "What does the Active Tank Status panel help you monitor?",
+        "choices": [
+            "Patient sample locations",
+            "Current LN2 levels across all active containers",
+            "Temperature deviations only",
+            "Pending lab orders"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q5-2",
+        "prompt": "What information is captured in the Recent Activity Log for each refill?",
+        "choices": [
+            "Only the date and container ID",
+            "Who performed the refill, when, amount added, and notes",
+            "Sensor readings at time of refill",
+            "Patient consent records"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q5-3",
+        "prompt": "What does the Reservoir Logs section track?",
+        "choices": [
+            "Individual container refills by technician",
+            "Bulk LN2 orders and deliveries for each branch reservoir",
+            "Alert thresholds for each tank",
+            "WebSocket connection status"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    }
+]

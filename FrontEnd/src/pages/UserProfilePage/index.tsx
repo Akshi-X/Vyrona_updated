@@ -4,6 +4,7 @@ import { COLORS } from '../../constants/colors';
 import { feedbackApi, type UserTicketSummary } from '../../api/feedbackApi';
 import { userService, type UserProfileDto } from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOnboardingMode } from '../../contexts/OnboardingModeContext';
 import Header from '../../components/Header';
 import FilterPanel, { FilterSelect } from '../../components/FilterPanel';
  
@@ -38,6 +39,7 @@ const UserProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const isOnboarding = useOnboardingMode();
   const { logout, isEmailNotificationsEnabled, setIsEmailNotificationsEnabled, isAuthenticated, isLoading, token } = useAuth();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
  
@@ -390,7 +392,7 @@ const UserProfilePage: React.FC = () => {
   };
  
   const handleSubmitRequest = () => {
-    navigate('/support', {
+    navigate(isOnboarding ? '/onboarding/support' : '/support', {
       state: {
         readonly: false,
         hideAttach: false,
@@ -405,7 +407,7 @@ const UserProfilePage: React.FC = () => {
  
  
   const navigateToTicketPrefilled = (ticket: Ticket) => {
-    navigate('/support', {
+    navigate(isOnboarding ? '/onboarding/support' : '/support', {
       state: {
         readonly: true,
         hideAttach: true,
@@ -428,12 +430,23 @@ const UserProfilePage: React.FC = () => {
     navigate('/login');
   };
  
+  // Onboarding: open edit mode via event so tour can walk through edit fields
+  useEffect(() => {
+    const fn = () => setIsEditingProfile(true);
+    document.addEventListener("onboarding:open-edit-profile", fn);
+    return () => document.removeEventListener("onboarding:open-edit-profile", fn);
+  }, []);
+
   const handleBackNavigation = () => {
+    if (isOnboarding) {
+      navigate("/onboarding/dashboard");
+      return;
+    }
     // Check if we came from within the app (same origin)
     const referrer = document.referrer;
     const currentOrigin = window.location.origin;
     const cameFromApp = referrer && referrer.startsWith(currentOrigin);
-   
+
     if (cameFromApp && window.history.length > 1) {
       navigate(-1);
     } else {
@@ -479,11 +492,12 @@ const UserProfilePage: React.FC = () => {
           <div className="space-y-8">
  
         {/* Basic Information Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-basic-info" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Basic Information</h2>
             {!isEditingProfile ? (
               <button
+                id="onboarding-profile-edit-btn"
                 onClick={handleEditProfile}
                 className="inline-flex items-center px-4 py-2 border border-[#6b1176] text-[#6b1176] rounded-lg hover:bg-[#6b1176]/10 transition-colors duration-200 bg-white"
               >
@@ -493,8 +507,9 @@ const UserProfilePage: React.FC = () => {
                 Edit Profile
               </button>
             ) : (
-              <div className="flex gap-3">
+              <div id="onboarding-profile-edit-actions" className="flex gap-3">
                 <button
+                  id="onboarding-profile-save-btn"
                   onClick={handleSaveProfile}
                   disabled={isSaving}
                   className="inline-flex items-center px-4 py-2 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -527,7 +542,7 @@ const UserProfilePage: React.FC = () => {
           </div>
  
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
+            <div id="onboarding-profile-first-name">
               <label className="block text-sm font-bold text-black mb-2">First Name</label>
               <input
                 type="text"
@@ -556,7 +571,7 @@ const UserProfilePage: React.FC = () => {
               />
               {firstNameError && (<p className="mt-1 text-xs text-red-600">{firstNameError}</p>)}
             </div>
-            <div>
+            <div id="onboarding-profile-last-name">
               <label className="block text-sm font-bold text-black mb-2">Last Name</label>
               <input
                 type="text"
@@ -585,7 +600,7 @@ const UserProfilePage: React.FC = () => {
               />
               {lastNameError && (<p className="mt-1 text-xs text-red-600">{lastNameError}</p>)}
             </div>
-            <div>
+            <div id="onboarding-profile-email">
               <label className="block text-sm font-bold text-black mb-2">Email Address</label>
               <input
                 type="email"
@@ -594,13 +609,13 @@ const UserProfilePage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
               />
             </div>
-            <div>
+            <div id="onboarding-profile-role">
               <label className="block text-sm font-bold text-black mb-2">Role</label>
               <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700">
                 {role || 'User'}
               </div>
             </div>
-            <div>
+            <div id="onboarding-profile-phone">
               <label className="block text-sm font-bold text-black mb-2">
                 Phone Number <span className="text-gray-400 font-normal">(optional)</span>
               </label>
@@ -649,11 +664,12 @@ const UserProfilePage: React.FC = () => {
         </div>
  
         {/* Support Activity Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-support-activity" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Support Activity</h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
+                id="onboarding-profile-submit-request"
                 onClick={handleSubmitRequest}
                 className="px-4 py-3 bg-[#6b1176] text-white rounded-lg hover:bg-[#8a2a95] transition-colors duration-200"
               >
@@ -823,7 +839,7 @@ const UserProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
+            <div id="onboarding-profile-support-table" className="w-full bg-white rounded-[10px] overflow-hidden border border-[#E7E1E1]">
               <div
                 className="max-h-[415px] overflow-y-auto"
                 style={{
@@ -937,11 +953,11 @@ const UserProfilePage: React.FC = () => {
         </div>
  
         {/* Notifications Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div id="onboarding-profile-notifications" className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Notifications</h2>
          
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div id="onboarding-profile-notif-ticket" className="flex items-center justify-between">
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-gray-900">Email me when my ticket is updated</h3>
                 <p className="text-sm text-gray-500 mt-1">Get notifications about ticket status changes</p>
@@ -960,7 +976,7 @@ const UserProfilePage: React.FC = () => {
               </button>
             </div>
  
-            <div className="flex items-center justify-between">
+            <div id="onboarding-profile-notif-updates" className="flex items-center justify-between">
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-gray-900">Include me in myGrape feature update emails</h3>
                 <p className="text-sm text-gray-500 mt-1">Stay informed about new features and improvements</p>

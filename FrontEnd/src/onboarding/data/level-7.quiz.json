@@ -1,0 +1,38 @@
+[
+    {
+        "id": "q7-1",
+        "prompt": "What can you update in the Basic Information section of your profile?",
+        "choices": [
+            "Tank thresholds and alert configurations",
+            "Your name, email, phone number, and role details",
+            "Branch-level LN2 reservoir inventory",
+            "WebSocket connection preferences"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q7-2",
+        "prompt": "What does the Support Activity section show?",
+        "choices": [
+            "Live sensor readings from all tanks",
+            "Support tickets you've raised, including bugs and feature requests",
+            "Monthly LN2 usage reports",
+            "Pending refill approvals"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    },
+    {
+        "id": "q7-3",
+        "prompt": "What can you control from the Notifications section?",
+        "choices": [
+            "Which tanks trigger critical alerts",
+            "Email and notification preferences for receiving alerts",
+            "Alert cooldown periods",
+            "User role assignments"
+        ],
+        "correctIndex": 1,
+        "points": 20
+    }
+]

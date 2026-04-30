@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { userService } from "../../services/userService";
 import { shipmentService } from "../../services/shipmentService";
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
+import { FilterSelect } from "../../components/FilterPanel";
 import {
     ivfReportsService,
     type CriticalAlertReportRow,
@@ -46,8 +47,8 @@ type FilterState = {
 const ALERT_STATUS_OPTIONS = ["All", "Active", "Acknowledged"] as const;
 const REFILL_STATUS_OPTIONS = ["All", "Not started", "In progress", "Done"] as const;
 const SEVERITY_OPTIONS = ["All", "High", "Medium", "Low"] as const;
-const ACTIVITY_OUTCOME_OPTIONS = ["All", "success", "failure", "partial"] as const;
-const ACTOR_TYPE_OPTIONS = ["All", "user", "system", "scheduler", "webhook", "integration"] as const;
+const ACTIVITY_OUTCOME_OPTIONS = ["All", "success", "failure", "partial"];
+const ACTOR_TYPE_OPTIONS = ["All", "user", "system", "scheduler", "webhook", "integration"];
 
 const escapeCsvValue = (value: string | number | null | undefined) => {
     const text = value === null || value === undefined ? "" : String(value);
@@ -393,6 +394,7 @@ export default function ReportsPage() {
     const [filters, setFilters] = useState<FilterState>(defaultFilters);
     const [activitySearchInput, setActivitySearchInput] = useState("");
 
+
     const [monthlySummaryRows, setMonthlySummaryRows] = useState<
         MonthlySummaryRow[]
     >([]);
@@ -615,6 +617,18 @@ export default function ReportsPage() {
         setActivitySearchInput(filters.search);
     }, [filters.search]);
 
+    // Onboarding tour events — each report-type step fires one of these to auto-select that type
+    useEffect(() => {
+        const handlers: Array<[string, () => void]> = [
+            ["onboarding:report-type:monthly-summary",  () => setFilters((p) => ({ ...p, reportType: "monthly-summary" }))],
+            ["onboarding:report-type:critical-alerts",  () => setFilters((p) => ({ ...p, reportType: "critical-alerts" }))],
+            ["onboarding:report-type:refill-logs",      () => setFilters((p) => ({ ...p, reportType: "refill-logs" }))],
+            ["onboarding:report-type:activity-logs",    () => setFilters((p) => ({ ...p, reportType: "activity-logs" }))],
+        ];
+        handlers.forEach(([event, fn]) => document.addEventListener(event, fn));
+        return () => { handlers.forEach(([event, fn]) => document.removeEventListener(event, fn)); };
+    }, []);
+
     const activeRowsCount = useMemo(() => {
         if (filters.reportType === "monthly-summary") {
             return monthlySummaryRows.length;
@@ -809,7 +823,7 @@ export default function ReportsPage() {
     return (
                 <PageLayout title="Reports" lucideIcon={Download}>
 
-                    <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-filters" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">
@@ -820,7 +834,10 @@ export default function ReportsPage() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <button
+                                <span className="text-xs text-gray-400">
+                                    Updates automatically when filters change.
+                                </span>
+                                 <button
                                     type="button"
                                     onClick={handleResetFilters}
                                     disabled={
@@ -834,48 +851,29 @@ export default function ReportsPage() {
                                 >
                                     Reset Filters
                                 </button>
-                                <span className="text-xs text-gray-400">
-                                    Updates automatically when filters change.
-                                </span>
                             </div>
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-semibold text-gray-600">
-                                    Report Type
-                                </label>
-                                <select
-                                    className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                            <div id="onboarding-reports-report-type">
+                                <FilterSelect
+                                    label="Report Type"
                                     value={filters.reportType}
-                                    onChange={(event) =>
-                                        setFilters((prev) => ({
-                                            ...prev,
-                                            reportType: event.target
-                                                .value as ReportType,
-                                        }))
+                                    onChange={(val) =>
+                                        setFilters((prev) => ({ ...prev, reportType: val as ReportType }))
                                     }
-                                    disabled={!isIvfUser && !canViewActivityLogs}
-                                >
-                                    {REPORT_TYPES.map((option) => (
-                                        <option
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    options={REPORT_TYPES.map((r) => ({ label: r.label, value: r.value }))}
+                                />
                             </div>
 
                             {filters.reportType === "monthly-summary" && (
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-xs font-semibold text-gray-600">
+                                <div id="onboarding-filter-month" className="flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Month
                                     </label>
                                     <input
                                         type="month"
-                                        className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                        className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                         value={filters.month}
                                         onChange={(event) =>
                                             setFilters((prev) => ({
@@ -890,13 +888,13 @@ export default function ReportsPage() {
 
                             {filters.reportType === "critical-alerts" && (
                                 <>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -907,13 +905,13 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -924,51 +922,27 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Status
-                                        </label>
-                                        <select
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    <div id="onboarding-filter-status">
+                                        <FilterSelect
+                                            label="Status"
                                             value={filters.alertStatus}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    alertStatus: event.target.value,
-                                                }))
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, alertStatus: val }))
                                             }
-                                            disabled={!isIvfUser}
-                                        >
-                                            {ALERT_STATUS_OPTIONS.map((status) => (
-                                                <option key={status} value={status}>
-                                                    {status}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={[...ALERT_STATUS_OPTIONS]}
+                                        />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Severity
-                                        </label>
-                                        <select
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    <div id="onboarding-filter-severity">
+                                        <FilterSelect
+                                            label="Severity"
                                             value={filters.severity}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    severity: event.target.value,
-                                                }))
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, severity: val }))
                                             }
-                                            disabled={!isIvfUser}
-                                        >
-                                            {SEVERITY_OPTIONS.map((severity) => (
-                                                <option key={severity} value={severity}>
-                                                    {severity}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={[...SEVERITY_OPTIONS]}
+                                        />
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <div id="onboarding-filter-tank-codes">
                                         <MultiSelectDropdown
                                             label="Tank Codes"
                                             options={tankOptions}
@@ -988,13 +962,13 @@ export default function ReportsPage() {
 
                             {filters.reportType === "refill-logs" && (
                                 <>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1005,13 +979,13 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1022,29 +996,17 @@ export default function ReportsPage() {
                                             disabled={!isIvfUser}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Status
-                                        </label>
-                                        <select
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    <div id="onboarding-filter-status">
+                                        <FilterSelect
+                                            label="Status"
                                             value={filters.refillStatus}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    refillStatus: event.target.value,
-                                                }))
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, refillStatus: val }))
                                             }
-                                            disabled={!isIvfUser}
-                                        >
-                                            {REFILL_STATUS_OPTIONS.map((status) => (
-                                                <option key={status} value={status}>
-                                                    {status}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={[...REFILL_STATUS_OPTIONS]}
+                                        />
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <div id="onboarding-filter-tank-codes">
                                         <MultiSelectDropdown
                                             label="Tank Codes"
                                             options={tankOptions}
@@ -1064,13 +1026,13 @@ export default function ReportsPage() {
 
                             {filters.reportType === "activity-logs" && (
                                 <>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-from" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date From
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateFrom}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1081,13 +1043,13 @@ export default function ReportsPage() {
                                             disabled={!canViewActivityLogs}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-date-to" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date To
                                         </label>
                                         <input
                                             type="date"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             value={filters.dateTo}
                                             onChange={(event) =>
                                                 setFilters((prev) => ({
@@ -1098,7 +1060,7 @@ export default function ReportsPage() {
                                             disabled={!canViewActivityLogs}
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <div id="onboarding-filter-actions">
                                         <MultiSelectDropdown
                                             label="Actions"
                                             options={ACTIVITY_ACTION_OPTIONS}
@@ -1113,57 +1075,33 @@ export default function ReportsPage() {
                                             }
                                         />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Outcome
-                                        </label>
-                                        <select
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    <div id="onboarding-filter-outcome">
+                                        <FilterSelect
+                                            label="Outcome"
                                             value={filters.outcome}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    outcome: event.target.value,
-                                                }))
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, outcome: val }))
                                             }
-                                            disabled={!canViewActivityLogs}
-                                        >
-                                            {ACTIVITY_OUTCOME_OPTIONS.map((option) => (
-                                                <option key={option} value={option}>
-                                                    {option === "All" ? "All" : option}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={ACTIVITY_OUTCOME_OPTIONS}
+                                        />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
-                                            Actor Type
-                                        </label>
-                                        <select
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                    <div id="onboarding-filter-actor-type">
+                                        <FilterSelect
+                                            label="Actor Type"
                                             value={filters.actorType}
-                                            onChange={(event) =>
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    actorType: event.target.value,
-                                                }))
+                                            onChange={(val) =>
+                                                setFilters((prev) => ({ ...prev, actorType: val }))
                                             }
-                                            disabled={!canViewActivityLogs}
-                                        >
-                                            {ACTOR_TYPE_OPTIONS.map((option) => (
-                                                <option key={option} value={option}>
-                                                    {option}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={ACTOR_TYPE_OPTIONS}
+                                        />
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-xs font-semibold text-gray-600">
+                                    <div id="onboarding-filter-search" className="flex flex-col">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Search
                                         </label>
                                         <input
                                             type="text"
-                                            className="border border-[#E7E1E1] rounded-md px-3 py-2 text-sm"
+                                            className="border border-[#E7E1E1] rounded-lg px-3 h-12 text-sm"
                                             placeholder="Press Enter to apply"
                                             value={activitySearchInput}
                                             onChange={(event) =>
@@ -1186,7 +1124,7 @@ export default function ReportsPage() {
                         </div>
                     </section>
 
-                    <section className="bg-white border border-[#E7E1E1] rounded-lg p-5">
+                    <section id="onboarding-reports-results" className="bg-white border border-[#E7E1E1] rounded-lg p-5">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                                 <h2 className="text-base font-semibold text-black">

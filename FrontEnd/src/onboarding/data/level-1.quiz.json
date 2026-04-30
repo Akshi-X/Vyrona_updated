@@ -1,23 +1,23 @@
 [
     {
         "id": "dash-q1",
-        "prompt": "Which KPI helps you quickly assess temperature stability?",
-        "choices": ["Stability Index", "Shipment Count", "User Activity", "Branch Coverage"],
+        "prompt": "Does mgSCALE alert you when something goes beyond set threshold??",
+        "choices": ["Yes", "No", "Yes, sometimes", "No, it only monitors."],
         "correctIndex": 0,
         "points": 15
     },
     {
         "id": "dash-q2",
         "prompt": "Where do you review alerts that need immediate attention?",
-        "choices": ["Timeline", "Alert List", "Settings", "Profile"],
+        "choices": ["Tasks", "Critical Alerts", "Settings", "Profile"],
         "correctIndex": 1,
         "points": 15
     },
     {
         "id": "dash-q3",
-        "prompt": "What does the shipment board primarily track?",
-        "choices": ["Invoices", "Critical Shipments", "User Roles", "Inventory Levels"],
-        "correctIndex": 1,
+        "prompt": "Does mgSCALE tell you which factor is causing more problem with the tanks?",
+        "choices": ["Yes", "No, it doesn't", "Yes, but only sometimes", "No, it only monitors."],
+        "correctIndex": 0,
         "points": 10
     },
     {
@@ -37,7 +37,7 @@
     {
         "id": "dash-q8",
         "prompt": "Which section lets you launch Cryocan Quality Tracking or Embryo Grading?",
-        "choices": ["Volume grid", "Quality Tracking cards", "Shipment board", "Incubator Performance"],
+        "choices": ["Volume grid", "Quality Tracking card", "Shipment board", "Incubator Performance"],
         "correctIndex": 1,
         "points": 10
     },
@@ -51,7 +51,7 @@
     {
         "id": "dash-q4",
         "prompt": "What is a good first action when an alert is raised?",
-        "choices": ["Ignore it", "Check alert details", "Delete shipment", "Disable sensors"],
+        "choices": ["Ignore it", "Check alert details", "Delete alert configuration", "Disable sensors"],
         "correctIndex": 1,
         "points": 10
     },

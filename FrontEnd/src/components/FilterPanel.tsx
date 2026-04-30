@@ -3,15 +3,20 @@ import { SlidersHorizontal } from "lucide-react";
 import { useTourNavContext } from "../contexts/TourNavContext";
 
 // --- FilterSelect ---
+type FilterOption = string | { label: string; value: string };
+
 type FilterSelectProps = {
     label: string;
     value: string;
     onChange: (val: string) => void;
-    options: string[];
+    options: FilterOption[];
     allLabel?: string;
     buttonId?: string;
     listId?: string;
 };
+
+const getOptionValue = (o: FilterOption) => typeof o === "string" ? o : o.value;
+const getOptionLabel = (o: FilterOption) => typeof o === "string" ? o : o.label;
 
 export const FilterSelect = ({
     label,
@@ -25,6 +30,10 @@ export const FilterSelect = ({
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const tourNavCtx = useTourNavContext();
+
+    const selectedLabel = value === "All"
+        ? allLabel
+        : (options.find((o) => getOptionValue(o) === value) ? getOptionLabel(options.find((o) => getOptionValue(o) === value)!) : value);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -53,7 +62,7 @@ export const FilterSelect = ({
                     className="w-full px-3 h-12 border border-[#E7E1E1] rounded-lg text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#9c3aa6] focus:border-transparent bg-white"
                 >
                     <span className={value !== "All" ? "text-[#6b1176]" : "text-gray-700"}>
-                        {value === "All" ? allLabel : value}
+                        {selectedLabel}
                     </span>
                     <svg
                         className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -71,25 +80,29 @@ export const FilterSelect = ({
                 </button>
                 {isOpen && (
                     <div id={listId} className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                        {options.map((option) => (
-                            <button
-                                key={option}
-                                id={listId ? `${listId}-${option}` : undefined}
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onChange(option);
-                                    setIsOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
-                                    value === option
-                                        ? "bg-[#6b1176] text-white"
-                                        : "text-[#6b1176] hover:bg-gray-100"
-                                }`}
-                            >
-                                {option === "All" ? allLabel : option}
-                            </button>
-                        ))}
+                        {options.map((option) => {
+                            const optVal = getOptionValue(option);
+                            const optLabel = getOptionLabel(option);
+                            return (
+                                <button
+                                    key={optVal}
+                                    id={listId ? `${listId}-${optVal}` : undefined}
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onChange(optVal);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors duration-150 ${
+                                        value === optVal
+                                            ? "bg-[#6b1176] text-white"
+                                            : "text-[#6b1176] hover:bg-gray-100"
+                                    }`}
+                                >
+                                    {optVal === "All" ? allLabel : optLabel}
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>

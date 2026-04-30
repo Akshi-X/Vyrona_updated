@@ -4,6 +4,45 @@ import dashboardData from "./mocks/dashboard-data.json";
 import controlTowerData from "./mocks/control-tower-data.json";
 import liveFeedFrames from "./mocks/live-feed-data.json";
 
+// ── Cached real profile (fetched once when mocks enable) ──────────────────────
+let cachedProfile: { user_id: string; first_name: string; last_name: string; role: string } | null = null;
+
+// ── Mutable in-memory alert state (reset each time mocks are enabled) ────────
+// Allows the acknowledge action to update alert status within the same session.
+let mockTankAlerts: typeof dashboardData.ivfTankAlerts;
+
+// ── Mutable in-memory chat state ───────────────────────────────────────────
+// Allows sent messages to appear immediately on the subsequent refresh call.
+let mockTankChatMessages: typeof dashboardData.ivfTankChatMessages;
+
+// ── Mutable in-memory task state ───────────────────────────────────────────
+// Allows created tasks to appear in the list after the POST resolves.
+let mockCanisterTasks: typeof dashboardData.ivfTankTasks;
+
+// ── Mutable in-memory refill log state ─────────────────────────────────────
+// Allows newly created refill log entries to appear on the subsequent GET.
+let mockCanisterRefillLogs: typeof dashboardData.ivfTankRefillLogs;
+
+// ── Mutable in-memory support ticket state ──────────────────────────────────
+// Allows submitted tickets to appear in the list; comments/status updates persist.
+interface MockSupportTicket {
+    feedback_id: string;
+    feedback: string;
+    type: string;
+    status: string;
+    submitted_on: string;
+    submitted_by_name: string | null;
+    hospital_name: string | null;
+    branch_name: string | null;
+    subject: string;
+    description: string;
+    priority: string;
+    affected_modules: string[];
+    attachment_paths: string[];
+    comments: Array<{ id: number; comment: string; commented_by: string; created_at: string }>;
+}
+let mockSupportTickets: MockSupportTicket[];
+
 // ── KPI unit map for live-feed messages ────────────────────────────────────
 const KPI_UNIT_MAP: Record<string, string> = {
     temp_internal:           "°C",
@@ -137,11 +176,98 @@ function buildMockKpiHistory() {
     return { tank_code: "T1", tank_id: 60, kpi_series: kpiSeries };
 }
 
+// ── KPI history timestamp shifter ──────────────────────────────────────────
+// Static mock data has hardcoded timestamps that age out of the chart's time
+// window filter (displayReadings filters to Date.now() - windowMs).
+// This re-stamps every point so the last point lands at `now` and earlier
+// points keep the same relative spacing.
+function shiftKpiHistoryToNow(data: typeof dashboardData.ivfKpiHistory24H) {
+    const now = Date.now();
+    // Find the latest timestamp across all series
+    let maxMs = 0;
+    for (const points of Object.values(data.kpi_series)) {
+        for (const p of points) {
+            const t = new Date(p.timestamp).getTime();
+            if (t > maxMs) maxMs = t;
+        }
+    }
+    if (!maxMs) return data;
+    const offset = now - maxMs;
+
+    const shiftedSeries: typeof data.kpi_series = {} as typeof data.kpi_series;
+    for (const [key, points] of Object.entries(data.kpi_series)) {
+        (shiftedSeries as Record<string, typeof points>)[key] = points.map((p) => ({
+            ...p,
+            timestamp: new Date(new Date(p.timestamp).getTime() + offset).toISOString().replace("Z", ""),
+        }));
+    }
+    return { ...data, kpi_series: shiftedSeries };
+}
+
 // ── Enable / disable ────────────────────────────────────────────────────────
 
 export const enableOnboardingMocks = () => {
+    // Deep-clone so mutations don't bleed across sessions
+    mockTankAlerts = JSON.parse(JSON.stringify(dashboardData.ivfTankAlerts));
+    mockTankChatMessages = JSON.parse(JSON.stringify(dashboardData.ivfTankChatMessages));
+    mockCanisterTasks = JSON.parse(JSON.stringify(dashboardData.ivfTankTasks));
+    mockCanisterRefillLogs = JSON.parse(JSON.stringify(dashboardData.ivfTankRefillLogs));
+    mockSupportTickets = [
+        {
+            feedback_id: "TK-2026-04-001",
+            feedback: "LN2 alert not triggering for tank T-05",
+            type: "bug_report",
+            status: "Open",
+            submitted_on: "2026-04-18T10:20:00Z",
+            submitted_by_name: "Avery Morgan",
+            hospital_name: "Iris Fertility",
+            branch_name: "Chennai",
+            subject: "LN2 alert not triggering for tank T-05",
+            description: "The critical alert for tank T-05 is not firing even when the LN2 level drops below threshold.",
+            priority: "high",
+            affected_modules: ["dashboard"],
+            attachment_paths: [],
+            comments: [],
+        },
+        {
+            feedback_id: "TK-2026-04-002",
+            feedback: "Request to add export to PDF for reports",
+            type: "feature_request",
+            status: "In Review",
+            submitted_on: "2026-04-14T14:05:00Z",
+            submitted_by_name: "Avery Morgan",
+            hospital_name: "Iris Fertility",
+            branch_name: "Chennai",
+            subject: "Request to add export to PDF for reports",
+            description: "It would be very helpful to export the reports page data as a PDF for sharing with the management team.",
+            priority: "medium",
+            affected_modules: ["container_quality_tracking"],
+            attachment_paths: [],
+            comments: [],
+        },
+        {
+            feedback_id: "TK-2026-04-003",
+            feedback: "Refill log table pagination not working on mobile",
+            type: "bug_report",
+            status: "Resolved",
+            submitted_on: "2026-04-08T09:30:00Z",
+            submitted_by_name: "Avery Morgan",
+            hospital_name: "Iris Fertility",
+            branch_name: "Chennai",
+            subject: "Refill log table pagination not working on mobile",
+            description: "When viewing the refill log on a mobile device, the pagination controls are not clickable.",
+            priority: "low",
+            affected_modules: ["dashboard"],
+            attachment_paths: [],
+            comments: [],
+        },
+    ];
+
+    // Pre-fetch real profile once so sent messages show current user as sender
+    userService.getProfileForOnboarding().then((p) => { cachedProfile = p; }).catch(() => {});
+
     BaseApiService.setMockEnabled(true);
-    BaseApiService.setMockResolver(async (endpoint) => {
+    BaseApiService.setMockResolver(async (endpoint, options) => {
         // User profile — hit real API only for onboarding, preserve real role as real_role, override role to Admin.
         if (endpoint.startsWith("/api/profile")) {
             try {
@@ -159,7 +285,24 @@ export const enableOnboardingMocks = () => {
 
         // IVF alerts for a specific tank (canister detail page).
         if (endpoint.startsWith("/api/ivf/alerts/tank/")) {
-            return dashboardData.ivfTankAlerts;
+            return mockTankAlerts;
+        }
+
+        // Acknowledge a single IVF alert — flip its status in the mutable copy.
+        if (endpoint.startsWith("/api/ivf/alerts/acknowledge")) {
+            try {
+                const body = options?.body ? JSON.parse(options.body as string) : {};
+                const alertId: string = body.alert_id ?? body.alertId ?? "";
+                const alert = mockTankAlerts.alerts.find((a) => a.alert_id === alertId) as
+                    | { status: string; acknowledged_by: string | null; acknowledged_at: string | null }
+                    | undefined;
+                if (alert) {
+                    alert.status = "Acknowledged";
+                    alert.acknowledged_by = "USR-DEMO";
+                    alert.acknowledged_at = new Date().toISOString();
+                }
+            } catch { /* ignore parse errors */ }
+            return { success: true };
         }
 
         // IVF alerts feed for IVF dashboard cards.
@@ -167,8 +310,8 @@ export const enableOnboardingMocks = () => {
             return dashboardData.ivfAlerts;
         }
 
-        // Task list for My Tasks modal.
-        if (endpoint.startsWith("/api/tasks")) {
+        // Task list for My Tasks modal (GET only — POST/PUT/PATCH/DELETE handled below).
+        if (endpoint === "/api/tasks" && (!options?.method || options.method === "GET")) {
             return dashboardData.tasks;
         }
 
@@ -274,6 +417,46 @@ export const enableOnboardingMocks = () => {
             return controlTowerData.controlTowerMap;
         }
 
+        // Alert Setting — branch list for filter dropdown.
+        if (endpoint.startsWith("/api/ivf/branches")) {
+            const allBranches = controlTowerData.activeCanisters.branches.map((b: any) => ({
+                branch_id: b.branch_id,
+                branch_name: b.branch_name,
+            }));
+            // Put Bangalore first so it's immediately visible in the onboarding dropdown
+            const bangalore = allBranches.find((b) => b.branch_name === "Bangalore");
+            const rest = allBranches.filter((b) => b.branch_name !== "Bangalore");
+            return { branches: bangalore ? [bangalore, ...rest] : allBranches };
+        }
+
+        // Alert Setting — bulk upsert KPI configs (POST). Merges into in-memory state
+        // so the subsequent re-fetch reflects the saved changes.
+        if (endpoint === "/api/ivf/quality/kpi-config/bulk" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const configs: any[] = body.configs ?? [];
+            const configList: any[] = dashboardData.alertSettingKpiConfigList.config;
+            let nextId = Math.max(...configList.map((c: any) => c.id), 0) + 1;
+            configs.forEach((incoming: any) => {
+                const existing = configList.find((c: any) => c.kpi_name === incoming.kpi_name);
+                if (existing) {
+                    Object.assign(existing, incoming);
+                } else {
+                    configList.push({ id: nextId++, hospital_id: 1, branch_id: 16, tank_id: 161, ...incoming });
+                }
+            });
+            return { updated: configs.filter((c: any) => configList.some((e: any) => e.kpi_name === c.kpi_name)).length, created: 0 };
+        }
+
+        // Alert Setting — KPI config list for a specific tank.
+        if (endpoint.startsWith("/api/ivf/quality/kpi-config/list")) {
+            return dashboardData.alertSettingKpiConfigList;
+        }
+
+        // Alert Setting — hospital notification settings.
+        if (endpoint.startsWith("/api/ivf/quality/hospital-notification-settings")) {
+            return { is_email_notifify: true, is_whatsapp_notify: false };
+        }
+
         // Control Tower (IVF) canisters and branch map data.
         if (endpoint.startsWith("/api/ivf/control_tower/active_canisters")) {
             return controlTowerData.activeCanisters;
@@ -301,8 +484,8 @@ export const enableOnboardingMocks = () => {
         // IVF track shipment — tank KPI history (any tankId, any duration).
         // Generated dynamically so LIVE range (last 10 min) always has data.
         if (endpoint.startsWith("/api/ivf/quality/tanks/") && endpoint.includes("/kpi-history")) {
-            if (endpoint.includes("duration_minutes=10080")) return dashboardData.ivfKpiHistory7D;
-            if (endpoint.includes("duration_minutes=1440")) return dashboardData.ivfKpiHistory24H;
+            if (endpoint.includes("duration_minutes=10080")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory7D);
+            if (endpoint.includes("duration_minutes=1440")) return shiftKpiHistoryToNow(dashboardData.ivfKpiHistory24H);
             return buildMockKpiHistory(); // LIVE and 1H
         }
 
@@ -311,19 +494,440 @@ export const enableOnboardingMocks = () => {
             return dashboardData.ivfTankTrackingDetails;
         }
 
-        // IVF track shipment — refill logs.
-        if (endpoint.startsWith("/api/quality-tracking/tanks/") && endpoint.includes("/refill-logs")) {
-            return dashboardData.ivfTankRefillLogs;
+        // IVF track shipment — create refill log entry.
+        if (
+            endpoint.match(/^\/api\/quality-tracking\/tanks\/[^/?]+\/refill-logs(\?|$)/) &&
+            options?.method === "POST"
+        ) {
+            const cleanPath = endpoint.split("?")[0];
+            const tankIdFromUrl = Number(cleanPath.split("/").filter(Boolean).find((_, i, arr) => arr[i - 1] === "tanks" && arr[i + 1] === "refill-logs") ?? 0);
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+
+            // Build a branch-aware log for the activity log list
+            const branchEntry = (() => {
+                for (const b of (controlTowerData as any).activeCanisters?.branches ?? []) {
+                    for (const t of b.tanks ?? []) {
+                        if (t.tank_id === tankIdFromUrl) return { branch_name: b.branch_name, tank_code: t.tank_code };
+                    }
+                }
+                return { branch_name: null, tank_code: null };
+            })();
+
+            const newLog = {
+                tank_id: tankIdFromUrl || 60,
+                log_id: mockCanisterRefillLogs.refill_logs.length + 500,
+                refill_date: body.refill_date ?? new Date().toISOString().split("T")[0],
+                refill_time: body.refill_time ?? "00:00:00",
+                refilled_by: body.refilled_by ?? "",
+                description: body.description ?? "",
+                status: body.status ?? "Not started",
+                cryoshipper: body.cryoshipper ?? null,
+                disinfected_shipper_infected_tank_description: body.disinfected_shipper_infected_tank_description ?? null,
+                reservoir: body.reservoir ?? null,
+                ln2_ordered_date: body.ln2_ordered_date ?? null,
+                ln2_received_date: body.ln2_received_date ?? null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                created_by: "demo@onboarding.local",
+                updated_by: null,
+            };
+            mockCanisterRefillLogs.refill_logs.unshift(newLog);
+
+            // Also prepend to refillAllLogs so the activity log reflects the new entry immediately
+            dashboardData.refillAllLogs.logs.unshift({
+                tank_id: tankIdFromUrl || 60,
+                tank_code: branchEntry.tank_code ?? body.tank_code ?? "—",
+                branch_name: branchEntry.branch_name,
+                refill_date: newLog.refill_date,
+                refill_time: newLog.refill_time,
+                refilled_by: newLog.refilled_by,
+                description: newLog.description,
+                status: newLog.status,
+                refill_weight: body.refill_weight ?? null,
+            });
+
+            return { success: true, log: newLog };
         }
 
-        // IVF track shipment — canister tasks.
+        // IVF track shipment — refill logs (GET).
+        if (endpoint.startsWith("/api/quality-tracking/tanks/") && endpoint.includes("/refill-logs")) {
+            return mockCanisterRefillLogs;
+        }
+
+        // Reports page — monthly summary (filter by month).
+        if (endpoint.startsWith("/api/ivf/reports/monthly-summary")) {
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const monthParam = qs.get("month") ?? "";
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+            const base = dashboardData.reportsMonthlySummary;
+            // Mock data is for 2026-04; other months return empty
+            const rows = (!monthParam || monthParam === base.month) ? [...base.rows] : [];
+            const total = rows.length;
+            const start = (page - 1) * pageSize;
+            return { ...base, rows: rows.slice(start, start + pageSize), total_count: total, total_kpis: total, page, page_size: pageSize };
+        }
+
+        // Reports page — critical alerts report (filter by status, severity, tank_codes, date range).
+        if (endpoint.startsWith("/api/ivf/reports/critical-alerts")) {
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam   = qs.get("status")     ?? "";
+            const severityParam = qs.get("severity")   ?? "";
+            const startDate     = qs.get("start_date") ?? "";
+            const endDate       = qs.get("end_date")   ?? "";
+            const tankCodes     = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            // Map UI status labels to mock data status values
+            const statusMap: Record<string, string> = { Active: "open", Acknowledged: "acknowledged" };
+            const normalizedStatus = statusMap[statusParam] ?? statusParam.toLowerCase();
+
+            type AlertRow = typeof dashboardData.reportsCriticalAlerts.alerts[number];
+            let alerts: AlertRow[] = [...dashboardData.reportsCriticalAlerts.alerts];
+
+            if (normalizedStatus) alerts = alerts.filter(a => a.status === normalizedStatus);
+            if (severityParam)    alerts = alerts.filter(a => a.severity.toLowerCase() === severityParam.toLowerCase());
+            if (tankCodes.length) alerts = alerts.filter(a => !!a.tank_code && tankCodes.includes(a.tank_code));
+            if (startDate)        alerts = alerts.filter(a => a.occurred_at >= startDate);
+            if (endDate)          alerts = alerts.filter(a => a.occurred_at <= endDate + "T23:59:59");
+
+            const total = alerts.length;
+            const start = (page - 1) * pageSize;
+            alerts = alerts.slice(start, start + pageSize);
+            return { alerts, total_count: total, page, page_size: pageSize, status: "ok" };
+        }
+
+        // Reports page — refill logs report (filter by status, tank_codes, date range).
+        if (endpoint.startsWith("/api/ivf/reports/refill-logs")) {
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const statusParam = qs.get("status")     ?? "";
+            const startDate   = qs.get("start_date") ?? "";
+            const endDate     = qs.get("end_date")   ?? "";
+            const tankCodes   = qs.getAll("tank_codes").filter(Boolean);
+            const page     = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize = parseInt(qs.get("page_size") ?? "20", 10);
+
+            type LogRow = typeof dashboardData.reportsRefillLogs.logs[number];
+            let logs: LogRow[] = [...dashboardData.reportsRefillLogs.logs];
+
+            if (statusParam)      logs = logs.filter(l => (l.status ?? "").toLowerCase() === statusParam.toLowerCase());
+            if (tankCodes.length) logs = logs.filter(l => !!l.tank_code && tankCodes.includes(l.tank_code));
+            if (startDate)        logs = logs.filter(l => (l.refill_date ?? "") >= startDate);
+            if (endDate)          logs = logs.filter(l => (l.refill_date ?? "") <= endDate);
+
+            const total = logs.length;
+            const start = (page - 1) * pageSize;
+            logs = logs.slice(start, start + pageSize);
+            return { logs, total_count: total, page, page_size: pageSize, status: "ok" };
+        }
+
+        // Reports page — activity logs (filtered by query params).
+        if (endpoint.startsWith("/api/activity-logs")) {
+            const qs = endpoint.includes("?") ? new URLSearchParams(endpoint.split("?")[1]) : new URLSearchParams();
+            const actionsParam = qs.get("actions");
+            const allowedActions = actionsParam ? actionsParam.split(",").map(s => s.trim()).filter(Boolean) : [];
+            const outcomeParam  = qs.get("outcome")    ?? "";
+            const actorTypeParam = qs.get("actor_type") ?? "";
+            const searchParam   = (qs.get("search")    ?? "").toLowerCase();
+            const dateFrom      = qs.get("date_from")  ?? "";
+            const dateTo        = qs.get("date_to")    ?? "";
+            const page          = parseInt(qs.get("page")      ?? "1",  10);
+            const pageSize      = parseInt(qs.get("page_size") ?? "20", 10);
+
+            type LogRow = typeof dashboardData.reportsActivityLogs.logs[number];
+            let logs: LogRow[] = [...dashboardData.reportsActivityLogs.logs];
+
+            if (allowedActions.length > 0) {
+                logs = logs.filter(l => allowedActions.includes(l.action));
+            }
+            if (outcomeParam) {
+                logs = logs.filter(l => l.outcome === outcomeParam);
+            }
+            if (actorTypeParam) {
+                logs = logs.filter(l => l.actor_type === actorTypeParam);
+            }
+            if (searchParam) {
+                logs = logs.filter(l =>
+                    (l.action        ?? "").toLowerCase().includes(searchParam) ||
+                    (l.actor_label   ?? "").toLowerCase().includes(searchParam) ||
+                    (l.target_label  ?? "").toLowerCase().includes(searchParam) ||
+                    (l.outcome       ?? "").toLowerCase().includes(searchParam),
+                );
+            }
+            if (dateFrom) {
+                logs = logs.filter(l => l.created_at >= dateFrom);
+            }
+            if (dateTo) {
+                const toEnd = dateTo + "T23:59:59Z";
+                logs = logs.filter(l => l.created_at <= toEnd);
+            }
+
+            const total = logs.length;
+            const start = (page - 1) * pageSize;
+            logs = logs.slice(start, start + pageSize);
+
+            return { logs, total_count: total, page, page_size: pageSize, status: "ok" };
+        }
+
+        // Refill Log page — pending detections.
+        if (endpoint.startsWith("/api/quality-tracking/refill-detections/pending")) {
+            return dashboardData.refillPendingDetections;
+        }
+
+        // Refill Log page — all-tanks refill logs.
+        if (endpoint.startsWith("/api/quality-tracking/tanks/all-refill-logs")) {
+            return dashboardData.refillAllLogs;
+        }
+
+        // Refill Log page — tanks refill summary.
+        if (endpoint.startsWith("/api/quality-tracking/tanks/refill-summary")) {
+            return dashboardData.refillSummary;
+        }
+
+        // Refill Log page — reservoirs list.
+        if (endpoint.startsWith("/api/ivf/reservoirs")) {
+            const sorted = [...dashboardData.refillReservoirs.reservoirs].sort((a, b) =>
+                (a.branch_name ?? a.reservoir_name).localeCompare(b.branch_name ?? b.reservoir_name)
+            );
+            return { ...dashboardData.refillReservoirs, reservoirs: sorted };
+        }
+
+        // Refill Log page — update reservoir log (PUT/PATCH).
+        if (endpoint.match(/^\/api\/ivf\/reservoir-logs\/\d+$/) && (options?.method === "PUT" || options?.method === "PATCH")) {
+            const logId = Number(endpoint.split("/").pop());
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const log = dashboardData.refillReservoirLogs.logs.find((l: any) => l.log_id === logId);
+            if (log) Object.assign(log, body);
+            return { success: true };
+        }
+
+        // Refill Log page — reservoir logs (GET).
+        if (endpoint.startsWith("/api/ivf/reservoir-logs")) {
+            return dashboardData.refillReservoirLogs;
+        }
+
+        // Users page — hospital user list.
+        if (endpoint.startsWith("/api/hospital/users")) {
+            return dashboardData.hospitalUsers;
+        }
+
+        // Company user list — used by StakeholderChatBox for @mention suggestions.
+        if (endpoint.startsWith("/api/users")) {
+            return dashboardData.hospitalUsers;
+        }
+
+        // Support / Profile — submit a new feedback ticket.
+        if (endpoint === "/api/feedback/create" && options?.method === "POST") {
+            let body: Record<string, any> = {};
+            // submitFeedback sends FormData; pull the JSON "request" field.
+            if (options.body instanceof FormData) {
+                const raw = (options.body as FormData).get("request");
+                if (raw) body = JSON.parse(raw as string);
+            } else if (typeof options.body === "string") {
+                body = JSON.parse(options.body);
+            }
+            const ticketNum = mockSupportTickets.length + 1;
+            const newId = `TK-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(ticketNum).padStart(3, "0")}`;
+            const submitterName = cachedProfile
+                ? `${cachedProfile.first_name} ${cachedProfile.last_name}`
+                : "Demo User";
+            const newTicket: MockSupportTicket = {
+                feedback_id: newId,
+                feedback: body.subject ?? "New Ticket",
+                type: body.feedback_type ?? "other",
+                status: "Open",
+                submitted_on: new Date().toISOString(),
+                submitted_by_name: submitterName,
+                hospital_name: "Iris Fertility",
+                branch_name: "Chennai",
+                subject: body.subject ?? "",
+                description: body.description ?? "",
+                priority: body.priority ?? "medium",
+                affected_modules: body.affected_modules ?? [],
+                attachment_paths: [],
+                comments: [],
+            };
+            mockSupportTickets.unshift(newTicket);
+            return { message: "Feedback submitted successfully", ticket_id: newId, feedback_id: newId, status: "Open" };
+        }
+
+        // Support — add comment to a ticket.
+        if (endpoint.match(/^\/api\/feedback\/[^/]+\/comments$/) && options?.method === "POST") {
+            const feedbackId = endpoint.split("/")[3];
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const ticket = mockSupportTickets.find((t) => t.feedback_id === feedbackId);
+            const commentId = Date.now();
+            const commenterName = cachedProfile
+                ? `${cachedProfile.first_name} ${cachedProfile.last_name}`
+                : "Demo User";
+            if (ticket) {
+                ticket.comments.push({
+                    id: commentId,
+                    comment: body.comment ?? "",
+                    commented_by: commenterName,
+                    created_at: new Date().toISOString(),
+                });
+            }
+            return { message: "Comment added", comment_id: commentId, ticket_id: feedbackId };
+        }
+
+        // Support — get comments for a ticket.
+        if (endpoint.match(/^\/api\/feedback\/[^/]+\/comments$/) && (!options?.method || options.method === "GET")) {
+            const feedbackId = endpoint.split("/")[3];
+            const ticket = mockSupportTickets.find((t) => t.feedback_id === feedbackId);
+            return ticket?.comments ?? [];
+        }
+
+        // Support — update ticket status.
+        if (endpoint.match(/^\/api\/feedback\/[^/]+\/status$/) && options?.method === "PATCH") {
+            const feedbackId = endpoint.split("/")[3];
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const ticket = mockSupportTickets.find((t) => t.feedback_id === feedbackId);
+            const oldStatus = ticket?.status ?? "Open";
+            if (ticket) ticket.status = body.status ?? ticket.status;
+            return { message: "Status updated", ticket_id: feedbackId, old_status: oldStatus, new_status: ticket?.status ?? body.status };
+        }
+
+        // Support / Profile — ticket details (readonly view).
+        if (endpoint.match(/^\/api\/feedback\/[^/]+$/) && (!options?.method || options.method === "GET")) {
+            const feedbackId = endpoint.split("/")[3];
+            const ticket = mockSupportTickets.find((t) => t.feedback_id === feedbackId);
+            if (!ticket) return undefined;
+            return {
+                id: ticket.feedback_id,
+                ticket_id: ticket.feedback_id,
+                department: "other",
+                feedback_type: ticket.type,
+                subject: ticket.subject,
+                description: ticket.description,
+                attachment_paths: ticket.attachment_paths,
+                priority: ticket.priority.toUpperCase(),
+                affected_modules: ticket.affected_modules,
+                status: ticket.status,
+                submitted_by: ticket.submitted_by_name ?? "Demo User",
+                submitted_by_email: cachedProfile ? `${cachedProfile.first_name.toLowerCase()}@example.com` : "demo@example.com",
+                submitted_on: ticket.submitted_on,
+                created_at: ticket.submitted_on,
+                comments: ticket.comments,
+            };
+        }
+
+        // Profile page / Support — user feedback ticket list.
+        if (endpoint.startsWith("/api/feedback/user/") || endpoint.startsWith("/api/feedback/admin")) {
+            return [...mockSupportTickets];
+        }
+
+        // IVF track shipment — canister tasks (GET).
+        // Return a shallow copy so React re-renders after add/edit.
         if (endpoint.startsWith("/api/canisters/") && endpoint.includes("/tasks")) {
-            return dashboardData.ivfTankTasks;
+            return { ...mockCanisterTasks, tasks: [...mockCanisterTasks.tasks] };
+        }
+
+        // Task creation — append to mock list and return success.
+        if (endpoint === "/api/tasks" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const assigneeId = body.assignee_id ?? cachedProfile?.user_id ?? "USR-DEMO";
+            const userInfo = cachedProfile
+                ? {
+                      user_id: cachedProfile.user_id,
+                      first_name: cachedProfile.first_name,
+                      last_name: cachedProfile.last_name,
+                      email: "demo@arcfertility.in",
+                      role: cachedProfile.role,
+                  }
+                : {
+                      user_id: assigneeId,
+                      first_name: "Demo",
+                      last_name: "User",
+                      email: "demo@arcfertility.in",
+                      role: "User",
+                  };
+            const nowIso = new Date().toISOString();
+            const newTask = {
+                id: mockCanisterTasks.tasks.length + 200,
+                task_name: body.task_name ?? "New Task",
+                description: body.description ?? "",
+                assignee: userInfo,
+                created_by: userInfo,
+                patient_id: null,
+                tank_code: body.tank_code ?? "T-161",
+                tank_id: body.tank_id ?? 0,
+                due_date: body.due_date ?? nowIso,
+                priority: body.priority ?? "Medium",
+                status: body.status ?? "Not started",
+                created_at: nowIso,
+                updated_at: nowIso,
+                permissions: {
+                    can_edit_all: true,
+                    can_edit_status_only: false,
+                },
+            };
+            mockCanisterTasks.tasks.push(newTask);
+            return { success: true, task: newTask };
+        }
+
+        // Task edit — update fields in mock list.
+        if (endpoint.match(/^\/api\/tasks\/\d+$/) && options?.method === "PUT") {
+            const taskId = Number(endpoint.split("/").pop());
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const idx = mockCanisterTasks.tasks.findIndex((t) => t.id === taskId);
+            if (idx !== -1) {
+                mockCanisterTasks.tasks[idx] = { ...mockCanisterTasks.tasks[idx], ...body };
+            }
+            return { success: true, task: mockCanisterTasks.tasks[idx] ?? {} };
+        }
+
+        // Task status update.
+        if (endpoint.match(/^\/api\/tasks\/\d+\/status$/) && options?.method === "PATCH") {
+            const taskId = Number(endpoint.split("/")[3]);
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const idx = mockCanisterTasks.tasks.findIndex((t) => t.id === taskId);
+            if (idx !== -1) {
+                mockCanisterTasks.tasks[idx] = { ...mockCanisterTasks.tasks[idx], status: body.status };
+            }
+            return { success: true };
+        }
+
+        // Task delete.
+        if (endpoint.match(/^\/api\/tasks\/\d+$/) && options?.method === "DELETE") {
+            const taskId = Number(endpoint.split("/").pop());
+            mockCanisterTasks.tasks = mockCanisterTasks.tasks.filter((t) => t.id !== taskId);
+            return { message: "Task deleted", task_id: taskId };
         }
 
         // IVF track shipment — stakeholder chat messages.
+        // Return a shallow copy so React detects the new array reference after a message is sent.
         if (endpoint.startsWith("/api/chat/canisters/") && endpoint.includes("/messages")) {
-            return dashboardData.ivfTankChatMessages;
+            return { ...mockTankChatMessages, messages: [...mockTankChatMessages.messages] };
+        }
+
+        // Stakeholder chat — send a new message.
+        if (endpoint === "/api/chat/messages" && options?.method === "POST") {
+            const body = options?.body ? JSON.parse(options.body as string) : {};
+            const newMsg = {
+                id: mockTankChatMessages.messages.length + 100,
+                message_content: body.message_content ?? "",
+                canister_number: body.canister_number ?? "161",
+                sender_id: cachedProfile?.user_id ?? "USR-DEMO",
+                sender_name: cachedProfile ? `${cachedProfile.first_name} ${cachedProfile.last_name}` : "Demo User",
+                sender_role: cachedProfile?.role ?? "Admin",
+                tagged_user_ids: [] as never[],
+                created_at: new Date().toISOString(),
+                is_read: true,
+                read_at: new Date().toISOString(),
+            };
+            mockTankChatMessages.messages.push(newMsg);
+            mockTankChatMessages.total_messages = mockTankChatMessages.messages.length;
+            return newMsg;
+        }
+
+        // Stakeholder chat — mark as read.
+        if (
+            (endpoint.startsWith("/api/chat/canisters/") && endpoint.includes("/mark-read")) ||
+            (endpoint.startsWith("/api/chat/patients/") && endpoint.includes("/mark-read"))
+        ) {
+            return { success: true, last_read_message_id: 0, unread_count: 0 };
         }
 
         return undefined;

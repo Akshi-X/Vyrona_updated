@@ -156,7 +156,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -176,7 +176,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -196,7 +196,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -216,7 +216,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -236,7 +236,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -256,7 +256,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -276,7 +276,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -296,7 +296,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -316,7 +316,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -336,7 +336,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -356,7 +356,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -376,7 +376,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -396,7 +396,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -416,7 +416,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -436,7 +436,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -456,7 +456,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -476,7 +476,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -496,7 +496,7 @@
       {
         "tank_id": 95,
         "hospital_id": 2,
-        "branch_id": 20,
+        "branch_id": 1,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -1677,7 +1677,7 @@
   "ivfTankKpiConfig": {
     "tank_id": 60,
     "tank_code": "T1",
-    "branch_id": 17,
+    "branch_id": 16,
     "branch_name": "Bangalore",
     "tank_max_capacity_reading": 56.36,
     "tank_min_capacity_reading": 22.156,
@@ -1849,7 +1849,7 @@
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -1859,16 +1859,16 @@
         "alert_id": "8f4b687a-8166-43e2-8bff-c27162f08f41",
         "tank_code": "T1",
         "branch_name": null,
-        "status": "Acknowledged",
-        "acknowledged_by": "USR-B7B383",
-        "acknowledged_at": "2026-04-13T10:00:15.466631",
+        "status": "Active",
+        "acknowledged_by": null,
+        "acknowledged_at": null,
         "created_at": "2026-04-13T09:23:09.840969",
-        "updated_at": "2026-04-13T10:00:15.466636"
+        "updated_at": "2026-04-13T09:23:09.840969"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -1879,15 +1879,15 @@
         "tank_code": "T1",
         "branch_name": null,
         "status": "Acknowledged",
-        "acknowledged_by": "USR-B7B383",
-        "acknowledged_at": "2026-04-13T10:00:27.837964",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-04-04T06:00:00.000000",
         "created_at": "2026-04-04T00:00:32.696653",
-        "updated_at": "2026-04-13T10:00:27.837969"
+        "updated_at": "2026-04-04T06:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -1897,16 +1897,16 @@
         "alert_id": "ec27bb8e-192f-4611-8210-70bf053a22ac",
         "tank_code": "T1",
         "branch_name": null,
-        "status": "Active",
-        "acknowledged_by": null,
-        "acknowledged_at": null,
+        "status": "Acknowledged",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-04-03T10:00:00.000000",
         "created_at": "2026-04-03T08:51:39.973211",
-        "updated_at": "2026-04-17T12:03:54.332266"
+        "updated_at": "2026-04-03T10:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -1916,16 +1916,16 @@
         "alert_id": "0fd6608c-b1d6-420b-9cf2-ac6d6ad3f19b",
         "tank_code": "T1",
         "branch_name": null,
-        "status": "Active",
-        "acknowledged_by": null,
-        "acknowledged_at": null,
+        "status": "Acknowledged",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-04-03T10:00:00.000000",
         "created_at": "2026-04-03T07:04:48.184144",
-        "updated_at": "2026-04-17T12:03:54.332235"
+        "updated_at": "2026-04-03T10:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -1935,16 +1935,16 @@
         "alert_id": "b0dac69f-8498-4b53-8ec7-c08f1aa7435b",
         "tank_code": "T1",
         "branch_name": null,
-        "status": "Active",
-        "acknowledged_by": null,
-        "acknowledged_at": null,
+        "status": "Acknowledged",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-03-28T13:00:00.000000",
         "created_at": "2026-03-28T11:13:50.460303",
-        "updated_at": "2026-04-17T12:03:54.332258"
+        "updated_at": "2026-03-28T13:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "High",
@@ -1954,16 +1954,16 @@
         "alert_id": "b54d1ae2-cd06-4fb9-8574-4f80a2745c9c",
         "tank_code": "T1",
         "branch_name": null,
-        "status": "Active",
-        "acknowledged_by": null,
-        "acknowledged_at": null,
+        "status": "Acknowledged",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-03-28T06:00:00.000000",
         "created_at": "2026-03-28T05:26:49.083395",
-        "updated_at": "2026-04-17T12:03:54.332260"
+        "updated_at": "2026-03-28T06:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -1974,15 +1974,15 @@
         "tank_code": "T1",
         "branch_name": null,
         "status": "Acknowledged",
-        "acknowledged_by": "USR-B7B383",
-        "acknowledged_at": "2026-03-28T04:28:39.834447",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-03-20T14:00:00.000000",
         "created_at": "2026-03-20T12:09:52.642879",
-        "updated_at": "2026-03-28T04:28:39.834451"
+        "updated_at": "2026-03-20T14:00:00.000000"
       },
       {
         "tank_id": 60,
         "hospital_id": 1,
-        "branch_id": 17,
+        "branch_id": 16,
         "alert_type": "Deviation alert",
         "source": "KPI",
         "severity": "Low",
@@ -1993,10 +1993,10 @@
         "tank_code": "T1",
         "branch_name": null,
         "status": "Acknowledged",
-        "acknowledged_by": "USR-B7B383",
-        "acknowledged_at": "2026-03-28T04:28:42.018430",
+        "acknowledged_by": "USR-DEMO",
+        "acknowledged_at": "2026-03-20T11:00:00.000000",
         "created_at": "2026-03-20T09:48:36.127674",
-        "updated_at": "2026-03-28T04:28:42.018435"
+        "updated_at": "2026-03-20T11:00:00.000000"
       }
     ],
     "total_count": 8
@@ -2076,11 +2076,48 @@
   },
   "ivfTankChatMessages": {
     "patient_id": null,
-    "tank_code": "T1",
+    "tank_code": "T-161",
     "patient_name": null,
-    "messages": [],
-    "total_messages": 0,
-    "unread_count": 0
+    "messages": [
+      {
+        "id": 1,
+        "message_content": "LN2 level on T-161 dropped to 42% overnight. Scheduled a top-up for 9 AM tomorrow.",
+        "canister_number": "161",
+        "sender_id": "USR-001",
+        "sender_name": "Dr. Priya Sharma",
+        "sender_role": "Embryologist",
+        "tagged_user_ids": [],
+        "created_at": "2026-04-22T06:14:00Z",
+        "is_read": true,
+        "read_at": "2026-04-22T06:20:00Z"
+      },
+      {
+        "id": 2,
+        "message_content": "Thanks for the heads-up. I'll make sure the technician is on-site by 8:45 AM.",
+        "canister_number": "161",
+        "sender_id": "USR-002",
+        "sender_name": "Ankit Rao",
+        "sender_role": "Lab Coordinator",
+        "tagged_user_ids": [],
+        "created_at": "2026-04-22T06:28:00Z",
+        "is_read": true,
+        "read_at": "2026-04-22T06:35:00Z"
+      },
+      {
+        "id": 3,
+        "message_content": "Top-up completed. LN2 now at 91%. Container is stable.",
+        "canister_number": "161",
+        "sender_id": "USR-003",
+        "sender_name": "Ravi Kumar",
+        "sender_role": "Technician",
+        "tagged_user_ids": [],
+        "created_at": "2026-04-22T09:17:00Z",
+        "is_read": false,
+        "read_at": null
+      }
+    ],
+    "total_messages": 3,
+    "unread_count": 1
   },
   "ivfKpiHistory24H": {
     "tank_code": "T1",
@@ -9961,5 +9998,2434 @@
         }
       ]
     }
-  }
+  },
+  "alertSettingKpiConfigList": {
+    "tank_id": 161,
+    "tank_code": "T-161",
+    "branch_id": 16,
+    "hospital_id": 1,
+    "config": [
+      {
+        "id": 1,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "temp_internal",
+        "alert_name": "Internal Temperature",
+        "min": -200.0,
+        "max": -180.0,
+        "unit": "\u00b0C",
+        "alert_type": "critical",
+        "cooldown_minutes": 30,
+        "status": true
+      },
+      {
+        "id": 2,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "temp_external",
+        "alert_name": "External Temperature",
+        "min": 20.0,
+        "max": 30.0,
+        "unit": "\u00b0C",
+        "alert_type": "soft",
+        "cooldown_minutes": 30,
+        "status": true
+      },
+      {
+        "id": 3,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "ln2_level",
+        "alert_name": "LN2 Level",
+        "min": 22.0,
+        "max": null,
+        "unit": "Ln2 in kg",
+        "alert_type": "critical",
+        "cooldown_minutes": 60,
+        "status": true
+      },
+      {
+        "id": 4,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "tive_battery_percentage",
+        "alert_name": "Battery Level",
+        "min": 20.0,
+        "max": 100.0,
+        "unit": "%",
+        "alert_type": "soft",
+        "cooldown_minutes": 60,
+        "status": true
+      },
+      {
+        "id": 5,
+        "hospital_id": 1,
+        "branch_id": 16,
+        "tank_id": 161,
+        "kpi_name": "shock",
+        "alert_name": "Shock Detection",
+        "min": 0.0,
+        "max": 1.5,
+        "unit": "g",
+        "alert_type": "soft",
+        "cooldown_minutes": 30,
+        "status": true
+      }
+    ]
+  },
+  "refillPendingDetections": {
+    "detections": [
+      {
+        "id": 1,
+        "tank_id": 161,
+        "tank_code": "T-161",
+        "branch_name": "Bangalore",
+        "detected_at": "2026-04-21T08:15:00",
+        "refill_weight": 5.2
+      },
+      {
+        "id": 2,
+        "tank_id": 162,
+        "tank_code": "T-162",
+        "branch_name": "Bangalore",
+        "detected_at": "2026-04-20T14:30:00",
+        "refill_weight": 4.8
+      }
+    ]
+  },
+  "refillAllLogs": {
+    "logs": [
+      {
+        "tank_id": 312,
+        "tank_code": "T-312",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-20",
+        "refill_time": "10:15",
+        "refilled_by": "Anita M",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 6.43
+      },
+      {
+        "tank_id": 39,
+        "tank_code": "T-39",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-18",
+        "refill_time": "16:45",
+        "refilled_by": "Raj K",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 5.48
+      },
+      {
+        "tank_id": 131,
+        "tank_code": "T-131",
+        "branch_name": "Delhi",
+        "refill_date": "2026-04-17",
+        "refill_time": "16:30",
+        "refilled_by": "Suresh P",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 5.74
+      },
+      {
+        "tank_id": 310,
+        "tank_code": "T-310",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-17",
+        "refill_time": "12:15",
+        "refilled_by": "Priya Nair",
+        "description": "Emergency refill",
+        "status": "completed",
+        "refill_weight": 5.78
+      },
+      {
+        "tank_id": 121,
+        "tank_code": "T-121",
+        "branch_name": "Kochin",
+        "refill_date": "2026-04-17",
+        "refill_time": "11:45",
+        "refilled_by": "Divya T",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 4.74
+      },
+      {
+        "tank_id": 21,
+        "tank_code": "T-21",
+        "branch_name": "Coimbatore",
+        "refill_date": "2026-04-17",
+        "refill_time": "11:00",
+        "refilled_by": "Suresh P",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 6.43
+      },
+      {
+        "tank_id": 81,
+        "tank_code": "T-81",
+        "branch_name": "Jaipur",
+        "refill_date": "2026-04-16",
+        "refill_time": "16:00",
+        "refilled_by": "Anita M",
+        "description": "Weekly refill",
+        "status": "completed",
+        "refill_weight": 4.78
+      },
+      {
+        "tank_id": 36,
+        "tank_code": "T-36",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-16",
+        "refill_time": "14:15",
+        "refilled_by": "Anita M",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 6.05
+      },
+      {
+        "tank_id": 38,
+        "tank_code": "T-38",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-16",
+        "refill_time": "12:45",
+        "refilled_by": "Deepak V",
+        "description": "Weekly refill",
+        "status": "completed",
+        "refill_weight": 4.48
+      },
+      {
+        "tank_id": 314,
+        "tank_code": "T-314",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-16",
+        "refill_time": "12:15",
+        "refilled_by": "Nisha R",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 4.81
+      },
+      {
+        "tank_id": 11,
+        "tank_code": "T-11",
+        "branch_name": "Tambaram",
+        "refill_date": "2026-04-16",
+        "refill_time": "11:15",
+        "refilled_by": "Vikram B",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 5.83
+      },
+      {
+        "tank_id": 171,
+        "tank_code": "T-171",
+        "branch_name": "Nellore",
+        "refill_date": "2026-04-16",
+        "refill_time": "07:30",
+        "refilled_by": "Ravi Kumar",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "refill_weight": 4.76
+      },
+      {
+        "tank_id": 51,
+        "tank_code": "T-51",
+        "branch_name": "Lucknow",
+        "refill_date": "2026-04-15",
+        "refill_time": "16:30",
+        "refilled_by": "Ravi Kumar",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 4.18
+      },
+      {
+        "tank_id": 161,
+        "tank_code": "T-161",
+        "branch_name": "Bangalore",
+        "refill_date": "2026-04-14",
+        "refill_time": "09:15",
+        "refilled_by": "Pooja K",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "refill_weight": 3.89
+      },
+      {
+        "tank_id": 132,
+        "tank_code": "T-132",
+        "branch_name": "Delhi",
+        "refill_date": "2026-04-14",
+        "refill_time": "07:30",
+        "refilled_by": "Suresh P",
+        "description": "Emergency refill",
+        "status": "completed",
+        "refill_weight": 3.8
+      },
+      {
+        "tank_id": 151,
+        "tank_code": "T-151",
+        "branch_name": "Hyderabad",
+        "refill_date": "2026-04-13",
+        "refill_time": "15:45",
+        "refilled_by": "Kiran R",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "refill_weight": 4.51
+      },
+      {
+        "tank_id": 311,
+        "tank_code": "T-311",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-13",
+        "refill_time": "13:00",
+        "refilled_by": "Nisha R",
+        "description": "Emergency refill",
+        "status": "completed",
+        "refill_weight": 6.77
+      },
+      {
+        "tank_id": 41,
+        "tank_code": "T-41",
+        "branch_name": "Tirunelveli",
+        "refill_date": "2026-04-13",
+        "refill_time": "10:00",
+        "refilled_by": "Divya T",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 5.57
+      },
+      {
+        "tank_id": 91,
+        "tank_code": "T-91",
+        "branch_name": "Raipur",
+        "refill_date": "2026-04-12",
+        "refill_time": "15:45",
+        "refilled_by": "Meena S",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 4.23
+      },
+      {
+        "tank_id": 37,
+        "tank_code": "T-37",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-12",
+        "refill_time": "09:30",
+        "refilled_by": "Meena S",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 5.33
+      },
+      {
+        "tank_id": 71,
+        "tank_code": "T-71",
+        "branch_name": "Varanasi",
+        "refill_date": "2026-04-12",
+        "refill_time": "07:15",
+        "refilled_by": "Deepak V",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "refill_weight": 4.93
+      },
+      {
+        "tank_id": 31,
+        "tank_code": "T-31",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-11",
+        "refill_time": "07:30",
+        "refilled_by": "Pooja K",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 3.8
+      },
+      {
+        "tank_id": 61,
+        "tank_code": "T-61",
+        "branch_name": "Mumbai",
+        "refill_date": "2026-04-10",
+        "refill_time": "16:00",
+        "refilled_by": "Anita M",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 5.76
+      },
+      {
+        "tank_id": 35,
+        "tank_code": "T-35",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-10",
+        "refill_time": "12:00",
+        "refilled_by": "Kiran R",
+        "description": "Weekly refill",
+        "status": "completed",
+        "refill_weight": 6.29
+      },
+      {
+        "tank_id": 313,
+        "tank_code": "T-313",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-10",
+        "refill_time": "11:15",
+        "refilled_by": "Nisha R",
+        "description": "Emergency refill",
+        "status": "completed",
+        "refill_weight": 6.08
+      },
+      {
+        "tank_id": 315,
+        "tank_code": "T-315",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-09",
+        "refill_time": "17:15",
+        "refilled_by": "Nisha R",
+        "description": "Weekly refill",
+        "status": "completed",
+        "refill_weight": 4.33
+      },
+      {
+        "tank_id": 111,
+        "tank_code": "T-111",
+        "branch_name": "Srinagar",
+        "refill_date": "2026-04-09",
+        "refill_time": "09:30",
+        "refilled_by": "Suresh P",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 6.38
+      },
+      {
+        "tank_id": 52,
+        "tank_code": "T-52",
+        "branch_name": "Lucknow",
+        "refill_date": "2026-04-08",
+        "refill_time": "17:00",
+        "refilled_by": "Meena S",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 3.74
+      },
+      {
+        "tank_id": 34,
+        "tank_code": "T-34",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-08",
+        "refill_time": "15:45",
+        "refilled_by": "Vikram B",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 6.61
+      },
+      {
+        "tank_id": 32,
+        "tank_code": "T-32",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-08",
+        "refill_time": "11:45",
+        "refilled_by": "Nisha R",
+        "description": "Emergency refill",
+        "status": "completed",
+        "refill_weight": 6.82
+      },
+      {
+        "tank_id": 33,
+        "tank_code": "T-33",
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-08",
+        "refill_time": "11:30",
+        "refilled_by": "Pooja K",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "refill_weight": 5.2
+      },
+      {
+        "tank_id": 101,
+        "tank_code": "T-101",
+        "branch_name": "Pune",
+        "refill_date": "2026-04-08",
+        "refill_time": "07:45",
+        "refilled_by": "Raj K",
+        "description": "Post-deviation refill",
+        "status": "completed",
+        "refill_weight": 6.69
+      },
+      {
+        "tank_id": 141,
+        "tank_code": "T-141",
+        "branch_name": "Kolkata",
+        "refill_date": "2026-04-08",
+        "refill_time": "07:00",
+        "refilled_by": "Vikram B",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 4.17
+      },
+      {
+        "tank_id": 12,
+        "tank_code": "T-12",
+        "branch_name": "Tambaram",
+        "refill_date": "2026-04-07",
+        "refill_time": "10:15",
+        "refilled_by": "Ravi Kumar",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "refill_weight": 5.36
+      },
+      {
+        "tank_id": 162,
+        "tank_code": "T-162",
+        "branch_name": "Bangalore",
+        "refill_date": "2026-04-07",
+        "refill_time": "09:15",
+        "refilled_by": "Deepak V",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 5.61
+      },
+      {
+        "tank_id": 82,
+        "tank_code": "T-82",
+        "branch_name": "Jaipur",
+        "refill_date": "2026-04-07",
+        "refill_time": "07:00",
+        "refilled_by": "Kiran R",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "refill_weight": 4.04
+      }
+    ]
+  },
+  "refillSummary": {
+    "summary": {
+      "11": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "11:15",
+        "last_refilled_by": "Vikram B",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 32.724,
+        "ln2_config_min": 22.027,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Tambaram"
+      },
+      "12": {
+        "last_refill_date": "2026-04-07",
+        "last_refill_time": "10:15",
+        "last_refilled_by": "Ravi Kumar",
+        "last_description": "Scheduled top-up",
+        "ln2_mass_kg": 31.228,
+        "ln2_config_min": 23.112,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Tambaram"
+      },
+      "21": {
+        "last_refill_date": "2026-04-17",
+        "last_refill_time": "11:00",
+        "last_refilled_by": "Suresh P",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 33.122,
+        "ln2_config_min": 25.594,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Coimbatore"
+      },
+      "31": {
+        "last_refill_date": "2026-04-11",
+        "last_refill_time": "07:30",
+        "last_refilled_by": "Pooja K",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 33.761,
+        "ln2_config_min": 22.366,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "32": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "11:45",
+        "last_refilled_by": "Nisha R",
+        "last_description": "Emergency refill",
+        "ln2_mass_kg": 31.831,
+        "ln2_config_min": 22.054,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "33": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "11:30",
+        "last_refilled_by": "Pooja K",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 30.997,
+        "ln2_config_min": 24.656,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "34": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "15:45",
+        "last_refilled_by": "Vikram B",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 30.208,
+        "ln2_config_min": 22.979,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "35": {
+        "last_refill_date": "2026-04-10",
+        "last_refill_time": "12:00",
+        "last_refilled_by": "Kiran R",
+        "last_description": "Weekly refill",
+        "ln2_mass_kg": 32.767,
+        "ln2_config_min": 24.873,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "36": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "14:15",
+        "last_refilled_by": "Anita M",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 31.004,
+        "ln2_config_min": 25.115,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "37": {
+        "last_refill_date": "2026-04-12",
+        "last_refill_time": "09:30",
+        "last_refilled_by": "Meena S",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 33.422,
+        "ln2_config_min": 21.926,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "38": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "12:45",
+        "last_refilled_by": "Deepak V",
+        "last_description": "Weekly refill",
+        "ln2_mass_kg": 33.407,
+        "ln2_config_min": 25.711,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "39": {
+        "last_refill_date": "2026-04-18",
+        "last_refill_time": "16:45",
+        "last_refilled_by": "Raj K",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 31.496,
+        "ln2_config_min": 22.741,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "310": {
+        "last_refill_date": "2026-04-17",
+        "last_refill_time": "12:15",
+        "last_refilled_by": "Priya Nair",
+        "last_description": "Emergency refill",
+        "ln2_mass_kg": 34.028,
+        "ln2_config_min": 23.733,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "311": {
+        "last_refill_date": "2026-04-13",
+        "last_refill_time": "13:00",
+        "last_refilled_by": "Nisha R",
+        "last_description": "Emergency refill",
+        "ln2_mass_kg": 30.48,
+        "ln2_config_min": 22.42,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "312": {
+        "last_refill_date": "2026-04-20",
+        "last_refill_time": "10:15",
+        "last_refilled_by": "Anita M",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 33.578,
+        "ln2_config_min": 25.195,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "313": {
+        "last_refill_date": "2026-04-10",
+        "last_refill_time": "11:15",
+        "last_refilled_by": "Nisha R",
+        "last_description": "Emergency refill",
+        "ln2_mass_kg": 33.412,
+        "ln2_config_min": 25.884,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "314": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "12:15",
+        "last_refilled_by": "Nisha R",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 32.3,
+        "ln2_config_min": 27.216,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "315": {
+        "last_refill_date": "2026-04-09",
+        "last_refill_time": "17:15",
+        "last_refilled_by": "Nisha R",
+        "last_description": "Weekly refill",
+        "ln2_mass_kg": 31.653,
+        "ln2_config_min": 24.912,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Egmore"
+      },
+      "41": {
+        "last_refill_date": "2026-04-13",
+        "last_refill_time": "10:00",
+        "last_refilled_by": "Divya T",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 33.504,
+        "ln2_config_min": 25.275,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Tirunelveli"
+      },
+      "51": {
+        "last_refill_date": "2026-04-15",
+        "last_refill_time": "16:30",
+        "last_refilled_by": "Ravi Kumar",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 33.636,
+        "ln2_config_min": 25.05,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Lucknow"
+      },
+      "52": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "17:00",
+        "last_refilled_by": "Meena S",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 32.991,
+        "ln2_config_min": 22.141,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Lucknow"
+      },
+      "61": {
+        "last_refill_date": "2026-04-10",
+        "last_refill_time": "16:00",
+        "last_refilled_by": "Anita M",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 31.035,
+        "ln2_config_min": 23.474,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Mumbai"
+      },
+      "71": {
+        "last_refill_date": "2026-04-12",
+        "last_refill_time": "07:15",
+        "last_refilled_by": "Deepak V",
+        "last_description": "Scheduled top-up",
+        "ln2_mass_kg": 30.427,
+        "ln2_config_min": 23.165,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Varanasi"
+      },
+      "81": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "16:00",
+        "last_refilled_by": "Anita M",
+        "last_description": "Weekly refill",
+        "ln2_mass_kg": 30.514,
+        "ln2_config_min": 23.412,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Jaipur"
+      },
+      "82": {
+        "last_refill_date": "2026-04-07",
+        "last_refill_time": "07:00",
+        "last_refilled_by": "Kiran R",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 32.709,
+        "ln2_config_min": 23.887,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Jaipur"
+      },
+      "91": {
+        "last_refill_date": "2026-04-12",
+        "last_refill_time": "15:45",
+        "last_refilled_by": "Meena S",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 31.619,
+        "ln2_config_min": 23.037,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Raipur"
+      },
+      "101": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "07:45",
+        "last_refilled_by": "Raj K",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 31.195,
+        "ln2_config_min": 27.017,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Pune"
+      },
+      "111": {
+        "last_refill_date": "2026-04-09",
+        "last_refill_time": "09:30",
+        "last_refilled_by": "Suresh P",
+        "last_description": "Post-deviation refill",
+        "ln2_mass_kg": 32.759,
+        "ln2_config_min": 25.224,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Srinagar"
+      },
+      "121": {
+        "last_refill_date": "2026-04-17",
+        "last_refill_time": "11:45",
+        "last_refilled_by": "Divya T",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 30.802,
+        "ln2_config_min": 25.881,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Kochin"
+      },
+      "131": {
+        "last_refill_date": "2026-04-17",
+        "last_refill_time": "16:30",
+        "last_refilled_by": "Suresh P",
+        "last_description": "Low level alert refill",
+        "ln2_mass_kg": 30.77,
+        "ln2_config_min": 23.967,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Delhi"
+      },
+      "132": {
+        "last_refill_date": "2026-04-14",
+        "last_refill_time": "07:30",
+        "last_refilled_by": "Suresh P",
+        "last_description": "Emergency refill",
+        "ln2_mass_kg": 34.161,
+        "ln2_config_min": 25.393,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Delhi"
+      },
+      "141": {
+        "last_refill_date": "2026-04-08",
+        "last_refill_time": "07:00",
+        "last_refilled_by": "Vikram B",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 32.386,
+        "ln2_config_min": 25.637,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Kolkata"
+      },
+      "151": {
+        "last_refill_date": "2026-04-13",
+        "last_refill_time": "15:45",
+        "last_refilled_by": "Kiran R",
+        "last_description": "Scheduled top-up",
+        "ln2_mass_kg": 33.559,
+        "ln2_config_min": 26.137,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Hyderabad"
+      },
+      "161": {
+        "last_refill_date": "2026-04-14",
+        "last_refill_time": "09:15",
+        "last_refilled_by": "Pooja K",
+        "last_description": "Scheduled top-up",
+        "ln2_mass_kg": 31.04,
+        "ln2_config_min": 22.066,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Bangalore"
+      },
+      "162": {
+        "last_refill_date": "2026-04-07",
+        "last_refill_time": "09:15",
+        "last_refilled_by": "Deepak V",
+        "last_description": "Routine maintenance",
+        "ln2_mass_kg": 31.394,
+        "ln2_config_min": 23.356,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Bangalore"
+      },
+      "171": {
+        "last_refill_date": "2026-04-16",
+        "last_refill_time": "07:30",
+        "last_refilled_by": "Ravi Kumar",
+        "last_description": "Scheduled top-up",
+        "ln2_mass_kg": 30.965,
+        "ln2_config_min": 27.051,
+        "tank_max_capacity": 56.36,
+        "tank_min_capacity": 22.156,
+        "branch_name": "Nellore"
+      }
+    }
+  },
+  "refillReservoirs": {
+    "reservoirs": [
+      {
+        "reservoir_id": 1,
+        "reservoir_name": "Tambaram Reservoir",
+        "branch_id": 1,
+        "hospital_id": 1,
+        "branch_name": "Tambaram",
+        "current_weight": 183.2,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 2,
+        "reservoir_name": "Coimbatore Reservoir",
+        "branch_id": 2,
+        "hospital_id": 1,
+        "branch_name": "Coimbatore",
+        "current_weight": 199.1,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 3,
+        "reservoir_name": "Egmore Reservoir",
+        "branch_id": 3,
+        "hospital_id": 1,
+        "branch_name": "Egmore",
+        "current_weight": 208.8,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 4,
+        "reservoir_name": "Tirunelveli Reservoir",
+        "branch_id": 4,
+        "hospital_id": 1,
+        "branch_name": "Tirunelveli",
+        "current_weight": 211.6,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 5,
+        "reservoir_name": "Lucknow Reservoir",
+        "branch_id": 5,
+        "hospital_id": 1,
+        "branch_name": "Lucknow",
+        "current_weight": 208.6,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 6,
+        "reservoir_name": "Mumbai Reservoir",
+        "branch_id": 6,
+        "hospital_id": 1,
+        "branch_name": "Mumbai",
+        "current_weight": 184.1,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 7,
+        "reservoir_name": "Varanasi Reservoir",
+        "branch_id": 7,
+        "hospital_id": 1,
+        "branch_name": "Varanasi",
+        "current_weight": 148.3,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 8,
+        "reservoir_name": "Jaipur Reservoir",
+        "branch_id": 8,
+        "hospital_id": 1,
+        "branch_name": "Jaipur",
+        "current_weight": 144.7,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 9,
+        "reservoir_name": "Raipur Reservoir",
+        "branch_id": 9,
+        "hospital_id": 1,
+        "branch_name": "Raipur",
+        "current_weight": 218.0,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 10,
+        "reservoir_name": "Pune Reservoir",
+        "branch_id": 10,
+        "hospital_id": 1,
+        "branch_name": "Pune",
+        "current_weight": 187.5,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 11,
+        "reservoir_name": "Srinagar Reservoir",
+        "branch_id": 11,
+        "hospital_id": 1,
+        "branch_name": "Srinagar",
+        "current_weight": 205.3,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 12,
+        "reservoir_name": "Kochin Reservoir",
+        "branch_id": 12,
+        "hospital_id": 1,
+        "branch_name": "Kochin",
+        "current_weight": 183.6,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 13,
+        "reservoir_name": "Delhi Reservoir",
+        "branch_id": 13,
+        "hospital_id": 1,
+        "branch_name": "Delhi",
+        "current_weight": 154.4,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 14,
+        "reservoir_name": "Kolkata Reservoir",
+        "branch_id": 14,
+        "hospital_id": 1,
+        "branch_name": "Kolkata",
+        "current_weight": 164.4,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 15,
+        "reservoir_name": "Hyderabad Reservoir",
+        "branch_id": 15,
+        "hospital_id": 1,
+        "branch_name": "Hyderabad",
+        "current_weight": 217.0,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 16,
+        "reservoir_name": "Bangalore Reservoir",
+        "branch_id": 16,
+        "hospital_id": 1,
+        "branch_name": "Bangalore",
+        "current_weight": 139.2,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      },
+      {
+        "reservoir_id": 17,
+        "reservoir_name": "Nellore Reservoir",
+        "branch_id": 17,
+        "hospital_id": 1,
+        "branch_name": "Nellore",
+        "current_weight": 154.9,
+        "max_weight": 250.0,
+        "created_at": "2026-01-01T00:00:00"
+      }
+    ]
+  },
+  "refillReservoirLogs": {
+    "logs": [
+      {
+        "log_id": 7,
+        "reservoir_id": 16,
+        "reservoir_name": "Bangalore Reservoir",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "ln2_ordered_date": "2026-04-20",
+        "ln2_received_date": null,
+        "created_at": "2026-04-20T00:00:00"
+      },
+      {
+        "log_id": 3,
+        "reservoir_id": 2,
+        "reservoir_name": "Coimbatore Reservoir",
+        "branch_id": 2,
+        "branch_name": "Coimbatore",
+        "ln2_ordered_date": "2026-04-13",
+        "ln2_received_date": "2026-04-15",
+        "created_at": "2026-04-13T09:00:00"
+      },
+      {
+        "log_id": 4,
+        "reservoir_id": 3,
+        "reservoir_name": "Egmore Reservoir",
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "ln2_ordered_date": "2026-04-08",
+        "ln2_received_date": "2026-04-12",
+        "created_at": "2026-04-08T09:00:00"
+      },
+      {
+        "log_id": 1,
+        "reservoir_id": 1,
+        "reservoir_name": "Tambaram Reservoir",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "ln2_ordered_date": "2026-04-05",
+        "ln2_received_date": "2026-04-08",
+        "created_at": "2026-04-05T09:00:00"
+      },
+      {
+        "log_id": 5,
+        "reservoir_id": 16,
+        "reservoir_name": "Bangalore Reservoir",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "ln2_ordered_date": "2026-04-01",
+        "ln2_received_date": "2026-04-05",
+        "created_at": "2026-04-01T09:00:00"
+      },
+      {
+        "log_id": 6,
+        "reservoir_id": 16,
+        "reservoir_name": "Bangalore Reservoir",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "ln2_ordered_date": "2026-03-31",
+        "ln2_received_date": "2026-04-04",
+        "created_at": "2026-03-31T09:00:00"
+      },
+      {
+        "log_id": 2,
+        "reservoir_id": 1,
+        "reservoir_name": "Tambaram Reservoir",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "ln2_ordered_date": "2026-03-27",
+        "ln2_received_date": "2026-03-31",
+        "created_at": "2026-03-27T09:00:00"
+      }
+    ],
+    "total_count": 6,
+    "page": 1,
+    "page_size": 20,
+    "status": "ok"
+  },
+  "reportsMonthlySummary": {
+    "month": "2026-04",
+    "rows": [
+      {
+        "kpi_name": "temp_internal",
+        "alerts_sent": 3,
+        "deviations_found": 5
+      },
+      {
+        "kpi_name": "temp_external",
+        "alerts_sent": 1,
+        "deviations_found": 2
+      },
+      {
+        "kpi_name": "ln2_level",
+        "alerts_sent": 7,
+        "deviations_found": 9
+      },
+      {
+        "kpi_name": "shock",
+        "alerts_sent": 2,
+        "deviations_found": 3
+      },
+      {
+        "kpi_name": "tive_battery_percentage",
+        "alerts_sent": 0,
+        "deviations_found": 1
+      }
+    ],
+    "total_kpis": 5,
+    "total_count": 5,
+    "page": 1,
+    "page_size": 20,
+    "status": "ok"
+  },
+  "reportsCriticalAlerts": {
+    "alerts": [
+      {
+        "alert_id": "ALT-1005",
+        "tank_id": 28,
+        "tank_code": "T-151",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "open",
+        "message": "Shock event detected on container",
+        "triggered_by": "shock",
+        "occurred_at": "2026-04-18T23:15:00",
+        "acknowledged_by": null,
+        "acknowledged_at": null,
+        "created_at": "2026-04-18T23:15:00"
+      },
+      {
+        "alert_id": "ALT-1011",
+        "tank_id": 17,
+        "tank_code": "T-78",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "resolved",
+        "message": "Internal temperature exceeded safe range",
+        "triggered_by": "temp_internal",
+        "occurred_at": "2026-04-16T11:45:00",
+        "acknowledged_by": null,
+        "acknowledged_at": "2026-04-16T12:41:00",
+        "created_at": "2026-04-16T11:45:00"
+      },
+      {
+        "alert_id": "ALT-1008",
+        "tank_id": 134,
+        "tank_code": "T-25",
+        "branch_id": 6,
+        "branch_name": "Mumbai",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "open",
+        "message": "Internal temperature exceeded safe range",
+        "triggered_by": "temp_internal",
+        "occurred_at": "2026-04-15T09:15:00",
+        "acknowledged_by": "Priya Nair",
+        "acknowledged_at": null,
+        "created_at": "2026-04-15T09:15:00"
+      },
+      {
+        "alert_id": "ALT-1000",
+        "tank_id": 133,
+        "tank_code": "T-66",
+        "branch_id": 13,
+        "branch_name": "Delhi",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "high",
+        "status": "acknowledged",
+        "message": "Shock event detected on container",
+        "triggered_by": "shock",
+        "occurred_at": "2026-04-15T03:30:00",
+        "acknowledged_by": "Arjun Sharma",
+        "acknowledged_at": "2026-04-15T04:12:00",
+        "created_at": "2026-04-15T03:30:00"
+      },
+      {
+        "alert_id": "ALT-1007",
+        "tank_id": 115,
+        "tank_code": "T-52",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "alert_type": "soft",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "open",
+        "message": "Internal temperature exceeded safe range",
+        "triggered_by": "temp_internal",
+        "occurred_at": "2026-04-15T02:45:00",
+        "acknowledged_by": "Priya Nair",
+        "acknowledged_at": "2026-04-15T03:05:00",
+        "created_at": "2026-04-15T02:45:00"
+      },
+      {
+        "alert_id": "ALT-1009",
+        "tank_id": 48,
+        "tank_code": "T-49",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "acknowledged",
+        "message": "Shock event detected on container",
+        "triggered_by": "shock",
+        "occurred_at": "2026-04-13T21:30:00",
+        "acknowledged_by": null,
+        "acknowledged_at": "2026-04-13T22:21:00",
+        "created_at": "2026-04-13T21:30:00"
+      },
+      {
+        "alert_id": "ALT-1001",
+        "tank_id": 21,
+        "tank_code": "T-122",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "alert_type": "soft",
+        "source": "sensor",
+        "severity": "high",
+        "status": "resolved",
+        "message": "LN2 level dropped below minimum threshold",
+        "triggered_by": "ln2_level",
+        "occurred_at": "2026-04-07T16:45:00",
+        "acknowledged_by": null,
+        "acknowledged_at": "2026-04-07T16:57:00",
+        "created_at": "2026-04-07T16:45:00"
+      },
+      {
+        "alert_id": "ALT-1010",
+        "tank_id": 105,
+        "tank_code": "T-164",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "alert_type": "soft",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "resolved",
+        "message": "LN2 level dropped below minimum threshold",
+        "triggered_by": "ln2_level",
+        "occurred_at": "2026-04-05T12:45:00",
+        "acknowledged_by": "Arjun Sharma",
+        "acknowledged_at": "2026-04-05T13:07:00",
+        "created_at": "2026-04-05T12:45:00"
+      },
+      {
+        "alert_id": "ALT-1002",
+        "tank_id": 42,
+        "tank_code": "T-16",
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "resolved",
+        "message": "Internal temperature exceeded safe range",
+        "triggered_by": "temp_internal",
+        "occurred_at": "2026-03-31T20:00:00",
+        "acknowledged_by": "Priya Nair",
+        "acknowledged_at": null,
+        "created_at": "2026-03-31T20:00:00"
+      },
+      {
+        "alert_id": "ALT-1003",
+        "tank_id": 61,
+        "tank_code": "T-64",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "open",
+        "message": "Shock event detected on container",
+        "triggered_by": "shock",
+        "occurred_at": "2026-03-30T17:00:00",
+        "acknowledged_by": "Priya Nair",
+        "acknowledged_at": null,
+        "created_at": "2026-03-30T17:00:00"
+      },
+      {
+        "alert_id": "ALT-1006",
+        "tank_id": 163,
+        "tank_code": "T-89",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "alert_type": "critical",
+        "source": "sensor",
+        "severity": "high",
+        "status": "acknowledged",
+        "message": "External temperature above limit",
+        "triggered_by": "temp_external",
+        "occurred_at": "2026-03-30T13:30:00",
+        "acknowledged_by": "Arjun Sharma",
+        "acknowledged_at": "2026-03-30T13:58:00",
+        "created_at": "2026-03-30T13:30:00"
+      },
+      {
+        "alert_id": "ALT-1004",
+        "tank_id": 126,
+        "tank_code": "T-139",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "alert_type": "soft",
+        "source": "sensor",
+        "severity": "medium",
+        "status": "resolved",
+        "message": "Shock event detected on container",
+        "triggered_by": "shock",
+        "occurred_at": "2026-03-22T14:30:00",
+        "acknowledged_by": "Priya Nair",
+        "acknowledged_at": null,
+        "created_at": "2026-03-22T14:30:00"
+      }
+    ],
+    "total_count": 12,
+    "page": 1,
+    "page_size": 20,
+    "status": "ok"
+  },
+  "reportsRefillLogs": {
+    "logs": [
+      {
+        "log_id": 2,
+        "tank_id": 83,
+        "tank_code": "T-43",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "refill_date": "2026-04-19",
+        "refill_time": "15:30",
+        "refilled_by": "Meena S",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "reservoir": "Bangalore Reservoir",
+        "ln2_ordered_date": "2026-04-15",
+        "ln2_received_date": "2026-04-18",
+        "created_at": "2026-04-19T00:00:00"
+      },
+      {
+        "log_id": 7,
+        "tank_id": 118,
+        "tank_code": "T-38",
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-19",
+        "refill_time": "17:00",
+        "refilled_by": "Meena S",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "reservoir": "Egmore Reservoir",
+        "ln2_ordered_date": "2026-04-13",
+        "ln2_received_date": "2026-04-17",
+        "created_at": "2026-04-19T00:00:00"
+      },
+      {
+        "log_id": 3,
+        "tank_id": 107,
+        "tank_code": "T-62",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "refill_date": "2026-04-16",
+        "refill_time": "16:00",
+        "refilled_by": "Arjun Sharma",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "reservoir": "Tambaram Reservoir",
+        "ln2_ordered_date": "2026-04-10",
+        "ln2_received_date": "2026-04-15",
+        "created_at": "2026-04-16T00:00:00"
+      },
+      {
+        "log_id": 12,
+        "tank_id": 111,
+        "tank_code": "T-48",
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-15",
+        "refill_time": "15:15",
+        "refilled_by": "Arjun Sharma",
+        "description": "Emergency refill",
+        "status": "completed",
+        "reservoir": "Egmore Reservoir",
+        "ln2_ordered_date": "2026-04-08",
+        "ln2_received_date": "2026-04-13",
+        "created_at": "2026-04-15T00:00:00"
+      },
+      {
+        "log_id": 10,
+        "tank_id": 32,
+        "tank_code": "T-20",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "refill_date": "2026-04-14",
+        "refill_time": "09:45",
+        "refilled_by": "Ravi Kumar",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "reservoir": "Lucknow Reservoir",
+        "ln2_ordered_date": "2026-04-08",
+        "ln2_received_date": "2026-04-12",
+        "created_at": "2026-04-14T00:00:00"
+      },
+      {
+        "log_id": 11,
+        "tank_id": 138,
+        "tank_code": "T-109",
+        "branch_id": 13,
+        "branch_name": "Delhi",
+        "refill_date": "2026-04-14",
+        "refill_time": "16:45",
+        "refilled_by": "Deepak V",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "reservoir": "Delhi Reservoir",
+        "ln2_ordered_date": "2026-04-10",
+        "ln2_received_date": "2026-04-12",
+        "created_at": "2026-04-14T00:00:00"
+      },
+      {
+        "log_id": 9,
+        "tank_id": 161,
+        "tank_code": "T-114",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "refill_date": "2026-04-13",
+        "refill_time": "14:15",
+        "refilled_by": "Meena S",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "reservoir": "Lucknow Reservoir",
+        "ln2_ordered_date": "2026-04-08",
+        "ln2_received_date": "2026-04-11",
+        "created_at": "2026-04-13T00:00:00"
+      },
+      {
+        "log_id": 14,
+        "tank_id": 18,
+        "tank_code": "T-93",
+        "branch_id": 16,
+        "branch_name": "Bangalore",
+        "refill_date": "2026-04-13",
+        "refill_time": "11:15",
+        "refilled_by": "Deepak V",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "reservoir": "Bangalore Reservoir",
+        "ln2_ordered_date": "2026-04-09",
+        "ln2_received_date": "2026-04-11",
+        "created_at": "2026-04-13T00:00:00"
+      },
+      {
+        "log_id": 5,
+        "tank_id": 86,
+        "tank_code": "T-139",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "refill_date": "2026-04-12",
+        "refill_time": "16:00",
+        "refilled_by": "Deepak V",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "reservoir": "Lucknow Reservoir",
+        "ln2_ordered_date": "2026-04-05",
+        "ln2_received_date": "2026-04-10",
+        "created_at": "2026-04-12T00:00:00"
+      },
+      {
+        "log_id": 4,
+        "tank_id": 55,
+        "tank_code": "T-70",
+        "branch_id": 6,
+        "branch_name": "Mumbai",
+        "refill_date": "2026-04-09",
+        "refill_time": "16:30",
+        "refilled_by": "Arjun Sharma",
+        "description": "Low level alert refill",
+        "status": "completed",
+        "reservoir": "Mumbai Reservoir",
+        "ln2_ordered_date": "2026-04-03",
+        "ln2_received_date": "2026-04-08",
+        "created_at": "2026-04-09T00:00:00"
+      },
+      {
+        "log_id": 6,
+        "tank_id": 85,
+        "tank_code": "T-170",
+        "branch_id": 3,
+        "branch_name": "Egmore",
+        "refill_date": "2026-04-05",
+        "refill_time": "15:15",
+        "refilled_by": "Arjun Sharma",
+        "description": "Emergency refill",
+        "status": "completed",
+        "reservoir": "Egmore Reservoir",
+        "ln2_ordered_date": "2026-04-01",
+        "ln2_received_date": "2026-04-03",
+        "created_at": "2026-04-05T00:00:00"
+      },
+      {
+        "log_id": 8,
+        "tank_id": 110,
+        "tank_code": "T-113",
+        "branch_id": 6,
+        "branch_name": "Mumbai",
+        "refill_date": "2026-04-05",
+        "refill_time": "10:00",
+        "refilled_by": "Arjun Sharma",
+        "description": "Routine maintenance",
+        "status": "completed",
+        "reservoir": "Mumbai Reservoir",
+        "ln2_ordered_date": "2026-04-02",
+        "ln2_received_date": "2026-04-04",
+        "created_at": "2026-04-05T00:00:00"
+      },
+      {
+        "log_id": 15,
+        "tank_id": 51,
+        "tank_code": "T-111",
+        "branch_id": 13,
+        "branch_name": "Delhi",
+        "refill_date": "2026-03-30",
+        "refill_time": "13:45",
+        "refilled_by": "Meena S",
+        "description": "Emergency refill",
+        "status": "completed",
+        "reservoir": "Delhi Reservoir",
+        "ln2_ordered_date": "2026-03-26",
+        "ln2_received_date": "2026-03-28",
+        "created_at": "2026-03-30T00:00:00"
+      },
+      {
+        "log_id": 13,
+        "tank_id": 129,
+        "tank_code": "T-38",
+        "branch_id": 5,
+        "branch_name": "Lucknow",
+        "refill_date": "2026-03-29",
+        "refill_time": "13:15",
+        "refilled_by": "Ravi Kumar",
+        "description": "Emergency refill",
+        "status": "completed",
+        "reservoir": "Lucknow Reservoir",
+        "ln2_ordered_date": "2026-03-22",
+        "ln2_received_date": "2026-03-28",
+        "created_at": "2026-03-29T00:00:00"
+      },
+      {
+        "log_id": 1,
+        "tank_id": 45,
+        "tank_code": "T-47",
+        "branch_id": 1,
+        "branch_name": "Tambaram",
+        "refill_date": "2026-03-24",
+        "refill_time": "13:00",
+        "refilled_by": "Priya Nair",
+        "description": "Scheduled top-up",
+        "status": "completed",
+        "reservoir": "Tambaram Reservoir",
+        "ln2_ordered_date": "2026-03-18",
+        "ln2_received_date": "2026-03-23",
+        "created_at": "2026-03-24T00:00:00"
+      }
+    ],
+    "total_count": 15,
+    "page": 1,
+    "page_size": 20,
+    "status": "ok"
+  },
+  "reportsActivityLogs": {
+    "logs": [
+      {
+        "id": 1,
+        "action": "user.login",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": null,
+        "target_id": null,
+        "target_label": null,
+        "metadata": {
+          "remember_me": false
+        },
+        "created_at": "2026-04-21T09:02:11Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": null
+      },
+      {
+        "id": 16,
+        "action": "user.login",
+        "outcome": "failure",
+        "actor_type": "user",
+        "actor_id": "USR-005",
+        "actor_label": "Kiran Babu",
+        "target_type": null,
+        "target_id": null,
+        "target_label": null,
+        "metadata": {
+          "remember_me": false
+        },
+        "created_at": "2026-04-21T08:50:02Z",
+        "actor_details": {
+          "first_name": "Kiran",
+          "last_name": "Babu",
+          "email": "kiran.babu@mygrape.io",
+          "branch_name": "Perambur"
+        },
+        "target_details": null
+      },
+      {
+        "id": 17,
+        "action": "user.profile_updated",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-003",
+        "actor_label": "Rahul Desai",
+        "target_type": "user",
+        "target_id": "USR-003",
+        "target_label": "Rahul Desai",
+        "metadata": {
+          "branch_name": "Velachery"
+        },
+        "created_at": "2026-04-21T10:30:00Z",
+        "actor_details": {
+          "first_name": "Rahul",
+          "last_name": "Desai",
+          "email": "rahul.desai@mygrape.io",
+          "branch_name": "Velachery"
+        },
+        "target_details": {
+          "first_name": "Rahul",
+          "last_name": "Desai",
+          "email": "rahul.desai@mygrape.io"
+        }
+      },
+      {
+        "id": 18,
+        "action": "user.profile_updated",
+        "outcome": "failure",
+        "actor_type": "user",
+        "actor_id": "USR-005",
+        "actor_label": "Kiran Babu",
+        "target_type": "user",
+        "target_id": "USR-005",
+        "target_label": "Kiran Babu",
+        "metadata": {
+          "branch_name": "Perambur"
+        },
+        "created_at": "2026-04-20T17:12:45Z",
+        "actor_details": {
+          "first_name": "Kiran",
+          "last_name": "Babu",
+          "email": "kiran.babu@mygrape.io",
+          "branch_name": "Perambur"
+        },
+        "target_details": {
+          "first_name": "Kiran",
+          "last_name": "Babu",
+          "email": "kiran.babu@mygrape.io"
+        }
+      },
+      {
+        "id": 19,
+        "action": "alert.created",
+        "outcome": "success",
+        "actor_type": "system",
+        "actor_id": null,
+        "actor_label": "System",
+        "target_type": "tank",
+        "target_id": "TANK-012",
+        "target_label": "T-12",
+        "metadata": {
+          "message": "LN2 level dropped below minimum threshold on T-12"
+        },
+        "created_at": "2026-04-21T06:44:10Z",
+        "actor_details": null,
+        "target_details": {
+          "tank_code": "T-12",
+          "branch_name": "Chennai"
+        }
+      },
+      {
+        "id": 20,
+        "action": "alert.created",
+        "outcome": "failure",
+        "actor_type": "system",
+        "actor_id": null,
+        "actor_label": "System",
+        "target_type": "tank",
+        "target_id": "TANK-033",
+        "target_label": "T-33",
+        "metadata": {
+          "message": "Alert creation failed: duplicate key violation on T-33"
+        },
+        "created_at": "2026-04-20T22:15:30Z",
+        "actor_details": null,
+        "target_details": {
+          "tank_code": "T-33",
+          "branch_name": "Mumbai"
+        }
+      },
+      {
+        "id": 21,
+        "action": "email.critical_alert_sent",
+        "outcome": "failure",
+        "actor_type": "scheduler",
+        "actor_id": null,
+        "actor_label": "Scheduler",
+        "target_type": "user",
+        "target_id": "USR-002",
+        "target_label": "Priya Nair",
+        "metadata": {
+          "recipient_email": "priya.nair@mygrape.io",
+          "email_message": "SMTP timeout sending critical alert notification."
+        },
+        "created_at": "2026-04-20T22:16:01Z",
+        "actor_details": null,
+        "target_details": {
+          "first_name": "Priya",
+          "last_name": "Nair",
+          "email": "priya.nair@mygrape.io"
+        }
+      },
+      {
+        "id": 22,
+        "action": "refill_detection.created",
+        "outcome": "failure",
+        "actor_type": "system",
+        "actor_id": null,
+        "actor_label": "System",
+        "target_type": "tank",
+        "target_id": "TANK-020",
+        "target_label": "T-20",
+        "metadata": {
+          "tank_id": 20,
+          "is_confirmed": false
+        },
+        "created_at": "2026-04-19T23:05:55Z",
+        "actor_details": null,
+        "target_details": {
+          "tank_code": "T-20",
+          "branch_name": "Velachery"
+        }
+      },
+      {
+        "id": 23,
+        "action": "user.profile_updated",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-004",
+        "actor_label": "Arjun Sharma",
+        "target_type": "user",
+        "target_id": "USR-004",
+        "target_label": "Arjun Sharma",
+        "metadata": {
+          "branch_name": "Mumbai"
+        },
+        "created_at": "2026-04-18T13:40:22Z",
+        "actor_details": {
+          "first_name": "Arjun",
+          "last_name": "Sharma",
+          "email": "arjun.sharma@mygrape.io",
+          "branch_name": "Mumbai"
+        },
+        "target_details": {
+          "first_name": "Arjun",
+          "last_name": "Sharma",
+          "email": "arjun.sharma@mygrape.io"
+        }
+      },
+      {
+        "id": 24,
+        "action": "alert_configuration.kpi_config_deleted",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": "kpi_config",
+        "target_id": "KPI-003",
+        "target_label": "Shock Sensor (legacy)",
+        "metadata": {
+          "kpi_name": "shock_legacy",
+          "alert_name": "Legacy Shock Alert",
+          "branch_id": 1
+        },
+        "created_at": "2026-04-17T11:05:00Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": {
+          "branch_name": "Chennai"
+        }
+      },
+      {
+        "id": 25,
+        "action": "task.status_updated",
+        "outcome": "failure",
+        "actor_type": "user",
+        "actor_id": "USR-003",
+        "actor_label": "Rahul Desai",
+        "target_type": "task",
+        "target_id": "TSK-088",
+        "target_label": "Tank T-18 Inspection",
+        "metadata": {
+          "status": "closed",
+          "priority": "high",
+          "tank_id": 18
+        },
+        "created_at": "2026-04-16T09:55:14Z",
+        "actor_details": {
+          "first_name": "Rahul",
+          "last_name": "Desai",
+          "email": "rahul.desai@mygrape.io",
+          "branch_name": "Velachery"
+        },
+        "target_details": {
+          "branch_name": "Velachery"
+        }
+      },
+      {
+        "id": 2,
+        "action": "alert.acknowledged",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": "alert",
+        "target_id": "ALT-044",
+        "target_label": "LN2 Level Low \u2014 T-05",
+        "metadata": {
+          "alert_id": "ALT-044",
+          "tank_code": "T-05",
+          "branch_name": "Chennai",
+          "severity": "High"
+        },
+        "created_at": "2026-04-21T09:15:33Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": {
+          "tank_code": "T-05",
+          "branch_name": "Chennai"
+        }
+      },
+      {
+        "id": 3,
+        "action": "refill_detection.reviewed",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-002",
+        "actor_label": "Priya Nair",
+        "target_type": "tank",
+        "target_id": "TANK-045",
+        "target_label": "T-47",
+        "metadata": {
+          "is_confirmed": true,
+          "tank_id": 45,
+          "refill_weight": 18.4,
+          "notes": "Topped up after low-level alert"
+        },
+        "created_at": "2026-04-20T14:22:05Z",
+        "actor_details": {
+          "first_name": "Priya",
+          "last_name": "Nair",
+          "email": "priya.nair@mygrape.io",
+          "branch_name": "Tambaram"
+        },
+        "target_details": {
+          "tank_code": "T-47",
+          "branch_name": "Tambaram"
+        }
+      },
+      {
+        "id": 4,
+        "action": "alert_configuration.kpi_config_updated",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-003",
+        "actor_label": "Rahul Desai",
+        "target_type": "kpi_config",
+        "target_id": "KPI-007",
+        "target_label": "LN2 Level",
+        "metadata": {
+          "before": {
+            "min": 20,
+            "max": 95,
+            "unit": "%"
+          },
+          "after": {
+            "min": 15,
+            "max": 95,
+            "unit": "%"
+          },
+          "alert_name": "LN2 Level Low",
+          "branch_id": 3
+        },
+        "created_at": "2026-04-20T11:05:47Z",
+        "actor_details": {
+          "first_name": "Rahul",
+          "last_name": "Desai",
+          "email": "rahul.desai@mygrape.io",
+          "branch_name": "Velachery"
+        },
+        "target_details": {
+          "branch_name": "Velachery"
+        }
+      },
+      {
+        "id": 5,
+        "action": "user.invited",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": "user",
+        "target_id": "USR-009",
+        "target_label": "Deepa Krishnan",
+        "metadata": {
+          "role": "User",
+          "department": "IVF",
+          "branch_name": "Perambur"
+        },
+        "created_at": "2026-04-19T16:40:00Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": {
+          "first_name": "Deepa",
+          "last_name": "Krishnan",
+          "email": "deepa.krishnan@mygrape.io",
+          "branch_name": "Perambur"
+        }
+      },
+      {
+        "id": 6,
+        "action": "alert.created",
+        "outcome": "success",
+        "actor_type": "system",
+        "actor_id": null,
+        "actor_label": "System",
+        "target_type": "tank",
+        "target_id": "TANK-070",
+        "target_label": "T-70",
+        "metadata": {
+          "message": "LN2 level dropped below minimum threshold (15%) on T-70"
+        },
+        "created_at": "2026-04-19T07:58:22Z",
+        "actor_details": null,
+        "target_details": {
+          "tank_code": "T-70",
+          "branch_name": "Mumbai"
+        }
+      },
+      {
+        "id": 7,
+        "action": "email.critical_alert_sent",
+        "outcome": "success",
+        "actor_type": "scheduler",
+        "actor_id": null,
+        "actor_label": "Scheduler",
+        "target_type": "user",
+        "target_id": "USR-004",
+        "target_label": "Arjun Sharma",
+        "metadata": {
+          "recipient_email": "arjun.sharma@mygrape.io",
+          "email_message": "Critical alert: LN2 level on T-70 has dropped below threshold.",
+          "occurred_at": "2026-04-19T07:58:22Z"
+        },
+        "created_at": "2026-04-19T07:59:01Z",
+        "actor_details": null,
+        "target_details": {
+          "first_name": "Arjun",
+          "last_name": "Sharma",
+          "email": "arjun.sharma@mygrape.io"
+        }
+      },
+      {
+        "id": 8,
+        "action": "refill_detection.created",
+        "outcome": "success",
+        "actor_type": "system",
+        "actor_id": null,
+        "actor_label": "System",
+        "target_type": "tank",
+        "target_id": "TANK-085",
+        "target_label": "T-170",
+        "metadata": {
+          "tank_id": 85,
+          "is_confirmed": false
+        },
+        "created_at": "2026-04-18T18:30:14Z",
+        "actor_details": null,
+        "target_details": {
+          "tank_code": "T-170",
+          "branch_name": "Egmore"
+        }
+      },
+      {
+        "id": 9,
+        "action": "alert_configuration.notification_settings_updated",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-002",
+        "actor_label": "Priya Nair",
+        "target_type": "branch",
+        "target_id": "BRN-004",
+        "target_label": "Tambaram",
+        "metadata": {
+          "branch_id": 4,
+          "before": {
+            "is_email_notifify": false,
+            "is_whatsapp_notify": false
+          },
+          "after": {
+            "is_email_notifify": true,
+            "is_whatsapp_notify": true
+          }
+        },
+        "created_at": "2026-04-18T10:12:55Z",
+        "actor_details": {
+          "first_name": "Priya",
+          "last_name": "Nair",
+          "email": "priya.nair@mygrape.io",
+          "branch_name": "Tambaram"
+        },
+        "target_details": {
+          "branch_name": "Tambaram"
+        }
+      },
+      {
+        "id": 10,
+        "action": "user.approved",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": "user",
+        "target_id": "USR-009",
+        "target_label": "Deepa Krishnan",
+        "metadata": {
+          "role": "User",
+          "department": "IVF",
+          "branch_name": "Perambur"
+        },
+        "created_at": "2026-04-17T09:30:00Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": {
+          "first_name": "Deepa",
+          "last_name": "Krishnan",
+          "email": "deepa.krishnan@mygrape.io",
+          "branch_name": "Perambur"
+        }
+      },
+      {
+        "id": 11,
+        "action": "report.ivf.monthly_summary.downloaded",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-003",
+        "actor_label": "Rahul Desai",
+        "target_type": null,
+        "target_id": null,
+        "target_label": null,
+        "metadata": {
+          "month": "2026-03",
+          "status": "ok"
+        },
+        "created_at": "2026-04-16T15:45:09Z",
+        "actor_details": {
+          "first_name": "Rahul",
+          "last_name": "Desai",
+          "email": "rahul.desai@mygrape.io",
+          "branch_name": "Velachery"
+        },
+        "target_details": null
+      },
+      {
+        "id": 12,
+        "action": "alert.acknowledged",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-004",
+        "actor_label": "Arjun Sharma",
+        "target_type": "alert",
+        "target_id": "ALT-038",
+        "target_label": "Temperature High \u2014 T-30",
+        "metadata": {
+          "alert_id": "ALT-038",
+          "tank_code": "T-30",
+          "branch_name": "Mumbai",
+          "severity": "Medium"
+        },
+        "created_at": "2026-04-15T11:22:44Z",
+        "actor_details": {
+          "first_name": "Arjun",
+          "last_name": "Sharma",
+          "email": "arjun.sharma@mygrape.io",
+          "branch_name": "Mumbai"
+        },
+        "target_details": {
+          "tank_code": "T-30",
+          "branch_name": "Mumbai"
+        }
+      },
+      {
+        "id": 13,
+        "action": "alert_configuration.kpi_config_created",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": "kpi_config",
+        "target_id": "KPI-012",
+        "target_label": "Shock Sensor",
+        "metadata": {
+          "kpi_name": "shock",
+          "alert_name": "Shock Detected",
+          "min": 0,
+          "max": 1,
+          "unit": "bool",
+          "alert_type": "threshold",
+          "cooldown_minutes": 30,
+          "status": true
+        },
+        "created_at": "2026-04-14T08:55:31Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": {
+          "branch_name": "Chennai"
+        }
+      },
+      {
+        "id": 14,
+        "action": "user.profile_updated",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-002",
+        "actor_label": "Priya Nair",
+        "target_type": "user",
+        "target_id": "USR-002",
+        "target_label": "Priya Nair",
+        "metadata": {
+          "branch_name": "Tambaram"
+        },
+        "created_at": "2026-04-13T14:10:22Z",
+        "actor_details": {
+          "first_name": "Priya",
+          "last_name": "Nair",
+          "email": "priya.nair@mygrape.io",
+          "branch_name": "Tambaram"
+        },
+        "target_details": {
+          "first_name": "Priya",
+          "last_name": "Nair",
+          "email": "priya.nair@mygrape.io"
+        }
+      },
+      {
+        "id": 15,
+        "action": "report.ivf.critical_alerts.downloaded",
+        "outcome": "success",
+        "actor_type": "user",
+        "actor_id": "USR-001",
+        "actor_label": "Avery Morgan",
+        "target_type": null,
+        "target_id": null,
+        "target_label": null,
+        "metadata": {
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-14",
+          "status": "All",
+          "severity": "All"
+        },
+        "created_at": "2026-04-12T16:05:48Z",
+        "actor_details": {
+          "first_name": "Avery",
+          "last_name": "Morgan",
+          "email": "avery.morgan@mygrape.io",
+          "branch_name": "Chennai"
+        },
+        "target_details": null
+      }
+    ],
+    "total_count": 25,
+    "page": 1,
+    "page_size": 20,
+    "status": "ok"
+  },
+  "hospitalUsers": {
+    "total_users": 8,
+    "users": [
+      {
+        "user_id": "USR-001",
+        "first_name": "Avery",
+        "last_name": "Morgan",
+        "email": "avery.morgan@mygrape.io",
+        "role": "Admin",
+        "branch_name": "Chennai",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-21T09:02:11Z"
+      },
+      {
+        "user_id": "USR-002",
+        "first_name": "Priya",
+        "last_name": "Nair",
+        "email": "priya.nair@mygrape.io",
+        "role": "Manager",
+        "branch_name": "Tambaram",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-20T14:22:05Z"
+      },
+      {
+        "user_id": "USR-003",
+        "first_name": "Rahul",
+        "last_name": "Desai",
+        "email": "rahul.desai@mygrape.io",
+        "role": "Manager",
+        "branch_name": "Velachery",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-20T11:05:47Z"
+      },
+      {
+        "user_id": "USR-004",
+        "first_name": "Arjun",
+        "last_name": "Sharma",
+        "email": "arjun.sharma@mygrape.io",
+        "role": "User",
+        "branch_name": "Mumbai",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-19T07:58:22Z"
+      },
+      {
+        "user_id": "USR-005",
+        "first_name": "Kiran",
+        "last_name": "Babu",
+        "email": "kiran.babu@mygrape.io",
+        "role": "User",
+        "branch_name": "Perambur",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-18T10:12:55Z"
+      },
+      {
+        "user_id": "USR-006",
+        "first_name": "Meena",
+        "last_name": "Suresh",
+        "email": "meena.suresh@mygrape.io",
+        "role": "User",
+        "branch_name": "Egmore",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-17T11:22:00Z"
+      },
+      {
+        "user_id": "USR-007",
+        "first_name": "Deepak",
+        "last_name": "V",
+        "email": "deepak.v@mygrape.io",
+        "role": "User",
+        "branch_name": "Lucknow",
+        "department": "IVF",
+        "status": false,
+        "approved_status": "approved",
+        "invite_pending": false,
+        "last_login": "2026-04-10T08:30:00Z"
+      },
+      {
+        "user_id": "USR-009",
+        "first_name": "Deepa",
+        "last_name": "Krishnan",
+        "email": "deepa.krishnan@mygrape.io",
+        "role": "User",
+        "branch_name": "Perambur",
+        "department": "IVF",
+        "status": true,
+        "approved_status": "pending",
+        "invite_pending": true,
+        "last_login": null
+      }
+    ]
+  },
+  "profileFeedbackTickets": [
+    {
+      "id": "TKT-001",
+      "title": "LN2 alert not triggering for tank T-05",
+      "type": "Bug",
+      "status": "Open",
+      "submittedOn": "2026-04-18T10:20:00Z",
+      "submittedByName": "Avery Morgan",
+      "hospitalName": "Iris Fertility",
+      "branchName": "Chennai"
+    },
+    {
+      "id": "TKT-002",
+      "title": "Request to add export to PDF for reports",
+      "type": "Feature Request",
+      "status": "In Review",
+      "submittedOn": "2026-04-14T14:05:00Z",
+      "submittedByName": "Avery Morgan",
+      "hospitalName": "Iris Fertility",
+      "branchName": "Chennai"
+    },
+    {
+      "id": "TKT-003",
+      "title": "Refill log table pagination not working on mobile",
+      "type": "Bug",
+      "status": "Resolved",
+      "submittedOn": "2026-04-08T09:30:00Z",
+      "submittedByName": "Avery Morgan",
+      "hospitalName": "Iris Fertility",
+      "branchName": "Chennai"
+    }
+  ]
 }
