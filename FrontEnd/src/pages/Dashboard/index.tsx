@@ -589,7 +589,7 @@ export default function Dashboard({ }: DashboardProps) {
         const response = await ivfService.getQualityDeviationsFlagged();
         if (!cancelled) {
           setIvfQualityDeviations(response?.total_deviations ?? 0);
-          setIvfActiveQualityDeviations(response?.active_total_deviations ?? 0);
+          setIvfActiveQualityDeviations(response?.total_deviations ?? 0);
         }
       } catch (e: any) {
         if (!cancelled) {

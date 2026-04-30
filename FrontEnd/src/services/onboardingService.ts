@@ -21,6 +21,15 @@ export class OnboardingService extends BaseApiService {
         }
     }
 
+    async completeOnboarding(): Promise<void> {
+        if (!authUtils.getToken()) return;
+        try {
+            await this.request("/api/onboarding/complete", { method: "POST" });
+        } catch {
+            // Ignore sync errors
+        }
+    }
+
     async saveState(state: OnboardingState): Promise<void> {
         if (!authUtils.getToken()) {
             return;

@@ -91,14 +91,14 @@ export default function MultiSelectDropdown({
     }, []);
 
     return (
-        <div className="flex flex-col gap-2 relative" ref={dropdownRef}>
-            <label className="text-xs font-semibold text-gray-600">
+        <div className="flex flex-col relative" ref={dropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
                 {label}
             </label>
             <button
                 type="button"
                 onClick={() => !disabled && setOpen((prev) => !prev)}
-                className={`w-full px-3 py-2 border rounded-md text-sm text-left flex items-center justify-between transition-colors ${
+                className={`w-full px-3 h-12 border rounded-lg text-sm text-left flex items-center justify-between transition-colors ${
                     disabled
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
                         : "bg-white border-[#E7E1E1] hover:border-[#c49ad1]"
@@ -131,7 +131,7 @@ export default function MultiSelectDropdown({
             </button>
 
             {open && !disabled && (
-                <div className="absolute z-20 mt-2 w-full bg-white border border-[#E7E1E1] rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute z-20 top-full mt-1 w-full bg-white border border-[#E7E1E1] rounded-lg shadow-lg overflow-hidden">
                     <div className="p-3 border-b border-[#F1E8F2]">
                         <input
                             type="text"

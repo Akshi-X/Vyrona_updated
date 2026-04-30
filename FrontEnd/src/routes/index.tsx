@@ -31,6 +31,7 @@ import {
     OnboardingLevel,
     OnboardingShell,
 } from "../pages/Onboarding";
+import OnboardingSuccess from "../pages/Onboarding/OnboardingSuccess";
 import Dashboard from "../pages/Dashboard";
 import { OnboardingProvider, useOnboarding } from "../contexts/OnboardingContext";
 import { useTourNavContext } from "../contexts/TourNavContext";
@@ -270,6 +271,7 @@ export const router = createBrowserRouter([
             { path: "/onboarding/refill-log",                            element: <><RefillLog /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/user-profile",                          element: <><UserProfilePage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/support",                               element: <><Support /><ActiveOnboardingLevel /></> },
+            { path: "/onboarding/success",                               element: <><OnboardingSuccess /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/users",                                 element: <><UsersPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/embryo-grading",                        element: <><EmbryoGradingPage /><ActiveOnboardingLevel /></> },
             { path: "/onboarding/incubator-tracking",                    element: <><IncubatorTrackingDashboardPage /><ActiveOnboardingLevel /></> },

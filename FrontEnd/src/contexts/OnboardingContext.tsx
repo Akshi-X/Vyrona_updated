@@ -427,23 +427,9 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             : initialState;
     });
 
-    const didHydrateFromApiRef = useRef(false);
     // Set to true only when a tour or level completes — triggers an API save
     const apiSyncNeededRef = useRef(false);
     const { isAuthenticated } = useAuth();
-
-    // Fetch from API once authenticated and merge — API is source of truth for
-    // cross-device sync; localStorage is the fast local cache on reload.
-    useEffect(() => {
-        if (!isAuthenticated || didHydrateFromApiRef.current) return;
-        (async () => {
-            const remoteState = await onboardingService.getState();
-            if (remoteState) {
-                dispatch({ type: "HYDRATE", payload: remoteState });
-            }
-            didHydrateFromApiRef.current = true;
-        })();
-    }, [isAuthenticated]);
 
     // Always persist to localStorage; only push to API on tour/quiz completion
     useEffect(() => {
@@ -483,6 +469,9 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
         completeLevel: (levelId, score) => {
             apiSyncNeededRef.current = true;
+            if (levelId === "level-8") {
+                onboardingService.completeOnboarding();
+            }
             dispatch({ type: "COMPLETE_LEVEL", levelId, score });
         },
         resetLevel: (levelId) => dispatch({ type: "RESET_LEVEL", levelId }),

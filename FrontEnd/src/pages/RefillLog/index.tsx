@@ -50,6 +50,8 @@ const formatDaysAgo = (dateStr: string): string => {
 const RefillLog = () => {
     const { isAuthenticated, userRole } = useAuth();
     const isOnboarding = useOnboardingMode();
+    const isOnboardingRef = useRef(isOnboarding);
+    isOnboardingRef.current = isOnboarding;
     const [selectedBranch] = useState<string>("All");
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [containers, setContainers] = useState<ContainerItem[]>([]);
@@ -169,7 +171,7 @@ const RefillLog = () => {
                 setIsActivityBranchOpen(false);
             }
             if (reservoirDropdownRef.current && !reservoirDropdownRef.current.contains(e.target as Node)) {
-                setIsReservoirDropdownOpen(false);
+                if (!isOnboardingRef.current) setIsReservoirDropdownOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -309,6 +311,21 @@ const RefillLog = () => {
         };
         document.addEventListener("onboarding:prefill-add-refill-log", handler);
         return () => document.removeEventListener("onboarding:prefill-add-refill-log", handler);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => {
+            setEditingLogId(7);
+            setEditLogForm({ ln2_ordered_date: "2026-04-20", ln2_received_date: "2026-04-25" });
+        };
+        document.addEventListener("onboarding:prefill-reservoir-received-date", handler);
+        return () => document.removeEventListener("onboarding:prefill-reservoir-received-date", handler);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => setIsReservoirDropdownOpen(true);
+        document.addEventListener("onboarding:open-reservoir-dropdown", handler);
+        return () => document.removeEventListener("onboarding:open-reservoir-dropdown", handler);
     }, []);
 
     const branchOptions = useMemo(() => {
@@ -668,9 +685,10 @@ const RefillLog = () => {
                                     </div>
                                 ))
                             )}
-                            {!containersLoading && filteredContainers.map((container) => (
+                            {!containersLoading && filteredContainers.map((container, cIdx) => (
                                 <div
                                     key={container.id}
+                                    id={cIdx === 0 ? "onboarding-refill-tank-first-row" : undefined}
                                     className="grid grid-cols-[minmax(0,1fr)_minmax(0,140px)_minmax(0,110px)_minmax(0,80px)] px-4 py-2.5 items-center"
                                 >
                                     <div className="min-w-0">
@@ -724,6 +742,7 @@ const RefillLog = () => {
                                     </div>
                                     <div className="flex items-center justify-center gap-1.5">
                                         <button
+                                            id={cIdx === 0 ? "onboarding-refill-tank-view-btn" : undefined}
                                             type="button"
                                             onClick={() => openView(container)}
                                             className="px-2 h-6 rounded-md border border-[#6b1176] text-[#6b1176] text-[10px] font-medium hover:bg-[#f7ecff] transition-colors"
@@ -749,7 +768,7 @@ const RefillLog = () => {
                         </div>
                         <div className="flex flex-1 min-h-0 overflow-hidden max-[880px]:flex-col">
                             {/* Left: Cryocan SVG + reservoir dropdown */}
-                            <div className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
+                            <div id="onboarding-refill-reservoir-svg-panel" className="relative flex flex-col items-center justify-center shrink-0 px-3 py-3 gap-3 border-r border-[#E7E1E1] max-[880px]:border-r-0 max-[880px]:border-b">
                                 {/* Coming Soon overlay — hidden during onboarding */}
                                 {!isOnboarding && (
                                     <div className="absolute inset-0 backdrop-blur-sm bg-white/40 rounded z-10 flex items-center justify-center">
@@ -821,6 +840,7 @@ const RefillLog = () => {
                                             {/* Reservoir dropdown — custom UI */}
                                             <div className="relative w-full" ref={reservoirDropdownRef}>
                                                 <button
+                                                    id="onboarding-refill-reservoir-dropdown-btn"
                                                     type="button"
                                                     onClick={() => setIsReservoirDropdownOpen(!isReservoirDropdownOpen)}
                                                     className="w-full flex items-center justify-between gap-2 px-3 h-8 rounded-lg border border-[#E7E1E1] text-xs text-gray-700 hover:bg-gray-50 transition-colors bg-white"
@@ -835,13 +855,14 @@ const RefillLog = () => {
                                                     </svg>
                                                 </button>
                                                 {isReservoirDropdownOpen && (
-                                                    <div className="absolute left-0 right-0 bottom-full mb-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                                    <div id="onboarding-refill-reservoir-dropdown" className="absolute left-0 right-0 bottom-full mb-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                                                         {reservoirs.length === 0 && (
                                                             <div className="px-3 py-2 text-xs text-gray-400">No reservoirs</div>
                                                         )}
-                                                        {reservoirs.map((r) => (
+                                                        {[...reservoirs].sort((a, b) => (a.branch_name ?? a.reservoir_name).localeCompare(b.branch_name ?? b.reservoir_name)).map((r) => (
                                                             <button
                                                                 key={r.reservoir_id}
+                                                                id={r.reservoir_id === 13 ? "onboarding-refill-reservoir-delhi-btn" : undefined}
                                                                 type="button"
                                                                 onClick={() => { setSelectedReservoirId(r.reservoir_id); setIsReservoirDropdownOpen(false); }}
                                                                 className={`w-full text-left px-3 py-2 text-xs transition-colors ${
@@ -884,11 +905,12 @@ const RefillLog = () => {
                                     {!reservoirLogsLoading && reservoirLogs.length === 0 && (
                                         <div className="p-4 text-xs text-gray-400">No reservoir logs found.</div>
                                     )}
-                                    {!reservoirLogsLoading && reservoirLogs.map((log) => {
+                                    {!reservoirLogsLoading && reservoirLogs.map((log, rIdx) => {
                                         const isEditing = editingLogId === log.log_id;
                                         return (
                                             <div
                                                 key={log.log_id}
+                                                id={rIdx === 0 ? "onboarding-refill-reservoir-first-row" : undefined}
                                                 className="grid grid-cols-[minmax(0,1fr)_90px_90px_20px] gap-x-2 px-4 py-2 items-center hover:bg-gray-50"
                                             >
                                                 <div className="flex items-center min-w-0">
@@ -904,19 +926,22 @@ const RefillLog = () => {
                                                 ) : (
                                                     <span className="text-xs text-gray-600 truncate text-center">{log.ln2_ordered_date ?? "—"}</span>
                                                 )}
-                                                {isEditing ? (
-                                                    <input
-                                                        type="date"
-                                                        value={editLogForm.ln2_received_date}
-                                                        onChange={(e) => setEditLogForm(f => ({ ...f, ln2_received_date: e.target.value }))}
-                                                        className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
-                                                    />
-                                                ) : (
-                                                    <span className="text-xs text-gray-600 truncate text-center">{log.ln2_received_date ?? "—"}</span>
-                                                )}
+                                                <div id={rIdx === 0 ? "onboarding-refill-reservoir-date-input" : undefined} className="flex items-center">
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="date"
+                                                            value={editLogForm.ln2_received_date}
+                                                            onChange={(e) => setEditLogForm(f => ({ ...f, ln2_received_date: e.target.value }))}
+                                                            className="text-xs border border-[#6b1176] rounded px-1 py-0.5 w-full focus:outline-none"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-gray-600 truncate text-center">{log.ln2_received_date ?? "—"}</span>
+                                                    )}
+                                                </div>
                                                 <div className="flex items-center justify-end">
                                                     {isEditing ? (
                                                         <button
+                                                            id={rIdx === 0 ? "onboarding-refill-reservoir-save-btn" : undefined}
                                                             type="button"
                                                             disabled={editLogSaving}
                                                             onClick={() => saveEditLog(log.log_id)}
@@ -931,6 +956,7 @@ const RefillLog = () => {
                                                         </button>
                                                     ) : (
                                                         <button
+                                                            id={rIdx === 0 ? "onboarding-refill-reservoir-edit-btn" : undefined}
                                                             type="button"
                                                             onClick={() => {
                                                                 setEditingLogId(log.log_id);
@@ -1215,7 +1241,7 @@ const RefillLog = () => {
             {/* View Modal */}
             {viewContainer && (
                 <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6">
-                    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+                    <div id="onboarding-refill-view-modal" className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
                         {/* Header */}
                         <div className="flex items-center justify-between px-8 py-5 border-b border-[#E7E1E1]">
                             <div className="flex items-center gap-4">
@@ -1234,6 +1260,7 @@ const RefillLog = () => {
                                 </div>
                             </div>
                             <button
+                                id="onboarding-refill-view-modal-close"
                                 type="button"
                                 onClick={() => setViewContainer(null)}
                                 className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"

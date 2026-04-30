@@ -95,7 +95,7 @@ function TourNavigation(_props: Record<string, unknown>) {
 }
 
 // Pages that have their own full-width layout — sidebar should be hidden for these.
-const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support"];
+const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support", "/onboarding/success"];
 
 export default function OnboardingShell() {
     const navigate = useNavigate();

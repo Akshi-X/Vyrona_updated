@@ -37,6 +37,18 @@ def update_onboarding_state_endpoint(
     return OnboardingStateResponse(state=record.state)
 
 
+@router.post("/onboarding/complete")
+def complete_onboarding_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    user = db.query(User).filter(User.user_id == current_user.user_id).first()
+    if user:
+        user.onboarding_completed = True
+        db.commit()
+    return {"status": "ok", "user_id": current_user.user_id}
+
+
 @router.post("/onboarding/events")
 def append_onboarding_events_endpoint(
     request: OnboardingEventsRequest,

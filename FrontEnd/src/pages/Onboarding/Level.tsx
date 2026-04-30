@@ -196,7 +196,7 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
     // ── 8. Click guard ───────────────────────────────────────────────
     useEffect(() => {
-        if (!isTourActive || !activeStep?.requireClick || confirmedSteps[activeStep.id]) return;
+        if (!isTourActive || !activeStep || confirmedSteps[activeStep.id]) return;
 
         const applyDisabledStyles = () => {
             activeStep.disableClickID?.forEach((sel) => {
@@ -215,10 +215,9 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
 
         const handlePointerDown = (event: Event) => {
             const { clientX, clientY } = event as PointerEvent;
-            const clickedEl = event.target as Element | null;
 
-            const target = document.querySelector(activeStep.target);
-            if (!target) return;
+            // Tour tooltip always passes through (Next / Prev / Close buttons)
+            if ((event.target as Element)?.closest(".reactour__popover")) return;
 
             applyDisabledStyles();
 
@@ -227,64 +226,55 @@ export default function OnboardingLevel({ levelId }: OnboardingLevelProps) {
                 return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
             };
 
+            // disableClickID elements are always blocked regardless of step type
             if (activeStep.disableClickID?.some((sel) => {
                 const el = document.querySelector(sel);
                 return el ? hitsBox(el) : false;
-            })) return;
-
-            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
-
-            if (hasWhitelist) {
-                let matchedEl: HTMLElement | null = null;
-                const hitWhitelisted = activeStep.clickOnlyId!.some((sel) => {
-                    const el = document.querySelector(sel) as HTMLElement | null;
-                    if (el && hitsBox(el)) { matchedEl = el; return true; }
-                    return false;
-                });
-                if (!hitWhitelisted) {
-                    // Block the event entirely so downstream handlers (e.g. dropdown
-                    // click-outside listeners) don't fire and close overlays the tour
-                    // needs to stay open.
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return;
-                }
-
-                // Prevent the native click from also firing so elements like
-                // toggle buttons aren't triggered twice (once real, once synthetic).
+            })) {
                 event.preventDefault();
                 event.stopPropagation();
+                return;
+            }
 
-                (matchedEl as HTMLElement | null)?.click();
+            // No whitelist = read-only step — block everything unconditionally
+            const hasWhitelist = (activeStep.clickOnlyId?.length ?? 0) > 0;
+            if (!hasWhitelist) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
 
-                const advance = () => {
-                    const nextIndex = stepIndex + 1;
-                    setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                    setCurrentStep(nextIndex);
-                    setStepIndex(levelId, nextIndex);
-                };
-                if (activeStep.stepDelay) {
-                    setTimeout(advance, activeStep.stepDelay);
-                } else {
-                    advance();
-                }
+            // Has whitelist — only allow clicks that land on a whitelisted element
+            let matchedEl: HTMLElement | null = null;
+            const hitWhitelisted = activeStep.clickOnlyId!.some((sel) => {
+                const el = document.querySelector(sel) as HTMLElement | null;
+                if (!el) return false;
+                if ((event.target as Element)?.closest(sel)) { matchedEl = el; return true; }
+                if (hitsBox(el)) { matchedEl = el; return true; }
+                return false;
+            });
+            if (!hitWhitelisted) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            // Whitelisted element hit — fire the click and advance the tour
+            event.preventDefault();
+            event.stopPropagation();
+
+            (matchedEl as HTMLElement | null)?.click();
+
+            const advance = () => {
+                const nextIndex = stepIndex + 1;
+                setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
+                setCurrentStep(nextIndex);
+                setStepIndex(levelId, nextIndex);
+            };
+            if (activeStep.stepDelay) {
+                setTimeout(advance, activeStep.stepDelay);
             } else {
-                const isInsideTarget = target.contains(clickedEl) || hitsBox(target);
-                if (!isInsideTarget) return;
-
-                (target as HTMLElement).click();
-
-                const advance = () => {
-                    const nextIndex = stepIndex + 1;
-                    setConfirmedSteps((prev) => ({ ...prev, [activeStep.id]: true }));
-                    setCurrentStep(nextIndex);
-                    setStepIndex(levelId, nextIndex);
-                };
-                if (activeStep.stepDelay) {
-                    setTimeout(advance, activeStep.stepDelay);
-                } else {
-                    advance();
-                }
+                advance();
             }
         };
 
