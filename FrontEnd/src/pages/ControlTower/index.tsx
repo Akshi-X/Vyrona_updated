@@ -64,6 +64,15 @@ const ControlTower = () => {
         setSearchParams(params, { replace: true });
     }, [selectedBranch, selectedStatusInbound, setSearchParams]);
 
+    // Reset filters when onboarding navigates to clean URL (level-3 start)
+    useEffect(() => {
+        const branchFromUrl = searchParams.get("branch_id");
+        const statusFromUrl = searchParams.get("status");
+        if (!branchFromUrl) setSelectedBranch("All");
+        if (!statusFromUrl) setSelectedStatusInbound("All");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams.get("branch_id"), searchParams.get("status")]);
+
     // Active routes via API
     const [routes, setRoutes] = useState<ActiveRouteItem[]>([]);
     const [loadingRoutes, setLoadingRoutes] = useState(false);

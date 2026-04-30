@@ -21,8 +21,8 @@ INSERT INTO devices (
     updated_at
 )
 VALUES (
-    25,                -- use correct branch_id
-    'IOTISWT1',
+    26,                -- use correct branch_id
+    'IOTISWT1',        -- update this too
     NOW(),
     NOW()
 )
@@ -55,8 +55,8 @@ INSERT INTO ln2_iot_devices (
     precaution_level_pct
 )
 SELECT
-    93 AS tank_id,
-    12 AS device_id,   -- 👈 use returned ID here
+    94 AS tank_id,     -- update with latest
+    13 AS device_id,   -- 👈 use returned ID here
     tank_max_capacity_reading,
     tank_min_capacity_reading,
     NOW(),

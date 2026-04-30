@@ -6,6 +6,7 @@ import React, {
     useCallback,
 } from "react";
 import { toast } from "react-toastify";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
     ivfService,
@@ -326,6 +327,7 @@ const AlertStatusBadge = ({
 
 export default function AlertSetting() {
     const { isAuthenticated } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [branches, setBranches] = useState<IvfBranch[]>([]);
     const [branchFilter, setBranchFilter] = useState<string>("All");
@@ -334,6 +336,25 @@ export default function AlertSetting() {
     const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(
         {},
     );
+
+    // Sync URL branch_id (numeric) → branchFilter (name) once branches are loaded
+    useEffect(() => {
+        const branchIdFromUrl = searchParams.get("branch_id");
+        if (!branchIdFromUrl || branches.length === 0) return;
+        const branch = branches.find((b) => String(b.branch_id) === branchIdFromUrl);
+        if (branch && branch.branch_name !== branchFilter) setBranchFilter(branch.branch_name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams.get("branch_id"), branches]);
+
+    // Sync branchFilter (name) → URL as numeric branch_id
+    useEffect(() => {
+        const params: Record<string, string> = {};
+        if (branchFilter !== "All") {
+            const branch = branches.find((b) => b.branch_name === branchFilter);
+            if (branch) params.branch_id = String(branch.branch_id);
+        }
+        setSearchParams(params, { replace: true });
+    }, [branchFilter, branches, setSearchParams]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -531,11 +552,8 @@ export default function AlertSetting() {
         if (!isAuthenticated) return;
         setContainersLoading(true);
         setContainersError(null);
-        const filters: { branch_name?: string } = {};
-        if (branchFilter && branchFilter !== "All")
-            filters.branch_name = branchFilter;
         shipmentService
-            .getActiveCanisters(filters)
+            .getActiveCanisters({})
             .then((data: any) => {
                 let list: ContainerRow[] = [];
                 if (data?.canisters && Array.isArray(data.canisters)) {
@@ -601,7 +619,7 @@ export default function AlertSetting() {
                 setContainers([]);
             })
             .finally(() => setContainersLoading(false));
-    }, [isAuthenticated, branchFilter]);
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (!primaryContainer?.tank_id) {
@@ -818,6 +836,13 @@ export default function AlertSetting() {
         () => ["All", ...branches.map((b) => b.branch_name)],
         [branches],
     );
+    const filteredContainers = useMemo(
+        () =>
+            branchFilter === "All"
+                ? containers
+                : containers.filter((c) => c.branchName === branchFilter),
+        [containers, branchFilter],
+    );
     const activeFilterCount = useMemo(
         () => (branchFilter !== "All" ? 1 : 0),
         [branchFilter],
@@ -848,6 +873,18 @@ export default function AlertSetting() {
         document.addEventListener("mousedown", handleClickOutside);
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Onboarding: pre-fill draft values for Evaporation Rate and Lid State so the
+    // Save Changes button becomes active for the final tour step.
+    useEffect(() => {
+        const handler = () => {
+            setMultiDraft("ln2_evaporation_rate", { min: 0.5, max: 2.0, alert_type: "soft", cooldown_minutes: 60 });
+            setMultiDraft("ln2_lid_state", { lid_state: "closed", alert_type: "soft", cooldown_minutes: 30 });
+        };
+        document.addEventListener("onboarding:prefill-alert-evap-lid", handler);
+        return () => document.removeEventListener("onboarding:prefill-alert-evap-lid", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const closeForm = () => {
@@ -1327,6 +1364,7 @@ export default function AlertSetting() {
                                 </FilterPanel>
                             </div>
                             <button
+                                id="onboarding-alert-settings-btn"
                                 type="button"
                                 onClick={openNotifySettings}
                                 className="w-9 h-9 rounded-lg border border-[#E7E1E1] bg-white flex items-center justify-center text-[#6b1176] hover:bg-[#F7ECFF] transition-colors"
@@ -1388,10 +1426,12 @@ export default function AlertSetting() {
                                         </button>
                                         {isBranchDropdownOpen && (
                                             <div id="onboarding-alert-branch-dropdown-list" className="absolute top-full mt-1 left-0 right-0 z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                                                {branchOptions.map((opt) => (
+                                                {branchOptions.map((opt) => {
+                                                    const branchObj = branches.find((b) => b.branch_name === opt);
+                                                    return (
                                                     <button
                                                         key={opt}
-                                                        id={opt === "Bangalore" ? "onboarding-alert-branch-bangalore" : undefined}
+                                                        id={branchObj ? `onboarding-alert-branch-${branchObj.branch_id}` : undefined}
                                                         type="button"
                                                         onClick={() => {
                                                             setBranchFilter(
@@ -1411,7 +1451,8 @@ export default function AlertSetting() {
                                                             ? "All Branches"
                                                             : opt}
                                                     </button>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -1484,8 +1525,8 @@ export default function AlertSetting() {
                                     )}
                                     {!containersLoading &&
                                         !containersError &&
-                                        containers.length > 0 &&
-                                        containers.map((c) => {
+                                        filteredContainers.length > 0 &&
+                                        filteredContainers.map((c) => {
                                             const isSelected =
                                                 selectedContainers.some(
                                                     (s) =>
@@ -1519,7 +1560,7 @@ export default function AlertSetting() {
                                         })}
                                     {!containersLoading &&
                                         !containersError &&
-                                        containers.length === 0 && (
+                                        filteredContainers.length === 0 && (
                                             <div className="p-4 text-xs text-gray-500">
                                                 No active containers found.
                                             </div>
@@ -1608,7 +1649,7 @@ export default function AlertSetting() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                                        <div className="flex flex-col flex-1 min-h-0">
                                             <div
                                                 className="flex-1 overflow-y-auto space-y-3 pr-1"
                                                 style={{
@@ -1691,6 +1732,7 @@ export default function AlertSetting() {
                                                                     key={
                                                                         kpiName
                                                                     }
+                                                                    id={`onboarding-alert-kpi-${kpiName}`}
                                                                     className={`relative rounded-xl border-2 p-5 transition-all duration-200 ${
                                                                         isAlertEnabled
                                                                             ? isCritical
@@ -2374,6 +2416,7 @@ export default function AlertSetting() {
                                                             return (
                                                                 <div
                                                                     key={r.id}
+                                                                    id={`onboarding-alert-kpi-${r.kpi_name}`}
                                                                     className={`relative rounded-xl border-2 p-5 transition-all duration-200 ${
                                                                         isAlertEnabled
                                                                             ? isCritical
@@ -2954,6 +2997,7 @@ export default function AlertSetting() {
                                                                 return (
                                                                     <div
                                                                         key={`missing-${kpiName}`}
+                                                                        id={`onboarding-alert-kpi-${kpiName}`}
                                                                         className="relative rounded-xl border-2 border-gray-200 bg-gray-50/30 p-5 transition-all duration-200"
                                                                     >
                                                                         <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
@@ -2995,11 +3039,9 @@ export default function AlertSetting() {
                                                                                         showUnset
                                                                                     />
                                                                                 </div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
-                                                                            {inputType ===
-                                                                            "lid_state" ? (
+                                                                                <div className="flex flex-wrap xl2:flex-nowrap items-center gap-3 mt-2 md:mt-4">
+                                                                                {inputType ===
+                                                                                "lid_state" ? (
                                                                                 <div className="relative w-64">
                                                                                     <button
                                                                                         type="button"
@@ -3449,6 +3491,8 @@ export default function AlertSetting() {
                                                                             </div>
                                                                         </div>
                                                                     </div>
+                                                                </div>
+                                                            </div>
                                                                 );
                                                             },
                                                         )}
@@ -3567,6 +3611,7 @@ export default function AlertSetting() {
                                                 </div>
                                                 {/* Save Changes */}
                                                 <button
+                                                    id="onboarding-alert-save-btn"
                                                     type="button"
                                                     onClick={handleSaveAll}
                                                     disabled={saveAllLoading || !hasPendingChanges}
@@ -3833,6 +3878,7 @@ export default function AlertSetting() {
                     }}
                 >
                     <div
+                        id="onboarding-alert-notify-modal"
                         className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -3841,6 +3887,7 @@ export default function AlertSetting() {
                                 Notification Settings
                             </h3>
                             <button
+                                id="onboarding-alert-notify-close"
                                 type="button"
                                 onClick={() => {
                                     if (!notifySettingsSaving) {

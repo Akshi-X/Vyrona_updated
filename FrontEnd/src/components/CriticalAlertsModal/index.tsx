@@ -248,6 +248,19 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
     const getAcknowledgementGroupId = (alert: CriticalAlert): string =>
         alert.status === "Acknowledged" ? "acknowledged" : "active";
 
+    let firstActiveGroupKey: string | undefined;
+    outerLoop: for (const dateGroups of Object.values(groupedAlerts)) {
+        for (const alert of dateGroups) {
+            if (alert.status === "Active") {
+                const tankGroupId = getTankGroupId(alert);
+                const kpiConfigId = getKpiConfigId(alert);
+                const label = getDateLabel(alert.timestamp);
+                firstActiveGroupKey = `${label}__${tankGroupId}__${kpiConfigId}__active`;
+                break outerLoop;
+            }
+        }
+    }
+
     const groupedByDateAndKpi = Object.entries(groupedAlerts).reduce<
         Record<
             string,
@@ -712,6 +725,7 @@ const CriticalAlertsModal: React.FC<CriticalAlertsModalProps> = ({
                                                     {(onAcknowledge || onAcknowledgeAll) && (
                                                         activeGroupAlertIds.length > 0 ? (
                                                             <button
+                                                                id={group.groupKey === firstActiveGroupKey ? "onboarding-critical-alert-ack-btn" : undefined}
                                                                 onClick={(e) => { e.stopPropagation(); handleAcknowledgeRequest(activeGroupAlertIds); }}
                                                                 disabled={isAcknowledgingGroup}
                                                                 className={`px-3 py-1 text-xs font-semibold rounded-4xl transition-colors whitespace-nowrap ${isAcknowledgingGroup ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-[#6b1176] text-white hover:bg-[#5a0f66]"}`}
