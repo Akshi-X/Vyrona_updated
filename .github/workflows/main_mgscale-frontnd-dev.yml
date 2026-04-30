@@ -48,4 +48,4 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: mgscale-frontnd-dev
-          package: FrontEnd/dist
+          package: dist
