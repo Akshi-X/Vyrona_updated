@@ -309,9 +309,17 @@ function getKpiLabelFromLimits(limitGroup: unknown, kpiName: string): string {
 
 interface IVFQualityTrackingChartProps {
   canisterNumber?: string;
+  selectedKpiKey?: string | null;
+  hideTabs?: boolean;
+  onClose?: () => void;
 }
 
-export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTrackingChartProps) {
+export default function IVFQualityTrackingChart({
+  canisterNumber,
+  selectedKpiKey,
+  hideTabs = false,
+  onClose,
+}: IVFQualityTrackingChartProps) {
   const tankId = canisterNumber != null ? String(canisterNumber) : undefined;
   const { token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
@@ -347,6 +355,10 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
 
   const timeRangeConfig = TIME_RANGES.find((r) => r.id === timeRange) ?? TIME_RANGES[0];
   timeRangeRef.current = timeRange;
+  const activeTabLabel = useMemo(() => {
+    if (!activeTab) return '';
+    return kpiTabs.find((tab) => tab.id === activeTab)?.label ?? kpiNameToLabel(activeTab);
+  }, [activeTab, kpiTabs]);
   /** LIVE = last 10 min; 1H/24H/7D = filter by time window; CUSTOM = filter by selected dates. */
   const displayReadings = useMemo(() => {
     if (timeRange === 'CUSTOM') {
@@ -468,6 +480,14 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
         setHasLoadedKpiConfig(true);
       });
   }, [tankId]);
+
+  useEffect(() => {
+    if (!selectedKpiKey) return;
+    if (!kpiTabs.length) return;
+    if (kpiTabs.some((tab) => tab.id === selectedKpiKey) && activeTab !== selectedKpiKey) {
+      setActiveTab(selectedKpiKey);
+    }
+  }, [selectedKpiKey, kpiTabs, activeTab]);
 
   // Fetch KPI history when tank or time range changes. LIVE = raw limit. 1H/24H/7D = aggregated. CUSTOM = raw from selected start.
   useEffect(() => {
@@ -1242,7 +1262,12 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
   return (
     <div id="onboarding-ivf-quality-chart" className="w-full min-w-0 min-h-[360px] h-full flex flex-col bg-white border border-[#E7E1E1] rounded-lg p-4">
       <div className="flex items-center justify-between mb-1 shrink-0">
-        <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-black text-[16px]">Quality Tracking</h3>
+          {hideTabs && activeTabLabel && (
+            <span className="text-xs text-gray-500">{activeTabLabel}</span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {isConnected && wsRef.current?.readyState === WebSocket.OPEN && (
             <span className="text-xs text-green-600">● Connected</span>
@@ -1251,31 +1276,45 @@ export default function IVFQualityTrackingChart({ canisterNumber }: IVFQualityTr
             <span className="text-xs text-yellow-600">● Connecting...</span>
           )}
           {error && <span className="text-xs text-red-600">● {error}</span>}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-1 inline-flex items-center justify-center h-7 w-7 rounded-md border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300"
+              aria-label="Close chart"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6l-12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {/* KPI Tabs (from DB kpi_config when available) */}
-      <div id="onboarding-chart-kpi-tabs" className="flex gap-1 mb-3 flex-wrap">
-        {!hasLoadedKpiConfig ? (
-          <span className="text-xs text-[#7C7C7C]">Loading...</span>
-        ) : (
-          kpiTabs.map((tab) => (
-            <button
-              key={tab.id}
-              id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-purple-100 border-purple-300 text-purple-900'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))
-        )}
-      </div>
+      {!hideTabs && (
+        <div id="onboarding-chart-kpi-tabs" className="flex gap-1 mb-3 flex-wrap">
+          {!hasLoadedKpiConfig ? (
+            <span className="text-xs text-[#7C7C7C]">Loading...</span>
+          ) : (
+            kpiTabs.map((tab) => (
+              <button
+                key={tab.id}
+                id={tab.id === 'ln2_level' ? 'onboarding-chart-tab-ln2' : undefined}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-purple-100 border-purple-300 text-purple-900'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {error && !isConnected && (
         <div className="text-red-500 text-xs mb-2" role="alert">
