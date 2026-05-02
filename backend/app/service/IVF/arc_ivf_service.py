@@ -16,7 +16,13 @@ from ...models.IVF.hospital_model import Hospital
 from ...models.IVF.hospital_branch_model import HospitalBranch
 from ...models.IVF.tank_model import Tank
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
-from ...utils.ivf_helpers import encrypt_sensitive_ivf_value
+from ...utils.ivf_helpers import (
+    encrypt_sensitive_ivf_value,
+    extract_tank_code_from_cryolock_number,
+    extract_canister_code_from_cryolock_number,
+    extract_cane_code_from_cryolock_number,
+    extract_position_from_cryolock_number,
+)
 from ...utils.reservoir_utils import ensure_branch_reservoir
 
 logger = logging.getLogger(__name__)
@@ -256,148 +262,16 @@ class ARCIVFService:
             }
     
     def _extract_tank_code_from_cryolock_number(self, cryolock_number: str) -> Optional[str]:
-        """
-        Extract tank code from ARC API cryolock number format.
-        
-        ARC API format: "T10/C2/B14/1" where:
-        - T10 = Tank Number (first segment)
-        - C2 = Canister Number
-        - B14 = Location (cane identifier)
-        - 1 = Cryolock Serial Number
-        
-        Args:
-            cryolock_number: Cryolock number string from ARC API (e.g., "T10/C2/B14/1")
-        
-        Returns:
-            Tank code (string) or None if cannot be extracted
-        """
-        if not cryolock_number:
-            return None
-        
-        try:
-            # Remove trailing slashes and split by '/'
-            cleaned = cryolock_number.rstrip('/')
-            parts = cleaned.split('/')
-            
-            if len(parts) > 0:
-                tank_code = parts[0].strip()
-                return tank_code if tank_code else None
-        except (ValueError, AttributeError, Exception) as e:
-            logger.warning(f"Could not extract tank code from cryolock_number: {cryolock_number}. Error: {e}")
-        
-        return None
-    
+        return extract_tank_code_from_cryolock_number(cryolock_number)
+
     def _extract_canister_code_from_cryolock_number(self, cryolock_number: str) -> Optional[str]:
-        """
-        Extract canister code from ARC API cryolock number format.
-        
-        ARC API format: "T10/C2/B14/1" where:
-        - T10 = Tank Number
-        - C2 = Canister Number (second segment)
-        - B14 = Location (cane identifier)
-        - 1 = Cryolock Serial Number
-        
-        Args:
-            cryolock_number: Cryolock number string from ARC API (e.g., "T10/C2/B14/1")
-        
-        Returns:
-            Canister code (string) or None if cannot be extracted
-        """
-        if not cryolock_number:
-            return None
-        
-        try:
-            # Remove trailing slashes and split by '/'
-            cleaned = cryolock_number.rstrip('/')
-            parts = cleaned.split('/')
-            
-            if len(parts) > 1:
-                canister_code = parts[1].strip()
-                return canister_code if canister_code else None
-        except (ValueError, AttributeError, Exception) as e:
-            logger.warning(f"Could not extract canister code from cryolock_number: {cryolock_number}. Error: {e}")
-        
-        return None
-    
+        return extract_canister_code_from_cryolock_number(cryolock_number)
+
     def _extract_location_from_cryolock_number(self, cryolock_number: str) -> Optional[str]:
-        """
-        Extract location (cane identifier) from ARC API cryolock number format.
-        
-        ARC API format: "T10/C2/B14/1" where:
-        - T10 = Tank Number
-        - C2 = Canister Number  
-        - B14 = Location (cane identifier/location within canister)
-        - 1 = Cryolock Serial Number
-        
-        The Location (B14, A11, etc.) represents the cane identifier and should be stored as cane_code.
-        
-        Args:
-            cryolock_number: Cryolock number string from ARC API (e.g., "T10/C2/B14/1")
-        
-        Returns:
-            Location/cane code (string) or None if cannot be extracted
-        """
-        if not cryolock_number:
-            return None
-        
-        try:
-            # Remove trailing slashes and split by '/'
-            cleaned = cryolock_number.rstrip('/')
-            parts = cleaned.split('/')
-            
-            # Third segment is Location (cane identifier)
-            if len(parts) > 2:
-                location = parts[2].strip()
-                return location if location else None
-        except (ValueError, AttributeError, Exception) as e:
-            logger.warning(f"Could not extract location from cryolock_number: {cryolock_number}. Error: {e}")
-        
-        return None
-    
+        return extract_cane_code_from_cryolock_number(cryolock_number)
+
     def _extract_position_from_cryolock_number(self, cryolock_number: str) -> Optional[int]:
-        """
-        Extract position number (Cryolock Serial Number) from ARC API cryolock number format.
-        
-        ARC API format: "T10/C2/B14/1" where:
-        - T10 = Tank Number
-        - C2 = Canister Number
-        - B14 = Location (cane identifier)
-        - 1 = Cryolock Serial Number (last segment, numeric)
-        
-        If the last segment is not a pure numeric value, return None to skip the record.
-        
-        Args:
-            cryolock_number: Cryolock number string from ARC API (e.g., "T10/C2/B14/1")
-        
-        Returns:
-            Position number/Cryolock Serial Number (integer) or None if cannot be extracted (will skip record)
-        """
-        if not cryolock_number:
-            return None
-        
-        try:
-            # Remove trailing slashes and split by '/'
-            cleaned = cryolock_number.rstrip('/')
-            parts = cleaned.split('/')
-            
-            if len(parts) > 0:
-                last_part = parts[-1].strip()
-                
-                # Only accept pure numeric values (e.g., "2", "15", "8")
-                # Reject alphanumeric values (e.g., "I3", "D15", "A8")
-                try:
-                    return int(last_part)
-                except ValueError:
-                    # Last segment is not numeric, skip this record
-                    logger.warning(
-                        f"Skipping record: cryolockNumber '{cryolock_number}' does not have a numeric position. "
-                        f"Last segment '{last_part}' is not numeric."
-                    )
-                    return None
-        except (ValueError, AttributeError, Exception) as e:
-            logger.warning(f"Could not extract position from cryolock_number: {cryolock_number}. Error: {e}")
-        
-        return None
+        return extract_position_from_cryolock_number(cryolock_number)
     
     def save_ivf_storage_to_db(
         self,

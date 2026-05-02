@@ -58,7 +58,7 @@ def push_patient_cryolock_update(
 
     service = HMSIntegrationService(db)
     results: List[HMSCryolockItemResult] = []
-    counters = {"created": 0, "updated": 0, "moved": 0, "noop": 0, "skipped": 0, "failed": 0}
+    counters = {"created": 0, "updated": 0, "noop": 0, "skipped": 0, "failed": 0}
 
     for item in items:
         outcome = service.apply_cryolock_update(item, hospital_id, user)
@@ -66,7 +66,6 @@ def push_patient_cryolock_update(
             status=outcome["status"],
             operation=outcome.get("operation"),
             patient_crylock_id=outcome.get("patient_crylock_id"),
-            old_patient_crylock_id=outcome.get("old_patient_crylock_id"),
             tank_id=outcome.get("tank_id"),
             branch_id=outcome.get("branch_id"),
             reason=outcome.get("reason"),
@@ -85,7 +84,6 @@ def push_patient_cryolock_update(
         accepted=len(items),
         created=counters["created"],
         updated=counters["updated"],
-        moved=counters["moved"],
         noop=counters["noop"],
         skipped=counters["skipped"],
         failed=counters["failed"],
