@@ -714,7 +714,13 @@ class CriticalAlertService:
                     is_hospital_whatsapp_configured,
                 ) = self._get_hospital_notification_config(alert.hospital_id)
                 if is_hospital_email_configured:
-                    self._send_alert_email(alert)
+                    if kpi_config.unack_escalation_threshold is not None:
+                        # Escalation mode: initial alert goes to branch users only.
+                        # Admins/Managers are notified when unack_escalation_threshold is reached.
+                        self._send_alert_email_to_users_only(alert)
+                    else:
+                        # Original behavior: Managers + Admins + branch Users all notified.
+                        self._send_alert_email(alert)
                 else:
                     logger.info(
                         "Skipping email for alert_id=%s because hospital_id=%s has email notifications disabled",
@@ -728,6 +734,59 @@ class CriticalAlertService:
                         "Skipping WhatsApp for alert_id=%s because hospital_id=%s has whatsapp notifications disabled",
                         alert.alert_id,
                         alert.hospital_id,
+                    )
+
+            # Escalation check: fires a background email to Admins/Managers when N
+            # consecutive unacknowledged alerts exist for this KPI.
+            if kpi_config.unack_escalation_threshold is not None:
+                if self._check_escalation_needed(kpi_config, tank_id):
+                    dedup_prefix = f"{tank_id}:{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+                    unack_alerts = (
+                        self.db.query(CriticalAlert)
+                        .filter(
+                            CriticalAlert.tank_id == tank_id,
+                            CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                            or_(
+                                CriticalAlert.dedup_key.like(dedup_prefix),
+                                CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                            ),
+                            CriticalAlert.status == AlertStatus.ACTIVE.value,
+                        )
+                        .order_by(CriticalAlert.created_at.desc())
+                        .limit(int(kpi_config.unack_escalation_threshold))
+                        .all()
+                    )
+                    kpi_cfg_id = kpi_config.id
+                    alerts_snapshot = list(unack_alerts)
+                    count = len(alerts_snapshot)
+
+                    def _escalation_bg(
+                        kpi_id=kpi_cfg_id, tid=tank_id, c=count, a=alerts_snapshot
+                    ):
+                        bg_db = SessionLocal()
+                        try:
+                            bg_kpi = (
+                                bg_db.query(KpiConfig)
+                                .filter(KpiConfig.id == kpi_id)
+                                .first()
+                            )
+                            if bg_kpi:
+                                CriticalAlertService(bg_db)._send_escalation_email_to_admins(
+                                    bg_kpi, tid, c, a
+                                )
+                                bg_db.commit()
+                        except Exception as exc:
+                            logger.error(
+                                "Escalation email failed for kpi_config_id=%s: %s",
+                                kpi_id, exc, exc_info=True,
+                            )
+                        finally:
+                            bg_db.close()
+
+                    threading.Thread(target=_escalation_bg, daemon=True).start()
+                    logger.info(
+                        "Started escalation email thread for kpi_config_id=%s tank_id=%s (%s unacknowledged)",
+                        kpi_config.id, tank_id, count,
                     )
 
             deviation.alert_id = alert.alert_id
@@ -1163,6 +1222,128 @@ class CriticalAlertService:
             except Exception as e:
                 logger.error(f"Failed to send alert email to {user.email}: {str(e)}")
 
+    def _send_alert_email_to_users_only(self, alert: CriticalAlert):
+        """Send critical alert email to branch Users only (role=User).
+        Used when escalation mode is active — Admins/Managers are notified separately once the
+        unack_escalation_threshold is reached."""
+        if alert.severity != AlertSeverity.HIGH.value:
+            logger.debug(
+                f"Skipping users-only email for non-critical alert_id={alert.alert_id} (severity={alert.severity})"
+            )
+            return
+
+        tank = self.db.query(Tank).filter(Tank.tank_id == alert.tank_id).first()
+        if not tank:
+            return
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == tank.branch_id)
+            .first()
+        )
+        if not branch:
+            return
+
+        branch_users = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role == "User",
+                User.branch_id == tank.branch_id,
+                User.status == True,
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+
+        if not branch_users:
+            logger.info(
+                "No branch users found for tank_id=%s branch_id=%s — skipping users-only alert email",
+                alert.tank_id,
+                tank.branch_id,
+            )
+            return
+
+        alerts_url = f"{settings.FRONTEND_URL}/dashboard?alert_id={alert.alert_id}"
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        try:
+            template = jinja_env.get_template("critical_alert_email.html")
+        except Exception as e:
+            logger.error(f"Failed to load alert email template: {str(e)}")
+            template = None
+
+        severity_class = "high-severity"
+        if alert.severity == "Medium":
+            severity_class = "medium-severity"
+        elif alert.severity == "Low":
+            severity_class = "low-severity"
+
+        tank_code = tank.tank_code or f"Tank-{tank.tank_id}"
+
+        for user in branch_users:
+            try:
+                subject = f"Critical Alert: {alert.alert_type} - {alert.severity} Severity - {tank_code}"
+                ist = timezone(timedelta(hours=5, minutes=30))
+                utc_time = alert.occurred_at.replace(tzinfo=timezone.utc)
+                timestamp_string = utc_time.astimezone(ist).strftime("%Y-%m-%d %H:%M:%S IST")
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        alert_type=alert.alert_type,
+                        severity=alert.severity,
+                        tank_id=alert.tank_id,
+                        tank_code=tank_code,
+                        branch_name=branch.branch_name or "N/A",
+                        message=alert.message,
+                        occurred_at=timestamp_string,
+                        acknowledge_url=alerts_url,
+                        severity_class=severity_class,
+                    )
+                else:
+                    html_body = f"""
+                    <html><body>
+                        <h2>Critical Alert Notification</h2>
+                        <p><strong>Alert Type:</strong> {alert.alert_type}</p>
+                        <p><strong>Severity:</strong> {alert.severity}</p>
+                        <p><strong>Tank:</strong> {tank_code}</p>
+                        <p><strong>Branch:</strong> {branch.branch_name or "N/A"}</p>
+                        <p><strong>Message:</strong> {alert.message}</p>
+                        <p><strong>Occurred At:</strong> {timestamp_string}</p>
+                        <br/>
+                        <a href="{alerts_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Alerts</a>
+                    </body></html>
+                    """
+
+                send_email(user.email, subject, html_body)
+                logger.info(
+                    f"Sent users-only alert email to {user.email} for alert_id={alert.alert_id}"
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="email.critical_alert_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "email_subject": subject,
+                        "alert_id": alert.alert_id,
+                        "alert_type": alert.alert_type,
+                        "severity": alert.severity,
+                        "message": alert.message,
+                        "occurred_at": timestamp_string,
+                        "tank_id": alert.tank_id,
+                        "tank_code": tank_code,
+                        "branch_id": branch.branch_id,
+                        "branch_name": branch.branch_name,
+                        "escalation_mode": True,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Failed to send users-only alert email to {user.email}: {str(e)}")
+
     def _send_alert_whatsapp(self, alert: CriticalAlert):
         """Send WhatsApp notification via Twilio for critical (High severity) alerts only.
         Recipients: all Managers across the hospital + Users in the tank's branch."""
@@ -1279,6 +1460,199 @@ class CriticalAlertService:
                     alert.alert_id,
                     str(e),
                 )
+
+    def _check_escalation_needed(self, kpi_config, tank_id: int) -> bool:
+        """Return True when N consecutive unacknowledged alerts exist for a KPI and the
+        escalation cooldown has passed. Returns False if escalation is disabled (threshold=None)."""
+        if kpi_config.unack_escalation_threshold is None:
+            return False
+
+        threshold = int(kpi_config.unack_escalation_threshold)
+        dedup_prefix = f"{tank_id}:{AlertSource.KPI.value}:{AlertType.DEVIATION_ALERT.value}:%:{kpi_config.id}"
+
+        unack_count = (
+            self.db.query(CriticalAlert)
+            .filter(
+                CriticalAlert.tank_id == tank_id,
+                CriticalAlert.alert_type == AlertType.DEVIATION_ALERT.value,
+                or_(
+                    CriticalAlert.dedup_key.like(dedup_prefix),
+                    CriticalAlert.dedup_key.like(f"{dedup_prefix}:%"),
+                ),
+                CriticalAlert.status == AlertStatus.ACTIVE.value,
+            )
+            .count()
+        )
+
+        if unack_count < threshold:
+            logger.info(
+                "Escalation not triggered for kpi_config_id=%s tank_id=%s: %s unacknowledged < threshold %s",
+                kpi_config.id, tank_id, unack_count, threshold,
+            )
+            return False
+
+        # Spam gate: don't re-escalate until threshold * cooldown_minutes has elapsed
+        if kpi_config.last_escalation_sent_at is not None:
+            last_sent = kpi_config.last_escalation_sent_at
+            if not last_sent.tzinfo:
+                last_sent = last_sent.replace(tzinfo=timezone.utc)
+            cooldown_secs = threshold * (
+                int(kpi_config.cooldown_minutes) * 60
+                if kpi_config.cooldown_minutes is not None
+                else 3600
+            )
+            elapsed = (datetime.now(timezone.utc) - last_sent).total_seconds()
+            if elapsed < cooldown_secs:
+                logger.info(
+                    "Skipping escalation for kpi_config_id=%s; last sent %.0fs ago (cooldown=%.0fs)",
+                    kpi_config.id, elapsed, cooldown_secs,
+                )
+                return False
+
+        logger.info(
+            "Escalation triggered for kpi_config_id=%s tank_id=%s: %s unacknowledged alerts >= threshold %s",
+            kpi_config.id, tank_id, unack_count, threshold,
+        )
+        return True
+
+    def _send_escalation_email_to_admins(
+        self, kpi_config, tank_id: int, unack_count: int, alerts: list
+    ):
+        """Send escalation email to Admins and Managers when N unacknowledged KPI alerts exist.
+        Updates kpi_config.last_escalation_sent_at — caller is responsible for db.commit()."""
+        tank = self.db.query(Tank).filter(Tank.tank_id == tank_id).first()
+        if not tank:
+            return
+
+        branch = (
+            self.db.query(HospitalBranch)
+            .filter(HospitalBranch.branch_id == tank.branch_id)
+            .first()
+        )
+        if not branch:
+            return
+
+        hospital_id = branch.hospital_id
+        is_email_enabled, _ = self._get_hospital_notification_config(hospital_id)
+        if not is_email_enabled:
+            logger.info(
+                "Skipping escalation email — hospital_id=%s has email notifications disabled", hospital_id
+            )
+            return
+
+        all_branch_ids = [
+            b.branch_id
+            for b in self.db.query(HospitalBranch)
+            .filter(HospitalBranch.hospital_id == hospital_id)
+            .all()
+        ]
+        recipients = (
+            self.db.query(User)
+            .filter(
+                User.department == "IVF",
+                User.role.in_(["Manager", "Admin"]),
+                User.branch_id.in_(all_branch_ids),
+                User.status == True,
+                User.approved_status == ApprovalStatus.APPROVED,
+            )
+            .all()
+        )
+        recipients = list({u.user_id: u for u in recipients}.values())
+
+        if not recipients:
+            logger.warning(
+                "No admin/manager recipients for escalation — kpi_config_id=%s tank_id=%s",
+                kpi_config.id, tank_id,
+            )
+            return
+
+        tank_code = tank.tank_code or f"Tank-{tank_id}"
+        acknowledge_url = f"{settings.FRONTEND_URL}/dashboard"
+        template_dir = Path(__file__).parent.parent.parent / "templates" / "emails"
+        jinja_env = Environment(loader=FileSystemLoader(str(template_dir)))
+
+        try:
+            template = jinja_env.get_template("kpi_escalation_email.html")
+        except Exception as e:
+            logger.error(f"Failed to load escalation email template: {str(e)}")
+            template = None
+
+        ist = timezone(timedelta(hours=5, minutes=30))
+        alert_data = []
+        for a in alerts:
+            try:
+                utc_ts = a.occurred_at.replace(tzinfo=timezone.utc)
+                hours_since = int((datetime.now(timezone.utc) - utc_ts).total_seconds() / 3600)
+                alert_data.append({
+                    "alert_id": a.alert_id,
+                    "severity": a.severity,
+                    "message": a.message,
+                    "occurred_at": utc_ts.astimezone(ist).strftime("%Y-%m-%d %H:%M:%S IST"),
+                    "hours_since": hours_since,
+                })
+            except Exception:
+                pass
+
+        subject = (
+            f"Escalation: {unack_count} Unacknowledged Alerts — "
+            f"{kpi_config.alert_name or kpi_config.kpi_name} — {tank_code}"
+        )
+
+        for user in recipients:
+            try:
+                if template:
+                    html_body = template.render(
+                        subject=subject,
+                        kpi_name=kpi_config.alert_name or kpi_config.kpi_name,
+                        tank_code=tank_code,
+                        branch_name=branch.branch_name or "N/A",
+                        unack_count=unack_count,
+                        threshold=kpi_config.unack_escalation_threshold,
+                        alerts=alert_data,
+                        acknowledge_url=acknowledge_url,
+                    )
+                else:
+                    alert_rows = "".join(
+                        f"<li>{a['occurred_at']} — {a['message']}</li>" for a in alert_data
+                    )
+                    html_body = f"""
+                    <html><body>
+                        <h2>Escalation: {unack_count} Unacknowledged Alerts</h2>
+                        <p><strong>KPI:</strong> {kpi_config.alert_name or kpi_config.kpi_name}</p>
+                        <p><strong>Tank:</strong> {tank_code} — {branch.branch_name or "N/A"}</p>
+                        <p><strong>Threshold:</strong> {kpi_config.unack_escalation_threshold} consecutive unacknowledged alerts</p>
+                        <ul>{alert_rows}</ul>
+                        <a href="{acknowledge_url}">View &amp; Acknowledge</a>
+                    </body></html>
+                    """
+
+                send_email(user.email, subject, html_body)
+                logger.info(
+                    "Sent escalation email to %s for kpi_config_id=%s tank_id=%s",
+                    user.email, kpi_config.id, tank_id,
+                )
+                ActivityLogService(self.db).log_activity(
+                    action="email.escalation_sent",
+                    outcome=ActivityOutcome.SUCCESS.value,
+                    actor=build_system_actor("critical_alert"),
+                    target=build_target("user", user.user_id, user.email),
+                    metadata={
+                        "recipient_email": user.email,
+                        "recipient_user_id": user.user_id,
+                        "kpi_config_id": kpi_config.id,
+                        "kpi_name": kpi_config.kpi_name,
+                        "tank_id": tank_id,
+                        "tank_code": tank_code,
+                        "unack_count": unack_count,
+                        "threshold": kpi_config.unack_escalation_threshold,
+                    },
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to send escalation email to %s: %s", user.email, str(e)
+                )
+
+        kpi_config.last_escalation_sent_at = datetime.now(timezone.utc)
 
     def _count_occurrences(
         self, tank_id: int, violation_type: str, occurred_at: datetime
