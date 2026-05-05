@@ -263,7 +263,8 @@ class IVFService:
                     "tank_code": tank.tank_code or "",
                     "updated_at": latest_activity_at,
                     "status": calculated_status,
-                    "deviations": total_deviations
+                    "deviations": total_deviations,
+                    "is_incubator": tank.is_incubator,
                 })
                 total_tanks += 1
 
