@@ -16,7 +16,7 @@ from ..config.database import SessionLocal
 from ..config.permissions import EndpointPermissions
 from ..models.user_model import User
 from ..constants.error_codes import ERROR_CODES
-from ..constants.app_constants import COMMON_API_HEADERS
+from ..constants.app_constants import COMMON_API_HEADERS, INTEGRATION_TOKEN_PURPOSE
 from ..utils.user_helpers import is_hospital_department
 from ..exceptions import (
     InvalidTokenException,
@@ -93,6 +93,21 @@ class TokenValidationMiddleware(BaseHTTPMiddleware):
             # Verify token and get payload
             payload = verify_token(token)
             request.state.audit_log_disabled = bool(payload.get("audit_log_disabled"))
+
+            # Integration tokens (e.g. HMS) carry purpose=hms_integration and a jti.
+            # They must exist in integration_api_tokens, not be revoked, and not be expired.
+            if payload.get("purpose") == INTEGRATION_TOKEN_PURPOSE:
+                jti = payload.get("jti")
+                if not jti:
+                    raise InvalidTokenException("Integration token missing jti")
+                from ..service.external.integration_auth_service import IntegrationAuthService
+                check_db = SessionLocal()
+                try:
+                    if not IntegrationAuthService(check_db).is_token_active(jti):
+                        raise InvalidTokenException("Integration token revoked or unknown")
+                    IntegrationAuthService(check_db).touch_last_used(jti)
+                finally:
+                    check_db.close()
             
             # Get user from database
             user_id = payload.get("sub")
