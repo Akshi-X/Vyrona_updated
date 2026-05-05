@@ -98,6 +98,7 @@ class TankBase(BaseModel):
     tank_code: Optional[str] = Field(None, description="Tank code")
     capacity_liters: Optional[float] = Field(None, description="Tank capacity in liters")
     is_active: bool = Field(default=True, description="Whether the tank is active")
+    is_incubator: bool = Field(default=False, description="True if this tank is an incubator, False for cryotanks")
     status: CanisterStatus = Field(default=CanisterStatus.SAFE, description="Tank status (safe, risk, critical)")
     created_by: Optional[str] = Field(None, description="User who created the record")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
@@ -113,6 +114,7 @@ class TankUpdate(BaseModel):
     tank_code: Optional[str] = Field(None, description="Tank code")
     capacity_liters: Optional[float] = Field(None, description="Tank capacity in liters")
     is_active: Optional[bool] = Field(None, description="Whether the tank is active")
+    is_incubator: Optional[bool] = Field(None, description="True if this tank is an incubator, False for cryotanks")
     status: Optional[CanisterStatus] = Field(None, description="Tank status (safe, risk, critical)")
     updated_by: Optional[str] = Field(None, description="User who last updated the record")
 
@@ -432,7 +434,8 @@ class ActiveTankItem(BaseModel):
     tank_code: str = Field(..., description="Tank code (e.g., 'T1')")
     updated_at: Optional[datetime] = Field(None, description="Last updated date and time from tanks table")
     status: CanisterStatus = Field(..., description="Tank status (safe, risk, critical)")
-    deviations: int = Field(...,description="Number of readings deviations")
+    deviations: int = Field(..., description="Number of readings deviations")
+    is_incubator: bool = Field(default=False, description="True if this tank is an incubator, False for cryotanks")
     class Config:
         from_attributes = True
 
