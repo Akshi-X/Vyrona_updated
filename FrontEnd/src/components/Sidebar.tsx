@@ -51,8 +51,8 @@ const isDropdown = (item: NavItem): item is NavGroup =>
 const DASHBOARD_CHILD_PATHS = [
     "/dashboard",
     "/ivf-track-shipment",
-    "/incubator-tracking",
-    "/embryo-grading",
+    // "/incubator-tracking",
+    // "/embryo-grading",
 ];
 
 const isDashboardRoute = (pathname: string) =>
@@ -70,14 +70,15 @@ const ALL_NAV_ITEMS: NavItem[] = [
         children: [
             { label: "Overview",                  path: "/dashboard"          },
             { label: "Cryocan Quality Tracking",  path: "/ivf-track-shipment" },
-            { label: "Incubator Tracking",         path: "/incubator-tracking" },
-            { label: "Embryo Grading",             path: "/embryo-grading"     },
+            // { label: "Incubator Tracking",         path: "/incubator-tracking" },
+            // { label: "Embryo Grading",             path: "/embryo-grading"     },
         ],
     },
     { icon: DatabaseIconWhite,    label: "Database",            path: "/database"      },
     { icon: ControlTowerIconWhite, label: "Control Tower",      path: "/control-tower" },
     { icon: "", lucideIcon: Users,    label: "Users",            path: "/users"         },
-{ icon: CriticalAlertsIcon,   label: "Alert Configuration", path: "/alert-setting" },
+    
+    { icon: CriticalAlertsIcon,   label: "Alert Configuration", path: "/alert-setting" },
     { icon: "", lucideIcon: Download, label: "Reports",         path: "/reports"       },
     { icon: ContainersIcon,       label: "Refill log",          path: "/refill-log"    },
 ];
