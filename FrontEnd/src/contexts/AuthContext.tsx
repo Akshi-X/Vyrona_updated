@@ -20,7 +20,7 @@ interface AuthContextType {
     onboardingCompleted: boolean | undefined;
     isEmailNotificationsEnabled: boolean;
     setIsEmailNotificationsEnabled: (enabled: boolean) => void;
-    login: (token: string, role?: string, rememberMe?: boolean) => void;
+    login: (token: string, role?: string, rememberMe?: boolean, onboardingCompleted?: boolean) => void;
     logout: () => void;
 }
 
@@ -323,6 +323,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         newToken: string,
         role?: string,
         rememberMe: boolean = false,
+        onboardingCompleted?: boolean,
     ) => {
         authUtils.setToken(newToken, rememberMe);
         setToken(newToken);
@@ -331,6 +332,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (role) {
             setUserRole(role);
             localStorage.setItem("user_role", role);
+        }
+
+        if (onboardingCompleted !== undefined) {
+            setOnboardingCompleted(onboardingCompleted);
+            localStorage.setItem("onboarding_completed", String(onboardingCompleted));
         }
 
         // Set session timeout

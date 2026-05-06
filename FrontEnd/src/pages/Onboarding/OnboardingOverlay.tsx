@@ -13,7 +13,7 @@ import LevelWelcomeCard from "./LevelWelcomeCard";
 export default function OnboardingOverlay() {
     const location  = useLocation();
     const { onboardingCompleted } = useAuth();
-    const { levels, getSteps, getQuiz, state } = useOnboarding();
+    const { levels, getSteps, getQuiz, state, isHydrating } = useOnboarding();
     const overallScore = levels.reduce((sum, l) => sum + (state.levels[l.id]?.highScore ?? 0), 0);
     const { isOpen: isTourOpen } = useTour();
     const tourNavCtx = useTourNavContext();
@@ -102,12 +102,13 @@ export default function OnboardingOverlay() {
 
     // Auto-open welcome on first dashboard landing (only if level-0 not yet completed and onboarding is still in progress)
     useEffect(() => {
+        if (isHydrating) return;
         if (onboardingCompleted !== false) return;
         if (location.pathname === "/onboarding/dashboard" && level0Status !== "completed") {
             setShowWelcome(true);
             setIsOpen(true);
         }
-    }, [location.pathname, level0Status, onboardingCompleted]);
+    }, [location.pathname, level0Status, onboardingCompleted, isHydrating]);
 
     const [showTimeline, setShowTimeline] = useState(false);
 
@@ -266,7 +267,11 @@ export default function OnboardingOverlay() {
 
                         {/* Content */}
                         <div className="mt-6 max-h-[70vh] overflow-y-auto pr-2">
-                            {renderContent()}
+                            {isHydrating ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#6b1176] border-t-transparent" />
+                                </div>
+                            ) : renderContent()}
                         </div>
                     </div>
                 </div>
