@@ -113,6 +113,7 @@ export interface KpiConfigRow {
     unit: string | null;
     alert_type: string | null;
     cooldown_minutes: number;
+    unack_escalation_threshold: number | null;
     status: boolean;
 }
 
@@ -130,6 +131,7 @@ export interface KpiConfigPayload {
     unit?: string | null;
     alert_type?: string | null;
     cooldown_minutes?: number;
+    unack_escalation_threshold?: number | null;
     status?: boolean;
 }
 
@@ -625,6 +627,7 @@ export class IvfService extends BaseApiService {
             unit?: string | null;
             alert_type?: string | null;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
             status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {

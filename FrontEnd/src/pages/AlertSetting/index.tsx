@@ -707,6 +707,7 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         >
     >({});
@@ -720,6 +721,7 @@ export default function AlertSetting() {
                 alert_type?: string | null;
                 lid_state?: string;
                 cooldown_minutes?: number;
+                unack_escalation_threshold?: number | null;
             }
         >
     >({});
@@ -939,6 +941,7 @@ export default function AlertSetting() {
                 max: row.max ?? null,
                 alert_type: row.alert_type ?? null,
                 cooldown_minutes: row.cooldown_minutes ?? 60,
+                unack_escalation_threshold: row.unack_escalation_threshold ?? null,
             };
 
             if (cfg.custom_dropdown) {
@@ -1363,6 +1366,7 @@ export default function AlertSetting() {
                         unit: metadata.unit ?? null,
                         alert_type: d.alert_type ?? null,
                         cooldown_minutes: d.cooldown_minutes,
+                        unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                         status: isActiveAlertType(d.alert_type ?? null),
                     });
                 }
@@ -1437,6 +1441,7 @@ export default function AlertSetting() {
                         d.cooldown_minutes !== undefined
                             ? d.cooldown_minutes
                             : undefined,
+                    unack_escalation_threshold: nextAlertType === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                     status: isActiveAlertType(nextAlertType),
                 });
             }
@@ -1488,6 +1493,7 @@ export default function AlertSetting() {
                             unit: metadata.unit ?? null,
                             alert_type: d.alert_type ?? null,
                             cooldown_minutes: d.cooldown_minutes,
+                            unack_escalation_threshold: d.alert_type === "critical" ? (d.unack_escalation_threshold ?? null) : null,
                             status: isActiveAlertType(d.alert_type ?? null),
                         });
                     }
@@ -2283,8 +2289,9 @@ export default function AlertSetting() {
                                                                                                             setMultiDraft(
                                                                                                                 kpiName,
                                                                                                                 {
-                                                                                                                    alert_type:
-                                                                                                                        v,
+                                                                                                                    alert_type: v,
+                                                                                                                    // Clear escalation threshold when moving away from critical
+                                                                                                                    ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                                 },
                                                                                                             );
                                                                                                             setOpenDropdowns(
@@ -2366,6 +2373,36 @@ export default function AlertSetting() {
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
                                                                                     </label>
+                                                                                )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {isCritical && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={d.unack_escalation_threshold ?? ""}
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setMultiDraft(kpiName, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {d.unack_escalation_threshold === null || d.unack_escalation_threshold === undefined
+                                                                                                    ? "disabled"
+                                                                                                    : d.unack_escalation_threshold === 0
+                                                                                                    ? "⚡ immediate"
+                                                                                                    : `after ${d.unack_escalation_threshold} unack`}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 )}
                                                                                 </div>
                                                                             </div>
@@ -2599,8 +2636,9 @@ export default function AlertSetting() {
                                                                                                             setDraft(
                                                                                                                 r.id,
                                                                                                                 {
-                                                                                                                    alert_type:
-                                                                                                                        v,
+                                                                                                                    alert_type: v,
+                                                                                                                    // Clear escalation threshold when moving away from critical
+                                                                                                                    ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                                 },
                                                                                                             );
                                                                                                             setOpenDropdowns(
@@ -2682,6 +2720,39 @@ export default function AlertSetting() {
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
                                                                                     </label>
+                                                                                )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {isCritical && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={
+                                                                                                    (d.unack_escalation_threshold !== undefined
+                                                                                                        ? d.unack_escalation_threshold
+                                                                                                        : r.unack_escalation_threshold) ?? ""
+                                                                                                }
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setDraft(r.id, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {(() => {
+                                                                                                    const v = d.unack_escalation_threshold !== undefined ? d.unack_escalation_threshold : r.unack_escalation_threshold;
+                                                                                                    return v === null || v === undefined ? "disabled" : v === 0 ? "⚡ immediate" : `after ${v} unack`;
+                                                                                                })()}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 )}
                                                                                 </div>
                                                                             </div>
@@ -2844,8 +2915,9 @@ export default function AlertSetting() {
                                                                                                         setMultiDraft(
                                                                                                             kpiName,
                                                                                                             {
-                                                                                                                alert_type:
-                                                                                                                    v,
+                                                                                                                alert_type: v,
+                                                                                                                // Clear escalation threshold when moving away from critical
+                                                                                                                ...(v !== "critical" && { unack_escalation_threshold: null }),
                                                                                                             },
                                                                                                         );
                                                                                                         setOpenDropdowns(
@@ -2927,6 +2999,36 @@ export default function AlertSetting() {
                                                                                         <span className="text-sm text-gray-500 shrink-0">mins</span>
                                                                                         </div>
                                                                                     </label>
+                                                                                )}
+                                                                                {/* Escalation Threshold — critical alerts only */}
+                                                                                {typeVal === "critical" && (
+                                                                                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg min-w-[100px]">
+                                                                                        <span className="text-[10px] text-orange-700 font-medium">Escalation</span>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                min={0}
+                                                                                                step={1}
+                                                                                                placeholder="—"
+                                                                                                value={d.unack_escalation_threshold ?? ""}
+                                                                                                onChange={(e) => {
+                                                                                                    const raw = e.target.value;
+                                                                                                    setMultiDraft(kpiName, {
+                                                                                                        unack_escalation_threshold: raw === "" ? null : Math.max(0, Math.round(Number(raw))),
+                                                                                                    });
+                                                                                                }}
+                                                                                                title="Send escalation email to admins/managers after N consecutive unacknowledged alerts. Leave empty to disable."
+                                                                                                className="w-10 text-sm text-orange-900 bg-transparent outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            />
+                                                                                            <span className="text-[10px] text-orange-600 whitespace-nowrap">
+                                                                                                {d.unack_escalation_threshold === null || d.unack_escalation_threshold === undefined
+                                                                                                    ? "disabled"
+                                                                                                    : d.unack_escalation_threshold === 0
+                                                                                                    ? "⚡ immediate"
+                                                                                                    : `after ${d.unack_escalation_threshold} unack`}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </div>
