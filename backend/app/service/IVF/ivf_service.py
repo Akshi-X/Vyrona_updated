@@ -16,6 +16,7 @@ from ...models.IVF.canister_ln2_log_model import CanisterLn2Log
 from ...models.IVF.ivf_shipment_model import IVFShipment
 from ...models.IVF.patient_crylock_info_model import PatientCrylockInfo
 from ...models.IVF.tank_model import Tank
+from ...models.IVF.incubator_model import Incubator
 from ...utils.ivf_helpers import decrypt_sensitive_ivf_value, encrypt_sensitive_ivf_value
 
 logger = logging.getLogger(__name__)
@@ -264,7 +265,6 @@ class IVFService:
                     "updated_at": latest_activity_at,
                     "status": calculated_status,
                     "deviations": total_deviations,
-                    "is_incubator": tank.is_incubator,
                 })
                 total_tanks += 1
 
@@ -280,6 +280,46 @@ class IVFService:
         except Exception as e:
             raise Exception(f"Error fetching active tanks: {str(e)}")
     
+    def get_active_incubators(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Get active incubators grouped by branch."""
+        try:
+            stmt = (
+                select(Incubator, HospitalBranch.branch_id, HospitalBranch.branch_name)
+                .join(HospitalBranch, Incubator.branch_id == HospitalBranch.branch_id)
+                .where(Incubator.is_active == True)
+            )
+            if hospital_id is not None:
+                stmt = stmt.where(Incubator.hospital_id == hospital_id)
+            if branch_id is not None:
+                stmt = stmt.where(Incubator.branch_id == branch_id)
+
+            results = self.db.execute(stmt).fetchall()
+
+            branches_dict: Dict[int, Any] = {}
+            total = 0
+            for incubator, b_id, b_name in results:
+                if b_id not in branches_dict:
+                    branches_dict[b_id] = {"branch_id": b_id, "branch_name": b_name or "Unknown", "incubators": []}
+                branches_dict[b_id]["incubators"].append({
+                    "incubator_id": incubator.incubator_id,
+                    "incubator_code": incubator.incubator_code,
+                    "external_id": incubator.external_id,
+                    "type": incubator.type,
+                    "chamber_r": incubator.chamber_r,
+                    "chamber_c": incubator.chamber_c,
+                    "updated_at": incubator.updated_at,
+                })
+                total += 1
+
+            branches_list = sorted(branches_dict.values(), key=lambda x: x["branch_name"])
+            return {"branches": branches_list, "total": total}
+        except Exception as e:
+            raise Exception(f"Error fetching active incubators: {str(e)}")
+
     def get_embryo_transfer_crylocks(self, branch_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Get all crylocks where embryo_transfer is True.

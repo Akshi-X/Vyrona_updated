@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Zap } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useTour } from "@reactour/tour";
+import { useAuth } from "../../contexts/AuthContext";
 import { useOnboarding } from "../../contexts/OnboardingContext";
 import { useTourNavContext } from "../../contexts/TourNavContext";
 import OnboardingWelcome from "./Welcome";
@@ -11,12 +12,17 @@ import LevelWelcomeCard from "./LevelWelcomeCard";
 
 export default function OnboardingOverlay() {
     const location  = useLocation();
+    const { onboardingCompleted } = useAuth();
     const { levels, getSteps, getQuiz, state } = useOnboarding();
     const overallScore = levels.reduce((sum, l) => sum + (state.levels[l.id]?.highScore ?? 0), 0);
     const { isOpen: isTourOpen } = useTour();
     const tourNavCtx = useTourNavContext();
 
-    const [isOpen, setIsOpen] = useState(() => location.pathname.startsWith("/onboarding/"));
+    // Open on reload only when onboarding is still in progress (onboarding_completed = false in localStorage).
+    // onboardingCompleted is seeded from localStorage synchronously by AuthContext before this renders.
+    const [isOpen, setIsOpen] = useState(() =>
+        onboardingCompleted === false && location.pathname.startsWith("/onboarding/")
+    );
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLevelWelcome, setShowLevelWelcome] = useState(false);
     const [levelWelcomeId, setLevelWelcomeId] = useState<string | null>(null);
@@ -94,13 +100,14 @@ export default function OnboardingOverlay() {
 
     const level0Status = state.levels["level-0"]?.status;
 
-    // Auto-open welcome on first dashboard landing (only if level-0 not yet completed)
+    // Auto-open welcome on first dashboard landing (only if level-0 not yet completed and onboarding is still in progress)
     useEffect(() => {
+        if (onboardingCompleted !== false) return;
         if (location.pathname === "/onboarding/dashboard" && level0Status !== "completed") {
             setShowWelcome(true);
             setIsOpen(true);
         }
-    }, [location.pathname, level0Status]);
+    }, [location.pathname, level0Status, onboardingCompleted]);
 
     const [showTimeline, setShowTimeline] = useState(false);
 
@@ -112,6 +119,7 @@ export default function OnboardingOverlay() {
     const prevTourCompleteRef = useRef(false);
     useEffect(() => {
         prevTourCompleteRef.current = tourComplete;
+        if (onboardingCompleted !== false) return;
         if (tourComplete && activeLevelId && activeLevelProgress?.status !== "completed") {
             const quiz = getQuiz(activeLevelId);
             const quizAttempted = quiz.length > 0 && (activeLevelProgress?.lastQuizIndex ?? 0) >= quiz.length;
@@ -122,7 +130,7 @@ export default function OnboardingOverlay() {
             setIsOpen(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tourComplete, activeLevelId, activeLevelProgress?.status, activeLevelProgress?.lastQuizIndex]);
+    }, [tourComplete, activeLevelId, activeLevelProgress?.status, activeLevelProgress?.lastQuizIndex, onboardingCompleted]);
 
     // When level-0 transitions to completed, hide welcome and show level-1's welcome card.
     // On reload (already completed), just hide welcome without re-showing the card.

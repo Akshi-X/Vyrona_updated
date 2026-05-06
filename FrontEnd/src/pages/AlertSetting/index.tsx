@@ -52,6 +52,9 @@ interface ContainerRow {
     status: string;
     date: string;
     is_incubator: boolean;
+    incubator_id?: number | null;
+    chamber_r?: number | null;
+    chamber_c?: number | null;
 }
 
 const KPI_NAMES = {
@@ -657,6 +660,7 @@ export default function AlertSetting() {
         ContainerRow[]
     >([]);
     const primaryContainer = selectedContainers[0] ?? null;
+    const [selectedChamberId, setSelectedChamberId] = useState<string | null>(null);
     const [showBranchDropdown, setShowBranchDropdown] = useState(false);
     const [selectedTankIds, setSelectedTankIds] = useState<number[]>([]);
     const [savingToBranches, setSavingToBranches] = useState(false);
@@ -753,16 +757,17 @@ export default function AlertSetting() {
     }, []);
 
     const refetchKpiConfig = useCallback(
-        async (tankId: number, options?: { showLoading?: boolean }) => {
+        async (id: number, options?: { showLoading?: boolean; isIncubator?: boolean }) => {
             if (options?.showLoading) setConfigLoading(true);
             try {
-                const res = await ivfService.getKpiConfigList(tankId);
+                const type = options?.isIncubator ? "incubator" : "tank";
+                const res = await ivfService.getKpiConfigList(id, type);
                 setConfigList(res?.config ?? []);
                 setTankContext({
                     hospital_id: res?.hospital_id ?? null,
                     branch_id: res?.branch_id ?? null,
                 });
-                setConfigLoadedTankId(tankId);
+                setConfigLoadedTankId(id);
                 return res;
             } finally {
                 if (options?.showLoading) setConfigLoading(false);
@@ -825,76 +830,59 @@ export default function AlertSetting() {
         if (!isAuthenticated) return;
         setContainersLoading(true);
         setContainersError(null);
-        shipmentService
-            .getActiveCanisters({})
-            .then((data: any) => {
+        setSelectedContainers([]);
+        setSelectedChamberId(null);
+
+        const fetchPromise = directionFilter === "incubators"
+            ? shipmentService.getActiveIncubators({}).then((data) => {
+                return data.branches.flatMap((branch) =>
+                    branch.incubators.map((inc) => ({
+                        tank_id: inc.incubator_id,
+                        canisterId: inc.incubator_code ?? String(inc.incubator_id),
+                        branchName: branch.branch_name,
+                        branch_id: branch.branch_id,
+                        status: "Safe" as const,
+                        date: inc.updated_at ? new Date(inc.updated_at).toLocaleDateString("en-GB") : "-",
+                        is_incubator: true,
+                        incubator_id: inc.incubator_id,
+                        chamber_r: inc.chamber_r,
+                        chamber_c: inc.chamber_c,
+                    }))
+                );
+            })
+            : shipmentService.getActiveCanisters({}).then((data: any) => {
                 let list: ContainerRow[] = [];
-                if (data?.canisters && Array.isArray(data.canisters)) {
-                    list = data.canisters.map((c: any) => ({
-                        tank_id: c.tank_id ?? c.canister_id,
-                        canisterId: String(
-                            c.canister_number ??
-                                c.canister_id ??
-                                c.tank_code ??
-                                "",
-                        ),
-                        branchName: c.branch_name ?? "N/A",
-                        branch_id: c.branch_id ?? 0,
-                        status:
-                            c.canister_status === "critical"
-                                ? "Critical"
-                                : c.canister_status === "risk"
-                                  ? "Risk"
-                                  : "Safe",
-                        date: c.updated_at
-                            ? new Date(c.updated_at).toLocaleDateString("en-GB")
-                            : "-",
-                        is_incubator: c.is_incubator ?? false,
-                    }));
-                } else if (data?.branches && Array.isArray(data.branches)) {
+                if (data?.branches && Array.isArray(data.branches)) {
                     list = data.branches.flatMap((branch: any) => {
                         const tanks = branch.tanks || branch.canisters || [];
                         return tanks.map((t: any) => {
-                            const status = (
-                                t.status ||
-                                t.canister_status ||
-                                "safe"
-                            ).toString();
-                            const statusDisplay =
-                                status === "critical"
-                                    ? "Critical"
-                                    : status === "risk"
-                                      ? "Risk"
-                                      : "Safe";
+                            const status = (t.status || t.canister_status || "safe").toString();
                             return {
                                 tank_id: t.tank_id ?? t.canister_id ?? 0,
-                                canisterId: String(
-                                    t.tank_code ??
-                                        t.canister_number ??
-                                        t.canister_id ??
-                                        "",
-                                ),
+                                canisterId: String(t.tank_code ?? t.canister_number ?? t.canister_id ?? ""),
                                 branchName: branch.branch_name || "N/A",
                                 branch_id: branch.branch_id ?? 0,
-                                status: statusDisplay,
-                                date: t.updated_at
-                                    ? new Date(t.updated_at).toLocaleDateString(
-                                          "en-GB",
-                                      )
-                                    : "-",
-                                is_incubator: t.is_incubator ?? false,
+                                status: status === "critical" ? "Critical" : status === "risk" ? "Risk" : "Safe",
+                                date: t.updated_at ? new Date(t.updated_at).toLocaleDateString("en-GB") : "-",
+                                is_incubator: false,
+                                incubator_id: null,
+                                chamber_r: null,
+                                chamber_c: null,
                             };
                         });
                     });
                 }
-                setContainers(list);
-            })
+                return list;
+            });
+
+        fetchPromise
+            .then((list) => setContainers(list))
             .catch((e: any) => {
                 setContainersError(e?.message || "Failed to fetch");
                 setContainers([]);
             })
             .finally(() => setContainersLoading(false));
-    }, [isAuthenticated]);
+    }, [isAuthenticated, directionFilter]);
 
     useEffect(() => {
         if (!primaryContainer?.tank_id) {
@@ -906,8 +894,10 @@ export default function AlertSetting() {
         setConfigLoading(true);
         setConfigError(null);
         setConfigLoadedTankId(null);
-        refetchKpiConfig(primaryContainer.tank_id)
-            .catch((e: any) => {
+        refetchKpiConfig(
+            primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id,
+            { isIncubator: primaryContainer.is_incubator },
+        ).catch((e: any) => {
                 setConfigError(e?.message || "Failed to fetch KPI config");
                 setConfigList([]);
             })
@@ -1105,6 +1095,7 @@ export default function AlertSetting() {
         }
 
         setSelectedContainers(nextSelection);
+        setSelectedChamberId(null);
     };
 
     const branchOptions = useMemo(
@@ -1194,7 +1185,9 @@ export default function AlertSetting() {
             const payload: KpiConfigPayload = {
                 hospital_id: tankContext.hospital_id,
                 branch_id: tankContext.branch_id,
-                tank_id: primaryContainer.tank_id,
+                tank_id: primaryContainer.is_incubator ? null : primaryContainer.tank_id,
+                incubator_id: primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? null) : null,
+                chamber_id: primaryContainer.is_incubator ? (selectedChamberId ?? null) : null,
                 kpi_name: (formPayload.kpi_name ?? "").trim(),
                 alert_name: formPayload.alert_name ?? null,
                 min: formPayload.min ?? null,
@@ -1206,7 +1199,7 @@ export default function AlertSetting() {
             };
             await ivfService.createKpiConfig(payload);
             closeForm();
-            await refetchKpiConfig(primaryContainer.tank_id, {
+            await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                 showLoading: true,
             });
         } catch (e: any) {
@@ -1232,7 +1225,7 @@ export default function AlertSetting() {
             });
             closeForm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                     showLoading: true,
                 });
             }
@@ -1395,12 +1388,13 @@ export default function AlertSetting() {
                 setMultiDraftConfig({});
                 // For multi-container, deselect all. For single container, reload config.
                 if (selectedContainers.length > 1) {
-                    await refetchKpiConfig(selectedContainers[0].tank_id, {
-                        showLoading: true,
-                    });
+                    await refetchKpiConfig(
+                        selectedContainers[0].is_incubator ? (selectedContainers[0].incubator_id ?? selectedContainers[0].tank_id) : selectedContainers[0].tank_id,
+                        { showLoading: true, isIncubator: selectedContainers[0].is_incubator },
+                    );
                     setSelectedContainers([]);
                 } else if (primaryContainer) {
-                    await refetchKpiConfig(primaryContainer.tank_id, {
+                    await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                         showLoading: true,
                     });
                 }
@@ -1520,7 +1514,7 @@ export default function AlertSetting() {
             setDraftConfig({});
             setMultiDraftConfig({});
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                     showLoading: true,
                 });
             }
@@ -1539,7 +1533,7 @@ export default function AlertSetting() {
             await ivfService.deleteKpiConfig(configToDeleteId);
             closeDeleteConfirm();
             if (primaryContainer) {
-                await refetchKpiConfig(primaryContainer.tank_id, {
+                await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                     showLoading: true,
                 });
             }
@@ -1994,6 +1988,46 @@ export default function AlertSetting() {
                                       ? "Selecting a tank will allow you to create alert configurations for various KPIs. Start by adding a new alert and setting thresholds to receive notifications when conditions are met."
                                       : "Configure alert thresholds for the selected container. Set minimum and maximum values to receive notifications when conditions are met."}
                             </p>
+                            {primaryContainer?.is_incubator &&
+                                primaryContainer.chamber_r != null &&
+                                primaryContainer.chamber_c != null && (
+                                    <div className="mb-6">
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                            Select Chamber
+                                        </p>
+                                        <div
+                                            className="inline-grid gap-1.5"
+                                            style={{ gridTemplateColumns: `repeat(${primaryContainer.chamber_c}, minmax(0, 1fr))` }}
+                                        >
+                                            {Array.from({ length: primaryContainer.chamber_r }).map((_, r) =>
+                                                Array.from({ length: primaryContainer.chamber_c! }).map((_, c) => {
+                                                    const id = `R${r + 1}C${c + 1}`;
+                                                    const active = selectedChamberId === id;
+                                                    return (
+                                                        <button
+                                                            key={id}
+                                                            type="button"
+                                                            onClick={() => setSelectedChamberId(active ? null : id)}
+                                                            title={id}
+                                                            className={`w-9 h-9 rounded border text-xs font-medium transition-colors ${
+                                                                active
+                                                                    ? "bg-[#6b1176] text-white border-[#6b1176]"
+                                                                    : "bg-white text-gray-600 border-gray-300 hover:border-[#6b1176] hover:text-[#6b1176]"
+                                                            }`}
+                                                        >
+                                                            {id}
+                                                        </button>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                        {selectedChamberId && (
+                                            <p className="mt-2 text-xs text-[#6b1176] font-medium">
+                                                Chamber {selectedChamberId} selected
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             {!primaryContainer ? (
                                 <div className="flex-1 flex items-center justify-center">
                                     <div className="text-center text-gray-400">
@@ -3003,7 +3037,7 @@ export default function AlertSetting() {
                                                                                     }));
                                                                                     await ivfService.bulkUpsertKpiConfig(selectedTankIds, configsToApply);
                                                                                     if (primaryContainer) {
-                                                                                        await refetchKpiConfig(primaryContainer.tank_id, {
+                                                                                        await refetchKpiConfig(primaryContainer.is_incubator ? (primaryContainer.incubator_id ?? primaryContainer.tank_id) : primaryContainer.tank_id, { isIncubator: primaryContainer.is_incubator,
                                                                                             showLoading: true,
                                                                                         });
                                                                                     }

@@ -145,14 +145,17 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
     // ── Filter nav items by role / department ──────────────────────────────────
 
     const isIVF = (userDepartment ?? "").toUpperCase() === "IVF";
+    const isCGT = (userDepartment ?? "").toUpperCase() === "CGT";
 
     const navigationItems = ALL_NAV_ITEMS.filter((item) => {
         if (item.label === "Pending approvals")
             return userRole === "Admin" || userRole === "Pharma_admin";
         if (item.label === "Users")
-            return isOnboarding || userRole === "Admin" || userRole === "Manager";
+            return !isCGT && (isOnboarding || userRole === "Admin" || userRole === "Manager");
+        if (item.label === "Refill log")
+            return !isCGT;
         if (item.label === "Alert Config")
-            return isIVF ;
+            return isIVF;
         if (item.label === "Reports")
             return isIVF;
         if (item.label === "Database")
@@ -160,6 +163,16 @@ export const Sidebar = ({ onLogout }: SidebarProps) => {
         if (item.label === "Control Tower" && userRole === "User" && !isOnboarding)
             return !isIVF;
         return true;
+    }).map((item) => {
+        // Filter dropdown children by department
+        if (isDropdown(item)) {
+            const filtered = item.children.filter((child) => {
+                if (child.path === "/ivf-track-shipment") return isIVF;
+                return true;
+            });
+            return { ...item, children: filtered };
+        }
+        return item;
     });
 
     // ── Helpers ────────────────────────────────────────────────────────────────
