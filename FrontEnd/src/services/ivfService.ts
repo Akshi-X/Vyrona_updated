@@ -114,6 +114,7 @@ export interface KpiConfigRow {
     unit: string | null;
     alert_type: string | null;
     cooldown_minutes: number;
+    unack_escalation_threshold: number | null;
     status: boolean;
 }
 
@@ -121,7 +122,9 @@ export interface KpiConfigRow {
 export interface KpiConfigPayload {
     hospital_id: number;
     branch_id: number;
-    tank_id: number;
+    tank_id?: number | null;
+    incubator_id?: number | null;
+    chamber_id?: string | null;
     kpi_name: string;
     alert_name?: string | null;
     min?: number | null;
@@ -129,6 +132,7 @@ export interface KpiConfigPayload {
     unit?: string | null;
     alert_type?: string | null;
     cooldown_minutes?: number;
+    unack_escalation_threshold?: number | null;
     status?: boolean;
 }
 
@@ -553,15 +557,18 @@ export class IvfService extends BaseApiService {
     }
 
     /** KPI config list for Alert Setting (Manager/Admin). Returns raw rows for selected tank. */
-    async getKpiConfigList(tankId: number): Promise<{
-        tank_id: number;
-        tank_code: string;
+    async getKpiConfigList(id: number, type: "tank" | "incubator" = "tank"): Promise<{
+        tank_id?: number;
+        incubator_id?: number;
+        tank_code?: string;
+        incubator_code?: string;
         branch_id: number;
         hospital_id: number | null;
         config: Array<KpiConfigRow>;
     }> {
+        const param = type === "incubator" ? `incubator_id=${encodeURIComponent(id)}` : `tank_id=${encodeURIComponent(id)}`;
         return await this.request(
-            `/api/ivf/quality/kpi-config/list?tank_id=${encodeURIComponent(tankId)}`,
+            `/api/ivf/quality/kpi-config/list?${param}`,
             { method: "GET" },
         );
     }
@@ -621,6 +628,7 @@ export class IvfService extends BaseApiService {
             unit?: string | null;
             alert_type?: string | null;
             cooldown_minutes?: number;
+            unack_escalation_threshold?: number | null;
             status?: boolean;
         }>,
     ): Promise<{ updated: number; created: number }> {

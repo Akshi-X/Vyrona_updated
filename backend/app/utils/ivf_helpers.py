@@ -99,6 +99,69 @@ def decrypt_sensitive_ivf_value(value: Optional[str]) -> Optional[str]:
     return value_str
 
 
+def extract_tank_code_from_cryolock_number(cryolock_number: Optional[str]) -> Optional[str]:
+    """First segment of 'T10/C5/E1/3' format (the tank code)."""
+    if not cryolock_number:
+        return None
+    try:
+        parts = cryolock_number.rstrip('/').split('/')
+        if parts:
+            value = parts[0].strip()
+            return value or None
+    except (ValueError, AttributeError):
+        logger.warning(f"Could not extract tank code from cryolock_number: {cryolock_number}")
+    return None
+
+
+def extract_canister_code_from_cryolock_number(cryolock_number: Optional[str]) -> Optional[str]:
+    """Second segment of 'T10/C5/E1/3' format (the canister code)."""
+    if not cryolock_number:
+        return None
+    try:
+        parts = cryolock_number.rstrip('/').split('/')
+        if len(parts) > 1:
+            value = parts[1].strip()
+            return value or None
+    except (ValueError, AttributeError):
+        logger.warning(f"Could not extract canister code from cryolock_number: {cryolock_number}")
+    return None
+
+
+def extract_cane_code_from_cryolock_number(cryolock_number: Optional[str]) -> Optional[str]:
+    """Third segment of 'T10/C5/E1/3' format (the cane code / location)."""
+    if not cryolock_number:
+        return None
+    try:
+        parts = cryolock_number.rstrip('/').split('/')
+        if len(parts) > 2:
+            value = parts[2].strip()
+            return value or None
+    except (ValueError, AttributeError):
+        logger.warning(f"Could not extract cane code from cryolock_number: {cryolock_number}")
+    return None
+
+
+def extract_position_from_cryolock_number(cryolock_number: Optional[str]) -> Optional[int]:
+    """Fourth segment of 'T10/C5/E1/3' format (numeric position). Non-numeric → None."""
+    if not cryolock_number:
+        return None
+    try:
+        parts = cryolock_number.rstrip('/').split('/')
+        if not parts:
+            return None
+        last_part = parts[-1].strip()
+        try:
+            return int(last_part)
+        except ValueError:
+            logger.warning(
+                f"cryolockNumber '{cryolock_number}' last segment '{last_part}' is not numeric."
+            )
+            return None
+    except (ValueError, AttributeError):
+        logger.warning(f"Could not extract position from cryolock_number: {cryolock_number}")
+    return None
+
+
 def get_branch_filter_info(request: Request, branch_id_override: Optional[int] = None, is_quality_tracking: bool = False) -> Tuple[Optional[int], Optional[str]]:
     """
     Get branch filter information for IVF department users.

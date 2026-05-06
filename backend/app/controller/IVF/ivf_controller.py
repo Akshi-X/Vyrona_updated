@@ -10,6 +10,7 @@ from app.models.IVF.hospital_branch_model import HospitalBranch
 from app.models.IVF.hospital_model import Hospital
 from app.schemas.IVF.ivf_schema import (
     ActiveCanistersResponse,
+    ActiveIncubatorsResponse,
     BranchListResponse,
     CanisterCheckResponse,
     EmbryoTransferResponse,
@@ -204,6 +205,44 @@ def get_active_canisters(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting active tanks: {str(e)}")
+
+
+@router.get("/control_tower/active_incubators", response_model=ActiveIncubatorsResponse)
+def get_active_incubators(
+    request: Request,
+    db: Session = Depends(get_db),
+    branch_name: Optional[str] = Query(None),
+):
+    """Get active incubators grouped by branch for the current user's hospital scope."""
+    try:
+        user = _ensure_ivf_user(request)
+        hospital_id = _resolve_hospital_id(request, db, user)
+        user_branch_id, role = get_branch_filter_info(request)
+
+        if role is None:
+            raise HTTPException(status_code=403, detail="Access denied: IVF users only")
+
+        filter_branch_id = None
+        if role == "User":
+            if user_branch_id is None:
+                raise HTTPException(status_code=403, detail="Access denied: no branch assigned")
+            filter_branch_id = user_branch_id
+        elif branch_name:
+            branch = db.query(HospitalBranch).filter(
+                HospitalBranch.branch_name == branch_name.strip(),
+                HospitalBranch.hospital_id == hospital_id,
+            ).first()
+            if not branch:
+                raise HTTPException(status_code=404, detail=f"Branch '{branch_name}' not found")
+            filter_branch_id = branch.branch_id
+
+        service = IVFService(db)
+        data = service.get_active_incubators(hospital_id=hospital_id, branch_id=filter_branch_id)
+        return ActiveIncubatorsResponse(**data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting active incubators: {str(e)}")
 
 
 @router.get("/embryo_tracking/filters")

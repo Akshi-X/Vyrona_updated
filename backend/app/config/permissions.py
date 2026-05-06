@@ -55,6 +55,8 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
     ("POST", "/api/internal/alerts/check-and-create"),
     # Internal service-to-service refill detection endpoint
     ("POST", "/api/internal/refill-detections"),
+    # External integration auth: password-only Admin login (mints HMS-bound JWT)
+    ("POST", "/api/external/integration/auth/login"),
 }
 
 
@@ -62,9 +64,12 @@ PUBLIC_ENDPOINTS: Set[EndpointPermission] = {
 # ADMIN-ONLY ENDPOINTS
 # ============================================
 ADMIN_ONLY_ENDPOINTS: Set[EndpointPermission] = {
-    # Add admin-only endpoints here when needed
-    # Example: ("POST", "/api/users"),  # Create user
-    # Example: ("DELETE", "/api/users/{id}"),  # Delete user
+    # External HMS integration push (called by the customer's HMS using an
+    # Admin-issued integration JWT)
+    ("POST", "/api/external/hms/patient-cryolock"),
+    # Integration token management
+    ("GET", "/api/external/integration/auth/tokens"),
+    ("POST", "/api/external/integration/auth/tokens/{token_id}/revoke"),
 }
 
 

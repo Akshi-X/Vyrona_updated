@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTour } from "@reactour/tour";
 import confetti from "canvas-confetti";
 import { useOnboarding } from "../../contexts/OnboardingContext";
@@ -24,6 +25,7 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
         resetQuiz,
     } = useOnboarding();
 
+    const navigate = useNavigate();
     const { setIsOpen: setTourOpen } = useTour();
     const steps = getSteps(levelId);
     const quiz = getQuiz(levelId);
@@ -37,15 +39,33 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
     // Fire confetti when score meets or exceeds threshold
     useEffect(() => {
         if (quizResult !== "pass" && !isCompleted) return;
-        const end = Date.now() + 2200;
-        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4"];
-        const frame = () => {
-            confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 }, colors });
-            confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
-            if (Date.now() < end) requestAnimationFrame(frame);
-        };
-        frame();
-    }, [quizResult, isCompleted]);
+
+        const isLastLevel = levelId === "level-8";
+        const colors = ["#6b1176", "#a855f7", "#ffffff", "#f9a8d4", "#fbbf24", "#34d399"];
+
+        if (isLastLevel) {
+            // Grand finale — centre burst + sustained side cannons for 5 s
+            confetti({ particleCount: 180, spread: 100, origin: { y: 0.5 }, colors, startVelocity: 45, gravity: 0.9, scalar: 1.2 });
+            setTimeout(() => confetti({ particleCount: 120, spread: 120, origin: { x: 0.2, y: 0.6 }, angle: 75, colors, startVelocity: 40 }), 250);
+            setTimeout(() => confetti({ particleCount: 120, spread: 120, origin: { x: 0.8, y: 0.6 }, angle: 105, colors, startVelocity: 40 }), 400);
+
+            const end = Date.now() + 5000;
+            const frame = () => {
+                confetti({ particleCount: 10, angle: 60, spread: 70, origin: { x: 0 }, colors });
+                confetti({ particleCount: 10, angle: 120, spread: 70, origin: { x: 1 }, colors });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            };
+            setTimeout(frame, 600);
+        } else {
+            const end = Date.now() + 2200;
+            const frame = () => {
+                confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 }, colors });
+                confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            };
+            frame();
+        }
+    }, [quizResult, isCompleted, levelId]);
 
     // Reveal state — set when user clicks an answer, cleared when advancing
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -251,7 +271,9 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
                         <span className="text-5xl leading-none">{completion.badge}</span>
                     )}
                     <div className="space-y-1 min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Level complete</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
+                            {levelId === "level-8" ? "Onboarding Complete 🎓" : "Level complete"}
+                        </p>
                         <h3 className="text-xl font-semibold text-slate-900">
                             {completion?.title ?? levelConfig?.title}
                         </h3>
@@ -286,10 +308,10 @@ export default function LevelOverlay({ levelId, onComplete, onHeaderTitle }: Lev
 
                 <button
                     type="button"
-                    onClick={() => onComplete?.()}
+                    onClick={() => levelId === "level-8" ? navigate("/dashboard") : onComplete?.()}
                     className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                 >
-                    Continue →
+                    {levelId === "level-8" ? "Go to Dashboard →" : "Continue →"}
                 </button>
             </div>
         );

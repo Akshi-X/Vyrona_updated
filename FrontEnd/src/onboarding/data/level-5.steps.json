@@ -7,7 +7,8 @@
         "content": "The Refill Log page gives you a complete view of every LN2 top-up across all containers — tank status, reservoir inventory, and a full activity history.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/dashboard"
+        "startPage": "/onboarding/dashboard",
+        "genieImage": "/genie/refilling.webp"
     },
     {
         "id": "rl5-sidebar-click",
@@ -18,7 +19,80 @@
         "placement": "right",
         "requireClick": true,
         "clickOnlyId": ["#onboarding-sidebar-refill-log"],
-        "prevDisable": true
+        "prevDisable": true,
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rl5-refill-detected",
+        "target": "#onboarding-refill-detected",
+        "title": "Refill Detected",
+        "icon": "Droplets",
+        "content": "The system automatically detects when a container has been refilled based on sensor data. Each card here represents a pending detection waiting for your review — confirm or dismiss it to keep the log accurate.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rl5-first-detection-card",
+        "target": "#onboarding-refill-first-card",
+        "title": "Detection Card",
+        "icon": "Droplets",
+        "content": "This card shows a refill detected for container T-161 in Bangalore on 21/04/26 at 08:15 AM — 5.2 kg of LN2 added. Click Add Log to convert this detection into a confirmed refill record.",
+        "placement": "bottom",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rl5-add-logs-btn",
+        "target": "#onboarding-refill-add-logs-btn",
+        "title": "Add Log",
+        "icon": "Plus",
+        "content": "Click here to open the Add Log form for this detection.",
+        "placement": "bottom",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-add-logs-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rl5-add-modal",
+        "target": "#onboarding-refill-add-modal",
+        "title": "Add Log Form",
+        "icon": "ClipboardList",
+        "content": "The form is pre-filled from the detection — tank T-161, Bangalore reservoir, date and time, and 5.2 kg refill weight. Set who performed the refill and add any notes before saving.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:prefill-add-refill-log",
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rl5-add-save",
+        "target": "#onboarding-refill-add-save-btn",
+        "title": "Save the Log",
+        "icon": "Save",
+        "content": "Click Save to confirm the refill and add it to the activity log.",
+        "placement": "top",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-add-save-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rl5-activity-log",
+        "target": "#onboarding-refill-activity-log",
+        "title": "Recent Activity Log",
+        "icon": "ClipboardList",
+        "content": "Every refill event — who performed it, when, how much LN2 was added, and any notes — is recorded here. This is your complete audit trail for compliance and maintenance reviews.",
+        "placement": "top",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
     },
     {
         "id": "rl5-tank-status",
@@ -28,7 +102,57 @@
         "content": "Every active container and its current LN2 level is listed here. Tanks approaching the minimum threshold are flagged so refills can be scheduled before a critical alert fires.",
         "placement": "right",
         "requireClick": false,
-        "startPage": "/onboarding/refill-log"
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rl5-tank-first-row",
+        "target": "#onboarding-refill-tank-first-row",
+        "title": "Tank T-11 — Tambaram",
+        "icon": "Thermometer",
+        "content": "Each row shows the container code, branch, current LN2 level against the L2 threshold, and days since the last refill. Click View to inspect the full refill history for this container.",
+        "placement": "right",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rl5-tank-view-btn",
+        "target": "#onboarding-refill-tank-view-btn",
+        "title": "View Refill History",
+        "icon": "Eye",
+        "content": "Click View to open the refill history for tank T-11.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-tank-view-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_cryocan.webp"
+    },
+    {
+        "id": "rl5-tank-view-modal",
+        "target": "#onboarding-refill-view-modal",
+        "title": "Refill History",
+        "icon": "ClipboardList",
+        "content": "This panel shows the complete refill log for the selected container — last refill date, who performed it, quantity added, reservoir used, and current status. Use this to audit and track maintenance for each tank.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rl5-tank-view-close",
+        "target": "#onboarding-refill-view-modal-close",
+        "title": "Close",
+        "icon": "X",
+        "content": "Close the refill history panel to return to the main view.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-view-modal-close"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_casual.webp"
     },
     {
         "id": "rl5-reservoir-logs",
@@ -37,15 +161,120 @@
         "icon": "FlaskConical",
         "content": "Track bulk LN2 orders and deliveries for each branch reservoir. Ordered and received dates are logged here to keep your supply chain transparent and auditable.",
         "placement": "left",
-        "requireClick": false
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/refilling.webp"
     },
     {
-        "id": "rl5-activity-log",
-        "target": "#onboarding-refill-activity-log",
-        "title": "Recent Activity Log",
-        "icon": "ClipboardList",
-        "content": "Every refill event — who performed it, when, how much LN2 was added, and any notes — is recorded here. This is your complete audit trail for compliance and maintenance reviews.",
+        "id": "rl5-reservoir-first-row",
+        "target": "#onboarding-refill-reservoir-first-row",
+        "title": "Bangalore Reservoir",
+        "icon": "FlaskConical",
+        "content": "This entry shows the LN2 ordered on 2026-04-20 for the Bangalore Reservoir — but the received date is still missing. Update it once the delivery arrives to keep the record complete.",
+        "placement": "left",
+        "requireClick": false,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_caution.webp"
+    },
+    {
+        "id": "rl5-reservoir-edit-btn",
+        "target": "#onboarding-refill-reservoir-edit-btn",
+        "title": "Edit Reservoir Log",
+        "icon": "Pencil",
+        "content": "Click the edit icon to fill in the missing received date.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-reservoir-edit-btn"],
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_settings.webp"
+    },
+    {
+        "id": "rl5-reservoir-date-input",
+        "target": "#onboarding-refill-reservoir-date-input",
+        "title": "LN2 Received Date",
+        "icon": "Calendar",
+        "content": "The received date has been filled in as 2026-04-25. This completes the order record and keeps your reservoir inventory accurate.",
         "placement": "top",
-        "requireClick": false
+        "requireClick": false,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:prefill-reservoir-received-date",
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_coat_and_pad.webp"
+    },
+    {
+        "id": "rl5-reservoir-save-btn",
+        "target": "#onboarding-refill-reservoir-save-btn",
+        "title": "Save",
+        "icon": "Save",
+        "content": "Click to save the received date and update the Bangalore Reservoir log.",
+        "placement": "left",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-reservoir-save-btn"],
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/refilling.webp"
+    },
+    {
+        "id": "rl5-reservoir-logs-overview",
+        "target": "#onboarding-refill-reservoir-logs",
+        "title": "Reservoir Logs",
+        "icon": "FlaskConical",
+        "content": "The Bangalore Reservoir log is now updated with the received date. Every bulk LN2 order and delivery for each branch is tracked here — keeping your supply chain fully auditable.",
+        "placement": "left",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/congratulating_with_arms_wide_open.webp"
+    },
+    {
+        "id": "rl5-reservoir-svg-panel",
+        "target": "#onboarding-refill-reservoir-svg-panel",
+        "title": "Reservoir Tank Visualizer",
+        "icon": "FlaskConical",
+        "content": "This panel shows the current LN2 level for the selected branch reservoir. The fill level updates in real time — use the dropdown below to switch between branch reservoirs.",
+        "placement": "right",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_from_inside_cryocan.webp"
+    },
+    {
+        "id": "rl5-reservoir-dropdown-btn",
+        "target": "#onboarding-refill-reservoir-svg-panel",
+        "title": "Switch Reservoir",
+        "icon": "ChevronDown",
+        "content": "Click the branch selector below the tank to view a different reservoir's LN2 level.",
+        "placement": "right",
+        "requireClick": false,
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:open-reservoir-dropdown",
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_globe.webp"
+    },
+    {
+        "id": "rl5-reservoir-delhi-select",
+        "target": "#onboarding-refill-reservoir-dropdown",
+        "title": "Select Delhi",
+        "icon": "MapPin",
+        "content": "All branch reservoirs are listed here. Click Delhi to load its current LN2 level into the visualizer.",
+        "placement": "right",
+        "requireClick": true,
+        "clickOnlyId": ["#onboarding-refill-reservoir-delhi-btn"],
+        "prevDisable": true,
+        "onboardingEvent": "onboarding:open-reservoir-dropdown",
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_with_globe.webp"
+    },
+    {
+        "id": "rl5-reservoir-svg-delhi",
+        "target": "#onboarding-refill-reservoir-svg-panel",
+        "title": "Delhi Reservoir",
+        "icon": "FlaskConical",
+        "content": "The Delhi reservoir is currently at 62% capacity — 154.4 kg of LN2 out of a 250 kg maximum. Monitor this panel regularly to schedule top-ups before levels drop below the minimum threshold.",
+        "placement": "right",
+        "requireClick": false,
+        "prevDisable": true,
+        "startPage": "/onboarding/refill-log",
+        "genieImage": "/genie/explaining_from_inside_cryocan.webp"
     }
 ]

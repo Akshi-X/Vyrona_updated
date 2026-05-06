@@ -95,7 +95,7 @@ function TourNavigation(_props: Record<string, unknown>) {
 }
 
 // Pages that have their own full-width layout — sidebar should be hidden for these.
-const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support"];
+const NO_SIDEBAR_PATHS = ["/onboarding/user-profile", "/onboarding/support", "/onboarding/success"];
 
 export default function OnboardingShell() {
     const navigate = useNavigate();
@@ -110,7 +110,6 @@ export default function OnboardingShell() {
         const previousRole = localStorage.getItem("user_role");
         const previousCompany = localStorage.getItem("company_name");
 
-        localStorage.setItem("department", "IVF");
         localStorage.setItem("user_role", "Admin");
         localStorage.setItem("company_name", "Iris Fertility");
         // Manually dispatch a storage event so AuthContext (which listens to the
@@ -124,7 +123,7 @@ export default function OnboardingShell() {
                 storageArea: localStorage,
             }),
         );
-        enableOnboardingMocks();
+        enableOnboardingMocks(previousDepartment ?? "IVF");
 
         return () => {
             if (previousDepartment) {
