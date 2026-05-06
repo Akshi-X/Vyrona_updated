@@ -753,7 +753,7 @@ class CriticalAlertService:
                             CriticalAlert.status == AlertStatus.ACTIVE.value,
                         )
                         .order_by(CriticalAlert.created_at.desc())
-                        .limit(int(kpi_config.unack_escalation_threshold))
+                        .limit(max(int(kpi_config.unack_escalation_threshold) + 1, 1))
                         .all()
                     )
                     kpi_cfg_id = kpi_config.id
@@ -1484,19 +1484,21 @@ class CriticalAlertService:
             .count()
         )
 
-        if unack_count < threshold:
+        if unack_count <= threshold:
             logger.info(
-                "Escalation not triggered for kpi_config_id=%s tank_id=%s: %s unacknowledged < threshold %s",
+                "Escalation not triggered for kpi_config_id=%s tank_id=%s: %s unacknowledged <= threshold %s",
                 kpi_config.id, tank_id, unack_count, threshold,
             )
             return False
 
-        # Spam gate: don't re-escalate until threshold * cooldown_minutes has elapsed
+        # Spam gate: don't re-escalate within the same cooldown window used for alert creation.
+        # Using cooldown_minutes directly (not multiplied by threshold) keeps escalation
+        # cadence aligned with how frequently new alerts are created for this KPI.
         if kpi_config.last_escalation_sent_at is not None:
             last_sent = kpi_config.last_escalation_sent_at
             if not last_sent.tzinfo:
                 last_sent = last_sent.replace(tzinfo=timezone.utc)
-            cooldown_secs = threshold * (
+            cooldown_secs = (
                 int(kpi_config.cooldown_minutes) * 60
                 if kpi_config.cooldown_minutes is not None
                 else 3600
