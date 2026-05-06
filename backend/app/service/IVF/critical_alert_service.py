@@ -753,7 +753,6 @@ class CriticalAlertService:
                             CriticalAlert.status == AlertStatus.ACTIVE.value,
                         )
                         .order_by(CriticalAlert.created_at.desc())
-                        .limit(max(int(kpi_config.unack_escalation_threshold) + 1, 1))
                         .all()
                     )
                     kpi_cfg_id = kpi_config.id
