@@ -20,22 +20,20 @@ from ...models.IVF.ivf_shipment_model import IVFShipment
 class IVFDashboardService:
     """Service for IVF dashboard metrics with role-based filtering."""
     
-    def get_deviation_counts_by_kpi(self, hospital_id: int, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict[str, int]:
+    def get_deviation_counts_by_kpi(
+        self,
+        hospital_id: int,
+        branch_id: Optional[int] = None,
+        role: Optional[str] = None,
+        from_dt: Optional[datetime] = None,
+        to_dt: Optional[datetime] = None,
+    ) -> Dict[str, int]:
             """
-            Get count of active KPI deviation alerts grouped by KpiConfig.alert_name.
-            The KPI config id is extracted from the last segment of CriticalAlert.dedup_key.
-            Response shape remains {alert_name: count}.
-            Args:
-                hospital_id: The hospital ID to filter alerts.
-                branch_id: Optional branch ID to filter by (role-based).
-                role: User's role to determine filtering.
-            Returns:
-                Dictionary mapping KpiConfig.alert_name to count of deviations.
+            Get count of KPI deviation alerts grouped by KpiConfig.alert_name.
+            Optionally filtered by created_at range (from_dt, to_dt).
             """
             filter_branch_id = self._get_branch_filter(branch_id, role)
 
-            # Count active KPI alerts and map them back to alert_name via kpi_config_id stored
-            # as the last segment of dedup_key: tank_id:source:alert_type:date:kpi_config_id
             query = text("""SELECT
                                 COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown') AS alert_name,
                                 COUNT(c.alert_id) AS deviation_count
@@ -50,14 +48,19 @@ class IVFDashboardService:
                             WHERE
                                 c.hospital_id = :hospital_id
                                 AND c.source = 'KPI'
-                                AND c.status = 'Active'
                                 AND (:branch_id IS NULL OR c.branch_id = :branch_id)
+                                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
+                                AND (:to_dt IS NULL OR c.created_at < :to_dt)
                             GROUP BY
                                 COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown');""")
 
-            results = self.db.execute(query, {"hospital_id": hospital_id, "branch_id": filter_branch_id}).fetchall()
+            results = self.db.execute(query, {
+                "hospital_id": hospital_id,
+                "branch_id": filter_branch_id,
+                "from_dt": from_dt,
+                "to_dt": to_dt,
+            }).fetchall()
 
-            # Return as {alert_name: count}
             return {alert_name: deviation_count for alert_name, deviation_count in results}
 
     def __init__(self, db: Session):
@@ -365,35 +368,48 @@ class IVFDashboardService:
             "all_drivers": drivers
         }
     
-    def get_total_deviations(self, hospital_id: Optional[int] = None, branch_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
+    def get_total_deviations(
+        self,
+        hospital_id: Optional[int] = None,
+        branch_id: Optional[int] = None,
+        role: Optional[str] = None,
+        from_dt: Optional[datetime] = None,
+        to_dt: Optional[datetime] = None,
+    ) -> Dict:
         """
-        Get total count of deviations from IVF quality logs.
-        
-        Uses distinct count to avoid double-counting records with multiple violations.
-        
-        Role-based access:
-        - Manager (IVF): Count deviations across all branches
-        - User (IVF): Count deviations only for their assigned branch/site
-        - Admin: Count deviations across all branches
-        
-        Args:
-            hospital_id: Optional hospital ID to filter by
-            branch_id: Optional branch ID to filter by
-            role: User's role to determine filtering
-            
-        Returns:
-            Dictionary with total deviations (distinct count)
+        Get total count of deviations from critical_alerts.
+
+        Optionally filtered by created_at range (from_dt, to_dt).
+        active_total_deviations counts only Active-status alerts within the same range.
         """
-        # Apply branch filter based on role
         filter_branch_id = self._get_branch_filter(branch_id, role)
-        
-        deviations = self.get_deviation_counts_by_kpi(hospital_id=hospital_id, branch_id=filter_branch_id, role=role)
-        
-        print(f"Deviation counts by KPI for hospital_id={hospital_id}, branch_id={branch_id}, role={role}: {deviations}")
-        
+
+        deviations = self.get_deviation_counts_by_kpi(
+            hospital_id=hospital_id, branch_id=filter_branch_id, role=role,
+            from_dt=from_dt, to_dt=to_dt,
+        )
+
+        active_query = text("""
+            SELECT COUNT(c.alert_id)
+            FROM critical_alerts c
+            WHERE c.hospital_id = :hospital_id
+              AND c.source = 'KPI'
+              AND c.status = 'Active'
+              AND (:branch_id IS NULL OR c.branch_id = :branch_id)
+              AND (:from_dt IS NULL OR c.created_at >= :from_dt)
+              AND (:to_dt IS NULL OR c.created_at < :to_dt)
+        """)
+        active_count = self.db.execute(active_query, {
+            "hospital_id": hospital_id,
+            "branch_id": filter_branch_id,
+            "from_dt": from_dt,
+            "to_dt": to_dt,
+        }).scalar() or 0
+
         return {
             "total_deviations": sum(deviations.values()),
-            "deviations_by_kpi": deviations
+            "active_total_deviations": int(active_count),
+            "deviations_by_kpi": deviations,
         }
     
     def get_outbound_shipments(self, branch_id: Optional[int] = None, hospital_id: Optional[int] = None, role: Optional[str] = None) -> Dict:
@@ -466,6 +482,8 @@ class IVFDashboardService:
         hospital_id: Optional[int] = None,
         branch_id: Optional[int] = None,
         role: Optional[str] = None,
+        from_dt: Optional[datetime] = None,
+        to_dt: Optional[datetime] = None,
     ) -> Dict:
         filter_branch_id = self._get_branch_filter(branch_id, role)
         role_normalized = role.title() if role else None
@@ -492,8 +510,9 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
+                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.created_at < :to_dt)
             GROUP BY
                 b.branch_name,
                 t.tank_code,
@@ -524,8 +543,9 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
                 AND (:branch_id IS NULL OR b.branch_id = :branch_id)
+                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.created_at < :to_dt)
             GROUP BY
                 b.branch_name, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
             ORDER BY
@@ -538,6 +558,8 @@ class IVFDashboardService:
             {
                 "hospital_id": hospital_id,
                 "branch_id": filter_branch_id,
+                "from_dt": from_dt,
+                "to_dt": to_dt,
             },
         ).mappings().fetchall()
 
@@ -575,6 +597,8 @@ class IVFDashboardService:
         self,
         hospital_id: Optional[int] = None,
         role: Optional[str] = None,
+        from_dt: Optional[datetime] = None,
+        to_dt: Optional[datetime] = None,
     ) -> Dict:
         query = text("""
         WITH branch_list AS (
@@ -611,7 +635,8 @@ class IVFDashboardService:
             WHERE
                 c.hospital_id = :hospital_id
                 AND c.source = 'KPI'
-                AND c.status = 'Active'
+                AND (:from_dt IS NULL OR c.created_at >= :from_dt)
+                AND (:to_dt IS NULL OR c.created_at < :to_dt)
             GROUP BY
                 c.branch_id, COALESCE(NULLIF(k.alert_name, ''), NULLIF(k.kpi_name, ''), 'Unknown')
         )
@@ -631,7 +656,11 @@ class IVFDashboardService:
             bl.branch_name, al.alert_name;
         """)
 
-        data_rows = self.db.execute(query, {"hospital_id": hospital_id}).mappings().fetchall()
+        data_rows = self.db.execute(query, {
+            "hospital_id": hospital_id,
+            "from_dt": from_dt,
+            "to_dt": to_dt,
+        }).mappings().fetchall()
 
         heading_query = text("""
         SELECT

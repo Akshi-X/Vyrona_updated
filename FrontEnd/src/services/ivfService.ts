@@ -38,6 +38,7 @@ export interface TotalContainersResponse {
 
 export interface QualityDeviationsFlaggedResponse {
     total_deviations: number;
+    active_total_deviations: number;
     deviations_by_kpi: Record<string, number>;
 }
 
@@ -773,8 +774,11 @@ export class IvfService extends BaseApiService {
     }
 
     async getQualityDeviationsFlagged(): Promise<QualityDeviationsFlaggedResponse> {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
         return await this.request<QualityDeviationsFlaggedResponse>(
-            "/api/ivf/dashboard/metrics/total-deviations",
+            `/api/ivf/dashboard/metrics/total-deviations?from_ts=${from}&to_ts=${to}`,
             { method: "GET" },
         );
     }
@@ -815,8 +819,11 @@ export class IvfService extends BaseApiService {
     }
 
     async getDeviationsGraph(): Promise<DeviationsGraphResponse> {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
         const raw = await this.request<DeviationsGraphResponse>(
-            "/api/ivf/dashboard/metrics/deviations-graph",
+            `/api/ivf/dashboard/metrics/deviations-graph?from_ts=${from}&to_ts=${to}`,
             { method: "GET" },
         );
         // Some environments return an array like: [{ view_level, data, ... }]

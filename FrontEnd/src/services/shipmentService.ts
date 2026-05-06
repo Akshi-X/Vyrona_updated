@@ -310,7 +310,7 @@ class ShipmentService extends BaseApiService {
    * GET /api/ivf/control_tower/active_canisters
    */
   async getActiveCanisters(filters?: {
-    branch_name?: string;
+    branch_id?: number;
     status?: string;
   }): Promise<{
     branches: Array<{
@@ -327,8 +327,8 @@ class ShipmentService extends BaseApiService {
     total: number;
   }> {
     const params = new URLSearchParams();
-    if (filters?.branch_name) {
-      params.append('branch_name', filters.branch_name);
+    if (filters?.branch_id != null) {
+      params.append('branch_id', String(filters.branch_id));
     }
     if (filters?.status) {
       params.append('status', filters.status);
