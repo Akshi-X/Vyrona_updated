@@ -668,10 +668,13 @@ def _resolve_current_hospital_id(request: Request, db: Session) -> int:
 
 def _kpi_config_metadata(row: KpiConfig) -> dict:
     return {
+        "id": row.id,
         "config_id": row.id,
         "hospital_id": row.hospital_id,
         "branch_id": row.branch_id,
         "tank_id": row.tank_id,
+        "incubator_id": row.incubator_id,
+        "chamber_id": row.chamber_id,
         "kpi_name": row.kpi_name,
         "alert_name": row.alert_name,
         "min": float(row.min) if row.min is not None else None,
@@ -771,6 +774,7 @@ def update_hospital_notification_settings(
 def list_kpi_config(
     tank_id: Optional[int] = Query(None, description="Tank ID"),
     incubator_id: Optional[int] = Query(None, description="Incubator ID"),
+    chamber_id: Optional[str] = Query(None, description="Chamber ID filter (incubator only)"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -786,12 +790,10 @@ def list_kpi_config(
         ).first()
         if not incubator:
             raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
-        rows = (
-            db.query(KpiConfig)
-            .filter(KpiConfig.incubator_id == incubator_id)
-            .order_by(KpiConfig.kpi_name, KpiConfig.alert_name)
-            .all()
-        )
+        q = db.query(KpiConfig).filter(KpiConfig.incubator_id == incubator_id)
+        if chamber_id:
+            q = q.filter(KpiConfig.chamber_id == chamber_id)
+        rows = q.order_by(KpiConfig.kpi_name, KpiConfig.alert_name).all()
         return {
             "incubator_id": incubator_id,
             "incubator_code": incubator.incubator_code or "",
@@ -942,6 +944,63 @@ def bulk_upsert_kpi_config(
             "created": result.get("created"),
             "config_count": len(configs),
             "kpi_names": unique_kpis,
+        },
+        audit_log_disabled=is_audit_log_disabled_for_user(current_user),
+    )
+    return result
+
+
+@router.post("/kpi-config/bulk-incubator")
+def bulk_upsert_kpi_config_for_incubator(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    body: dict = Body(...),
+):
+    """
+    Bulk upsert KPI config for a single incubator + optional chamber.
+    Body: incubator_id (int), chamber_id (str | null), configs (list).
+    """
+    _require_alert_setting_role(current_user)
+    incubator_id = body.get("incubator_id")
+    chamber_id = body.get("chamber_id")
+    configs = body.get("configs")
+    if not incubator_id:
+        raise HTTPException(status_code=400, detail="incubator_id is required")
+    if not isinstance(configs, list):
+        raise HTTPException(status_code=400, detail="configs must be a list")
+    try:
+        incubator_id = int(incubator_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="incubator_id must be an integer")
+
+    incubator = db.query(Incubator).filter(
+        Incubator.incubator_id == incubator_id,
+        Incubator.hospital_id == current_user.hospital_id,
+    ).first()
+    if not incubator:
+        raise HTTPException(status_code=404, detail=f"Incubator '{incubator_id}' not found")
+
+    quality_service = QualityService(db)
+    result = quality_service.bulk_upsert_kpi_config_for_incubator(
+        incubator_id=incubator_id,
+        chamber_id=chamber_id,
+        configs=configs,
+        hospital_id=incubator.hospital_id,
+        branch_id=incubator.branch_id,
+    )
+    db.commit()
+
+    ActivityLogService(db).log_activity(
+        action="alert_configuration.kpi_config_bulk_upserted",
+        outcome=ActivityOutcome.SUCCESS.value,
+        actor=build_actor_from_user(current_user),
+        target=build_target("incubator", str(incubator_id)),
+        metadata={
+            "incubator_id": incubator_id,
+            "chamber_id": chamber_id,
+            "updated": result.get("updated"),
+            "created": result.get("created"),
         },
         audit_log_disabled=is_audit_log_disabled_for_user(current_user),
     )
