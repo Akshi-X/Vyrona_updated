@@ -428,17 +428,6 @@ const INCUBATOR_KPI_NAMES = KPI_FORM_CONFIG
     .filter((c) => c.tank_type === "incubator")
     .map((c) => c.kpi_name);
 
-type KpiInputType = "standard" | "temperature" | "percentage" | "battery" | "lid_state";
-
-const getKpiInputType = (kpiName: string): KpiInputType => {
-    const cfg = getKpiFormConfig(kpiName);
-    if (cfg.custom_dropdown) return "lid_state";
-    if (!cfg.max_available && cfg.min_bound === 0 && cfg.max_bound === 100) return "battery";
-    if (kpiName === KPI_NAMES.IVF_LN2_LEVEL) return "percentage";
-    if (cfg.both_required) return "temperature";
-    return "standard";
-};
-
 // Lid state helpers (kept for draft ↔ min/max conversion)
 const lidStateToValues = (state: string | null): { min: number | null; max: number | null } => {
     const cfg = getKpiFormConfig(KPI_NAMES.IVF_LN2_LID_STATE);
